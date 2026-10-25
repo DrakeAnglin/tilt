@@ -56,14 +56,15 @@ PARAMS = {
     # Printed wand connector: grips the worm's 8-ridge spline, carries the helical gear and the wand loop
     'tl_conn_d':        (8.13, 'mm', 'Connector body OD (factory size)'),
     'tl_conn_depth':    (5.3, 'mm', 'Connector socket depth on the spline'),
-    'tl_conn_len':      (14.0, 'mm', 'Connector + loop length (estimate)'),
+    'tl_conn_len':      (26.0, 'mm', 'Connector + loop length'),
+    'tl_conn_gap':      (0.2, 'mm', 'Lower flange to connector mouth'),
     # Crossed helical drive (45° helix, 90° shafts)
-    'tl_hg_d':          (10.0, 'mm', 'Helical gear pitch diameter (on worm shaft)'),
-    'tl_hp_d':          (10.0, 'mm', 'Helical pinion pitch diameter (on N20)'),
-    'tl_h_mn':          (0.6, 'mm', 'Normal module of the helical pair'),
+    'tl_hg_d':          (11.314, 'mm', 'Helical gear pitch diameter (connector, 8T, mn 1.0)'),
+    'tl_hp_d':          (9.899, 'mm', 'Helical pinion pitch diameter (N20, 7T, mn 1.0)'),
+    'tl_h_mn':          (0.85, 'mm', 'Addendum of the helical pair (0.85 x module 1.0)'),
     'tl_hg_face':       (4.0, 'mm', 'Helical gear face width'),
     'tl_hp_face':       (5.0, 'mm', 'Helical pinion face width'),
-    'tl_gear_s':        (21.0, 'mm', 'Gear center along worm axis from thread center (spline 18.77-23.77)'),
+    'tl_gear_s':        (20.97, 'mm', 'Gear center along worm axis from thread center (spline 18.77-23.77)'),
     'tl_motor_rot':     (0.0, 'deg', 'Motor axis rotation about the worm axis (0 = parallel to rod)'),
     # N20 gear motor
     'tl_n20_w':         (12.0, 'mm', 'N20 width'),
@@ -261,8 +262,8 @@ def build(design):
     B.component('Worm (factory)', [('Worm', B.union(sections))], 1.0, 'Plastic - Matte (White)')
 
     # --- NEW printed wand connector (socket over the spline, carries the gear and the wand loop) ---
-    conn = B.cyl(S(worm_end - P['tl_conn_depth']), P['tl_conn_d'] / 2,
-                 S(worm_end - P['tl_conn_depth'] + P['tl_conn_len']))
+    mouth = worm_end - P['tl_spline_len'] + P['tl_conn_gap']       # connector mouth, just clear of the lower flange
+    conn = B.cyl(S(mouth), P['tl_conn_d'] / 2, S(mouth + P['tl_conn_len']))
     B.component('NEW wand connector', [('Connector + loop envelope', conn)], 0.6,
                 'Plastic - Translucent Matte (Yellow)')
 
@@ -323,7 +324,7 @@ def build(design):
         - P['tl_flange_d'] / 2 if any(0 <= dot(sub(q, p0), d) <= worm_end for q in samples) else 99.0
     g0, g1 = gs - P['tl_hg_face'] / 2, gs + P['tl_hg_face'] / 2
     spline_start = worm_end - P['tl_spline_len']
-    if g0 >= spline_start - 0.01 and g1 <= worm_end - P['tl_spline_len'] + P['tl_conn_depth'] + 0.01:
+    if g0 >= spline_start - 0.01 and g1 <= spline_start + P['tl_conn_depth'] + 0.01:
         gear_where = 'on the connector, over the spline'
     elif g0 >= spline_start:
         gear_where = 'on the connector, below the spline'

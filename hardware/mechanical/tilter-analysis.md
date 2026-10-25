@@ -85,39 +85,25 @@ which matches module 0.88 (π × 0.88 = 2.76). The worm and wheel are a matched 
 - Lead angle ≈ atan(2.76 / (π × 9.24)) ≈ 5.4°: **self-locking**.
 - The wand loop connector engages only the bottom ~5 mm splined section (5.6 mm Ø).
 
-## Chosen concept: crossed helical gear on a new printed wand connector
-Evaluated in the [TiltLayout](fusion/README.md) fit study, built and checked live in Fusion (2026-10-25).
+## Chosen concept (v0.1 test fit): motor parallel to the worm, spur gears
+Owner's proposal (2026-10-25), replacing the crossed-helical idea: put the N20 in the worm's plane, parallel to the worm,
+shaft pointing down, and mesh plain spur gears. Simpler, stronger (line contact) and easier to print and align.
 
-| Concept | Result |
+| Item | Value |
 |---|---|
-| Motor parallel to the worm (spur drive) | ✗ A 35 mm N20 at a 56° slope is taller than the 36.5 mm rail |
-| 90° bevel (miter) gear at the connector | ✗ Misses the rail by 1–2 mm, and the connector passes through the pinion's apex |
-| Helical gear on the plain shaft between the flanges | ✗ The shaft is smooth, slick acetal: a printed gear would slip and glue won't hold. It needs drilling or filing |
-| **Crossed helical pair, driven gear part of a new printed wand connector on the 8-ridge spline** | ✓ **Worm unmodified.** Uses the spline the factory already uses to carry wand torque |
+| Worm angle | **75°** from horizontal (factory 56°). The wand hangs 15° off vertical and exits through the rail **floor** |
+| Gears | m1.0 spur, 20° PA, addendum 0.8 m (tip ≈ 0.74 mm wide), backlash 0.15 mm |
+| Adapter | **14T**, 5.6 mm face, 8-ridge spline socket 5.3 mm deep (clearance 0.15 mm default), Ø8.13 body, teardrop loop pointing toward the body |
+| Motor gear | **16T**, 4 mm face, D-bore 3.0 / 2.5 flat, 7 mm hub |
+| Center distance | 15.0 + 0.1 = 15.1 mm. Ratio 16:14 (worm turns 1.14× motor) |
+| Motor | N20 **without encoder** (~24 mm). The 32 mm encoder version doesn't fit the rail height at any angle |
+| Position sensing | AS5600 magnetic angle sensor on the tilt rod (absolute, survives power loss, sees manual wand use) |
+| Clearances | ≈ 1.2 mm for gears and motor inside the rail. The case is trimmed to the rail interior |
 
-```
- worm (factory, unmodified) ── lower flange ── 8-ridge spline
-                                                  │
-                         [ NEW printed connector: spline socket + helical gear + wand loop + snap tabs ]
-                                                  ╲ 90° crossed, 10 mm centers
-                                        [ helical pinion ]── N20 (parallel to the rod)
-```
+Why 75°: the fit study (tools/layout_spur.py) checks both faces of each gear, the motor body, the worm-wheel barrel and the
+rail walls/floor/top. Steeper is roomier (78° ≈ 1.5 mm), but the wand would hang closer to the rail.
 
-- **Factory parts kept:** worm wheel and worm, unchanged. The factory wand connector is replaced by a printed one.
-- **New connector:** 5.3 mm deep 8-ridge socket on the spline (≈ 6.0 OD / 5.0 root), a helical gear ring around the socket,
-  the wand loop below, and flexible tabs that snap into the housing like the original.
-- **Helical pair:** 45° helix, 1:1, 10 mm pitch diameters, 10 mm centers. Not self-locking, so the wand back-drives the motor.
-  The 16:1 worm still locks the slats.
-- **N20 position:** parallel to the rod. X 6.5–38.5, Y −19.1 to −7.1, Z 2.5–12.5.
-  Clearances: floor 2.5 mm, room-side wall ≈ 2 mm, worm flange 2.1 mm, worm-wheel barrel 7.3 mm.
-- **Total ratio:** N20 (1:30–1:50) × 1 × 16. Full 60° travel = 2.67 worm turns.
-
-### FDM printing notes
-- Print the connector and both helical gears **axis vertical**. 45° helix teeth are a 45° overhang, which prints cleanly, and
-  the spline socket comes out round and accurate.
-- Gear teeth this small want a **0.2 mm nozzle** (normal module ≈ 0.8 → about 9 teeth on a 10 mm pitch diameter). PETG or
-  PLA+ for the first test, nylon/PA later for wear.
-- Spline socket: print a tolerance test (socket clearance 0.1 / 0.15 / 0.2 mm) before the real part.
+Superseded: the crossed-helical layout (fusion/TiltLayout) stays in the repo as the fit study for the factory 56° angle.
 
 ### Wand-loop connector (factory)
 | Feature | Value |
