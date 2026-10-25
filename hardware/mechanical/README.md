@@ -7,7 +7,7 @@ CAD sources (parametric. Fusion/Onshape/OpenSCAD TBD) and exported 3MF/STL go he
 |---|---|---|
 | Headrail inner width × height | ≈ 55.5 × 36.5 mm, 2 mm plastic walls, inward hooked lips at top | [cross-section](../../docs/reference/headrail-cross-section.png) |
 | Tilt rod | **4 mm square steel** | Owner |
-| Tilt rod axis height | ≈ 24 mm above inner floor (assumed from the 10 mm Ø circle in the sketch). **Confirm** | Sketch |
+| Tilt rod axis height | **24 mm above inner floor**, centered side to side (the 10 mm circle in the sketch marks the rod center) | Owner |
 | Free length, end cap → first tilt drum cradle | **110 mm** | Owner |
 | Factory wand + tilter gears | **Removed**. The motor drives the rod directly, with nothing self-locking in the chain | Owner |
 | Lift/holding mechanism | Long perforated module under the rod, separate from tilt | Owner, [photo](../../docs/reference/headrail-square-tilt-rod.jpg) |

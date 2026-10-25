@@ -66,5 +66,6 @@ Still unknown:
 - [x] Wand + tilter gears: **removed**. Motor drives the rod directly (decision D1 = Option B, D11 = no wand)
 - [x] Long perforated part = the **lift/holding mechanism**
 - [x] Free length end cap → first tilt cradle: **110 mm**
-- [ ] Rod axis height above the inner floor (sketch suggests 24 mm) and how far the rod sticks out past the first cradle
+- [x] Rod axis: **24 mm above the inner floor**, centered
+- [ ] How far the rod sticks out past the first cradle
 - [ ] Torque at the rod end with the tilter disengaged ([measure-your-blinds.md](measure-your-blinds.md))
