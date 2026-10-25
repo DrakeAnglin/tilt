@@ -8,7 +8,7 @@ another part, the case, or the tilt rod. With the pinion rotated into mesh
 | File | What | Print orientation | Notes |
 |---|---|---|---|
 | `spline_test.stl` | 3 cups, socket clearance 0.10 / 0.15 / 0.20 mm (1 / 2 / 3 rim notches) | open end down | **Print first.** Pick the one that slides onto the worm's spline snugly |
-| `adapter.stl` | 8T 45° helical gear (RH) + 8-ridge socket + Ø8.13 body + teardrop loop (point toward the body, like the factory loop) | gear/socket down, loop up | Replaces the factory wand connector |
+| `adapter.stl` | 8T 45° helical gear (RH, 2.6 mm face) + 8-ridge socket inside an Ø8.2 collar (0.95 mm wall) + 45° taper to an Ø6.0 body + teardrop loop (point toward the body, like the factory loop) | gear/socket down, loop up | Replaces the factory wand connector |
 | `motor_pinion.stl` | 7T 45° helical pinion (RH), D-bore for the N20 3 mm shaft | gear down, hub up | Press on; CA on the flat if loose |
 | `case_right.stl` | Main half (X > 0): worm-wheel bearing, worm bearing, gear pockets, N20 pod, notch block | split face on the bed | Everything drops into this half |
 | `case_left.stl` | Lid half | split face on the bed | 3× M2 screws (lid: clearance holes, main half: Ø1.7 pilots), about M2 × 16 |
@@ -18,6 +18,20 @@ The case spans the rail (55.4 mm, a snug press between the walls like the factor
 
 Suggested settings: PETG or PLA+, 0.4 mm nozzle, 0.12 mm layers for the gears (the helix looks smoother), 4 walls.
 Gear tips are ~0.82 mm wide measured normal to the tooth. 45° helical teeth are a 45° overhang, fine without support.
+
+## Measured clearances (Fusion, minimum distance)
+| Pair | Gap |
+|---|---|
+| Adapter ↔ rail wall (top edge of the notch) | 0.54 mm |
+| Adapter ↔ case | 0.20 mm (designed running clearance) |
+| Motor pinion ↔ case | 0.30 mm |
+| Motor pinion ↔ worm lower flange | 0.49 mm |
+| Motor pinion ↔ rail floor | 1.85 mm |
+| N20 ↔ rail floor | 3.0 mm |
+| Case ↔ tilt rod | 3.6 mm |
+| Case ↔ rail walls / floor | 0.05 / 0.15 mm (press fit) |
+
+The case is trimmed to the rail interior everywhere except the notch block, and the interference check includes the rail.
 
 ## What this print checks
 - Spline socket clearance

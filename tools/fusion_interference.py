@@ -7,7 +7,7 @@ for i in range(root.occurrences.count):
         continue
     for j in range(o.bRepBodies.count):
         b = o.bRepBodies.item(j)
-        if b.name.startswith('Rail') or b.name == 'Barrel':
+        if b.name == 'Barrel':
             continue
         bodies.add(b)
 inp = design.createInterferenceInput(bodies)

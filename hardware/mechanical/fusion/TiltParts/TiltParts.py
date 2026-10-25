@@ -35,11 +35,11 @@ P = dict(
     # crossed helical pair
     mn=1.0, helix=45.0, pressure=20.0, addendum=0.85, dedendum=1.25, backlash=0.15, cd_extra=0.10,
     z_adapter=8, z_pinion=7,
-    adapter_face=5.0, pinion_face=6.0, pinion_hub_d=6.5, pinion_hub=1.5,
+    adapter_face=2.6, pinion_face=6.0, pinion_hub_d=6.5, pinion_hub=1.5,
     pinion_gap=3.0,           # pinion face to N20 gearbox face
     motor_rot=5.0,            # motor axis swung about the worm axis (0 = parallel to the rod)
     # adapter
-    mouth_s=18.97, body_d=8.13, body_len=19.0,
+    mouth_s=18.97, collar_d=8.2, body_d=6.0, body_len=19.0,
     spline_od=6.0, spline_root=5.0, spline_n=8, socket_depth=5.3, spline_clear=0.15,
     loop_center=25.0, loop_r_out=5.2, loop_r_in=2.6, loop_t=3.4,
     # N20 (no encoder)
@@ -257,7 +257,14 @@ def add_bodies(comp, named_bodies):
 def build_adapter(root, L):
     occ, comp = new_component(root, 'Adapter')
     helical_body(comp, L['ga'], P['adapter_face'])
-    extrude(comp, circle_profile(comp, P['adapter_face'], P['body_d'] / 2), P['body_len'] - P['adapter_face'], JOIN)
+    collar_end = P['socket_depth'] + 0.5                       # solid wall all around the spline socket
+    extrude(comp, circle_profile(comp, P['adapter_face'], P['collar_d'] / 2), collar_end - P['adapter_face'], JOIN)
+    cone_end = collar_end + (P['collar_d'] - P['body_d']) / 2  # 45° taper down to the slim body (clears the notch edge)
+    loft = comp.features.loftFeatures.createInput(JOIN)
+    loft.loftSections.add(circle_profile(comp, collar_end, P['collar_d'] / 2))
+    loft.loftSections.add(circle_profile(comp, cone_end, P['body_d'] / 2))
+    comp.features.loftFeatures.add(loft)
+    extrude(comp, circle_profile(comp, cone_end, P['body_d'] / 2), P['body_len'] - cone_end, JOIN)
     # teardrop loop (local XZ plane): point toward the body like the factory loop, round end outward
     sk = comp.sketches.add(comp.xZConstructionPlane)
     sk.isComputeDeferred = True
@@ -396,7 +403,9 @@ def case_shapes(L):
         cyl_s(L, 8.9, 16.7, 2.95),                                                       # bearing shaft
         cyl_s(L, 16.7, mouth + 0.1, 5.1),                                                # lower flange
         cyl_s(L, mouth - 0.2, mouth + P['adapter_face'] + 0.3, ga['ra'] + 0.5),          # adapter gear
-        cyl_s(L, mouth + P['adapter_face'] + 0.3, mouth + 40, P['body_d'] / 2 + 0.3),    # adapter body, exits
+        cyl_s(L, mouth + P['adapter_face'],
+              mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 0.3, P['collar_d'] / 2 + 0.3),  # collar + taper
+        cyl_s(L, mouth + P['socket_depth'] + 0.5, mouth + 40, P['body_d'] / 2 + 0.3),   # adapter body, exits
         cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 0.3, P['pinion_face'] / 2 + 0.3, gp['ra'] + 0.6),   # pinion
         cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5, 0, 2.0),                       # shaft tip
         cyl_u(L, L['pin_c'], 0, P['pinion_face'] / 2 + P['pinion_gap'] + 0.1, 4.0),      # hub + gearbox boss
@@ -415,11 +424,14 @@ def case_shapes(L):
         cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5 - wall, P['pinion_face'] / 2 + P['pinion_gap'],
               gp['ra'] + 0.6 + wall),
     ]
-    # trims: stay under the rail's top lips, and above the floor outside the notch
+    # trims: stay under the rail's top lips, above the floor and inside the walls (except the notch block)
     trims = [
-        box_minmax(-60, 60, -hw - 5, -hw + P['lip_in'], P['case_top'] - P['lip_h'], 60),
-        box_minmax(-60, 60, hw - P['lip_in'], hw + 5, P['case_top'] - P['lip_h'], 60),
-        box_minmax(-60, 60, -60, 60, 36.3, 80),
+        box_minmax(-60, 80, -hw - 5, -hw + P['lip_in'], P['case_top'] - P['lip_h'], 60),
+        box_minmax(-60, 80, hw - P['lip_in'], hw + 5, P['case_top'] - P['lip_h'], 60),
+        box_minmax(-60, 80, -60, 60, P['case_top'], 80),
+        box_minmax(-60, 80, -60, 60, -20, P['case_floor']),          # below the floor
+        box_minmax(-60, 80, -60, -hw, -20, 80),                       # past the room-side wall
+        box_minmax(-60, 80, hw, 60, -20, 80),                         # past the back wall
     ]
     return env, cav, trims, mo_len
 
@@ -465,7 +477,12 @@ def build_case(root, L):
             body = b
         else:
             tbm.booleanOperation(body, b, adsk.fusion.BooleanTypes.UnionBooleanType)
-    for c in cav + trims:
+    keep = notch_box(-P['notch_clear'])
+    for t in trims:
+        tool = t.brep(tbm)
+        tbm.booleanOperation(tool, keep.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        tbm.booleanOperation(body, tool, adsk.fusion.BooleanTypes.DifferenceBooleanType)
+    for c in cav:
         tbm.booleanOperation(body, c.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
     out = {}
     for name, xc in (('Case left', -50.0), ('Case right', 50.0)):
