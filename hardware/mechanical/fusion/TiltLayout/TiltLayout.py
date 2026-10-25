@@ -116,14 +116,23 @@ class Builder:
         return target
 
     def component(self, name, bodies, opacity=1.0):
-        occ = self.root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-        comp = occ.component
-        comp.name = PREFIX + name
+        # Assemblies get one component per group. Single-component "Part" documents can't hold more
+        # components, so there the bodies go into the root, prefixed with the group name.
+        try:
+            occ = self.root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+            comp = occ.component
+            comp.name = PREFIX + name
+            body_prefix = ''
+        except RuntimeError:
+            occ = None
+            comp = self.root
+            body_prefix = PREFIX + name + ': '
         base = comp.features.baseFeatures.add()
+        base.name = PREFIX + name
         base.startEdit()
         for body_name, body in bodies:
             b = comp.bRepBodies.add(body, base)
-            b.name = body_name
+            b.name = body_prefix + body_name
             try:
                 b.opacity = opacity
             except Exception:
@@ -152,10 +161,15 @@ def get_params(design):
 
 
 def remove_old(design):
-    occs = design.rootComponent.occurrences
+    root = design.rootComponent
+    occs = root.occurrences
     for i in range(occs.count - 1, -1, -1):
         if occs.item(i).component.name.startswith(PREFIX):
             occs.item(i).deleteMe()
+    bases = root.features.baseFeatures
+    for i in range(bases.count - 1, -1, -1):
+        if bases.item(i).name.startswith(PREFIX):
+            bases.item(i).deleteMe()
 
 
 def build(design):

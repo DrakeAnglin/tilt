@@ -12,3 +12,4 @@ fp-info-cache
 # Fusion/CAD temp
 *.~*
 node_modules/
+.vscode/
