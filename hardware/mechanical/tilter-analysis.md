@@ -67,12 +67,12 @@ Photos: [overview](../../docs/reference/tilter-opened-overview.jpg), [gear](../.
 | Section | Ø | Length |
 |---|---|---|
 | Upper journal pin | 5.0 | ≈ 2.5 |
-| Threads (single start assumed) | **11.0** OD | **9.0** (≈ 3¼ crests visible) |
+| Threads (**single start**, confirmed) | **11.0** OD | **9.0** (≈ 3¼ crests visible) |
 | Gap | shaft | ≈ 2.5 |
 | Upper flange | 9.5 | 1.6 |
 | Shaft between flanges (bearing in shell) | 5.6 | 8.4 |
 | Lower flange | 9.5 | 1.77 |
-| Splined drive to the wand-loop connector | 5.6 | ≈ 5 |
+| Splined drive to the wand-loop connector: **8 ridges**, ≈ 6.0 OD / ≈ 5.0 root | 5.6 nominal | ≈ 5 |
 | **Sum** | | ≈ 30.8 (measured 31.15) |
 
 Axial pitch: "≈ 7 mm across 3 teeth" (≈ 2 pitches + one crest width) and 9 mm of thread holding 3–4 crests → **≈ 2.75 mm**,
@@ -102,8 +102,13 @@ The wand already drives the worm through the **splined output shaft**. The motor
 - **Encoder:** 14 counts/motor rev × 30 × 16 ≈ 6,700 counts per rod turn → ~1,100 counts across the 60° travel. Plenty.
 - Motor pod is parallel to the worm (~56° slope), offset along the rod into the 110 mm pocket. Fit inside the 36.5 mm rail height is checked in CAD.
 
+### Wand-loop connector (factory)
+| Feature | Value |
+|---|---|
+| Socket depth on the spline | **5.3 mm** |
+| Outer diameter | **8.13 mm** |
+| Socket | 8-ridge internal spline matching the worm's drive end |
+| Retention | Two flexible tabs. It snaps in through the housing after the shell is closed and locks against it, so the connector is replaceable |
+
 ## Still needed
-- [ ] Single or double start? (Look at the worm end-on: one ridge spiraling, or two side by side)
-- [ ] Splined drive section: number of splines/teeth, and whether the wand-loop connector latches into a groove or just presses on
-- [ ] Wand-loop connector: socket depth and outer diameter
 - [ ] Optional check: center distance (square-bore center → worm axis in the shell), predicted ≈ 11.6 mm
