@@ -69,6 +69,9 @@ Still unknown:
 - [x] Rod axis: **24 mm above the inner floor**, centered
 - [ ] How far the rod sticks out past the first cradle
 - [ ] **Wand turns** for full travel, closed → closed (gives the worm ratio)
-- [ ] Torque at the **wand hook** with the tilter installed (and at the rod, from the printed adapter)
-- [ ] Tilter housing dimensions + worm shaft angle; which end of the headrail it sits at; is the worm shaft's back end reachable?
+- [x] Torque: low, finger-twistable. N20 strength is not a concern (exact number still nice to have)
+- [x] Tilter sits in the 110 mm pocket, rod passes through the worm wheel
+- [x] Clearance above the installed headrail: ~6.5 mm
+- [x] Tilt travel ≈ 60° (confirm: rod rotation, not wand)
+- [ ] Tilter housing dimensions, worm shaft angle, worm + wheel sizes; is the worm shaft's back end reachable?
 - [ ] Torque at the rod end with the tilter disengaged ([measure-your-blinds.md](measure-your-blinds.md))

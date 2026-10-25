@@ -10,6 +10,10 @@ CAD sources (parametric. Fusion/Onshape/OpenSCAD TBD) and exported 3MF/STL go he
 | Tilt rod axis height | **24 mm above inner floor**, centered side to side (the 10 mm circle in the sketch marks the rod center) | Owner |
 | Free length, end cap → first tilt drum cradle | **110 mm** | Owner |
 | Factory wand + tilter gears | **Removed**. The motor drives the rod directly, with nothing self-locking in the chain | Owner |
+| Clearance above the headrail when installed | **≈ 6.5 mm** from the top of the cross-section to the window frame. Nothing may stick up more than ~5 mm; cables can't exit the top | Owner |
+| Factory tilter location | **In the 110 mm end pocket**; the rod passes through its worm wheel | Owner |
+| Tilt travel | **≈ 60° of rod rotation**, closed → closed (to confirm: rod vs. wand) | Owner |
+| Tilt torque | Low: the rod turns easily with fingers (exact kg·cm still to measure) | Owner |
 | Lift/holding mechanism | Long perforated module under the rod, separate from tilt | Owner, [photo](../../docs/reference/headrail-square-tilt-rod.jpg) |
 
 ## Layout in the 110 mm end pocket (draft)
