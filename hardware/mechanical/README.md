@@ -10,7 +10,7 @@ Design constraints: [headrail cross-section](../../docs/reference/headrail-cross
 |---|---|---|
 | Motor cradle | PETG / PLA | Slides into headrail, holds the motor through isolators, anti-rotation keyed |
 | Motor isolator sleeve | TPU 95A (test vs 68D) | Wraps the N20 gearbox. Only soft contact between motor and cradle |
-| Headrail pads | TPU 95A | Cradle never touches the aluminum directly |
+| Headrail pads | TPU 95A | Cradle never touches the plastic headrail directly |
 | Shaft coupler | TPU 68D or PETG + TPU spider | 3 mm D-shaft → tilt rod profile (parametric) |
 | Encoder cap / cable strain relief | PETG | Protects the encoder PCB, routes the cable out of the headrail end |
 | Controller enclosure | PETG | Sits on the headrail/top of the window frame |

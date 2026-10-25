@@ -41,3 +41,10 @@
 - [ ] Number of blinds, and how they group into controllers (which windows are within ~3 m of each other)
 - [ ] Where outlets are relative to the windows
 - [ ] Which hubs are in the house (Echo model? HomePod/Apple TV?)
+
+## Findings from headrail photos (2026-10-25)
+See [headrail-top-view.jpg](reference/headrail-top-view.jpg).
+- Headrail is **injection-molded white plastic**, not aluminum. Thin walls → avoid clamping loads; mount by sliding into the channel like the factory modules do.
+- Layout (top view): **cord spool module** (lift cord wound on a drum) at each end of the shown section, and a **middle module** where the tilt rod covers the **spring (cordless-lift) mechanism**. The rod passes through all three modules.
+- The copper/brass-colored parts are the owner's 3D-printed copies of the factory tilt device (the white originals are still in the headrail).
+- Still needed: the other photos (the Photos library is not readable from here; export them to a regular folder or paste them into chat), the tilter location and the rod cross-section.

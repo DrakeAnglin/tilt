@@ -11,7 +11,7 @@ before designing around it.
 
 | v1 problem | Why it happened | Why the N20 + encoder fixes it |
 |---|---|---|
-| Loud | Large servo gear train, often running constantly to hold position, rigidly coupled to a hard mount and the aluminum headrail (a sounding board) | Small motor, only runs during moves; TPU isolation; 20+ kHz PWM so the drive itself doesn't whine |
+| Loud | Large servo gear train, often running constantly to hold position, rigidly coupled to a hard mount and the long hollow plastic headrail (a sounding board) | Small motor, only runs during moves; TPU isolation; 20+ kHz PWM so the drive itself doesn't whine |
 | 180° limit | Hobby servos have a potentiometer with a hard stop | DC gear motor turns continuously; the encoder counts any number of turns |
 | Burnout | The servo was always powered and fighting load to hold position. Heat built up for years | Motor is **off** when idle. A high-ratio gearbox holds position by friction. Firmware stall detection plus driver current limit stop it before damage |
 
@@ -79,7 +79,7 @@ doesn't change. Keep Option A as the fallback for anything too heavy.
 1. **20–25 kHz PWM**: kHz-range PWM makes the windings sing audibly. Above 20 kHz it's inaudible. (DRV8833 handles up to ~50 kHz.)
 2. **Soft start / soft stop** ramps (~200–300 ms): removes the "clunk" at start and stop and reduces gear impact.
 3. **Run slower than max** when time allows: noise rises sharply with motor RPM. 5 V instead of 6 V already helps.
-4. **Decouple, don't just soften:** a rigid printed cradle (PETG) holds the motor through a **soft TPU sleeve/grommets**, and the cradle touches the aluminum headrail only through TPU pads. The headrail is a long metal channel that **amplifies** vibration. That was probably a big part of v1's noise.
+4. **Decouple, don't just soften:** a rigid printed cradle (PETG) holds the motor through a **soft TPU sleeve/grommets**, and the cradle touches the headrail only through TPU pads. The headrail is a long, thin-walled hollow plastic channel: an acoustic box that **amplifies** vibration (plastic rings less than metal, but the thin walls act like a speaker cone). That was probably a big part of v1's noise.
 5. **TPU hardness:** Bambu "TPU for AMS" is **Shore 68D**: quite stiff, close to a hard plastic for damping. Fine for flexible couplers and structural clips, but for **isolation** a softer TPU (95A, or 85A/90A) damps far better. Plan: print the isolators in 95A or softer and test 68D against them.
 6. **Torsionally stiff, axially/radially compliant coupler** between motor shaft and tilt rod (e.g. TPU "jaw/spider" coupler) so misalignment doesn't make the gearbox grind.
 7. Use brake mode (both driver outputs low) when idle. It adds damping without consuming power.
