@@ -1,0 +1,11 @@
+{
+	"autodeskProduct": "Fusion",
+	"type": "addin",
+	"author": "Automated Blinds project",
+	"description": {
+		"": "Local-only (127.0.0.1) token-protected bridge that lets Claude Code run modeling code and take viewport screenshots"
+	},
+	"supportedOS": "windows|mac",
+	"editEnabled": true,
+	"runOnStartup": false
+}

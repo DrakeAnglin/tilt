@@ -22,3 +22,23 @@ Most useful knobs: `tl_worm_angle`, `tl_gear_s` (gear position on the worm), `tl
 worm axis), `tl_hg_d`/`tl_hp_d` (helical pitch diameters), `tl_pinion_gap`, and the `tl_n20_*` sizes once the motors arrive.
 
 Checked outside Fusion against a mock API (geometry and report). Not yet run inside Fusion itself.
+
+## FusionBridge: let Claude Code drive Fusion
+An add-in that listens on **127.0.0.1:7655 only** and requires a random token, rewritten each time the add-in starts
+(`~/.fusion_bridge/token`, readable only by you). Claude Code (or you) can then run modeling code inside Fusion and save
+viewport screenshots with [`fusion.py`](fusion.py):
+
+```bash
+python3 hardware/mechanical/fusion/fusion.py ping
+python3 hardware/mechanical/fusion/fusion.py layout                       # rebuild TiltLayout, print fit report
+python3 hardware/mechanical/fusion/fusion.py shot /tmp/view.png --view iso
+python3 hardware/mechanical/fusion/fusion.py exec -c "result = [o.name for o in root.occurrences]"
+```
+
+### Install (once)
+1. Fusion: **Shift+S → Add-Ins tab → +** next to "My Add-Ins" → *Script or add-in from device* → select the `FusionBridge` folder.
+2. Select **FusionBridge → Run**. Tick **Run on Startup** if you want it always available.
+3. **Stop** it in the same dialog to close the port and delete the token.
+
+It runs whatever code it's sent, with your Fusion session's permissions, so only run it while you want Claude driving
+Fusion. A modal dialog open in Fusion blocks requests until it's closed.
