@@ -37,7 +37,7 @@ PARAMS = {
     'tl_wheel_od':      (15.8, 'mm', 'Worm wheel outside diameter (16 teeth)'),
     'tl_wheel_face':    (7.5, 'mm', 'Worm wheel tooth face width'),
     'tl_wheel_hub_len': (16.66, 'mm', 'Worm wheel barrel length along rod'),
-    'tl_wheel_hub_d':   (9.0, 'mm', 'Worm wheel barrel diameter (estimate)'),
+    'tl_wheel_hub_d':   (12.5, 'mm', 'Worm wheel barrel diameter (measured)'),
     'tl_module':        (0.88, 'mm', 'Worm/wheel module (derived)'),
     # Worm (factory), sections listed top (gear end) to bottom (wand end)
     'tl_worm_angle':    (56.0, 'deg', 'Worm axis slope from horizontal, down toward the room'),
@@ -58,13 +58,13 @@ PARAMS = {
     'tl_conn_depth':    (5.3, 'mm', 'Connector socket depth on the spline'),
     'tl_conn_len':      (14.0, 'mm', 'Connector + loop length (estimate)'),
     # Crossed helical drive (45° helix, 90° shafts)
-    'tl_hg_d':          (10.0, 'mm', 'Helical gear pitch diameter (on worm shaft)'),
-    'tl_hp_d':          (10.0, 'mm', 'Helical pinion pitch diameter (on N20)'),
+    'tl_hg_d':          (12.0, 'mm', 'Helical gear pitch diameter (on worm shaft)'),
+    'tl_hp_d':          (12.0, 'mm', 'Helical pinion pitch diameter (on N20)'),
     'tl_h_mn':          (0.6, 'mm', 'Normal module of the helical pair'),
     'tl_hg_face':       (4.0, 'mm', 'Helical gear face width'),
     'tl_hp_face':       (5.0, 'mm', 'Helical pinion face width'),
-    'tl_gear_s':        (12.8, 'mm', 'Gear position along worm axis from thread center (mid between flanges)'),
-    'tl_motor_rot':     (0.0, 'deg', 'Motor axis rotation about the worm axis (0 = parallel to rod)'),
+    'tl_gear_s':        (14.0, 'mm', 'Gear center along worm axis from thread center (flanges at 8.6 and 17.0)'),
+    'tl_motor_rot':     (-10.0, 'deg', 'Motor axis rotation about the worm axis (0 = parallel to rod)'),
     # N20 gear motor
     'tl_n20_w':         (12.0, 'mm', 'N20 width'),
     'tl_n20_h':         (10.0, 'mm', 'N20 height (across flats)'),

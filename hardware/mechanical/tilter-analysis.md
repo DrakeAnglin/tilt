@@ -60,6 +60,7 @@ Photos: [overview](../../docs/reference/tilter-opened-overview.jpg), [gear](../.
 | Outside diameter | **15.8 mm** |
 | Tooth face width | **7.5 mm** |
 | Hub ("barrel") length along the rod | **16.66 mm** (≈ housing thickness 16.5) |
+| Barrel diameter | **12.5 mm** |
 | Bore | 4 mm square |
 | Derived module | 15.8 / (16 + 2) ≈ **0.88** → pitch diameter ≈ 14.0 mm |
 
@@ -95,9 +96,9 @@ Evaluated in the [TiltLayout](fusion/README.md) fit study (2026-10-25):
 | **Crossed helical pair (45° helix, 90° shafts), gear on the worm shaft between the flanges** | ✓ Fits with ~1 mm clearances. Motor lies parallel to the rod, mid-rail |
 
 ```
-  worm (factory) ── upper flange ──[ helical gear 10 mm PD ]── lower flange ── spline ── wand connector (factory)
-                                          ╲ 90° crossed, 10 mm centers
-                                     [ helical pinion ]── N20 (axis parallel to the rod, toward the tilt drums)
+  worm (factory) ── upper flange ──[ helical gear 12 mm PD ]── lower flange ── spline ── wand connector (factory)
+                                          ╲ 90° crossed, 12 mm centers
+                                     [ helical pinion ]── N20 (axis ~parallel to the rod, toward the tilt drums)
 ```
 
 - **Factory parts stay:** worm wheel, worm, and wand connector + loop, all unchanged except fixing the gear to the worm.
@@ -105,13 +106,13 @@ Evaluated in the [TiltLayout](fusion/README.md) fit study (2026-10-25):
   (a) a 1.5 mm cross-pin through the shaft with a slotted gear hub (keeps the molded worm, the quietest option);
   (b) a printed replacement worm with the gear integral (no drilling; module 0.88, single start, lead 2.76 mm).
   The housing then supports the worm on the upper pin and the lower flange/spline end instead of between the flanges.
-- **Helical pair:** 45° helix, normal module ≈ 0.6, both 10 mm pitch diameter → **1:1**, 10 mm center distance. At 45° it is
+- **Helical pair:** 45° helix, normal module ≈ 0.6, both 12 mm pitch diameter → **1:1**, 12 mm center distance. Gear centered 14 mm down the worm from the thread center (between the flanges at 8.6 and 17.0). At 45° it is
   **not self-locking**, so the wand back-drives the motor. The 16:1 worm still locks the slats.
-- **N20 position (default):** X 5.5–37.5 mm from the tilter plane, Y −14.5 to −2.5, Z 9.3–19.3: mid-rail, well inside walls and floor.
-  Uses ~38 mm of the 110 mm pocket.
+- **N20 position (default):** swung 10° about the worm axis (it tips slightly toward the floor and the back wall as it runs
+  along the rod). Envelope X 2.0–36.2 mm, Y −12.9 to 3.7, Z 3.7–16.7. Uses ~36 mm of the 110 mm pocket.
 - **Total ratio:** N20 (1:30–1:50) × 1 × 16. Full 60° travel = 2.67 worm turns.
 - **Encoder:** 14 counts/motor rev × 30 × 16 ≈ 6,700 counts per rod turn → ~1,100 counts across the 60° travel.
-- Tightest clearance: motor to the worm-wheel barrel, 0.8 mm, and the barrel diameter (9 mm) is an **estimate**.
+- Clearances: motor to the worm-wheel barrel (12.5 mm Ø, measured) **1.1 mm**; to the worm flanges 2.2 mm; to the floor 3.7 mm.
 
 ### Wand-loop connector (factory)
 | Feature | Value |
@@ -122,5 +123,4 @@ Evaluated in the [TiltLayout](fusion/README.md) fit study (2026-10-25):
 | Retention | Two flexible tabs. It snaps in through the housing after the shell is closed and locks against it, so the connector is replaceable |
 
 ## Still needed
-- [ ] Worm-wheel barrel diameter (the part outside the teeth, along the rod). Sets the tightest clearance
 - [ ] Optional check: center distance (square-bore center → worm axis in the shell), predicted ≈ 11.6 mm
