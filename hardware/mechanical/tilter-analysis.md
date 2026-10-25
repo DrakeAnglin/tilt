@@ -85,25 +85,23 @@ which matches module 0.88 (π × 0.88 = 2.76). The worm and wheel are a matched 
 - Lead angle ≈ atan(2.76 / (π × 9.24)) ≈ 5.4°: **self-locking**.
 - The wand loop connector engages only the bottom ~5 mm splined section (5.6 mm Ø).
 
-## Chosen concept (v0.1 test fit): motor parallel to the worm, spur gears
-Owner's proposal (2026-10-25), replacing the crossed-helical idea: put the N20 in the worm's plane, parallel to the worm,
-shaft pointing down, and mesh plain spur gears. Simpler, stronger (line contact) and easier to print and align.
+## Chosen concept (v0.2): crossed helical at the factory 56° angle
+The headrail has a **corner notch** (12 tall × 10.5 into the floor × 12 wide along the rod) where the factory tilter's
+tube exits. A printed block fills it, and the housing presses between the rail walls. The adapter must exit through
+that notch, which pins the worm angle near the factory 56°: only 66–67° would also allow a motor parallel to the worm,
+and there the motor has ~0 mm clearance. Decision (owner, 2026-10-25): crossed helical at 56°.
 
 | Item | Value |
 |---|---|
-| Worm angle | **75°** from horizontal (factory 56°). The wand hangs 15° off vertical and exits through the rail **floor** |
-| Gears | m1.0 spur, 20° PA, addendum 0.8 m (tip ≈ 0.74 mm wide), backlash 0.15 mm |
-| Adapter | **14T**, 5.6 mm face, 8-ridge spline socket 5.3 mm deep (clearance 0.15 mm default), Ø8.13 body, teardrop loop pointing toward the body |
-| Motor gear | **16T**, 4 mm face, D-bore 3.0 / 2.5 flat, 7 mm hub |
-| Center distance | 15.0 + 0.1 = 15.1 mm. Ratio 16:14 (worm turns 1.14× motor) |
-| Motor | N20 **without encoder** (~24 mm). The 32 mm encoder version doesn't fit the rail height at any angle |
-| Position sensing | AS5600 magnetic angle sensor on the tilt rod (absolute, survives power loss, sees manual wand use) |
-| Clearances | ≈ 1.2 mm for gears and motor inside the rail. The case is trimmed to the rail interior |
+| Worm angle | 56° (factory), adapter exits through the existing notch |
+| Adapter | 8T 45° RH helical, mn 1.0 (PD 11.31, OD 13.0), 5 mm face, spline socket, Ø8.13 × 19 mm body, teardrop loop |
+| Motor pinion | 7T 45° RH helical, mn 1.0 (PD 9.90, OD 11.6), 6 mm face, D-bore, Ø6.5 hub |
+| Centers | 10.71 mm (incl. 0.1 extra). Not self-locking, so the wand back-drives the motor |
+| Motor | N20 without encoder, axis swung 5° from the rod direction, in the lower front of the rail. ~1.9 mm clearances |
+| Case | Full-width slab (55.4 mm press fit) + notch block + motor pod; split at the tilter mid-plane; 3× M2 |
+| Verified in Fusion | Interference analysis: no contacts. Gear mesh: zero overlap at the right phase, ~6° backlash |
 
-Why 75°: the fit study (tools/layout_spur.py) checks both faces of each gear, the motor body, the worm-wheel barrel and the
-rail walls/floor/top. Steeper is roomier (78° ≈ 1.5 mm), but the wand would hang closer to the rail.
-
-Superseded: the crossed-helical layout (fusion/TiltLayout) stays in the repo as the fit study for the factory 56° angle.
+The spur/parallel v0.1 is in git history (commit 466ac59).
 
 ### Wand-loop connector (factory)
 | Feature | Value |
