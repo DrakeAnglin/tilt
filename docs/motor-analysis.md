@@ -60,9 +60,34 @@ on the wand/tilter-input side.
 - Reversible: the tilter just unclips and goes in a bag.
 - **N20 verdict: maybe.** Likely needs a **higher ratio (1:1000, ~15 RPM)** or a **worm-gear N20** for the largest blinds. Measure first.
 
-**Recommendation (confirmed by photos: square rod, free space at the headrail end, ~½ turn travel):** design for **Option B** (hidden, fast, the "product" look), measure the real torque,
-and choose the gear ratio from the measurement. The N20 footprint is the same across ratios, so the printed mount
-doesn't change. Keep Option A as the fallback for anything too heavy.
+### Option C: motorized tilter (keep the worm gear and the wand). **Now recommended**
+Photos: [tilter side](reference/tilter-side.jpg), [tilter gears](reference/tilter-worm-gear.jpg). The factory tilter is a clear
+plastic housing: worm wheel with a 4 mm square bore on the rod, worm on an angled input shaft that exits at the wand hook.
+
+Idea: a printed tilter housing that reuses the factory worm + worm wheel (or printed copies) and adds an N20 coupled to
+the **back end of the worm shaft**. Wand and motor both sit on the worm (input) side.
+
+**Important:** the motor can only go on the *worm* side. A motor on the rod side would have to back-drive the worm,
+which is self-locking, so it can't. That rules out "Option B + keep the wand in place".
+
+Why this is better than B:
+- **Manual use still works.** The wand stays.
+- **Holding is free.** The self-locking worm holds the slats with zero power, even on the heaviest blind.
+- **Torque need drops** by the worm ratio, so the N20 is comfortably strong enough. Strength stops being a risk.
+- **Use a low-ratio N20 (≈1:30–1:50)** so turning the wand by hand can back-drive the motor easily. The driver idles in
+  *coast* mode (not brake), and **the encoder still counts manual wand turns**, so position stays correct.
+- Travel stays quick: e.g. 10 worm turns at ~300 RPM output (1:50 at 5 V) ≈ 2 s, ramped and PWM'd slower for quiet.
+- For **MakerWorld** this is the most universal product: "a drop-in motorized tilter for 4 mm square rods" (adapters for other rod sizes).
+
+Costs / risks:
+- New housing design around an **angled worm shaft** in a 36 mm tall rail. The N20 (12 × 10 mm) must fit on the worm axis behind the worm.
+- If the controller is unpowered while someone turns the wand, those turns are missed. Optional fix: an **AS5600 magnetic
+  absolute angle sensor** reading a magnet on the tilt rod (the rod turns < 360° over full range), which also removes the need for homing.
+- Worm meshes make a little noise. The factory molded worm is quieter than a printed one, so reuse it where possible.
+
+**Recommendation:** Option C. Option B remains the fallback if the motorized tilter can't be packaged in the headrail.
+Needed: wand turns for full travel (gives the worm ratio), torque at the wand hook with the tilter installed, tilter dimensions,
+and which end of the headrail the tilter sits at.
 
 ## Alternatives if the N20 is too weak or too noisy
 

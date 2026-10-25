@@ -21,7 +21,7 @@
 
 | # | Question | Recommendation | Status |
 |---|---|---|---|
-| D1 | Drive point: tilter input (A) or tilt rod with tilter removed (B)? | B: drive the 4 mm square rod from the headrail end | **Decided** |
+| D1 | Drive point: tilter input (A) or tilt rod with tilter removed (B)? | **C: motorized tilter** (keep worm + wand, N20 on the worm input). B fallback | Reopened: C recommended |
 | D2 | N20 gear ratio | Choose from measured torque; 40 RPM for A, likely 15 RPM or worm N20 for B on large blinds | Needs measurements |
 | D3 | Motor ports per controller: 4 (3 tilt + spare) or 6 (tilt + lift ×3)? | 4 for v1 board unless lift is proven early | Open |
 | D4 | MCU | ESP32-S3-WROOM-1-N8 | Proposed |
@@ -31,7 +31,7 @@
 | D8 | Motor connector | RJ12 6P6C | Proposed |
 | D9 | Supply | 5 V/3 A USB-C | Proposed |
 | D10 | Isolation material | Test 95A TPU vs Bambu TPU for AMS (68D) | Test |
-| D11 | Keep the manual wand? | No, removed | **Decided** |
+| D11 | Keep the manual wand? | Yes, with Option C | Owner prefers keeping it |
 | D12 | License | CERN-OHL-S / MIT / CC BY-SA | Ask |
 
 ## Information needed from the owner
@@ -68,4 +68,7 @@ Still unknown:
 - [x] Free length end cap → first tilt cradle: **110 mm**
 - [x] Rod axis: **24 mm above the inner floor**, centered
 - [ ] How far the rod sticks out past the first cradle
+- [ ] **Wand turns** for full travel, closed → closed (gives the worm ratio)
+- [ ] Torque at the **wand hook** with the tilter installed (and at the rod, from the printed adapter)
+- [ ] Tilter housing dimensions + worm shaft angle; which end of the headrail it sits at; is the worm shaft's back end reachable?
 - [ ] Torque at the rod end with the tilter disengaged ([measure-your-blinds.md](measure-your-blinds.md))
