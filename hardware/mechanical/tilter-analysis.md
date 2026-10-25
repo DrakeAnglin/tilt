@@ -85,34 +85,39 @@ which matches module 0.88 (π × 0.88 = 2.76). The worm and wheel are a matched 
 - Lead angle ≈ atan(2.76 / (π × 9.24)) ≈ 5.4°: **self-locking**.
 - The wand loop connector engages only the bottom ~5 mm splined section (5.6 mm Ø).
 
-## Chosen concept: crossed helical gear on the worm shaft
-Evaluated in the [TiltLayout](fusion/README.md) fit study (2026-10-25):
+## Chosen concept: crossed helical gear on a new printed wand connector
+Evaluated in the [TiltLayout](fusion/README.md) fit study, built and checked live in Fusion (2026-10-25).
 
 | Concept | Result |
 |---|---|
 | Motor parallel to the worm (spur drive) | ✗ A 35 mm N20 at a 56° slope is taller than the 36.5 mm rail |
-| Gear on a sleeve over the spline | ✗ The factory connector already covers the whole 5 mm spline |
-| 90° bevel (miter) gear on a printed connector | ✗ Near the front-bottom corner: misses the rail by 1–2 mm for every size tried, and the connector would pass through the pinion's apex |
-| **Crossed helical pair (45° helix, 90° shafts), gear on the worm shaft between the flanges** | ✓ Fits with ~1 mm clearances. Motor lies parallel to the rod, mid-rail |
+| 90° bevel (miter) gear at the connector | ✗ Misses the rail by 1–2 mm, and the connector passes through the pinion's apex |
+| Helical gear on the plain shaft between the flanges | ✗ The shaft is smooth, slick acetal: a printed gear would slip and glue won't hold. It needs drilling or filing |
+| **Crossed helical pair, driven gear part of a new printed wand connector on the 8-ridge spline** | ✓ **Worm unmodified.** Uses the spline the factory already uses to carry wand torque |
 
 ```
-  worm (factory) ── upper flange ──[ helical gear 12 mm PD ]── lower flange ── spline ── wand connector (factory)
-                                          ╲ 90° crossed, 12 mm centers
-                                     [ helical pinion ]── N20 (axis ~parallel to the rod, toward the tilt drums)
+ worm (factory, unmodified) ── lower flange ── 8-ridge spline
+                                                  │
+                         [ NEW printed connector: spline socket + helical gear + wand loop + snap tabs ]
+                                                  ╲ 90° crossed, 10 mm centers
+                                        [ helical pinion ]── N20 (parallel to the rod)
 ```
 
-- **Factory parts stay:** worm wheel, worm, and wand connector + loop, all unchanged except fixing the gear to the worm.
-- **Gear on the worm:** the 8.4 mm plain shaft (5.6 mm Ø) between the flanges carries a 4 mm wide helical gear. Ways to fix it:
-  (a) a 1.5 mm cross-pin through the shaft with a slotted gear hub (keeps the molded worm, the quietest option);
-  (b) a printed replacement worm with the gear integral (no drilling; module 0.88, single start, lead 2.76 mm).
-  The housing then supports the worm on the upper pin and the lower flange/spline end instead of between the flanges.
-- **Helical pair:** 45° helix, normal module ≈ 0.6, both 12 mm pitch diameter → **1:1**, 12 mm center distance. Gear centered 14 mm down the worm from the thread center (between the flanges at 8.6 and 17.0). At 45° it is
-  **not self-locking**, so the wand back-drives the motor. The 16:1 worm still locks the slats.
-- **N20 position (default):** swung 10° about the worm axis (it tips slightly toward the floor and the back wall as it runs
-  along the rod). Envelope X 2.0–36.2 mm, Y −12.9 to 3.7, Z 3.7–16.7. Uses ~36 mm of the 110 mm pocket.
+- **Factory parts kept:** worm wheel and worm, unchanged. The factory wand connector is replaced by a printed one.
+- **New connector:** 5.3 mm deep 8-ridge socket on the spline (≈ 6.0 OD / 5.0 root), a helical gear ring around the socket,
+  the wand loop below, and flexible tabs that snap into the housing like the original.
+- **Helical pair:** 45° helix, 1:1, 10 mm pitch diameters, 10 mm centers. Not self-locking, so the wand back-drives the motor.
+  The 16:1 worm still locks the slats.
+- **N20 position:** parallel to the rod. X 6.5–38.5, Y −19.1 to −7.1, Z 2.5–12.5.
+  Clearances: floor 2.5 mm, room-side wall ≈ 2 mm, worm flange 2.1 mm, worm-wheel barrel 7.3 mm.
 - **Total ratio:** N20 (1:30–1:50) × 1 × 16. Full 60° travel = 2.67 worm turns.
-- **Encoder:** 14 counts/motor rev × 30 × 16 ≈ 6,700 counts per rod turn → ~1,100 counts across the 60° travel.
-- Clearances: motor to the worm-wheel barrel (12.5 mm Ø, measured) **1.1 mm**; to the worm flanges 2.2 mm; to the floor 3.7 mm.
+
+### FDM printing notes
+- Print the connector and both helical gears **axis vertical**. 45° helix teeth are a 45° overhang, which prints cleanly, and
+  the spline socket comes out round and accurate.
+- Gear teeth this small want a **0.2 mm nozzle** (normal module ≈ 0.8 → about 9 teeth on a 10 mm pitch diameter). PETG or
+  PLA+ for the first test, nylon/PA later for wear.
+- Spline socket: print a tolerance test (socket clearance 0.1 / 0.15 / 0.2 mm) before the real part.
 
 ### Wand-loop connector (factory)
 | Feature | Value |

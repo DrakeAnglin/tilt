@@ -1,8 +1,8 @@
 """TiltLayout: layout/fit study for the motorized tilter (Fusion 360 script).
 
-Builds reference bodies for the headrail end pocket, the factory worm + worm wheel + wand connector, and the motor
-drive: a crossed-axis (90°, 45° helix) helical gear pair. One gear sits on the worm shaft between its two flanges;
-the pinion is on an N20 gear motor lying parallel to the tilt rod. Crossed helicals at 45° are not self-locking, so
+Builds reference bodies for the headrail end pocket, the factory worm + worm wheel, and the motor drive: a
+crossed-axis (90°, 45° helix) helical gear pair. The driven gear is part of a NEW printed wand connector that grips the
+worm's 8-ridge spline (the worm itself is unmodified); the pinion is on an N20 gear motor lying parallel to the tilt rod. Crossed helicals at 45° are not self-locking, so
 the wand still back-drives the motor, and their axes don't intersect, so no shaft passes through the other gear.
 
 All sizes are Fusion User Parameters prefixed "tl_". Edit them in Modify > Change Parameters, then run the
@@ -53,18 +53,18 @@ PARAMS = {
     'tl_flange2_t':     (1.77, 'mm', 'Lower flange thickness'),
     'tl_spline_d':      (6.0, 'mm', 'Spline OD (8 ridges)'),
     'tl_spline_len':    (5.0, 'mm', 'Spline length'),
-    # Factory wand connector (reference only)
-    'tl_conn_d':        (8.13, 'mm', 'Wand connector OD'),
+    # Printed wand connector: grips the worm's 8-ridge spline, carries the helical gear and the wand loop
+    'tl_conn_d':        (8.13, 'mm', 'Connector body OD (factory size)'),
     'tl_conn_depth':    (5.3, 'mm', 'Connector socket depth on the spline'),
     'tl_conn_len':      (14.0, 'mm', 'Connector + loop length (estimate)'),
     # Crossed helical drive (45° helix, 90° shafts)
-    'tl_hg_d':          (12.0, 'mm', 'Helical gear pitch diameter (on worm shaft)'),
-    'tl_hp_d':          (12.0, 'mm', 'Helical pinion pitch diameter (on N20)'),
+    'tl_hg_d':          (10.0, 'mm', 'Helical gear pitch diameter (on worm shaft)'),
+    'tl_hp_d':          (10.0, 'mm', 'Helical pinion pitch diameter (on N20)'),
     'tl_h_mn':          (0.6, 'mm', 'Normal module of the helical pair'),
     'tl_hg_face':       (4.0, 'mm', 'Helical gear face width'),
     'tl_hp_face':       (5.0, 'mm', 'Helical pinion face width'),
-    'tl_gear_s':        (14.0, 'mm', 'Gear center along worm axis from thread center (flanges at 8.6 and 17.0)'),
-    'tl_motor_rot':     (-10.0, 'deg', 'Motor axis rotation about the worm axis (0 = parallel to rod)'),
+    'tl_gear_s':        (21.0, 'mm', 'Gear center along worm axis from thread center (spline 18.77-23.77)'),
+    'tl_motor_rot':     (0.0, 'deg', 'Motor axis rotation about the worm axis (0 = parallel to rod)'),
     # N20 gear motor
     'tl_n20_w':         (12.0, 'mm', 'N20 width'),
     'tl_n20_h':         (10.0, 'mm', 'N20 height (across flats)'),
@@ -72,7 +72,7 @@ PARAMS = {
     'tl_n20_mot_len':   (15.0, 'mm', 'Motor can length'),
     'tl_n20_enc_len':   (8.0, 'mm', 'Encoder + cap length'),
     'tl_n20_shaft_d':   (3.0, 'mm', 'Output shaft diameter'),
-    'tl_pinion_gap':    (3.0, 'mm', 'Pinion face to gearbox face'),
+    'tl_pinion_gap':    (4.0, 'mm', 'Pinion face to gearbox face'),
 }
 
 
@@ -260,11 +260,11 @@ def build(design):
     worm_top = S(-P['tl_worm_thread'] / 2 - P['tl_worm_pin_len'])
     B.component('Worm (factory)', [('Worm', B.union(sections))], 1.0, 'Plastic - Matte (White)')
 
-    # --- Factory wand connector (reference) ---
+    # --- NEW printed wand connector (socket over the spline, carries the gear and the wand loop) ---
     conn = B.cyl(S(worm_end - P['tl_conn_depth']), P['tl_conn_d'] / 2,
                  S(worm_end - P['tl_conn_depth'] + P['tl_conn_len']))
-    B.component('Wand connector (factory)', [('Connector + loop envelope', conn)], 0.6,
-                'Plastic - Translucent Matte (White)')
+    B.component('NEW wand connector', [('Connector + loop envelope', conn)], 0.6,
+                'Plastic - Translucent Matte (Yellow)')
 
     # --- Crossed helical drive + N20 ---
     gs = P['tl_gear_s']
@@ -290,7 +290,7 @@ def build(design):
     mot = seg(mot_start, P['tl_n20_mot_len'])
     enc_start = add(mot_start, mul(u, P['tl_n20_mot_len']))
     enc = seg(enc_start, P['tl_n20_enc_len'])
-    B.component('NEW helical gear on worm', [('Helical gear envelope', gear)], 1.0, 'Plastic - Glossy (Yellow)')
+    B.component('NEW helical gear on connector', [('Helical gear envelope', gear)], 1.0, 'Plastic - Glossy (Yellow)')
     B.component('NEW helical pinion', [('Pinion envelope', pinion)], 1.0, 'Plastic - Glossy (Yellow)')
     B.component('N20 motor', [('Shaft', shaft), ('Gearbox', gbx), ('Motor', mot), ('Encoder', enc)], 1.0,
                 'Plastic - Glossy (Blue)')
@@ -321,6 +321,16 @@ def build(design):
     rod_clear = min(dist_to_line(q, rod_c, X) for q in samples) - P['tl_wheel_hub_d'] / 2
     worm_clear = min(dist_to_line(q, p0, d) for q in samples if 0 <= dot(sub(q, p0), d) <= worm_end) \
         - P['tl_flange_d'] / 2 if any(0 <= dot(sub(q, p0), d) <= worm_end for q in samples) else 99.0
+    g0, g1 = gs - P['tl_hg_face'] / 2, gs + P['tl_hg_face'] / 2
+    spline_start = worm_end - P['tl_spline_len']
+    if g0 >= spline_start - 0.01 and g1 <= worm_end - P['tl_spline_len'] + P['tl_conn_depth'] + 0.01:
+        gear_where = 'on the connector, over the spline'
+    elif g0 >= spline_start:
+        gear_where = 'on the connector, below the spline'
+    elif g0 >= flange1_end and g1 <= flange2_start:
+        gear_where = 'on the plain shaft between the flanges (needs a pin or flat)'
+    else:
+        gear_where = 'OVERLAPS a flange'
     report = [
         'Worm-wheel center distance: {:.2f} mm (ratio {:.0f}:1)'.format(cd, 16),
         'Worm top end: Y {:.1f}, Z {:.1f}  (rail top Z {:.1f})'.format(worm_top[1], worm_top[2], h),
@@ -332,9 +342,7 @@ def build(design):
         'Helical center distance {:.2f} mm, pinion center Y {:.1f} Z {:.1f}'.format(rg + rp, pc[1], pc[2]),
         'Motor clearance to worm-wheel barrel: {:.2f} mm'.format(rod_clear),
         'Motor clearance to worm flanges: {:.2f} mm'.format(worm_clear),
-        'Gear on worm sits between flanges: {}'.format(
-            'yes' if (gs - P['tl_hg_face'] / 2) >= flange1_end and (gs + P['tl_hg_face'] / 2) <= flange2_start
-            else 'NO'),
+        'Gear position: {}'.format(gear_where),
     ]
     problems = []
     if min(ys) < -w / 2 or max(ys) > w / 2:
@@ -347,7 +355,7 @@ def build(design):
         problems.append('motor too close to the worm-wheel barrel')
     if worm_clear < 0.3:
         problems.append('motor too close to the worm flanges')
-    if not ((gs - P['tl_hg_face'] / 2) >= flange1_end and (gs + P['tl_hg_face'] / 2) <= flange2_start):
+    if gear_where.startswith('OVERLAPS'):
         problems.append('helical gear overlaps a flange (adjust tl_gear_s / tl_hg_face)')
     report.append('')
     report.append('FIT OK' if not problems else 'CHECK: ' + '; '.join(problems))
