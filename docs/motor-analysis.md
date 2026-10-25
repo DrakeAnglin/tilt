@@ -60,7 +60,7 @@ on the wand/tilter-input side.
 - Reversible: the tilter just unclips and goes in a bag.
 - **N20 verdict: maybe.** Likely needs a **higher ratio (1:1000, ~15 RPM)** or a **worm-gear N20** for the largest blinds. Measure first.
 
-**Recommendation:** design for **Option B** (hidden, fast, the "product" look), measure the real torque,
+**Recommendation (confirmed by photos: square rod, free space at the headrail end, ~½ turn travel):** design for **Option B** (hidden, fast, the "product" look), measure the real torque,
 and choose the gear ratio from the measurement. The N20 footprint is the same across ratios, so the printed mount
 doesn't change. Keep Option A as the fallback for anything too heavy.
 

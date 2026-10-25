@@ -43,8 +43,27 @@
 - [ ] Which hubs are in the house (Echo model? HomePod/Apple TV?)
 
 ## Findings from headrail photos (2026-10-25)
-See [headrail-top-view.jpg](reference/headrail-top-view.jpg).
-- Headrail is **injection-molded white plastic**, not aluminum. Thin walls → avoid clamping loads; mount by sliding into the channel like the factory modules do.
-- Layout (top view): **cord spool module** (lift cord wound on a drum) at each end of the shown section, and a **middle module** where the tilt rod covers the **spring (cordless-lift) mechanism**. The rod passes through all three modules.
-- The copper/brass-colored parts are the owner's 3D-printed copies of the factory tilt device (the white originals are still in the headrail).
-- Still needed: the other photos (the Photos library is not readable from here; export them to a regular folder or paste them into chat), the tilter location and the rod cross-section.
+
+| Photo | What it shows |
+|---|---|
+| [top view](reference/headrail-top-view.jpg) | Cordless **lift module**: two lift-cord spools with gear rims, brass-colored constant-force **spring drums** between them. Self-contained, held by two screws |
+| [end, tilt drum](reference/headrail-end-tilt-drum.jpg) | **Tilt drum** (owner's printed copy) in its white cradle, on the **square steel tilt rod** |
+| [end profile](reference/headrail-end-profile.jpg) | U-channel profile (matches the cross-section sketch). Tilt rod sticks out past the last cradle: **free space at the end of the headrail** |
+| [square rod](reference/headrail-square-tilt-rod.jpg) | Square tilt rod runs the full length above a long perforated plastic part |
+| [ladder cords](reference/tilt-drum-ladder-cords.jpg) | Factory tilt drum with ladder cords tied on |
+| [printed drum](reference/printed-tilt-drum-front.jpg), [angle](reference/printed-tilt-drum-angle.jpg) | Owner's printed tilt drum: square bore, two cord slots |
+
+Conclusions:
+- Headrail and all internals are **plastic** (not aluminum). Mount by sliding/snapping into the channel like the factory cradles. No clamping of thin walls.
+- The tilt rod is **square**, so a printed square-socket coupler is trivial and can't slip.
+- The tilt drums only need **about a half turn** of the rod for full range. Driving the rod directly (Option B) means short, fast moves.
+- There's room at the **end of the headrail**, past the last cradle, for a motor sled coupled to the rod end. This is the leading design.
+- **Lift is a separate, self-contained module** (spools geared to the spring drums), not connected to the tilt rod. Motorizing lift means meshing with the spool gear rim or the spring drum. Possible, but it's its own sub-project (see lift-bonus.md).
+- The owner already has CAD for the tilt drum, which gives the exact square size and drum geometry.
+
+Still unknown:
+- [ ] Square rod size (from the tilt drum CAD, or calipers)
+- [ ] Where the factory **tilter/wand** connects (which end, and does it need to stay?)
+- [ ] What the long perforated plastic part under the rod is
+- [ ] Free length at the headrail end (rod end to end cap), with the end cap in place
+- [ ] Torque at the rod end with the tilter disengaged ([measure-your-blinds.md](measure-your-blinds.md))
