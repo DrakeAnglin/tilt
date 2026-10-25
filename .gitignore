@@ -1,0 +1,14 @@
+.DS_Store
+# PlatformIO / builds
+.pio/
+build/
+*.bin
+!firmware/releases/*.bin
+# KiCad
+*-backups/
+*.kicad_prl
+fp-info-cache
+\#auto_saved_files#
+# Fusion/CAD temp
+*.~*
+node_modules/
