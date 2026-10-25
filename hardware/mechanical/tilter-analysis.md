@@ -84,23 +84,34 @@ which matches module 0.88 (π × 0.88 = 2.76). The worm and wheel are a matched 
 - Lead angle ≈ atan(2.76 / (π × 9.24)) ≈ 5.4°: **self-locking**.
 - The wand loop connector engages only the bottom ~5 mm splined section (5.6 mm Ø).
 
-## Chosen concept: drive sleeve on the splined shaft (layout L1, refined)
-The wand already drives the worm through the **splined output shaft**. The motor can drive the same shaft:
+## Chosen concept: crossed helical gear on the worm shaft
+Evaluated in the [TiltLayout](fusion/README.md) fit study (2026-10-25):
+
+| Concept | Result |
+|---|---|
+| Motor parallel to the worm (spur drive) | ✗ A 35 mm N20 at a 56° slope is taller than the 36.5 mm rail |
+| Gear on a sleeve over the spline | ✗ The factory connector already covers the whole 5 mm spline |
+| 90° bevel (miter) gear on a printed connector | ✗ Near the front-bottom corner: misses the rail by 1–2 mm for every size tried, and the connector would pass through the pinion's apex |
+| **Crossed helical pair (45° helix, 90° shafts), gear on the worm shaft between the flanges** | ✓ Fits with ~1 mm clearances. Motor lies parallel to the rod, mid-rail |
 
 ```
-   worm (factory) ──spline──► [printed DRIVE SLEEVE: internal spline + spur gear + external spline] ──► wand loop (factory, snaps on)
-                                         ▲
-                                  spur pinion on N20 (motor parallel to the worm axis, offset ~11 mm)
+  worm (factory) ── upper flange ──[ helical gear 10 mm PD ]── lower flange ── spline ── wand connector (factory)
+                                          ╲ 90° crossed, 10 mm centers
+                                     [ helical pinion ]── N20 (axis parallel to the rod, toward the tilt drums)
 ```
 
-- Reuse the factory **worm, worm wheel, and wand loop** unchanged (molded parts are smoother and quieter than printed ones).
-- New printed **housing halves** (the original shape plus a pod for the N20 beside the worm tube), joined with M2 screws in place of the rivets.
-- **Drive sleeve:** slides over the factory spline (only ~5 mm long, 5.6 mm Ø), carries a spur gear, and repeats the spline on its outer end so the factory
-  wand loop snaps onto it. If the spline is too fine to print, use a printed hex/D interface and a printed wand loop.
-- **Spur stage 1 : 1** (e.g. module 0.8, 14 T / 14 T, 11.2 mm centers) keeps the wand easy to back-drive. Reduction lives in the N20 + worm.
-- **Total ratio:** N20 (1:30–1:50) × 1 × 16 worm. Full 60° travel = 2.67 worm turns ≈ 0.4–0.6 s at full speed, so run it slow for quiet.
-- **Encoder:** 14 counts/motor rev × 30 × 16 ≈ 6,700 counts per rod turn → ~1,100 counts across the 60° travel. Plenty.
-- Motor pod is parallel to the worm (~56° slope), offset along the rod into the 110 mm pocket. Fit inside the 36.5 mm rail height is checked in CAD.
+- **Factory parts stay:** worm wheel, worm, and wand connector + loop, all unchanged except fixing the gear to the worm.
+- **Gear on the worm:** the 8.4 mm plain shaft (5.6 mm Ø) between the flanges carries a 4 mm wide helical gear. Ways to fix it:
+  (a) a 1.5 mm cross-pin through the shaft with a slotted gear hub (keeps the molded worm, the quietest option);
+  (b) a printed replacement worm with the gear integral (no drilling; module 0.88, single start, lead 2.76 mm).
+  The housing then supports the worm on the upper pin and the lower flange/spline end instead of between the flanges.
+- **Helical pair:** 45° helix, normal module ≈ 0.6, both 10 mm pitch diameter → **1:1**, 10 mm center distance. At 45° it is
+  **not self-locking**, so the wand back-drives the motor. The 16:1 worm still locks the slats.
+- **N20 position (default):** X 5.5–37.5 mm from the tilter plane, Y −14.5 to −2.5, Z 9.3–19.3: mid-rail, well inside walls and floor.
+  Uses ~38 mm of the 110 mm pocket.
+- **Total ratio:** N20 (1:30–1:50) × 1 × 16. Full 60° travel = 2.67 worm turns.
+- **Encoder:** 14 counts/motor rev × 30 × 16 ≈ 6,700 counts per rod turn → ~1,100 counts across the 60° travel.
+- Tightest clearance: motor to the worm-wheel barrel, 0.8 mm, and the barrel diameter (9 mm) is an **estimate**.
 
 ### Wand-loop connector (factory)
 | Feature | Value |
@@ -111,4 +122,5 @@ The wand already drives the worm through the **splined output shaft**. The motor
 | Retention | Two flexible tabs. It snaps in through the housing after the shell is closed and locks against it, so the connector is replaceable |
 
 ## Still needed
+- [ ] Worm-wheel barrel diameter (the part outside the teeth, along the rod). Sets the tightest clearance
 - [ ] Optional check: center distance (square-bore center → worm axis in the shell), predicted ≈ 11.6 mm
