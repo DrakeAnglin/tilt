@@ -49,28 +49,40 @@ Worm input needs only ~3–5 turns for full travel, so speed isn't a constraint.
 - 1:100 (~130 RPM at 5 V): ~2 s travel. Back-drive by hand is likely stiff. **Test before choosing.**
 - 1:298/1:380 (the 40 RPM motors): too stiff to back-drive through a wand. Fine for bench and noise tests only.
 
-## Internals (tilter opened, 2026-10-25)
+## Internals (measured with calipers, 2026-10-25)
 Photos: [overview](../../docs/reference/tilter-opened-overview.jpg), [gear](../../docs/reference/tilter-opened-gear.jpg),
-[worm](../../docs/reference/tilter-opened-worm.jpg). Scale checked against the 4 mm square bore (reads 3.8–4.0 mm).
-Values are photo estimates (±0.5–1 mm) until confirmed with calipers.
+[worm](../../docs/reference/tilter-opened-worm.jpg).
 
-| Part | Feature | Estimate |
+### Worm wheel
+| Feature | Value |
+|---|---|
+| Teeth | **16** |
+| Outside diameter | **15.8 mm** |
+| Tooth face width | **7.5 mm** |
+| Hub ("barrel") length along the rod | **16.66 mm** (≈ housing thickness 16.5) |
+| Bore | 4 mm square |
+| Derived module | 15.8 / (16 + 2) ≈ **0.88** → pitch diameter ≈ 14.0 mm |
+
+### Worm (total length 31.15 mm), from top (gear end) to bottom (wand end)
+| Section | Ø | Length |
 |---|---|---|
-| Worm wheel | Teeth | **15** (count to confirm) |
-| | Outside diameter | ≈ 18.5 mm → **module ≈ 1.0–1.1** |
-| | Bore | 4 mm square, molded |
-| Worm | Threaded section | ≈ 11–13 mm long, ~3.5 crests, **single start** (to confirm) |
-| | Thread OD | ≈ 12 mm (pitch dia ≈ 10 mm) |
-| | Axial pitch | ≈ 3.2–3.3 mm (consistent with module 1: π × 1 = 3.14) |
-| | Upper journal (pin) | ≈ 4.5 mm Ø, runs in a molded seat |
-| | Thrust collar | ≈ 10 mm Ø flange, located in shell slots |
-| | Output shaft | **Splined**, ≈ 5 mm Ø × ≈ 15 mm, exits through the tube |
-| Wand loop | Attachment | Separate part: sleeve with snap barbs that slides onto the worm's splined shaft |
-| Mesh | Center distance | ≈ (10 + 15) / 2 ≈ **12.5 mm** |
+| Upper journal pin | 5.0 | ≈ 2.5 |
+| Threads (single start assumed) | **11.0** OD | **9.0** (≈ 3¼ crests visible) |
+| Gap | shaft | ≈ 2.5 |
+| Upper flange | 9.5 | 1.6 |
+| Shaft between flanges (bearing in shell) | 5.6 | 8.4 |
+| Lower flange | 9.5 | 1.77 |
+| Splined drive to the wand-loop connector | 5.6 | ≈ 5 |
+| **Sum** | | ≈ 30.8 (measured 31.15) |
+
+Axial pitch: "≈ 7 mm across 3 teeth" (≈ 2 pitches + one crest width) and 9 mm of thread holding 3–4 crests → **≈ 2.75 mm**,
+which matches module 0.88 (π × 0.88 = 2.76). The worm and wheel are a matched module ≈ 0.88 pair.
 
 **Derived:**
-- **Worm ratio = 15 : 1** (single start, 15 teeth). 60° of rod = **2.5 worm turns**, which matches "a few turns".
-- Lead angle ≈ atan(3.14 / (π × 10)) ≈ 5.7°. Below the friction angle of plastic on plastic, so it **self-locks**, as expected.
+- **Worm ratio = 16 : 1** (single start). 60° of rod = **2.67 worm turns**.
+- Worm pitch diameter ≈ 11.0 − 2 × 0.88 ≈ 9.24 mm → **center distance ≈ (9.24 + 14.0) / 2 ≈ 11.6 mm**.
+- Lead angle ≈ atan(2.76 / (π × 9.24)) ≈ 5.4°: **self-locking**.
+- The wand loop connector engages only the bottom ~5 mm splined section (5.6 mm Ø).
 
 ## Chosen concept: drive sleeve on the splined shaft (layout L1, refined)
 The wand already drives the worm through the **splined output shaft**. The motor can drive the same shaft:
@@ -83,17 +95,15 @@ The wand already drives the worm through the **splined output shaft**. The motor
 
 - Reuse the factory **worm, worm wheel, and wand loop** unchanged (molded parts are smoother and quieter than printed ones).
 - New printed **housing halves** (the original shape plus a pod for the N20 beside the worm tube), joined with M2 screws in place of the rivets.
-- **Drive sleeve:** slides over the factory spline, carries a spur gear, and repeats the spline on its outer end so the factory
+- **Drive sleeve:** slides over the factory spline (only ~5 mm long, 5.6 mm Ø), carries a spur gear, and repeats the spline on its outer end so the factory
   wand loop snaps onto it. If the spline is too fine to print, use a printed hex/D interface and a printed wand loop.
 - **Spur stage 1 : 1** (e.g. module 0.8, 14 T / 14 T, 11.2 mm centers) keeps the wand easy to back-drive. Reduction lives in the N20 + worm.
-- **Total ratio:** N20 (1:30–1:50) × 1 × 15 worm. Full 60° travel = 2.5 worm turns ≈ 0.4–0.6 s at full speed, so run it slow for quiet.
-- **Encoder:** 14 counts/motor rev × 30 × 15 ≈ 6,300 counts per rod turn → ~1,050 counts across the 60° travel. Plenty.
+- **Total ratio:** N20 (1:30–1:50) × 1 × 16 worm. Full 60° travel = 2.67 worm turns ≈ 0.4–0.6 s at full speed, so run it slow for quiet.
+- **Encoder:** 14 counts/motor rev × 30 × 16 ≈ 6,700 counts per rod turn → ~1,100 counts across the 60° travel. Plenty.
 - Motor pod is parallel to the worm (~56° slope), offset along the rod into the 110 mm pocket. Fit inside the 36.5 mm rail height is checked in CAD.
 
-## Still needed (calipers)
-- [ ] Worm wheel: tooth count, OD, face width
-- [ ] Worm: thread OD, root diameter, axial pitch (measure over 3 crests ÷ 3), single or double start
-- [ ] Spline shaft: OD, number of splines, length from housing exit to tip
-- [ ] Wand loop socket: depth on the spline, how the barbs latch (groove on the shaft?)
-- [ ] Worm upper journal Ø, collar Ø and thickness
-- [ ] Center distance worm axis ↔ wheel axis (or measure in the shell: bore center to worm seat center)
+## Still needed
+- [ ] Single or double start? (Look at the worm end-on: one ridge spiraling, or two side by side)
+- [ ] Splined drive section: number of splines/teeth, and whether the wand-loop connector latches into a groove or just presses on
+- [ ] Wand-loop connector: socket depth and outer diameter
+- [ ] Optional check: center distance (square-bore center → worm axis in the shell), predicted ≈ 11.6 mm
