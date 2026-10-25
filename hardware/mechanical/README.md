@@ -2,8 +2,32 @@
 
 CAD sources (parametric. Fusion/Onshape/OpenSCAD TBD) and exported 3MF/STL go here.
 
-Design constraints: [headrail cross-section](../../docs/reference/headrail-cross-section.png). Inner ≈ 55.5 mm wide, ≈ 36.5 mm tall,
-2 mm walls, inward lips at the top, 10 mm Ø feature centered 24 mm above the floor.
+## Known dimensions
+| What | Value | Source |
+|---|---|---|
+| Headrail inner width × height | ≈ 55.5 × 36.5 mm, 2 mm plastic walls, inward hooked lips at top | [cross-section](../../docs/reference/headrail-cross-section.png) |
+| Tilt rod | **4 mm square steel** | Owner |
+| Tilt rod axis height | ≈ 24 mm above inner floor (assumed from the 10 mm Ø circle in the sketch). **Confirm** | Sketch |
+| Free length, end cap → first tilt drum cradle | **110 mm** | Owner |
+| Factory wand + tilter gears | **Removed**. The motor drives the rod directly, with nothing self-locking in the chain | Owner |
+| Lift/holding mechanism | Long perforated module under the rod, separate from tilt | Owner, [photo](../../docs/reference/headrail-square-tilt-rod.jpg) |
+
+## Layout in the 110 mm end pocket (draft)
+```
+ end cap                                                          first tilt cradle
+ |<--3-->|<----20---->|<-------- ~35 -------->|<---- ~20 ---->|<--5+-->|
+ | gap   | RJ12 jack  | N20: encoder|motor|gbx | TPU coupler   | spare  |
+ |       | + strain   | in TPU sleeve, held   | 3 mm D-bore → |        |
+ |       |   relief   | by PETG sled          | 4 mm sq socket|        |
+                                                ═══════ 4 mm square rod ═══════►
+```
+Total ≈ 83 mm of 110 mm, so ~25 mm margin. That's enough for a longer 1:1000 gearbox, or a right-angle worm N20 if torque requires it.
+
+- **Sled:** PETG, slides in from the end and keys under the top lips like the factory cradles (no screws into the thin plastic). It touches the headrail only through TPU pads.
+- **Coupler:** one-piece TPU (68D) or PETG hub + TPU spider. A 4 mm square socket ≥ 8 mm deep slides over the rod end; the motor end is a 3 mm D-bore (N20 shaft, 2.5 mm across the flat). Takes up small misalignment so the gearbox doesn't bind.
+- **Rod engagement:** the rod must reach ≥ 8 mm into the coupler. If it stops short, a 4 mm square steel rod is cheap to replace, or the coupler gets a longer socket.
+- **Holding:** with the worm tilter gone, the N20 gearbox friction plus the driver's brake mode hold the slats. Tilt loads are mostly balanced; verify on the largest blind.
+
 
 ## Parts (planned)
 | Part | Material | Notes |

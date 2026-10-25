@@ -21,7 +21,7 @@
 
 | # | Question | Recommendation | Status |
 |---|---|---|---|
-| D1 | Drive point: tilter input (A) or tilt rod with tilter removed (B)? | B if torque allows (hidden, fast); A fallback | Needs measurements |
+| D1 | Drive point: tilter input (A) or tilt rod with tilter removed (B)? | B: drive the 4 mm square rod from the headrail end | **Decided** |
 | D2 | N20 gear ratio | Choose from measured torque; 40 RPM for A, likely 15 RPM or worm N20 for B on large blinds | Needs measurements |
 | D3 | Motor ports per controller: 4 (3 tilt + spare) or 6 (tilt + lift ×3)? | 4 for v1 board unless lift is proven early | Open |
 | D4 | MCU | ESP32-S3-WROOM-1-N8 | Proposed |
@@ -31,7 +31,7 @@
 | D8 | Motor connector | RJ12 6P6C | Proposed |
 | D9 | Supply | 5 V/3 A USB-C | Proposed |
 | D10 | Isolation material | Test 95A TPU vs Bambu TPU for AMS (68D) | Test |
-| D11 | Keep the manual wand? | — | Ask |
+| D11 | Keep the manual wand? | No, removed | **Decided** |
 | D12 | License | CERN-OHL-S / MIT / CC BY-SA | Ask |
 
 ## Information needed from the owner
@@ -62,8 +62,9 @@ Conclusions:
 - The owner already has CAD for the tilt drum, which gives the exact square size and drum geometry.
 
 Still unknown:
-- [ ] Square rod size (from the tilt drum CAD, or calipers)
-- [ ] Where the factory **tilter/wand** connects (which end, and does it need to stay?)
-- [ ] What the long perforated plastic part under the rod is
-- [ ] Free length at the headrail end (rod end to end cap), with the end cap in place
+- [x] Square rod size: **4 mm square**
+- [x] Wand + tilter gears: **removed**. Motor drives the rod directly (decision D1 = Option B, D11 = no wand)
+- [x] Long perforated part = the **lift/holding mechanism**
+- [x] Free length end cap → first tilt cradle: **110 mm**
+- [ ] Rod axis height above the inner floor (sketch suggests 24 mm) and how far the rod sticks out past the first cradle
 - [ ] Torque at the rod end with the tilter disengaged ([measure-your-blinds.md](measure-your-blinds.md))
