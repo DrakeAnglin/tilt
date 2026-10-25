@@ -100,6 +100,20 @@ class Builder:
         self.design = design
         self.root = design.rootComponent
         self.tbm = adsk.fusion.TemporaryBRepManager.get()
+        app = adsk.core.Application.get()
+        libs = [app.materialLibraries.item(i) for i in range(app.materialLibraries.count)]
+        self.lib = next((l for l in libs if l.name == 'Fusion Appearance Library'), None)
+
+    def appearance(self, name):
+        if not name or self.lib is None:
+            return None
+        a = self.design.appearances.itemByName(name)
+        if a is None:
+            src = self.lib.appearances.itemByName(name)
+            if src is None:
+                return None
+            a = self.design.appearances.addByCopy(src, name)
+        return a
 
     def cyl(self, p1, r1, p2, r2=None):
         return self.tbm.createCylinderOrCone(pt(p1), r1 / 10.0, pt(p2), (r1 if r2 is None else r2) / 10.0)
@@ -115,7 +129,7 @@ class Builder:
             self.tbm.booleanOperation(target, b, adsk.fusion.BooleanTypes.UnionBooleanType)
         return target
 
-    def component(self, name, bodies, opacity=1.0):
+    def component(self, name, bodies, opacity=1.0, look=None):
         # Assemblies get one component per group. Single-component "Part" documents can't hold more
         # components, so there the bodies go into the root, prefixed with the group name.
         try:
@@ -133,6 +147,9 @@ class Builder:
         for body_name, body in bodies:
             b = comp.bRepBodies.add(body, base)
             b.name = body_prefix + body_name
+            a = self.appearance(look)
+            if a is not None:
+                b.appearance = a
             try:
                 b.opacity = opacity
             except Exception:
@@ -191,7 +208,8 @@ def build(design):
     ])
     endcap = B.box((x0 - t / 2, 0, h / 2 - t / 2), X, Y, t, w + 2 * t, h + t)
     frame = B.box((xm, 0, h + P['tl_frame_gap'] + 0.5), X, Y, L, w + 2 * t, 1.0)
-    B.component('Headrail', [('Rail', rail), ('End cap', endcap), ('Window frame limit', frame)], 0.25)
+    B.component('Headrail', [('Rail', rail), ('End cap', endcap), ('Window frame limit', frame)], 0.25,
+                'Plastic - Matte (Gray)')
 
     # --- Tilt rod + worm wheel ---
     rod_c = (0.0, 0.0, P['tl_rod_z'])
@@ -202,7 +220,8 @@ def build(design):
               add(rod_c, (P['tl_wheel_face'] / 2, 0, 0))),
         B.cyl(add(rod_c, (-hw, 0, 0)), P['tl_wheel_hub_d'] / 2, add(rod_c, (hw, 0, 0))),
     ])
-    B.component('Rod and worm wheel', [('Tilt rod', rod), ('Worm wheel (factory)', wheel)])
+    B.component('Rod and worm wheel', [('Tilt rod', rod), ('Worm wheel (factory)', wheel)], 1.0,
+                'Plastic - Matte (White)')
 
     # --- Worm (factory) ---
     a = math.radians(P['tl_worm_angle'])
@@ -218,8 +237,9 @@ def build(design):
     sections = []
     bounds = []
     s = -P['tl_worm_thread'] / 2 - P['tl_worm_pin_len']
+    thread_start = s + P['tl_worm_pin_len']
     for dia, length in ((P['tl_worm_pin_d'], P['tl_worm_pin_len']),
-                        (P['tl_worm_od'], P['tl_worm_thread']),
+                        (P['tl_worm_od'] - 4.5 * P['tl_module'], P['tl_worm_thread']),   # root cylinder
                         (P['tl_worm_shaft_d'], P['tl_worm_gap']),
                         (P['tl_flange_d'], P['tl_flange1_t']),
                         (P['tl_worm_shaft_d'], P['tl_flange_gap']),
@@ -229,14 +249,22 @@ def build(design):
         s += length
         bounds.append(s)
     flange1_end, flange2_start = bounds[3], bounds[4]
+    # thread crests drawn as rings at the axial pitch (visual only; a single-start helix in reality)
+    pitch = math.pi * P['tl_module']
+    crest_w = 0.4 * pitch
+    c = thread_start + pitch / 2
+    while c + crest_w / 2 <= thread_start + P['tl_worm_thread']:
+        sections.append(B.cyl(S(c - crest_w / 2), P['tl_worm_od'] / 2, S(c + crest_w / 2)))
+        c += pitch
     worm_end = s
     worm_top = S(-P['tl_worm_thread'] / 2 - P['tl_worm_pin_len'])
-    B.component('Worm (factory)', [('Worm', B.union(sections))])
+    B.component('Worm (factory)', [('Worm', B.union(sections))], 1.0, 'Plastic - Matte (White)')
 
     # --- Factory wand connector (reference) ---
     conn = B.cyl(S(worm_end - P['tl_conn_depth']), P['tl_conn_d'] / 2,
                  S(worm_end - P['tl_conn_depth'] + P['tl_conn_len']))
-    B.component('Wand connector (factory)', [('Connector + loop envelope', conn)], 0.5)
+    B.component('Wand connector (factory)', [('Connector + loop envelope', conn)], 0.6,
+                'Plastic - Translucent Matte (White)')
 
     # --- Crossed helical drive + N20 ---
     gs = P['tl_gear_s']
@@ -262,9 +290,10 @@ def build(design):
     mot = seg(mot_start, P['tl_n20_mot_len'])
     enc_start = add(mot_start, mul(u, P['tl_n20_mot_len']))
     enc = seg(enc_start, P['tl_n20_enc_len'])
-    B.component('Helical gear on worm (printed)', [('Helical gear envelope', gear)])
-    B.component('N20 + helical pinion', [('Pinion envelope', pinion), ('Shaft', shaft), ('Gearbox', gbx),
-                                         ('Motor', mot), ('Encoder', enc)])
+    B.component('NEW helical gear on worm', [('Helical gear envelope', gear)], 1.0, 'Plastic - Glossy (Yellow)')
+    B.component('NEW helical pinion', [('Pinion envelope', pinion)], 1.0, 'Plastic - Glossy (Yellow)')
+    B.component('N20 motor', [('Shaft', shaft), ('Gearbox', gbx), ('Motor', mot), ('Encoder', enc)], 1.0,
+                'Plastic - Glossy (Blue)')
 
     # --- Fit report: motor envelope corners vs the rail ---
     total = P['tl_n20_gbx_len'] + P['tl_n20_mot_len'] + P['tl_n20_enc_len']
