@@ -73,5 +73,7 @@ Still unknown:
 - [x] Tilter sits in the 110 mm pocket, rod passes through the worm wheel
 - [x] Clearance above the installed headrail: ~6.5 mm
 - [x] Tilt travel ≈ 60° (confirm: rod rotation, not wand)
-- [ ] Tilter housing dimensions, worm shaft angle, worm + wheel sizes; is the worm shaft's back end reachable?
+- [x] Tilter housing: 16.5 mm thick, worm at ~67°, worm back end enclosed (see hardware/mechanical/tilter-analysis.md)
+- [ ] Open the tilter (3 screws): worm + wheel sizes, tooth count, worm starts, how the wand loop attaches
+- [ ] Exact wand turns closed → closed (when reassembled)
 - [ ] Torque at the rod end with the tilter disengaged ([measure-your-blinds.md](measure-your-blinds.md))
