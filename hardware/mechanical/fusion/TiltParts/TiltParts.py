@@ -48,7 +48,7 @@ P = dict(
     n20_w=12.0, n20_h=10.0, n20_gbx=9.0, n20_motor=15.0, n20_end=1.0, n20_shaft_d=3.0, n20_flat=2.5,
     n20_screw_spacing=9.0,
     # case
-    wall=1.6, slab_half=8.33, case_w=55.4, case_floor=0.2, case_top=36.3,
+    wall=1.6, slab_half=8.33, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
     dome_wall=1.2, dome_max_y=21.0,   # cover over the worm's top end, allowed to rise into the rail's open top slot
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0,
     # AS5600 sensor: magnet cap on the rod end + holder screwed to the lid's outer face
@@ -346,34 +346,6 @@ def build_pinion(root, L):
     return occ, comp
 
 
-def build_spline_test(root):
-    occ, comp = new_component(root, 'Spline test')
-    for i, c in enumerate((0.10, 0.15, 0.20)):
-        x0 = i * 14.0
-        sk = comp.sketches.add(comp.xYConstructionPlane)
-        sk.sketchCurves.sketchCircles.addByCenterRadius(adsk.core.Point3D.create(x0 / 10, 0, 0), 0.5)
-        extrude(comp, sk.profiles.item(0), 7.0, NEW)
-        sk = comp.sketches.add(comp.xYConstructionPlane)
-        polyline(sk, [(x + x0, y) for x, y in spline_socket_profile(c)])
-        cut = comp.features.extrudeFeatures.createInput(largest_profile(sk), CUT)
-        cut.setDistanceExtent(False, VI(P['socket_depth']))
-        cut.participantBodies = [comp.bRepBodies.item(i)]
-        comp.features.extrudeFeatures.add(cut)
-        for k in range(i + 1):
-            sk = comp.sketches.add(offset_plane(comp, 6.0))
-            a = math.radians(90 + (k - i / 2.0) * 25)
-            cx, cy = x0 + 4.6 * math.cos(a), 4.6 * math.sin(a)
-            sk.sketchCurves.sketchLines.addCenterPointRectangle(
-                adsk.core.Point3D.create(cx / 10, cy / 10, 0), adsk.core.Point3D.create((cx + 0.6) / 10, (cy + 0.6) / 10, 0))
-            cut = comp.features.extrudeFeatures.createInput(sk.profiles.item(0), CUT)
-            cut.setDistanceExtent(False, VI(1.0))
-            cut.participantBodies = [comp.bRepBodies.item(i)]
-            comp.features.extrudeFeatures.add(cut)
-    for i, c in enumerate(('0.10', '0.15', '0.20')):
-        comp.bRepBodies.item(i).name = 'Spline test %s mm' % c
-    return occ, comp
-
-
 # ------------------------------------------------------------------ case
 class Prim:
     """Finite cylinder or oriented box: builds a TemporaryBRep body and answers point-containment queries."""
@@ -515,6 +487,36 @@ def pick_bosses(cav, keep_in, count=3):
     return chosen
 
 
+def round_outer_edges(comp, r):
+    """Round the straight edges that run along X on the case's outer outline (rail corners, top, motor pod).
+    Best effort: if Fusion can't fillet a set, the edges stay sharp."""
+    body = comp.bRepBodies.item(0)
+    bb = body.boundingBox
+    ymin, ymax, zmin, zmax = bb.minPoint.y, bb.maxPoint.y, bb.minPoint.z, bb.maxPoint.z
+    tol = 0.02
+    picked = adsk.core.ObjectCollection.create()
+    for e in body.edges:
+        g = e.geometry
+        if not isinstance(g, adsk.core.Line3D) or e.length < 0.5:
+            continue
+        a, b = e.startVertex.geometry, e.endVertex.geometry
+        if abs(a.y - b.y) > 1e-4 or abs(a.z - b.z) > 1e-4:
+            continue                                   # not parallel to X
+        on_side = abs(a.y - ymin) < tol or abs(a.y - ymax) < tol
+        on_tb = abs(a.z - zmin) < tol or abs(a.z - zmax) < tol
+        if on_side or on_tb:
+            picked.add(e)
+    if picked.count == 0:
+        return 0
+    try:
+        inp = comp.features.filletFeatures.createInput()
+        inp.addConstantRadiusEdgeSet(picked, VI(r), True)
+        comp.features.filletFeatures.add(inp)
+        return picked.count
+    except Exception:
+        return -1
+
+
 def build_case(root, L):
     tbm = adsk.fusion.TemporaryBRepManager.get()
     env, cav, trims, mo_len, dome = case_shapes(L)
@@ -569,6 +571,7 @@ def build_case(root, L):
                                                 r=0.85).brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
         occ, comp = new_component(root, name)
         add_bodies(comp, [(name, half)])
+        round_outer_edges(comp, P['edge_round'])
         out[name] = (occ, comp)
     return out, bosses, mo_len, pilots, pegs
 

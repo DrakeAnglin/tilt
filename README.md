@@ -4,7 +4,8 @@ Quiet, open-source, 3D-printable motorization for existing cordless horizontal b
 One ESP32 controller drives up to 3 blinds over Wi-Fi, with voice control through
 Alexa and Apple Home, and a setup app for calibration.
 
-> Status: **planning / v2 restart.** v1 used large hobby servos. They were loud, could only turn 180°,
+> Status: **tilt mechanism v0.3, ready for a test print** (see [hardware/mechanical/ASSEMBLY.md](hardware/mechanical/ASSEMBLY.md)).
+> History: **v2 restart.** v1 used large hobby servos. They were loud, could only turn 180°,
 > and burned out from being powered all the time. v2 uses small gear motors with encoders that switch
 > off once they reach position.
 
@@ -13,7 +14,7 @@ Alexa and Apple Home, and a setup app for calibration.
 | | |
 |---|---|
 | Controller | ESP32-S3 on a custom PCB, 3 motor ports (+1 spare) |
-| Motors | N20 micro gear motor with Hall encoder (being validated, see [motor analysis](docs/motor-analysis.md)) |
+| Motors | N20 micro gear motor (no encoder) driving the factory worm through a printed helical gear; AS5600 magnetic sensor reads the tilt rod |
 | Power | One 5 V USB-C wall adapter. No mains wiring on the board |
 | Smart home | Matter over Wi-Fi as a Window Covering device: Apple Home, Alexa, Google Home, Home Assistant |
 | Setup | Web app served by the controller, optional phone app later |

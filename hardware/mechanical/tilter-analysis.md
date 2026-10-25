@@ -85,6 +85,19 @@ which matches module 0.88 (π × 0.88 = 2.76). The worm and wheel are a matched 
 - Lead angle ≈ atan(2.76 / (π × 9.24)) ≈ 5.4°: **self-locking**.
 - The wand loop connector engages only the bottom ~5 mm splined section (5.6 mm Ø).
 
+## Current design (v0.3): crossed helical, worm at 60°, AS5600 sensing
+Changes from v0.2 (2026-10-25):
+- **Worm 56° → 60°.** At 56° the worm's top end sat above the case. No angle fits the worm plus a cover inside the
+  36.5 mm rail, so the case now has a **dome** that rises 2.1 mm into the rail's open top slot (6.5 mm frame gap above).
+  60° keeps the dome lowest while the gears still clear the floor by ≥ 1.1 mm (search: tools/layout_helical.py).
+- **Spline socket 0.10 mm** clearance (owner's fit test, cup #1).
+- **Position sensing:** AS5600 board + 6 × 2.5 mm diametric magnet on the rod end (magnet cap + sensor holder).
+- Motor screws counterbored inside the pinion pocket. Two alignment pegs between the case halves. 1 mm rounded outer edges.
+- Adapter collar gives 0.95 mm of wall around the spline socket, then a 45° taper to a 6 mm shaft.
+- Verification is automated (tools/fusion_verify.py): interference incl. the rail, clearances, gear phase + full-rev sweep.
+
+See [stl/README.md](stl/README.md) for the measured clearances and [ASSEMBLY.md](ASSEMBLY.md) for the build.
+
 ## Chosen concept (v0.2): crossed helical at the factory 56° angle
 The headrail has a **corner notch** (12 tall × 10.5 into the floor × 12 wide along the rod) where the factory tilter's
 tube exits. A printed block fills it, and the housing presses between the rail walls. The adapter must exit through

@@ -1,5 +1,7 @@
 # Motorized tilter: build & test guide (v0.3)
 
+![closed housing](../../docs/renders/v03-closed-iso.png)
+
 This replaces the blind's factory tilter with a printed housing that keeps the factory **worm** and **worm wheel**,
 adds a small N20 gear motor, and keeps the wand working by hand. An AS5600 magnetic sensor reads the tilt rod's angle.
 
@@ -30,7 +32,7 @@ Suggested: 0.4 mm nozzle, 4 walls, 30–40 % infill, no supports needed.
 | Item | Qty | Notes |
 |---|---|---|
 | Factory worm, worm wheel | 1 each | From the blind's tilter (drill out the 3 rivets) |
-| N20 gear motor, **no encoder**, 3 mm D-shaft | 1 | 5–6 V. ~1:30–1:100 so the wand can still turn it by hand |
+| N20 gear motor, **no encoder**, 3 mm D-shaft (≥ 9 mm long) | 1 | 5–6 V. **1:30–1:50 recommended** so the wand can still back-drive it; full 60° travel is ~3 motor turns |
 | M2 × 16 screw (self-tapping or machine) | 3 | Case halves |
 | M2 × 10 screw | 2 | Sensor holder to the lid |
 | M1.6 × 4 screw | 2 | N20 gearbox face (counterbored inside the case) |
@@ -51,12 +53,14 @@ Suggested: 0.4 mm nozzle, 4 walls, 30–40 % infill, no supports needed.
    and meshes with the pinion. The loop hangs out through the notch block.
 6. **Check by hand:** turn the adapter loop. The worm wheel should turn smoothly, and so should the motor (it back-drives
    through the gears). Nothing should rub.
-7. **Lid:** fit `case_left`, 3 × M2 × 16.
+7. **Lid:** fit `case_left` (2 pegs locate it), then 3 × M2 × 16.
 8. **Sensor:** push the magnet into `magnet_cap` (any orientation, diametric magnets are symmetric for this). Push the
    cap onto the rod end until it touches the worm wheel's barrel. Slide the AS5600 board into `sensor_holder` from the
    top, chip facing the magnet, then screw the holder to the lid (2 × M2 × 10).
-9. **Install:** slide the rod through the worm wheel, hook the housing under the rail's lips and press it down between
-   the walls until the block drops into the corner notch. Hook the wand onto the teardrop loop.
+9. **Install:** position the housing so the block lines up with the rail's corner notch and there's ≥ 15 mm between
+   the lid and the end cap for the sensor holder. Slide the rod through the worm wheel, press the housing down between
+   the walls until the block drops into the notch (the small dome over the worm sits in the rail's open top slot), and
+   hook the wand onto the teardrop loop.
 
 ## First power-on test (bench)
 - 5 V through the motor driver, low PWM first. Slats should tilt smoothly through the full ~60° in about a second.
