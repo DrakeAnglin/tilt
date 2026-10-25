@@ -12,9 +12,10 @@ Face photo scale: ruler 0–100 mm ≈ 10.4 px/mm. The face shown is the headrai
 | Overall face envelope | ≈ 61 × 45 mm (excl. wand loop) | Photo. Spans the full rail cross-section; top hook clips over the rear lip |
 | Square bore → bottom of frame | ≈ 23.5 mm | Photo. Matches the 24 mm rod axis, so the frame bottom sits on the rail floor |
 | Worm wheel OD | ≈ 15 mm | Photo |
-| Worm axis | ≈ 65–70° from horizontal, sloping down to the front-bottom corner where the wand loop exits | Photo |
+| Worm axis | ≈ **55–65°** from horizontal (back-face photo reads ~56°), sloping down to the front-bottom corner where the wand loop exits | Photos |
+| Worm assembly length along its axis | ≈ 44 mm from the upper end cap (≈ 6 mm Ø) to the base of the wand loop | [back face](../../docs/reference/tilter-back-face-ruler.jpg) |
 | Worm housing tube OD | ≈ 10 mm (worm itself ≈ 6–7 mm) | Photo |
-| Housing | Sealed two-half clear shell, **3 screws** (can be opened) | Photo |
+| Housing | Two-half clear shell held by **3 rivets** (owner drilled them out). A printed housing would use M2 screws | Owner |
 | Worm back end | **Enclosed**, ends close to the top of the rail. No room for a coaxial motor | Owner + photo |
 | Wand travel | "A few full turns" closed → closed | Owner |
 | Rod travel | ≈ 60° closed → closed | Owner |
