@@ -1,7 +1,8 @@
-"""TiltParts: printable parts for the motorized tilter, test-fit version v0.2 (crossed helical).
+"""TiltParts: printable parts for the motorized tilter, version v0.3 (crossed helical).
 
-Layout: factory worm wheel on the 4 mm square rod, factory worm at the factory 56° slope, so the wand still exits
-through the headrail's existing corner notch. A new printed ADAPTER slides on the worm's 8-ridge spline. It carries
+Layout: factory worm wheel on the 4 mm square rod, factory worm at 60° (factory 56°), so the wand still exits
+through the headrail's existing corner notch; a small dome on the case covers the worm's top end where it rises into
+the rail's open top slot. A new printed ADAPTER slides on the worm's 8-ridge spline. It carries
 an 8T 45° helical gear and the teardrop wand loop. An N20 (no encoder) lies roughly along the rod and drives the
 adapter through a 7T 45° helical pinion. The 90° crossed helicals are 1:1-ish and NOT self-locking, so the wand
 still back-drives the motor. The 16:1 factory worm does the locking.
@@ -9,9 +10,10 @@ still back-drives the motor. The 16:1 factory worm does the locking.
 Parts (each its own component, exported to STL in its own print orientation):
   Adapter        8T helical (mn 1.0, 45° RH) + 8-ridge spline socket + Ø8.13 body + teardrop loop
   Motor pinion   7T helical (mn 1.0, 45° RH), D-bore for the N20 3 mm shaft, small hub
-  Case left      lid half (X < 0)
+  Case left      lid half (X < 0), 2 pilot holes for the sensor holder
   Case right     main half (X > 0) with the motor pod and the notch block
-  Spline test    three cups with socket clearances 0.10 / 0.15 / 0.20 mm (1 / 2 / 3 rim notches)
+  Magnet cap     pushes onto the tilt rod's end, holds a 6 x 2.5 mm diametric magnet on the rod axis
+  Sensor holder  screws to the lid, holds an AS5600 breakout (<= 23.4 mm square) facing the magnet
 Reference bodies (not printed): rail with its corner notch, rod, worm wheel, worm, N20.
 
 Global coordinates (mm): X along the rod (0 = tilter mid-plane, +X toward the tilt drums), Y across the rail
@@ -28,7 +30,7 @@ import adsk.fusion
 
 # ------------------------------------------------------------------ parameters (mm / deg)
 P = dict(
-    worm_angle=56.0, cd_worm=11.64, rod_z=24.0, rod=4.0,
+    worm_angle=60.0, cd_worm=11.64, rod_z=24.0, rod=4.0,
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0,
     # corner notch in the rail (measured from the outside): 12 tall, 10.5 into the floor, 12 wide along the rod
     notch_h=12.0, notch_d=10.5, notch_w=12.0, notch_clear=0.15,
@@ -37,16 +39,21 @@ P = dict(
     z_adapter=8, z_pinion=7,
     adapter_face=2.6, pinion_face=6.0, pinion_hub_d=6.5, pinion_hub=1.5,
     pinion_gap=3.0,           # pinion face to N20 gearbox face
-    motor_rot=5.0,            # motor axis swung about the worm axis (0 = parallel to the rod)
+    motor_rot=0.0,            # motor axis swung about the worm axis (0 = parallel to the rod)
     # adapter
     mouth_s=18.97, collar_d=8.2, body_d=6.0, body_len=19.0,
-    spline_od=6.0, spline_root=5.0, spline_n=8, socket_depth=5.3, spline_clear=0.15,
+    spline_od=6.0, spline_root=5.0, spline_n=8, socket_depth=5.3, spline_clear=0.10,   # owner's fit test: 0.10 fits best
     loop_center=25.0, loop_r_out=5.2, loop_r_in=2.6, loop_t=3.4,
     # N20 (no encoder)
     n20_w=12.0, n20_h=10.0, n20_gbx=9.0, n20_motor=15.0, n20_end=1.0, n20_shaft_d=3.0, n20_flat=2.5,
     n20_screw_spacing=9.0,
     # case
     wall=1.6, slab_half=8.33, case_w=55.4, case_floor=0.2, case_top=36.3,
+    dome_wall=1.2, dome_max_y=21.0,   # cover over the worm's top end, allowed to rise into the rail's open top slot
+    screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0,
+    # AS5600 sensor: magnet cap on the rod end + holder screwed to the lid's outer face
+    cap_d=10.0, cap_socket=6.0, cap_floor=0.8, magnet_d=6.0, magnet_t=2.5, magnet_clear=0.15,
+    sensor_gap=1.5, board_w=23.4, board_t=1.8, holder_wall=1.6,
 )
 
 TOOTH_PTS = 10
@@ -203,8 +210,18 @@ def largest_profile(sketch):
     return best
 
 
+def own_bodies(comp):
+    return [comp.bRepBodies.item(i) for i in range(comp.bRepBodies.count)]
+
+
 def extrude(comp, profile, dist_mm, op):
-    return comp.features.extrudeFeatures.addSimple(profile, VI(dist_mm), op)
+    """Extrude; joins/cuts touch ONLY this component's bodies. (Every part is built at the origin before it is
+    placed, and Fusion's default would otherwise cut or join whatever other part happens to overlap there.)"""
+    inp = comp.features.extrudeFeatures.createInput(profile, op)
+    inp.setDistanceExtent(False, VI(dist_mm))
+    if op != NEW:
+        inp.participantBodies = own_bodies(comp)
+    return comp.features.extrudeFeatures.add(inp)
 
 
 def circle_profile(comp, z_mm, r_mm):
@@ -226,6 +243,18 @@ def helical_body(comp, g, face, hand=1.0):
         loft.loftSections.add(largest_profile(sk))
     loft.isSolid = True
     return comp.features.loftFeatures.add(loft)
+
+
+def merge_bodies(comp):
+    """Join every body in the component into the first one (some feature joins leave separate lumps)."""
+    if comp.bRepBodies.count < 2:
+        return
+    tools = adsk.core.ObjectCollection.create()
+    for i in range(1, comp.bRepBodies.count):
+        tools.add(comp.bRepBodies.item(i))
+    inp = comp.features.combineFeatures.createInput(comp.bRepBodies.item(0), tools)
+    inp.operation = JOIN
+    comp.features.combineFeatures.add(inp)
 
 
 def place(occ, origin, xaxis, zaxis):
@@ -257,14 +286,24 @@ def add_bodies(comp, named_bodies):
 def build_adapter(root, L):
     occ, comp = new_component(root, 'Adapter')
     helical_body(comp, L['ga'], P['adapter_face'])
-    collar_end = P['socket_depth'] + 0.5                       # solid wall all around the spline socket
-    extrude(comp, circle_profile(comp, P['adapter_face'], P['collar_d'] / 2), collar_end - P['adapter_face'], JOIN)
-    cone_end = collar_end + (P['collar_d'] - P['body_d']) / 2  # 45° taper down to the slim body (clears the notch edge)
-    loft = comp.features.loftFeatures.createInput(JOIN)
-    loft.loftSections.add(circle_profile(comp, collar_end, P['collar_d'] / 2))
-    loft.loftSections.add(circle_profile(comp, cone_end, P['body_d'] / 2))
-    comp.features.loftFeatures.add(loft)
-    extrude(comp, circle_profile(comp, cone_end, P['body_d'] / 2), P['body_len'] - cone_end, JOIN)
+    # collar (solid wall round the spline socket) -> 45° taper -> slim body, as ONE revolved profile
+    collar_end = P['socket_depth'] + 0.5
+    cone_end = collar_end + (P['collar_d'] - P['body_d']) / 2
+    z0 = P['adapter_face'] - 0.3                               # overlaps the gear so the bodies fuse
+    rc, rb = P['collar_d'] / 2, P['body_d'] / 2
+    sk = comp.sketches.add(comp.xZConstructionPlane)
+    toS = lambda r, z: sk.modelToSketchSpace(adsk.core.Point3D.create(r / 10.0, 0, z / 10.0))
+    pts = [toS(0, z0), toS(rc, z0), toS(rc, collar_end), toS(rb, cone_end), toS(rb, P['body_len']), toS(0, P['body_len'])]
+    lines = sk.sketchCurves.sketchLines
+    prev = lines.addByTwoPoints(pts[0], pts[1])
+    first = prev.startSketchPoint
+    for q in pts[2:]:
+        prev = lines.addByTwoPoints(prev.endSketchPoint, q)
+    axis_line = lines.addByTwoPoints(prev.endSketchPoint, first)
+    rev = comp.features.revolveFeatures.createInput(sk.profiles.item(0), axis_line, JOIN)
+    rev.setAngleExtent(False, adsk.core.ValueInput.createByString('360 deg'))
+    rev.participantBodies = own_bodies(comp)
+    comp.features.revolveFeatures.add(rev)
     # teardrop loop (local XZ plane): point toward the body like the factory loop, round end outward
     sk = comp.sketches.add(comp.xZConstructionPlane)
     sk.isComputeDeferred = True
@@ -281,10 +320,12 @@ def build_adapter(root, L):
     ring = next(sk.profiles.item(i) for i in range(sk.profiles.count) if sk.profiles.item(i).profileLoops.count == 2)
     inp = comp.features.extrudeFeatures.createInput(ring, JOIN)
     inp.setSymmetricExtent(VI(P['loop_t']), True)
+    inp.participantBodies = own_bodies(comp)
     comp.features.extrudeFeatures.add(inp)
     sk = comp.sketches.add(comp.xYConstructionPlane)
     polyline(sk, spline_socket_profile(P['spline_clear']))
     extrude(comp, largest_profile(sk), P['socket_depth'], CUT)
+    merge_bodies(comp)
     comp.bRepBodies.item(0).name = 'Adapter'
     return occ, comp
 
@@ -343,7 +384,8 @@ class Prim:
 
     def brep(self, tbm):
         if self.kind == 'cyl':
-            return tbm.createCylinderOrCone(P3(self.p1), self.r / 10, P3(self.p2), self.r / 10)
+            r2 = getattr(self, 'r2', self.r)
+            return tbm.createCylinderOrCone(P3(self.p1), self.r / 10, P3(self.p2), r2 / 10)
         obb = adsk.core.OrientedBoundingBox3D.create(P3(self.c), V3(self.u), V3(self.w),
                                                      self.L / 10, self.W / 10, self.H / 10)
         return tbm.createBox(obb)
@@ -355,7 +397,8 @@ class Prim:
             ax = mul(ax, 1 / Lx)
             v = sub(p, self.p1)
             t = dot(v, ax)
-            return -grow <= t <= Lx + grow and norm(sub(v, mul(ax, t))) <= self.r + grow
+            rr = self.r + (getattr(self, 'r2', self.r) - self.r) * min(max(t / Lx, 0.0), 1.0)
+            return -grow <= t <= Lx + grow and norm(sub(v, mul(ax, t))) <= rr + grow
         v = sub(p, self.c)
         h = cross(self.u, self.w)
         return (abs(dot(v, self.u)) <= self.L / 2 + grow and abs(dot(v, self.w)) <= self.W / 2 + grow
@@ -412,12 +455,19 @@ def case_shapes(L):
         Prim('box', c=mo_c, u=u, w=w, L=mo_len + 6, W=P['n20_w'] + 0.3, H=P['n20_h'] + 0.3),        # N20, open end
         box_minmax(-P['slab_half'] + 2, P['slab_half'] - 2, 11.0, hw - 2, 3.0, 31.0),    # lightening pocket
     ]
-    for sgn in (-1, 1):                                                                  # gearbox screws M1.6
-        hp = add(L['face'], mul(w, sgn * P['n20_screw_spacing'] / 2))
-        cav.append(Prim('cyl', p1=add(hp, mul(u, -2.0)), p2=add(hp, mul(u, 0.5)), r=0.9))
+    pocket_end = P['pinion_face'] / 2 + 0.3                                            # pinion pocket face (from pin_c)
+    for sgn in (-1, 1):                                                                  # gearbox screws M1.6 x 4
+        hp = add(L['pin_c'], mul(w, sgn * P['n20_screw_spacing'] / 2))
+        cav.append(cyl_u(L, hp, pocket_end - 0.5, P['pinion_face'] / 2 + P['pinion_gap'] + 0.5, 0.9))
+        cav.append(cyl_u(L, hp, pocket_end - 0.5, pocket_end + P['screw_cbore'], P['screw_cbore_d'] / 2))
     slab = box_minmax(-P['slab_half'], P['slab_half'], -hw, hw, P['case_floor'], P['case_top'])
+    dw = P['dome_wall']
+    dome = [cyl_s(L, -4.8 - dw, 4.8, 5.9 + dw),                                        # over the threads
+            cyl_s(L, -7.3, -4.8 - dw + 0.01, 2.65 + dw),                               # over the top pin
+            Prim('cyl', p1=L['S'](-7.3), p2=L['S'](-7.3 - dw), r=2.65 + dw, r2=2.0)]   # tapered end cap
     env = [
         slab,
+        *dome,
         notch_box(-P['notch_clear']),
         Prim('box', c=add(L['face'], mul(u, (mo_len - 1) / 2)), u=u, w=w,
              L=mo_len - 1, W=P['n20_w'] + 0.3 + 2 * wall, H=P['n20_h'] + 0.3 + 2 * wall),
@@ -433,7 +483,7 @@ def case_shapes(L):
         box_minmax(-60, 80, -60, -hw, -20, 80),                       # past the room-side wall
         box_minmax(-60, 80, hw, 60, -20, 80),                         # past the back wall
     ]
-    return env, cav, trims, mo_len
+    return env, cav, trims, mo_len, dome
 
 
 def pick_bosses(cav, keep_in, count=3):
@@ -467,9 +517,14 @@ def pick_bosses(cav, keep_in, count=3):
 
 def build_case(root, L):
     tbm = adsk.fusion.TemporaryBRepManager.get()
-    env, cav, trims, mo_len = case_shapes(L)
+    env, cav, trims, mo_len, dome = case_shapes(L)
     hw = P['case_w'] / 2
-    bosses = pick_bosses(cav, lambda y, z: abs(y) < hw - 3 and 3 < z < P['case_top'] - P['lip_h'] - 2)
+    picks = pick_bosses(cav, lambda y, z: abs(y) < hw - 3 and 3 < z < P['case_top'] - P['lip_h'] - 2, count=5)
+    bosses, pegs = picks[:3], picks[3:]
+    # sensor holder pilots: inside the holder footprint, clear of the barrel and every cavity
+    bw = P['board_w'] / 2 + P['holder_wall']
+    pilots = pick_bosses(cav, lambda y, z: abs(y) < bw - 2 and abs(z - P['rod_z']) < bw - 2
+                         and math.hypot(y, z - P['rod_z']) > 8.5, count=2)
     body = None
     for e in env:
         b = e.brep(tbm)
@@ -478,9 +533,15 @@ def build_case(root, L):
         else:
             tbm.booleanOperation(body, b, adsk.fusion.BooleanTypes.UnionBooleanType)
     keep = notch_box(-P['notch_clear'])
+    dome_keep = dome[0].brep(tbm)
+    for dpart in dome[1:]:
+        tbm.booleanOperation(dome_keep, dpart.brep(tbm), adsk.fusion.BooleanTypes.UnionBooleanType)
+    tbm.booleanOperation(dome_keep, box_minmax(-60, 80, -P['dome_max_y'], P['dome_max_y'], 0, 60).brep(tbm),
+                         adsk.fusion.BooleanTypes.IntersectionBooleanType)
     for t in trims:
         tool = t.brep(tbm)
         tbm.booleanOperation(tool, keep.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        tbm.booleanOperation(tool, dome_keep, adsk.fusion.BooleanTypes.DifferenceBooleanType)
         tbm.booleanOperation(body, tool, adsk.fusion.BooleanTypes.DifferenceBooleanType)
     for c in cav:
         tbm.booleanOperation(body, c.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
@@ -494,10 +555,83 @@ def build_case(root, L):
             r = 1.1 if name == 'Case left' else 0.85
             tbm.booleanOperation(half, Prim('cyl', p1=(-9, y, z), p2=(9, y, z), r=r).brep(tbm),
                                  adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        for y, z in pegs:                       # alignment pegs on the main half, sockets in the lid
+            if name == 'Case right':
+                tbm.booleanOperation(half, Prim('cyl', p1=(0, y, z), p2=(-P['peg_h'], y, z), r=P['peg_d'] / 2).brep(tbm),
+                                     adsk.fusion.BooleanTypes.UnionBooleanType)
+            else:
+                tbm.booleanOperation(half, Prim('cyl', p1=(0.1, y, z), p2=(-P['peg_h'] - 0.4, y, z),
+                                                r=P['peg_d'] / 2 + 0.15).brep(tbm),
+                                     adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        if name == 'Case left':
+            for y, z in pilots:                 # M2 pilots for the sensor holder, from the lid's outer face
+                tbm.booleanOperation(half, Prim('cyl', p1=(-P['slab_half'] - 1, y, z), p2=(-P['slab_half'] + 6, y, z),
+                                                r=0.85).brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
         occ, comp = new_component(root, name)
         add_bodies(comp, [(name, half)])
         out[name] = (occ, comp)
-    return out, bosses, mo_len
+    return out, bosses, mo_len, pilots, pegs
+
+
+def build_magnet_cap(root):
+    """Local Z = rod axis pointing away from the case (-X in the assembly). Z=0 rests on the worm-wheel barrel."""
+    occ, comp = new_component(root, 'Magnet cap')
+    total = P['cap_socket'] + P['cap_floor'] + P['magnet_t'] + 0.1
+    extrude(comp, circle_profile(comp, 0, P['cap_d'] / 2), total, NEW)
+    sk = comp.sketches.add(comp.xYConstructionPlane)
+    a = P['rod'] / 2 + 0.08
+    polyline(sk, [(-a, -a), (a, -a), (a, a), (-a, a)])
+    extrude(comp, sk.profiles.item(0), P['cap_socket'], CUT)
+    top = total
+    cut = comp.features.extrudeFeatures.createInput(
+        circle_profile(comp, top, P['magnet_d'] / 2 + P['magnet_clear']), CUT)
+    cut.setDistanceExtent(False, VI(-(P['magnet_t'] + 0.1)))
+    cut.participantBodies = own_bodies(comp)
+    comp.features.extrudeFeatures.add(cut)
+    comp.bRepBodies.item(0).name = 'Magnet cap'
+    return occ, comp, total
+
+
+def sensor_x(cap_len):
+    """X positions (assembly) of the magnet face and the board's front face."""
+    magnet_face = -P['slab_half'] - cap_len
+    board_front = magnet_face - P['sensor_gap']
+    return magnet_face, board_front
+
+
+def build_sensor_holder(root, cap_len, pilots):
+    """Built in assembly coordinates (it is only translated, never rotated); exported as-is."""
+    tbm = adsk.fusion.TemporaryBRepManager.get()
+    occ, comp = new_component(root, 'Sensor holder')
+    z0 = P['rod_z']
+    hb = P['board_w'] / 2                      # half board
+    t = P['holder_wall']
+    _, front = sensor_x(cap_len)
+    back = front - P['board_t']
+    x_back = back - t
+    x_face = -P['slab_half']
+    ymax = hb + t
+    zlo = z0 - hb - 0.2 - t
+    zhi = min(z0 + hb + 1.0, P['case_top'] - 0.2)
+    parts = [
+        box_minmax(x_back, x_face, ymax - t, ymax, zlo, zhi),            # side walls (form a tunnel round the cap)
+        box_minmax(x_back, x_face, -ymax, -ymax + t, zlo, zhi),
+        box_minmax(x_back, front + 1.0, -ymax, ymax, zlo, zlo + t),      # bottom bar the board stands on
+        box_minmax(x_back, back, -ymax, ymax, zlo, z0 + hb - 6.0),       # back plate (top left open for the header)
+        box_minmax(front, front + 1.0, hb - 1.5, ymax, zlo, zhi),         # front lips keep the board in its slot
+        box_minmax(front, front + 1.0, -ymax, -hb + 1.5, zlo, zhi),
+        box_minmax(x_face - t, x_face, -ymax, ymax, zlo, zhi),            # flange on the lid face
+    ]
+    body = parts[0].brep(tbm)
+    for pr in parts[1:]:
+        tbm.booleanOperation(body, pr.brep(tbm), adsk.fusion.BooleanTypes.UnionBooleanType)
+    hole = Prim('cyl', p1=(x_face + 1, 0, z0), p2=(x_face - t - 1, 0, z0), r=P['cap_d'] / 2 + 0.8)
+    tbm.booleanOperation(body, hole.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
+    for y, z in pilots:
+        tbm.booleanOperation(body, Prim('cyl', p1=(x_face + 1, y, z), p2=(x_face - t - 1, y, z), r=1.1).brep(tbm),
+                             adsk.fusion.BooleanTypes.DifferenceBooleanType)
+    add_bodies(comp, [('Sensor holder', body)])
+    return occ, comp
 
 
 def build_refs(root, L, mo_len):
@@ -513,6 +647,10 @@ def build_refs(root, L, mo_len):
         ('N20 shaft', cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 1.0, P['pinion_face'] / 2 + P['pinion_gap'],
                             P['n20_shaft_d'] / 2)),
     ]
+    cap_len = P['cap_socket'] + P['cap_floor'] + P['magnet_t'] + 0.1
+    mf, bf = sensor_x(cap_len)
+    items.append(('Magnet', Prim('cyl', p1=(mf + P['magnet_t'], 0, P['rod_z']), p2=(mf, 0, P['rod_z']), r=P['magnet_d'] / 2)))
+    items.append(('AS5600 board', box_minmax(bf - 1.6, bf, -11.5, 11.5, P['rod_z'] - 11.5, P['rod_z'] + 11.5)))
     for i, (s0, s1, r) in enumerate([(-7, -4.5, 2.5), (-4.5, 4.5, 5.5), (4.5, 7, 2.8), (7, 8.6, 4.75),
                                      (8.6, 17, 2.8), (17, 18.77, 4.75), (18.77, 23.77, 3.0)]):
         items.append(('Worm %d' % i, cyl_s(L, s0, s1, r)))
@@ -554,29 +692,31 @@ def build(design, export_dir=None):
     L = layout()
     _, adapter = build_adapter(root, L)
     _, pinion = build_pinion(root, L)
-    _, test = build_spline_test(root)
-    cases, bosses, mo_len = build_case(root, L)
+    cases, bosses, mo_len, pilots, pegs = build_case(root, L)
+    _, cap, cap_len = build_magnet_cap(root)
+    _, holder = build_sensor_holder(root, cap_len, pilots)
     _, refs = build_refs(root, L, mo_len)
 
     def occ_named(name):
         return next(root.occurrences.item(i) for i in range(root.occurrences.count)
                     if root.occurrences.item(i).component.name == PREFIX + name)
-    place(occ_named('Spline test'), (0, 70, 0), (1, 0, 0), (0, 0, 1))
     place(occ_named('Motor pinion'), add(L['pin_c'], mul(L['u'], -P['pinion_face'] / 2)), L['w'], L['u'])
+    place(occ_named('Magnet cap'), (-P['slab_half'], 0, P['rod_z']), (0, 1, 0), (-1, 0, 0))
     place(occ_named('Adapter'), L['S'](P['mouth_s']), L['X'], L['d'])
 
     color(design, adapter, 'Plastic - Glossy (Yellow)')
     color(design, pinion, 'Plastic - Glossy (Yellow)')
-    color(design, test, 'Plastic - Glossy (Green)')
     color(design, cases['Case left'][1], 'Plastic - Translucent Matte (Blue)')
     color(design, cases['Case right'][1], 'Plastic - Matte (Blue)')
     color(design, refs, 'Plastic - Matte (White)')
+    color(design, cap, 'Plastic - Glossy (Green)')
+    color(design, holder, 'Plastic - Matte (Green)')
 
     files = []
     if export_dir:
         os.makedirs(export_dir, exist_ok=True)
         em = design.exportManager
-        for nm, comp in (('adapter', adapter), ('motor_pinion', pinion), ('spline_test', test),
+        for nm, comp in (('adapter', adapter), ('motor_pinion', pinion), ('magnet_cap', cap), ('sensor_holder', holder),
                          ('case_left', cases['Case left'][1]), ('case_right', cases['Case right'][1])):
             path = os.path.join(export_dir, nm + '.stl')
             opt = em.createSTLExportOptions(comp, path)
@@ -591,6 +731,8 @@ def build(design, export_dir=None):
         'Center distance %.2f mm, motor axis swung %.0f°' % (L['cd'], P['motor_rot']),
         'Pinion center (Y, Z): (%.1f, %.1f)' % (L['pin_c'][1], L['pin_c'][2]),
         'Screw holes (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in bosses),
+        'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
+        'Sensor holder pilots (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pilots),
         'Exported: %s' % ', '.join(os.path.basename(f) for f in files),
     ])
 

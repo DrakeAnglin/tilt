@@ -67,6 +67,7 @@ def main():
     e = sub.add_parser('exec')
     e.add_argument('file', nargs='?')
     e.add_argument('-c', dest='code')
+    e.add_argument('--timeout', type=int, default=120, help='seconds to wait for Fusion (long checks need more)')
     s = sub.add_parser('shot')
     s.add_argument('path')
     s.add_argument('--view', default='iso')
@@ -79,7 +80,7 @@ def main():
         show({'ok': True, 'result': call('/ping')})
     elif a.cmd == 'exec':
         code = a.code if a.code is not None else open(a.file).read()
-        show(call('/exec', {'code': code}))
+        show(call('/exec', {'code': code, 'timeout': a.timeout}, timeout=a.timeout + 30))
     elif a.cmd == 'shot':
         w, h = (int(x) for x in a.size.lower().split('x'))
         show(call('/screenshot', {'path': os.path.abspath(a.path), 'width': w, 'height': h,
