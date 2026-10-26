@@ -28,7 +28,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 |---|---|---|
 | Factory worm + worm wheel | 1 each | From the blind's tilter (drill out the 3 rivets) |
 | N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9.5 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full travel ≈ 13 motor turns (~2.5–4 s) |
-| M1.6 × 4 screw | 2 | N20 gearbox face (heads sink into counterbores in the pinion pocket) |
+| M1.6 × 4 screw | 1 | N20 gearbox face, the hole away from the adapter gear (head sinks into a counterbore in the pinion pocket) |
 | M2 × 16 screw | 3 | Tilter halves (heads sit flush in the lid) |
 | M2 heat-set insert | 1 | Lid, bottom-right AS5600 standoff (the top-left one threads into a pilot hole) |
 | M2 × 5 mm standoff (male-female) + M2 × 4 screw | 2 + 2 | AS5600 board |
@@ -39,7 +39,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 ## Tilter assembly
 1. **Strip the factory tilter:** drill out the 3 rivets and keep the worm and worm wheel.
 2. **Motor:** push the N20's gearbox into the rectangular socket in the back face of `case_right` until its face seats
-   against the wall. Fit 2 × M1.6 × 4 from inside the pinion pocket. The rest of the motor sticks out the back.
+   against the wall. Fit 1 × M1.6 × 4 from inside the pinion pocket (the socket stops rotation; one screw holds it in). The rest of the motor sticks out the back.
 3. **Pinion:** press `motor_pinion` onto the shaft, hub toward the motor, until the hub touches the wall (CA on the flat
    if loose).
 4. **Worm wheel:** drop it into its pocket, barrel through the bearing hole.

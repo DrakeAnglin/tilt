@@ -19,7 +19,7 @@ sensor needs a **diametrically** magnetized 6 × 2.5 mm magnet, 0.5–2 mm from 
 | ESP32-S3 dev board (N8R2 / N8R8) | 3 (+1 spare) | One per controller |
 | DRV8833 dual motor driver board | 6 (+spares) | 2 per controller (3 motors each) |
 | 5 V 3 A USB-C power supply | 3 | One per controller |
-| M1.6 × 4 screws | 16+ | N20 gearbox face, 2 per motor |
+| M1.6 × 4 screws | 8+ | N20 gearbox face, 1 per motor |
 | M2 screws: × 16 (24) and × 12 (16) | — | Tilter halves (3 each), sensor halves (2 each). An M2 assortment covers both |
 | Plastic-safe grease (PTFE, e.g. Super Lube) | 1 | Worm, worm gear, helical gears |
 | 6-core 24–26 AWG cable | ~25 m | One 5-wire run per blind to its controller: motor ±, 3V3, GND, sensor OUT |

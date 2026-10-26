@@ -39,7 +39,7 @@ P = dict(
     mn=1.0, helix=45.0, pressure=20.0, addendum=0.85, dedendum=1.25, backlash=0.15, cd_extra=0.20,
     z_adapter=8, z_pinion=7,
     adapter_face=2.6, pinion_face=5.0, pinion_hub_d=6.5, pinion_hub=3.0,
-    pinion_gap=4.5,           # pinion face to N20 gearbox face (room for a sealing wall between gear chamber and motor pocket)
+    pinion_gap=5.0,           # pinion face to N20 gearbox face (room for a sealing wall between gear chamber and motor pocket)
     motor_rot=0.0,            # motor axis swung about the worm axis (0 = parallel to the rod)
     # adapter
     mouth_s=18.97, collar_d=8.2, body_d=6.0, body_len=19.0,
@@ -56,6 +56,7 @@ P = dict(
     worm_free_clear=0.7,      # thread ends and lower flange never touch
     worm_pin_end_clear=0.4,   # top pin end never touches   # top between the lips rises flush with the headrail top (owner: 2.8 mm room)
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0, lid_cbore_d=4.2, lid_cbore=1.8,
+    screw_wall=2.0,           # min wall around case screw counterbores / pilots (screws and inserts push plastic out)
     # AS5600 sensor, integrated: a 20T sensor gear meshes with the BACK of the factory worm wheel (which turns with
     # the rod; full travel ≈ 250–270° of rod = ~200–215° at the magnet, still under one turn); its shaft runs through the lid to a magnet head; the AS5600 board sits on standoffs screwed into
     # heat-set inserts in the lid's outer face, chip facing the magnet.
@@ -445,33 +446,50 @@ def case_shapes(L):
     mo_c = add(L['face'], mul(u, (mo_len + 6) / 2))
     hw = P['case_w'] / 2
     thr, free = P['worm_thrust_clear'], P['worm_free_clear']
+    win_s0 = mouth - 0.2
+    win_s1 = mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 2.0   # runs past the collar so its lower edge exits the side wall cleanly
     pin_end = -7.0 - P['worm_pin_end_clear']
-    cav = [
-        Prim('cyl', p1=add(rc, (-4.15, 0, 0)), p2=add(rc, (4.15, 0, 0)), r=8.3),       # wheel teeth
-        Prim('cyl', p1=add(rc, (-9.5, 0, 0)), p2=add(rc, (slab_right(L) + 1, 0, 0)), r=6.4),  # barrel bearings / rod
+    named = [
+        ('wheel teeth', Prim('cyl', p1=add(rc, (-4.15, 0, 0)), p2=add(rc, (4.15, 0, 0)), r=8.3)),
+        ('barrel bore', Prim('cyl', p1=add(rc, (-9.5, 0, 0)), p2=add(rc, (slab_right(L) + 1, 0, 0)), r=6.4)),
         # Worm: ONE thrust collar (the upper flange, tight both ways); every other end face has free play so only
         # one pair of faces ever carries thrust. Radial support: top-pin journal + shaft bearing between the flanges.
-        cyl_s(L, pin_end, -4.5, 2.65),                                                   # top pin journal
-        cyl_s(L, -4.5 - free, 4.5 + free, 5.9),                                          # threads (free ends)
-        *sensor_cavities(),
-        cyl_s(L, 4.5 + free - 0.01, 7.0 - thr, 3.4),
-        cyl_s(L, 7.0 - thr, 8.6 + thr, 5.1),                                             # upper flange = thrust collar
-        cyl_s(L, 8.6 + thr, 17.0 - free, 2.95),                                          # shaft bearing
-        cyl_s(L, 17.0 - free, mouth + 0.1, 5.1),                                         # lower flange (free)
-        cyl_s(L, mouth - 0.2, mouth + P['adapter_face'] + 0.3, ga['ra'] + 0.3),          # adapter gear
-        cyl_s(L, mouth + P['adapter_face'],
-              mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 0.3, P['collar_d'] / 2 + 0.3),  # collar + taper
-        cyl_s(L, mouth + P['socket_depth'] + 0.5, mouth + 40, P['body_d'] / 2 + 0.3),   # adapter body, exits
-        cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 0.3, P['pinion_face'] / 2 + 0.3, gp['ra'] + 0.6),   # pinion
-        cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5, 0, 2.0),                       # shaft tip
-        cyl_u(L, L['pin_c'], 0, P['pinion_face'] / 2 + P['pinion_gap'] + 0.1, 4.0),      # hub + gearbox boss
-        Prim('box', c=mo_c, u=u, w=w, L=mo_len + 6, W=P['n20_w'] + 0.3, H=P['n20_h'] + 0.3),        # N20, open end
+        ('worm top pin', cyl_s(L, pin_end, -4.5, 2.65)),
+        ('worm threads', cyl_s(L, -4.5 - free, 4.5 + free, 5.9)),
+        *zip(('sensor gear', 'sensor shaft', 'magnet head'), sensor_cavities()),
+        ('worm thread gap', cyl_s(L, 4.5 + free - 0.01, 7.0 - thr, 3.4)),
+        ('worm upper flange', cyl_s(L, 7.0 - thr, 8.6 + thr, 5.1)),
+        ('worm shaft bearing', cyl_s(L, 8.6 + thr, 17.0 - free, 2.95)),
+        ('worm lower flange', cyl_s(L, 17.0 - free, mouth + 0.1, 5.1)),
+        ('adapter gear', cyl_s(L, mouth - 0.2, mouth + P['adapter_face'] + 0.3, ga['ra'] + 0.3)),
+        # side window by the adapter gear + collar: their side wall would be < 1 mm; the rail wall closes the opening
+        ('adapter gear side window', Prim('box', c=add(L['S']((win_s0 + win_s1) / 2), mul(L['n'], ga['ra'] + 1.0)),
+                                          u=L['d'], w=(1, 0, 0), L=win_s1 - win_s0, W=2 * (ga['ra'] + 0.3), H=9.0)),
+        ('adapter collar', cyl_s(L, mouth + P['adapter_face'],
+                                 mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 0.3,
+                                 P['collar_d'] / 2 + 0.3)),
+        ('adapter exit', cyl_s(L, mouth + P['socket_depth'] + 0.5, mouth + 40, P['body_d'] / 2 + 0.3)),
+        # wide enough to merge cleanly with the worm's lower-flange and collar pockets (no knife-edge slivers)
+        ('pinion', cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 0.3, P['pinion_face'] / 2 + 0.3, gp['ra'] + 1.5)),
+        # open the thin skin under the pinion instead of leaving a wall a slicer can't print (rail floor closes it)
+        # (only down to Z -0.5: the notch block keeps 1.5 mm of bottom, so nothing opens to the outside)
+        ('pinion floor window', box_minmax(-P['pinion_face'] / 2 - 0.3, P['pinion_face'] / 2 + 0.3,
+                                           -21.0, L['pin_c'][1] + gp['ra'] + 1.5, -0.5, L['pin_c'][2])),
+        ('motor shaft tip', cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5, 0, 2.0)),
+        ('motor hub', cyl_u(L, L['pin_c'], 0, P['pinion_face'] / 2 + P['pinion_gap'] + 0.1, P['pinion_hub_d'] / 2 + 0.45)),
+        ('motor socket', Prim('box', c=mo_c, u=u, w=w, L=mo_len + 6, W=P['n20_w'] + 0.3, H=P['n20_h'] + 0.3)),
     ]
     pocket_end = P['pinion_face'] / 2 + 0.3                                            # pinion pocket face (from pin_c)
-    for sgn in (-1, 1):                                                                  # gearbox screws M1.6 x 4
-        hp = add(L['pin_c'], mul(w, sgn * P['n20_screw_spacing'] / 2))
-        cav.append(cyl_u(L, hp, pocket_end - 0.5, P['pinion_face'] / 2 + P['pinion_gap'] + 0.5, 0.9))
-        cav.append(cyl_u(L, hp, pocket_end - 0.5, pocket_end + P['screw_cbore'], P['screw_cbore_d'] / 2))
+    # gearbox screw M1.6 x 4: only the hole on the side AWAY from the adapter gear (the other one's head would sit at
+    # the edge of the adapter gear's path). The socket stops rotation; one screw holds the motor axially.
+    far = max((-1, 1), key=lambda sg: norm(sub(add(L['pin_c'], mul(w, sg * 4.5)), L['gear_c'])))
+    hp = add(L['pin_c'], mul(w, far * P['n20_screw_spacing'] / 2))
+    named.append(('motor screw hole', cyl_u(L, hp, pocket_end - 0.5, P['pinion_face'] / 2 + P['pinion_gap'] + 0.5, 0.9)))
+    named.append(('motor screw counterbore', cyl_u(L, hp, pocket_end - 0.5, pocket_end + P['screw_cbore'],
+                                                   P['screw_cbore_d'] / 2)))
+    for nm, pr in named:
+        pr.label = nm
+    cav = [pr for _, pr in named]
     x_right = slab_right(L)        # main half is thicker: the N20 gearbox sits in a short socket in its back face
     slab = box_minmax(-P['slab_half'], x_right, -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
@@ -498,7 +516,7 @@ def case_shapes(L):
     return env, cav, trims, mo_len, dome
 
 
-def pick_bosses(cav, keep_in, count=3):
+def pick_bosses(cav, keep_in, count=3, clear_r=1.9):
     """M2 screw positions along X through the slab: clear of every cavity, inside the slab cross-section."""
     cands = []
     for yi in range(-25, 26):
@@ -511,7 +529,7 @@ def pick_bosses(cav, keep_in, count=3):
                 x = xi * 2.0
                 for k in range(6):
                     a = k * math.pi / 3
-                    q = (x, y + 1.9 * math.cos(a), z + 1.9 * math.sin(a))
+                    q = (x, y + clear_r * math.cos(a), z + clear_r * math.sin(a))
                     if any(c.contains(q) for c in cav):
                         ok = False
                         break
@@ -557,21 +575,41 @@ def round_outer_edges(comp, r):
         return -1
 
 
-def build_case(root, L):
-    tbm = adsk.fusion.TemporaryBRepManager.get()
+def case_plan(L):
+    """Everything that defines the two case halves: envelope, cavities, trims, and the per-half holes / pegs.
+    Used by build_case() and by tools/fusion_wallcheck.py (so the checker sees exactly what gets built)."""
     env, cav, trims, mo_len, dome = case_shapes(L)
     hw = P['case_w'] / 2
     on_board = board_footprint(margin=2.0)        # case screws stay out from under the AS5600 board
-    # keep screw counterbores (Ø%.1f) >= 2.5 mm from the side walls, the floor and the lip steps at the top corners
-    cb = P['lid_cbore_d'] / 2 + 2.5
+    cb = P['lid_cbore_d'] / 2 + P['screw_wall']   # counterbore radius + wall to the side walls, floor and lip steps
     def screw_ok(y, z):
         if abs(y) > hw - cb or z < P['case_floor'] + cb:
             return False
         if abs(y) > hw - P['lip_in'] - cb and z > P['case_top'] - P['lip_h'] - cb:
             return False                          # next to the lip step
         return z < P['case_top'] - cb and not on_board(y, z)
-    picks = pick_bosses(cav, screw_ok, count=5)
+    picks = pick_bosses(cav, screw_ok, count=5, clear_r=P['lid_cbore_d'] / 2 + P['screw_wall'])
     bosses, pegs = picks[:3], picks[3:]
+    x0 = -P['slab_half']
+    X = lambda xa, xb, y, z, r: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r)
+    holes = {'Case left': [], 'Case right': []}
+    for y, z in bosses:
+        holes['Case left'].append(('screw clearance', X(-9, 9, y, z, 1.1)))
+        holes['Case left'].append(('screw counterbore', X(x0 - 1, x0 + P['lid_cbore'], y, z, P['lid_cbore_d'] / 2)))
+        holes['Case right'].append(('screw pilot', X(-9, 9, y, z, 0.85)))
+    for y, z in pegs:
+        holes['Case right'].append(('peg socket', X(-0.1, P['peg_h'] + 0.4, y, z, P['peg_d'] / 2 + 0.15)))
+    for (y, z), kind, r, depth in board_hole_plan():
+        holes['Case left'].append(('AS5600 ' + kind, X(x0 - 1, x0 + depth, y, z, r)))
+    peg_solids = [X(0, P['peg_h'], y, z, P['peg_d'] / 2) for y, z in pegs]      # on the lid
+    return dict(env=env, cav=cav, trims=trims, dome=dome, mo_len=mo_len, bosses=bosses, pegs=pegs,
+                holes=holes, peg_solids=peg_solids)
+
+
+def build_case(root, L):
+    tbm = adsk.fusion.TemporaryBRepManager.get()
+    plan = case_plan(L)
+    env, cav, trims, dome, mo_len = plan['env'], plan['cav'], plan['trims'], plan['dome'], plan['mo_len']
     body = None
     for e in env:
         b = e.brep(tbm)
@@ -598,33 +636,16 @@ def build_case(root, L):
         cutter = tbm.createBox(adsk.core.OrientedBoundingBox3D.create(
             P3((xc, 0, 18)), V3((1, 0, 0)), V3((0, 1, 0)), 10.0, 20.0, 20.0))
         tbm.booleanOperation(half, cutter, adsk.fusion.BooleanTypes.IntersectionBooleanType)
-        for y, z in bosses:
-            r = 1.1 if name == 'Case left' else 0.85
-            tbm.booleanOperation(half, Prim('cyl', p1=(-9, y, z), p2=(9, y, z), r=r).brep(tbm),
-                                 adsk.fusion.BooleanTypes.DifferenceBooleanType)
-            if name == 'Case left':             # flush screw heads
-                x0 = -P['slab_half']
-                tbm.booleanOperation(half, Prim('cyl', p1=(x0 - 1, y, z), p2=(x0 + P['lid_cbore'], y, z),
-                                                r=P['lid_cbore_d'] / 2).brep(tbm),
-                                     adsk.fusion.BooleanTypes.DifferenceBooleanType)
-        for y, z in pegs:                       # pegs on the lid (prints on its back, pegs up); sockets in the main half
-            if name == 'Case left':             # (prints split face down, so its split face must stay flat)
-                tbm.booleanOperation(half, Prim('cyl', p1=(0, y, z), p2=(P['peg_h'], y, z), r=P['peg_d'] / 2).brep(tbm),
-                                     adsk.fusion.BooleanTypes.UnionBooleanType)
-            else:
-                tbm.booleanOperation(half, Prim('cyl', p1=(-0.1, y, z), p2=(P['peg_h'] + 0.4, y, z),
-                                                r=P['peg_d'] / 2 + 0.15).brep(tbm),
-                                     adsk.fusion.BooleanTypes.DifferenceBooleanType)
-        if name == 'Case left':             # AS5600 standoff holes: heat-set insert, or a self-tap pilot near a wall
-            for (y, z), kind, r, depth in board_hole_plan():
-                tbm.booleanOperation(half, Prim('cyl', p1=(sensor_layout()['lid_face'] - 1, y, z),
-                                                p2=(sensor_layout()['lid_face'] + depth, y, z), r=r).brep(tbm),
-                                     adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        if name == 'Case left':                 # pegs on the lid (prints on its back, pegs up)
+            for peg in plan['peg_solids']:
+                tbm.booleanOperation(half, peg.brep(tbm), adsk.fusion.BooleanTypes.UnionBooleanType)
+        for _, h in plan['holes'][name]:
+            tbm.booleanOperation(half, h.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
         occ, comp = new_component(root, name)
         add_bodies(comp, [(name, half)])
         round_outer_edges(comp, P['edge_round'])
         out[name] = (occ, comp)
-    return out, bosses, mo_len, pegs
+    return out, plan['bosses'], mo_len, plan['pegs']
 
 
 def spur(z, m):
@@ -675,7 +696,7 @@ def sensor_cavities():
     S = sensor_layout()
     c = (0.0, S['y'], S['z'])
     X = lambda x0, x1, r: Prim('cyl', p1=(x0, c[1], c[2]), p2=(x1, c[1], c[2]), r=r)
-    fc = P['ss_face'] / 2 + 0.3
+    fc = P['ss_face'] / 2 + 0.3                # just the gear: keeps 1.5 mm between it and the AS5600 insert hole
     return [
         X(-fc, fc, S['gs']['ra'] + 0.4),                                       # sensor gear (meshes with the wheel)
         X(S['head_x0'] + 0.3, P['ss_shaft_right'] + 0.3, P['ss_shaft_d'] / 2 + 0.15),  # shaft bearings (blind right)
