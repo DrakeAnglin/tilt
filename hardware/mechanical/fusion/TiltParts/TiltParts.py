@@ -53,7 +53,7 @@ P = dict(
     # case
     wall=1.6, slab_half=8.33, motor_socket=4.0, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
     dome_wall=1.2, dome_max_y=21.0,   # cover over the worm's top end, allowed to rise into the rail's open top slot
-    plateau_top=38.9, plateau_clear=0.3,
+    plateau_top=38.9, plateau_clear=1.5,   # plateau side to the lip edge (0.3 rubbed: rounded corners pushed on the lips)
     worm_thrust_clear=0.15,   # upper flange: the single axial stop, both directions
     worm_free_clear=0.7,      # thread ends and lower flange never touch
     worm_pin_end_clear=0.4,   # top pin end never touches   # top between the lips rises flush with the headrail top (owner: 2.8 mm room)
@@ -501,8 +501,8 @@ def case_shapes(L):
     dome = [cyl_s(L, -4.5 - free - dw, 4.8, 5.9 + dw),                                 # over the threads
             cyl_s(L, pin_end, -4.5 - free - dw + 0.01, 2.65 + dw),                     # over the top pin
             Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=2.65 + dw, r2=2.0)]   # tapered end cap
-    plateau = box_minmax(x_left, x_right, -(hw - P['lip_in'] - P['plateau_clear']),
-                         hw - P['lip_in'] - P['plateau_clear'], P['case_top'] - 1.0, P['plateau_top'])
+    py = hw - P['lip_in'] - P['plateau_clear']      # plateau half-width; the step under the lips is cut at the same Y
+    plateau = box_minmax(x_left, x_right, -py, py, P['case_top'] - 1.0, P['plateau_top'])
     env = [
         slab,
         plateau,
@@ -511,8 +511,8 @@ def case_shapes(L):
     ]
     # trims: stay under the rail's top lips, above the floor and inside the walls (except the notch block)
     trims = [
-        box_minmax(-60, 80, -hw - 5, -hw + P['lip_in'], P['case_top'] - P['lip_h'], 60),
-        box_minmax(-60, 80, hw - P['lip_in'], hw + 5, P['case_top'] - P['lip_h'], 60),
+        box_minmax(-60, 80, -hw - 5, -py, P['case_top'] - P['lip_h'], 60),      # one flat side from the step to the top
+        box_minmax(-60, 80, py, hw + 5, P['case_top'] - P['lip_h'], 60),
         box_minmax(-60, 80, -60, 60, P['plateau_top'], 80),
         box_minmax(-60, 80, -60, 60, -20, P['case_floor']),          # below the floor
         box_minmax(-60, 80, -60, -hw, -20, 80),                       # past the room-side wall
@@ -590,7 +590,7 @@ def case_plan(L):
     def screw_ok(y, z):
         if abs(y) > hw - cb or z < P['case_floor'] + cb:
             return False
-        if abs(y) > hw - P['lip_in'] - cb and z > P['case_top'] - P['lip_h'] - cb:
+        if abs(y) > hw - P['lip_in'] - P['plateau_clear'] - cb and z > P['case_top'] - P['lip_h'] - cb:
             return False                          # next to the lip step
         return z < P['case_top'] - cb and not on_board(y, z)
     picks = pick_bosses(cav, screw_ok, count=5, clear_r=P['lid_cbore_d'] / 2 + P['screw_wall'])

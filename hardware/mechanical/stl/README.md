@@ -56,6 +56,7 @@ They bridge fine as they are; no supports needed.
 | AS5600 board ↔ tilt rod | 3.8 mm (the rod can stick out any length) |
 | AS5600 board ↔ rail back wall | 0.95 mm |
 | Cases ↔ rail walls / floor | 0.05 / 0.15–0.2 mm (press fit) |
+| Case top ↔ rail top lips (sides of the raised top) | 1.5 mm |
 
 ## Envelope
 - **Tilter:** inside the 55.5 × 36.5 mm rail except a dome over the worm's top end, which rises 2.1 mm into the open slot
