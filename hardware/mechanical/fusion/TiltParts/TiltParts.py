@@ -38,8 +38,8 @@ P = dict(
     # crossed helical pair
     mn=1.0, helix=45.0, pressure=20.0, addendum=0.85, dedendum=1.25, backlash=0.15, cd_extra=0.20,
     z_adapter=8, z_pinion=7,
-    adapter_face=2.6, pinion_face=6.0, pinion_hub_d=6.5, pinion_hub=1.5,
-    pinion_gap=3.0,           # pinion face to N20 gearbox face
+    adapter_face=2.6, pinion_face=5.0, pinion_hub_d=6.5, pinion_hub=3.0,
+    pinion_gap=4.5,           # pinion face to N20 gearbox face (room for a sealing wall between gear chamber and motor pocket)
     motor_rot=0.0,            # motor axis swung about the worm axis (0 = parallel to the rod)
     # adapter
     mouth_s=18.97, collar_d=8.2, body_d=6.0, body_len=19.0,
@@ -448,7 +448,7 @@ def case_shapes(L):
         cyl_s(L, 7.0 - thr, 8.6 + thr, 5.1),                                             # upper flange = thrust collar
         cyl_s(L, 8.6 + thr, 17.0 - free, 2.95),                                          # shaft bearing
         cyl_s(L, 17.0 - free, mouth + 0.1, 5.1),                                         # lower flange (free)
-        cyl_s(L, mouth - 0.2, mouth + P['adapter_face'] + 0.3, ga['ra'] + 0.5),          # adapter gear
+        cyl_s(L, mouth - 0.2, mouth + P['adapter_face'] + 0.3, ga['ra'] + 0.3),          # adapter gear
         cyl_s(L, mouth + P['adapter_face'],
               mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 0.3, P['collar_d'] / 2 + 0.3),  # collar + taper
         cyl_s(L, mouth + P['socket_depth'] + 0.5, mouth + 40, P['body_d'] / 2 + 0.3),   # adapter body, exits

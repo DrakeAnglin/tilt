@@ -29,7 +29,7 @@ Two units, both press-fit between the rail walls:
 | Item | Qty | Notes |
 |---|---|---|
 | Factory worm + worm wheel | 1 each | From the blind's tilter (drill out the 3 rivets) |
-| N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full 60° ≈ 3 motor turns |
+| N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9.5 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full 60° ≈ 3 motor turns |
 | M1.6 × 4 screw | 2 | N20 gearbox face (heads sink into counterbores in the pinion pocket) |
 | M2 × 16 screw | 3 | Tilter halves (heads sit flush in the lid) |
 | M2 × 12 screw | 2 | Sensor module halves |
