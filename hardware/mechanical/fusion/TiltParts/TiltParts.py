@@ -452,7 +452,6 @@ def case_shapes(L):
     hw = P['case_w'] / 2
     thr, free = P['worm_thrust_clear'], P['worm_free_clear']
     pin_end = -7.0 - P['worm_pin_end_clear']
-    pinion_lift = 0.8
     named = [
         ('wheel teeth', Prim('cyl', p1=add(rc, (-4.15, 0, 0)), p2=add(rc, (4.15, 0, 0)), r=8.3)),
         ('barrel bore', Prim('cyl', p1=add(rc, (slab_x(L)[0] - 1, 0, 0)), p2=add(rc, (slab_x(L)[1] + 1, 0, 0)), r=6.4)),
@@ -470,10 +469,9 @@ def case_shapes(L):
                                  mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 0.3,
                                  P['collar_d'] / 2 + 0.3)),
         ('adapter exit', cyl_s(L, mouth + P['socket_depth'] + 0.5, mouth + 40, P['body_d'] / 2 + 0.3)),
-        # big enough to merge cleanly with the worm's lower-flange and collar pockets (no knife-edge slivers), but
-        # shifted up so only 0.4 mm of running room is left below the pinion: the floor under it stays a printable wall
-        ('pinion', cyl_u(L, add(L['pin_c'], (0, 0, pinion_lift)), -P['pinion_face'] / 2 - 0.3, P['pinion_face'] / 2 + 0.3,
-                         gp['ra'] + 1.2)),
+        # centred, 0.4 mm running room all round: leaves 0.59 mm of floor under it and ~0.7 mm walls to the worm's
+        # lower-flange and adapter-collar pockets (owner: >= 0.4 mm prints fine)
+        ('pinion', cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 0.3, P['pinion_face'] / 2 + 0.3, gp['ra'] + 0.4)),
         ('motor shaft tip', cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5, 0, 2.0)),
         ('motor hub', cyl_u(L, L['pin_c'], 0, P['pinion_face'] / 2 + P['pinion_gap'] + 0.1, P['pinion_hub_d'] / 2 + 0.45)),
         ('motor socket', Prim('box', c=mo_c, u=u, w=w, L=mo_len + 6, W=P['n20_w'] + 0.3, H=P['n20_h'] + 0.3)),
