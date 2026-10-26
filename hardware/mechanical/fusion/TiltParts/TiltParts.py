@@ -51,7 +51,10 @@ P = dict(
     # case
     wall=1.6, slab_half=8.33, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
     dome_wall=1.2, dome_max_y=21.0,   # cover over the worm's top end, allowed to rise into the rail's open top slot
-    plateau_top=38.9, plateau_clear=0.3,   # top between the lips rises flush with the headrail top (owner: 2.8 mm room)
+    plateau_top=38.9, plateau_clear=0.3,
+    worm_thrust_clear=0.15,   # upper flange: the single axial stop, both directions
+    worm_free_clear=0.7,      # thread ends and lower flange never touch
+    worm_pin_end_clear=0.4,   # top pin end never touches   # top between the lips rises flush with the headrail top (owner: 2.8 mm room)
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0, lid_cbore_d=4.2, lid_cbore=1.8,
     # AS5600 sensor module: its own press-fit block anywhere on the rod. A 24T gear on the square rod drives a 14T
     # sensor gear (60° of rod = 103° at the magnet); the magnet sits in the sensor shaft's head, facing the board.
@@ -432,15 +435,19 @@ def case_shapes(L):
     mo_len = P['n20_gbx'] + P['n20_motor'] + P['n20_end']
     mo_c = add(L['face'], mul(u, (mo_len + 6) / 2))
     hw = P['case_w'] / 2
+    thr, free = P['worm_thrust_clear'], P['worm_free_clear']
+    pin_end = -7.0 - P['worm_pin_end_clear']
     cav = [
         Prim('cyl', p1=add(rc, (-4.15, 0, 0)), p2=add(rc, (4.15, 0, 0)), r=8.3),       # wheel teeth
         Prim('cyl', p1=add(rc, (-9.5, 0, 0)), p2=add(rc, (9.5, 0, 0)), r=6.4),         # barrel bearings
-        cyl_s(L, -7.3, -4.5, 2.65),                                                      # top pin
-        cyl_s(L, -4.8, 4.8, 5.9),                                                        # threads
-        cyl_s(L, 4.8, 6.7, 3.4),
-        cyl_s(L, 6.7, 8.9, 5.1),                                                         # upper flange
-        cyl_s(L, 8.9, 16.7, 2.95),                                                       # bearing shaft
-        cyl_s(L, 16.7, mouth + 0.1, 5.1),                                                # lower flange
+        # Worm: ONE thrust collar (the upper flange, tight both ways); every other end face has free play so only
+        # one pair of faces ever carries thrust. Radial support: top-pin journal + shaft bearing between the flanges.
+        cyl_s(L, pin_end, -4.5, 2.65),                                                   # top pin journal
+        cyl_s(L, -4.5 - free, 4.5 + free, 5.9),                                          # threads (free ends)
+        cyl_s(L, 4.5 + free - 0.01, 7.0 - thr, 3.4),
+        cyl_s(L, 7.0 - thr, 8.6 + thr, 5.1),                                             # upper flange = thrust collar
+        cyl_s(L, 8.6 + thr, 17.0 - free, 2.95),                                          # shaft bearing
+        cyl_s(L, 17.0 - free, mouth + 0.1, 5.1),                                         # lower flange (free)
         cyl_s(L, mouth - 0.2, mouth + P['adapter_face'] + 0.3, ga['ra'] + 0.5),          # adapter gear
         cyl_s(L, mouth + P['adapter_face'],
               mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 0.3, P['collar_d'] / 2 + 0.3),  # collar + taper
@@ -458,9 +465,9 @@ def case_shapes(L):
         cav.append(cyl_u(L, hp, pocket_end - 0.5, pocket_end + P['screw_cbore'], P['screw_cbore_d'] / 2))
     slab = box_minmax(-P['slab_half'], P['slab_half'], -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
-    dome = [cyl_s(L, -4.8 - dw, 4.8, 5.9 + dw),                                        # over the threads
-            cyl_s(L, -7.3, -4.8 - dw + 0.01, 2.65 + dw),                               # over the top pin
-            Prim('cyl', p1=L['S'](-7.3), p2=L['S'](-7.3 - dw), r=2.65 + dw, r2=2.0)]   # tapered end cap
+    dome = [cyl_s(L, -4.5 - free - dw, 4.8, 5.9 + dw),                                 # over the threads
+            cyl_s(L, pin_end, -4.5 - free - dw + 0.01, 2.65 + dw),                     # over the top pin
+            Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=2.65 + dw, r2=2.0)]   # tapered end cap
     plateau = box_minmax(-P['slab_half'], P['slab_half'], -(hw - P['lip_in'] - P['plateau_clear']),
                          hw - P['lip_in'] - P['plateau_clear'], P['case_top'] - 1.0, P['plateau_top'])
     env = [
@@ -561,7 +568,7 @@ def build_case(root, L):
     dome_keep = dome[0].brep(tbm)
     for dpart in dome[1:]:
         tbm.booleanOperation(dome_keep, dpart.brep(tbm), adsk.fusion.BooleanTypes.UnionBooleanType)
-    tbm.booleanOperation(dome_keep, box_minmax(-60, 80, -P['dome_max_y'], P['dome_max_y'], 0, 60).brep(tbm),
+    tbm.booleanOperation(dome_keep, box_minmax(-60, 80, -P['dome_max_y'], P['dome_max_y'], 0, P['plateau_top']).brep(tbm),
                          adsk.fusion.BooleanTypes.IntersectionBooleanType)
     for t in trims:
         tool = t.brep(tbm)
