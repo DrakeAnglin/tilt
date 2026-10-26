@@ -47,7 +47,7 @@ Two units, both press-fit between the rail walls:
 5. **Worm + adapter:** slide `adapter` onto the worm's splined end. Lay the worm in its groove with both flanges in their
    pockets. The adapter gear meshes with the pinion, and the loop hangs out through the notch block.
 6. **Hand check:** turn the loop. The worm wheel should turn smoothly, and so should the motor shaft. Nothing should rub.
-7. **Lid:** fit `case_left` (2 pegs locate it), 3 × M2 × 16.
+7. **Lid:** fit `case_left`. Its 2 pegs drop into the sockets in `case_right`. Then 3 × M2 × 16.
 
 ## Sensor module assembly
 1. Press the magnet into the head of `sensor_gear`.

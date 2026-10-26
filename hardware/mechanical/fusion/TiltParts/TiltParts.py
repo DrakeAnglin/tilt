@@ -592,12 +592,12 @@ def build_case(root, L):
                 tbm.booleanOperation(half, Prim('cyl', p1=(x0 - 1, y, z), p2=(x0 + P['lid_cbore'], y, z),
                                                 r=P['lid_cbore_d'] / 2).brep(tbm),
                                      adsk.fusion.BooleanTypes.DifferenceBooleanType)
-        for y, z in pegs:                       # alignment pegs on the main half, sockets in the lid
-            if name == 'Case right':
-                tbm.booleanOperation(half, Prim('cyl', p1=(0, y, z), p2=(-P['peg_h'], y, z), r=P['peg_d'] / 2).brep(tbm),
+        for y, z in pegs:                       # pegs on the lid (prints on its back, pegs up); sockets in the main half
+            if name == 'Case left':             # (prints split face down, so its split face must stay flat)
+                tbm.booleanOperation(half, Prim('cyl', p1=(0, y, z), p2=(P['peg_h'], y, z), r=P['peg_d'] / 2).brep(tbm),
                                      adsk.fusion.BooleanTypes.UnionBooleanType)
             else:
-                tbm.booleanOperation(half, Prim('cyl', p1=(0.1, y, z), p2=(-P['peg_h'] - 0.4, y, z),
+                tbm.booleanOperation(half, Prim('cyl', p1=(-0.1, y, z), p2=(P['peg_h'] + 0.4, y, z),
                                                 r=P['peg_d'] / 2 + 0.15).brep(tbm),
                                      adsk.fusion.BooleanTypes.DifferenceBooleanType)
         occ, comp = new_component(root, name)
