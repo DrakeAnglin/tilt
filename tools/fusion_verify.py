@@ -65,9 +65,9 @@ for i in range(root.occurrences.count):
     for j in range(o.bRepBodies.count):
         B[o.bRepBodies.item(j).name] = o.bRepBodies.item(j)
 
-PRINTED = [n for n in ('Adapter', 'Motor pinion', 'Case left', 'Case right', 'Rod gear', 'Sensor gear',
-                        'Sensor case left', 'Sensor case right') if n in B]
-EXPECTED = {frozenset(p) for p in [('Adapter', 'Worm 6'), ('Motor pinion', 'N20 shaft'), ('Sensor gear', 'Magnet')]}
+PRINTED = [n for n in ('Adapter', 'Motor pinion', 'Case left', 'Case right', 'Sensor gear') if n in B]
+EXPECTED = {frozenset(p) for p in [('Adapter', 'Worm 6'), ('Motor pinion', 'N20 shaft'), ('Sensor gear', 'Magnet'),
+                                   ('Sensor gear', 'Worm wheel')]}   # worm wheel ref is a plain cylinder (no teeth)
 
 
 def interference(names):
@@ -131,16 +131,14 @@ def check_pair(big_name, small_name, z_big, z_small, steps):
 
 
 gear = check_pair('TP Adapter', 'TP Motor pinion', mod.P['z_adapter'], mod.P['z_pinion'], SWEEP_STEPS)
-sensor_gears = check_pair('TP Rod gear', 'TP Sensor gear', mod.P['sm_z_rod'], mod.P['sm_z_sensor'], 12)
 
 pairs = [('Adapter', 'Rail wall room'), ('Adapter', 'Rail floor'), ('Adapter', 'Case right'), ('Adapter', 'Case left'),
          ('Motor pinion', 'Case right'), ('Motor pinion', 'Rail floor'), ('Motor pinion', 'Worm 5'),
          ('Motor pinion', 'Worm 6'), ('N20', 'Rail floor'), ('N20', 'Rail wall room'), ('N20', 'Rod'),
          ('Case right', 'Rod'), ('Case left', 'Rod'), ('Case right', 'Rail floor'), ('Case right', 'Rail wall room'),
-         ('Case right', 'Rail wall back'), ('Magnet', 'AS5600 board'), ('Rod gear', 'Sensor case right'),
-         ('Sensor gear', 'Sensor case right'), ('Sensor gear', 'Sensor case left'), ('Rod gear', 'Rod'),
-         ('Sensor case left', 'Rail floor'), ('Sensor case left', 'Rail wall back'), ('AS5600 board', 'Rail floor'),
-         ('AS5600 board', 'Rail wall back'), ('Sensor case right', 'N20')]
+         ('Case right', 'Rail wall back'), ('Magnet', 'AS5600 chip'), ('Sensor gear', 'Case left'),
+         ('Sensor gear', 'Case right'), ('Sensor gear', 'Worm 1'), ('Sensor gear', 'Barrel'), ('AS5600 board', 'Rod'),
+         ('AS5600 board', 'Rail wall back'), ('AS5600 board', 'Rail floor'), ('AS5600 board', 'Case left')]
 dist = {}
 for a, b in pairs:
     if a in B and b in B:
@@ -155,7 +153,7 @@ result = dict(
     params={k: mod.P[k] for k in ('worm_angle', 'motor_rot', 'pinion_gap', 'adapter_face', 'spline_clear')},
     build=report.split('\n'),
     interference=interference(list(B.keys())) or 'none',
-    gear=gear, sensor_gears=sensor_gears,
+    gear=gear,
     distances=dist,
     worm_top_z=round(worm_top, 2), case_top_z=round(case_max_z, 2),
     motor_max_x=round(B['N20'].boundingBox.maxPoint.x * 10, 2),

@@ -12,9 +12,8 @@ Parts (each its own component, exported to STL in its own print orientation):
   Motor pinion   7T helical (mn 1.0, 45° RH), D-bore for the N20 3 mm shaft, small hub
   Case left      lid half (X < 0)
   Case right     main half (X > 0) with the motor pod and the notch block
-  Sensor module  separate press-fit block anywhere along the rod (the rod passes straight through):
-                 sensor_case_left (with the AS5600 board frame), sensor_case_right, rod_gear (24T, square bore),
-                 sensor_gear (12T with its shaft and the magnet pocket)
+  Sensor gear    20T spur meshing with the back of the worm wheel; shaft through the lid, magnet in its head.
+                 The AS5600 board sits on standoffs in heat-set inserts in the lid's outer face.
 Reference bodies (not printed): rail with its corner notch, rod, worm wheel, worm, N20.
 
 Global coordinates (mm): X along the rod (0 = tilter mid-plane, +X toward the tilt drums), Y across the rail
@@ -31,6 +30,7 @@ import adsk.fusion
 
 # ------------------------------------------------------------------ parameters (mm / deg)
 P = dict(
+    module_worm=0.88,
     worm_angle=60.0, cd_worm=11.64 + 0.25, rod_z=24.0, rod=4.0,   # +0.25: printed test fit was tight
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0,
     # corner notch in the rail (measured from the outside): 12 tall, 10.5 into the floor, 12 wide along the rod
@@ -56,11 +56,15 @@ P = dict(
     worm_free_clear=0.7,      # thread ends and lower flange never touch
     worm_pin_end_clear=0.4,   # top pin end never touches   # top between the lips rises flush with the headrail top (owner: 2.8 mm room)
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0, lid_cbore_d=4.2, lid_cbore=1.8,
-    # AS5600 sensor module: its own press-fit block anywhere on the rod. A 24T gear on the square rod drives a 14T
-    # sensor gear (60° of rod = 103° at the magnet); the magnet sits in the sensor shaft's head, facing the board.
-    sm_x=55.0, sm_half=7.0, sm_m=0.8, sm_z_rod=24, sm_z_sensor=14, sm_face=4.0, sm_cd_extra=0.1,
-    sm_sensor_y=15.2, sm_rod_hub_d=8.0, sm_shaft_d=4.0, sm_head_d=8.0, sm_head_len=3.4, sm_rod_clear=3.4,
-    magnet_d=6.0, magnet_t=2.5, magnet_clear=0.15, sensor_gap=1.5, board_w=23.4, board_t=1.8, frame_wall=1.6,
+    # AS5600 sensor, integrated: a 20T sensor gear meshes with the BACK of the factory worm wheel (which turns with
+    # the rod); its shaft runs through the lid to a magnet head; the AS5600 board sits on standoffs screwed into
+    # heat-set inserts in the lid's outer face, chip facing the magnet.
+    ss_z=20, ss_m=0.88, ss_face=4.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0, ss_shaft_right=3.5,
+    ss_head_d=8.0, ss_head_len=3.4,
+    magnet_d=6.0, magnet_t=2.5, magnet_clear=0.15,
+    board_w=23.4, board_t=1.6, chip_h=1.5, sensor_gap=1.5, standoff_len=5.0,
+    board_holes=((-9.0, 9.0), (9.0, -9.0)),   # TO MEASURE on the real board: hole centres relative to the chip (Y, Z)
+    insert_d=3.2, insert_depth=4.5,          # M2 heat-set insert hole (check against your inserts)
 )
 
 TOOTH_PTS = 10
@@ -449,6 +453,7 @@ def case_shapes(L):
         # one pair of faces ever carries thrust. Radial support: top-pin journal + shaft bearing between the flanges.
         cyl_s(L, pin_end, -4.5, 2.65),                                                   # top pin journal
         cyl_s(L, -4.5 - free, 4.5 + free, 5.9),                                          # threads (free ends)
+        *sensor_cavities(),
         cyl_s(L, 4.5 + free - 0.01, 7.0 - thr, 3.4),
         cyl_s(L, 7.0 - thr, 8.6 + thr, 5.1),                                             # upper flange = thrust collar
         cyl_s(L, 8.6 + thr, 17.0 - free, 2.95),                                          # shaft bearing
@@ -556,7 +561,9 @@ def build_case(root, L):
     tbm = adsk.fusion.TemporaryBRepManager.get()
     env, cav, trims, mo_len, dome = case_shapes(L)
     hw = P['case_w'] / 2
-    picks = pick_bosses(cav, lambda y, z: abs(y) < hw - 3 and 3 < z < P['case_top'] - P['lip_h'] - 2, count=5)
+    on_board = board_footprint(margin=2.0)        # case screws stay out from under the AS5600 board
+    picks = pick_bosses(cav, lambda y, z: abs(y) < hw - 3 and 3 < z < P['case_top'] - P['lip_h'] - 2
+                        and not on_board(y, z), count=5)
     bosses, pegs = picks[:3], picks[3:]
     body = None
     for e in env:
@@ -601,6 +608,14 @@ def build_case(root, L):
                 tbm.booleanOperation(half, Prim('cyl', p1=(-0.1, y, z), p2=(P['peg_h'] + 0.4, y, z),
                                                 r=P['peg_d'] / 2 + 0.15).brep(tbm),
                                      adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        if name == 'Case left':             # heat-set insert holes for the AS5600 standoffs
+            S = sensor_layout()
+            for dy, dz in P['board_holes']:
+                y, z = S['y'] + dy, S['z'] + dz
+                tbm.booleanOperation(half, Prim('cyl', p1=(S['lid_face'] - 1, y, z),
+                                                p2=(S['lid_face'] + P['insert_depth'], y, z),
+                                                r=P['insert_d'] / 2).brep(tbm),
+                                     adsk.fusion.BooleanTypes.DifferenceBooleanType)
         occ, comp = new_component(root, name)
         add_bodies(comp, [(name, half)])
         round_outer_edges(comp, P['edge_round'])
@@ -615,49 +630,36 @@ def spur(z, m):
 
 
 def sensor_layout():
-    xm = P['sm_x']
-    gr, gs = spur(P['sm_z_rod'], P['sm_m']), spur(P['sm_z_sensor'], P['sm_m'])
-    cd = gr['rp'] + gs['rp'] + P['sm_cd_extra']
-    y = P['sm_sensor_y']
-    z = P['rod_z'] - math.sqrt(cd * cd - y * y)          # sensor gear sits back-and-down from the rod
-    face_x = xm - P['sm_half']                          # outer face the board frame sits on
-    return dict(xm=xm, gr=gr, gs=gs, cd=cd, sc=(xm, y, z), face_x=face_x,
-                magnet_face_x=face_x, board_front_x=face_x - P['sensor_gap'])
-
-
-def build_rod_gear(root):
-    """24T spur, square bore for the 4 mm rod, hub both sides (the hubs run in the module walls)."""
-    occ, comp = new_component(root, 'Rod gear')
-    S = sensor_layout()
-    hub_len = 2 * P['sm_half'] - 0.4
-    extrude(comp, circle_profile(comp, -hub_len / 2, P['sm_rod_hub_d'] / 2), hub_len, NEW)
-    sk = comp.sketches.add(offset_plane(comp, -P['sm_face'] / 2))
-    polyline(sk, gear_profile(S['gr']))
-    extrude(comp, largest_profile(sk), P['sm_face'], JOIN)
-    merge_bodies(comp)
-    sk = comp.sketches.add(offset_plane(comp, -hub_len / 2))
-    a = P['rod'] / 2 + 0.1
-    polyline(sk, [(-a, -a), (a, -a), (a, a), (-a, a)])
-    extrude(comp, sk.profiles.item(0), hub_len, CUT)
-    comp.bRepBodies.item(0).name = 'Rod gear'
-    return occ, comp
+    """Sensor gear axis (parallel to the rod), magnet face and board plane, in assembly coordinates."""
+    gs = spur(P['ss_z'], P['ss_m'])
+    wheel_rp = 16 * P['module_worm'] / 2.0
+    cd = wheel_rp + gs['rp'] + P['ss_cd_extra']
+    y = P['ss_y']
+    z = P['rod_z'] - math.sqrt(cd * cd - y * y)          # behind and slightly below the rod: clear of the worm
+    lid_face = -P['slab_half']
+    protrude = P['standoff_len'] - P['chip_h'] - P['sensor_gap']   # magnet head sticks out of the lid face by this
+    magnet_x = lid_face - protrude
+    head_x0 = magnet_x + P['ss_head_len']                  # inner end of the head
+    return dict(gs=gs, cd=cd, y=y, z=z, lid_face=lid_face, magnet_x=magnet_x, head_x0=head_x0,
+                chip_x=lid_face - P['standoff_len'], board_back_x=lid_face - P['standoff_len'] - P['board_t'])
 
 
 def build_sensor_gear(root):
-    """12T spur on a shaft; local Z points toward the board (-X in the assembly); magnet pocket in that end."""
+    """20T spur meshing with the worm wheel, shaft + magnet head. Local Z points to the board (-X in the assembly);
+    local origin = gear centre plane (assembly X = 0)."""
     occ, comp = new_component(root, 'Sensor gear')
     S = sensor_layout()
-    half = P['sm_half']
-    extrude(comp, circle_profile(comp, -(half - 0.6), P['sm_shaft_d'] / 2), 2 * half - 0.6, NEW)   # shaft (to the face)
-    sk = comp.sketches.add(offset_plane(comp, -P['sm_face'] / 2))
+    head_l0 = -S['head_x0']                                # local z where the head starts
+    magnet_l = -S['magnet_x']                              # local z of the head's end face (magnet face)
+    shaft_l0 = -P['ss_shaft_right']
+    extrude(comp, circle_profile(comp, shaft_l0, P['ss_shaft_d'] / 2), head_l0 + 0.3 - shaft_l0, NEW)
+    sk = comp.sketches.add(offset_plane(comp, -P['ss_face'] / 2))
     polyline(sk, gear_profile(S['gs']))
-    extrude(comp, largest_profile(sk), P['sm_face'], JOIN)
-    merge_bodies(comp)
-    # head at the board end (flush with the module face) holding the magnet, with a solid floor under it
-    extrude(comp, circle_profile(comp, half - P['sm_head_len'], P['sm_head_d'] / 2), P['sm_head_len'], JOIN)
+    extrude(comp, largest_profile(sk), P['ss_face'], JOIN)
+    extrude(comp, circle_profile(comp, head_l0, P['ss_head_d'] / 2), magnet_l - head_l0, JOIN)
     merge_bodies(comp)
     cut = comp.features.extrudeFeatures.createInput(
-        circle_profile(comp, half, P['magnet_d'] / 2 + P['magnet_clear']), CUT)
+        circle_profile(comp, magnet_l, P['magnet_d'] / 2 + P['magnet_clear']), CUT)
     cut.setDistanceExtent(False, VI(-(P['magnet_t'] + 0.1)))
     cut.participantBodies = own_bodies(comp)
     comp.features.extrudeFeatures.add(cut)
@@ -665,85 +667,22 @@ def build_sensor_gear(root):
     return occ, comp
 
 
-def build_sensor_case(root):
-    """Press-fit block in the rail around both gears, split at its mid-plane; the left half carries the board frame."""
-    tbm = adsk.fusion.TemporaryBRepManager.get()
+def sensor_cavities():
     S = sensor_layout()
-    xm, half, hw = S['xm'], P['sm_half'], P['case_w'] / 2
-    rod_c = (xm, 0.0, P['rod_z'])
-    sc = S['sc']
-    fc = P['sm_face'] / 2 + 0.3
-    X = lambda x0, x1, c, r: Prim('cyl', p1=(x0, c[1], c[2]), p2=(x1, c[1], c[2]), r=r)
-    cav = [
-        X(xm - fc, xm + fc, rod_c, S['gr']['ra'] + 0.5),                       # rod gear
-        X(xm - half - 1, xm + half + 1, rod_c, P['sm_rod_hub_d'] / 2 + 0.2),  # rod gear hubs (bearings)
-        X(xm - fc, xm + fc, sc, S['gs']['ra'] + 0.5),                          # sensor gear
-        X(xm - half - 1, xm + half - 0.3, sc, P['sm_shaft_d'] / 2 + 0.15),    # shaft bearings (blind on the right)
-        X(xm - half - 1, xm - half + P['sm_head_len'] + 0.3, sc, P['sm_head_d'] / 2 + 0.3),  # magnet head seat
-        X(xm - half - 12, xm - half + 0.5, rod_c, P['sm_rod_clear']),         # rod passes through the board frame
+    c = (0.0, S['y'], S['z'])
+    X = lambda x0, x1, r: Prim('cyl', p1=(x0, c[1], c[2]), p2=(x1, c[1], c[2]), r=r)
+    fc = P['ss_face'] / 2 + 0.3
+    return [
+        X(-fc, fc, S['gs']['ra'] + 0.4),                                       # sensor gear (meshes with the wheel)
+        X(S['head_x0'] + 0.3, P['ss_shaft_right'] + 0.3, P['ss_shaft_d'] / 2 + 0.15),  # shaft bearings (blind right)
+        X(S['lid_face'] - 1.0, S['head_x0'] + 0.3, P['ss_head_d'] / 2 + 0.3),  # magnet head, out through the lid face
     ]
-    block = box_minmax(xm - half, xm + half, -hw, hw, P['case_floor'], P['case_top'])
-    # AS5600 board frame on the left outer face, centred on the sensor shaft; board slides in from the top
-    bw, t = P['board_w'] / 2, P['frame_wall']
-    fx1 = S['face_x']
-    fx0 = S['board_front_x'] - P['board_t'] - t
-    frame = [
-        box_minmax(fx0, fx1, sc[1] - bw - t, sc[1] - bw, sc[2] - bw - t, sc[2] + bw),     # sides
-        box_minmax(fx0, fx1, sc[1] + bw, min(sc[1] + bw + t, hw), sc[2] - bw - t, sc[2] + bw),
-        box_minmax(fx0, fx1, sc[1] - bw - t, min(sc[1] + bw + t, hw), sc[2] - bw - t, sc[2] - bw),  # bottom
-        box_minmax(fx0, fx0 + t, sc[1] - bw - t, min(sc[1] + bw + t, hw), sc[2] - bw - t, sc[2] + bw - 6),  # back
-        box_minmax(S['board_front_x'], fx1, sc[1] - bw - t, sc[1] - bw + 1.5, sc[2] - bw - t, sc[2] + bw),  # lips
-        box_minmax(S['board_front_x'], fx1, sc[1] + bw - 1.5, min(sc[1] + bw + t, hw), sc[2] - bw - t, sc[2] + bw),
-    ]
-    body = block.brep(tbm)
-    for f in frame:
-        tbm.booleanOperation(body, f.brep(tbm), adsk.fusion.BooleanTypes.UnionBooleanType)
-    trims = [box_minmax(xm - 30, xm + 30, -hw - 5, -hw + P['lip_in'], P['case_top'] - P['lip_h'], 60),
-             box_minmax(xm - 30, xm + 30, hw - P['lip_in'], hw + 5, P['case_top'] - P['lip_h'], 60)]
-    for c in cav + trims:
-        tbm.booleanOperation(body, c.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
-    # 2 M2 screws + 2 pegs, clear of the cavities
-    def keep(y, z):
-        return abs(y) < hw - 3 and 3 < z < P['case_top'] - P['lip_h'] - 2
-    picks = []
-    for yi in range(-25, 26):
-        for zi in range(3, 31):
-            y, z = float(yi), float(zi)
-            if not keep(y, z):
-                continue
-            q = [(xm, y + 2.0 * math.cos(k * math.pi / 3), z + 2.0 * math.sin(k * math.pi / 3)) for k in range(6)]
-            # stay out of the board frame footprint on the left face too
-            in_frame = abs(y - sc[1]) < bw + t + 1.5 and abs(z - sc[2]) < bw + t + 1.5
-            if not in_frame and not any(c.contains(pt) for c in cav for pt in q):
-                picks.append((y, z))
-    chosen = []
-    while picks and len(chosen) < 4:
-        pick = max(picks, key=lambda c: c[1]) if not chosen else \
-            max(picks, key=lambda c: min(math.hypot(c[0] - q[0], c[1] - q[1]) for q in chosen))
-        chosen.append(pick)
-    screws, pegs = chosen[:2], chosen[2:]
-    out = {}
-    for name, sgn in (('Sensor case left', -1), ('Sensor case right', 1)):
-        part = tbm.copy(body)
-        cutter = tbm.createBox(adsk.core.OrientedBoundingBox3D.create(
-            P3((xm + sgn * 50, 0, 18)), V3((1, 0, 0)), V3((0, 1, 0)), 10.0, 20.0, 20.0))
-        tbm.booleanOperation(part, cutter, adsk.fusion.BooleanTypes.IntersectionBooleanType)
-        for y, z in screws:
-            r = 1.1 if sgn < 0 else 0.85
-            tbm.booleanOperation(part, X(xm - half - 5, xm + half + 1, (0, y, z), r).brep(tbm),
-                                 adsk.fusion.BooleanTypes.DifferenceBooleanType)
-        for y, z in pegs:
-            if sgn > 0:
-                tbm.booleanOperation(part, X(xm, xm - P['peg_h'], (0, y, z), P['peg_d'] / 2).brep(tbm),
-                                     adsk.fusion.BooleanTypes.UnionBooleanType)
-            else:
-                tbm.booleanOperation(part, X(xm + 0.1, xm - P['peg_h'] - 0.4, (0, y, z), P['peg_d'] / 2 + 0.15).brep(tbm),
-                                     adsk.fusion.BooleanTypes.DifferenceBooleanType)
-        occ, comp = new_component(root, name)
-        add_bodies(comp, [(name, part)])
-        round_outer_edges(comp, P['edge_round'])
-        out[name] = (occ, comp)
-    return out, screws
+
+
+def board_footprint(margin=0.0):
+    S = sensor_layout()
+    hb = P['board_w'] / 2 + margin
+    return lambda y, z: abs(y - S['y']) < hb and abs(z - S['z']) < hb
 
 
 def build_refs(root, L, mo_len):
@@ -760,10 +699,14 @@ def build_refs(root, L, mo_len):
                             P['n20_shaft_d'] / 2)),
     ]
     SL = sensor_layout()
-    mx, (_, sy, sz) = SL['magnet_face_x'], SL['sc']
-    items.append(('Magnet', Prim('cyl', p1=(mx + P['magnet_t'], sy, sz), p2=(mx + 0.05, sy, sz), r=P['magnet_d'] / 2)))
-    bf = SL['board_front_x']
-    items.append(('AS5600 board', box_minmax(bf - 1.6, bf, sy - 11.5, sy + 11.5, sz - 11.5, sz + 11.5)))
+    sy, sz = SL['y'], SL['z']
+    items.append(('Magnet', Prim('cyl', p1=(SL['magnet_x'] + P['magnet_t'], sy, sz), p2=(SL['magnet_x'] + 0.05, sy, sz),
+                                 r=P['magnet_d'] / 2)))
+    items.append(('AS5600 board', box_minmax(SL['board_back_x'], SL['chip_x'], sy - 11.5, sy + 11.5, sz - 11.5, sz + 11.5)))
+    items.append(('AS5600 chip', box_minmax(SL['chip_x'], SL['chip_x'] + P['chip_h'], sy - 2.5, sy + 2.5, sz - 2.0, sz + 2.0)))
+    for k, (dy, dz) in enumerate(P['board_holes']):
+        items.append(('Standoff %d' % k, Prim('cyl', p1=(SL['lid_face'], sy + dy, sz + dz),
+                                              p2=(SL['chip_x'], sy + dy, sz + dz), r=1.75)))
     for i, (s0, s1, r) in enumerate([(-7, -4.5, 2.5), (-4.5, 4.5, 5.5), (4.5, 7, 2.8), (7, 8.6, 4.75),
                                      (8.6, 17, 2.8), (17, 18.77, 4.75), (18.77, 23.77, 3.0)]):
         items.append(('Worm %d' % i, cyl_s(L, s0, s1, r)))
@@ -806,9 +749,7 @@ def build(design, export_dir=None):
     _, adapter = build_adapter(root, L)
     _, pinion = build_pinion(root, L)
     cases, bosses, mo_len, pegs = build_case(root, L)
-    _, rod_gear = build_rod_gear(root)
     _, sgear = build_sensor_gear(root)
-    scases, sscrews = build_sensor_case(root)
     _, refs = build_refs(root, L, mo_len)
     SL = sensor_layout()
 
@@ -816,8 +757,7 @@ def build(design, export_dir=None):
         return next(root.occurrences.item(i) for i in range(root.occurrences.count)
                     if root.occurrences.item(i).component.name == PREFIX + name)
     place(occ_named('Motor pinion'), add(L['pin_c'], mul(L['u'], -P['pinion_face'] / 2)), L['w'], L['u'])
-    place(occ_named('Rod gear'), (SL['xm'], 0, P['rod_z']), (0, 1, 0), (1, 0, 0))
-    place(occ_named('Sensor gear'), SL['sc'], (0, 1, 0), (-1, 0, 0))
+    place(occ_named('Sensor gear'), (0, SL['y'], SL['z']), (0, 1, 0), (-1, 0, 0))
     place(occ_named('Adapter'), L['S'](P['mouth_s']), L['X'], L['d'])
 
     color(design, adapter, 'Plastic - Glossy (Yellow)')
@@ -825,18 +765,13 @@ def build(design, export_dir=None):
     color(design, cases['Case left'][1], 'Plastic - Translucent Matte (Blue)')
     color(design, cases['Case right'][1], 'Plastic - Matte (Blue)')
     color(design, refs, 'Plastic - Matte (White)')
-    color(design, rod_gear, 'Plastic - Glossy (Green)')
     color(design, sgear, 'Plastic - Glossy (Green)')
-    color(design, scases['Sensor case left'][1], 'Plastic - Matte (Green)')
-    color(design, scases['Sensor case right'][1], 'Plastic - Matte (Green)')
 
     files = []
     if export_dir:
         os.makedirs(export_dir, exist_ok=True)
         em = design.exportManager
-        for nm, comp in (('adapter', adapter), ('motor_pinion', pinion), ('rod_gear', rod_gear), ('sensor_gear', sgear),
-                         ('sensor_case_left', scases['Sensor case left'][1]),
-                         ('sensor_case_right', scases['Sensor case right'][1]),
+        for nm, comp in (('adapter', adapter), ('motor_pinion', pinion), ('sensor_gear', sgear),
                          ('case_left', cases['Case left'][1]), ('case_right', cases['Case right'][1])):
             path = os.path.join(export_dir, nm + '.stl')
             opt = em.createSTLExportOptions(comp, path)
@@ -852,9 +787,8 @@ def build(design, export_dir=None):
         'Pinion center (Y, Z): (%.1f, %.1f)' % (L['pin_c'][1], L['pin_c'][2]),
         'Screw holes (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in bosses),
         'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
-        'Sensor module at X=%.0f: gears %dT/%dT m%.1f, centres %.2f, sensor shaft (Y, Z)=(%.1f, %.1f), screws %s' % (
-            SL['xm'], P['sm_z_rod'], P['sm_z_sensor'], P['sm_m'], SL['cd'], SL['sc'][1], SL['sc'][2],
-            ', '.join('(%.0f, %.0f)' % b for b in sscrews)),
+        'Sensor gear %dT m%.2f on the worm wheel, centres %.2f, axis (Y, Z)=(%.1f, %.1f), magnet face X=%.2f, board chip side X=%.2f' % (
+            P['ss_z'], P['ss_m'], SL['cd'], SL['y'], SL['z'], SL['magnet_x'], SL['chip_x']),
         'Exported: %s' % ', '.join(os.path.basename(f) for f in files),
     ])
 

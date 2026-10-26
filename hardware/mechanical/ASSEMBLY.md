@@ -2,12 +2,11 @@
 
 ![closed housing](../../docs/renders/v03-closed-iso.png)
 
-Two units, both press-fit between the rail walls:
-- **Tilter** replaces the blind's factory tilter. It keeps the factory **worm** and **worm wheel**, adds a small N20
-  gear motor, and keeps the wand working by hand.
-- **Sensor module** clips onto the tilt rod anywhere along the rail. The rod runs straight through it, at any length.
-  An AS5600 magnetic sensor reads the rod's angle through a pair of gears, so the controller always knows the slat
-  angle, even right after power-up or after someone used the wand.
+One unit per blind replaces the factory tilter. It keeps the factory **worm** and **worm wheel**, adds a small N20 gear
+motor, keeps the wand working by hand, and has an **AS5600 magnetic sensor** built in. A small gear on the back of the
+worm wheel turns a magnet, so the controller always knows the slat angle, even right after power-up or after someone
+used the wand. The ESP32 + motor drivers are a separate **controller unit** (one per 3 blinds) at the end of a
+5-wire cable from each blind.
 
 ```
  TILTER   tilt rod ── worm wheel (factory 16T) ◄── worm (factory, 16:1, self-locking)
@@ -15,15 +14,14 @@ Two units, both press-fit between the rail walls:
                                            ADAPTER (printed): 8T 45° helical gear + teardrop wand loop
                                                      │ crossed helical, not self-locking → wand back-drives the motor
                                            PINION (printed, 7T) on the N20 motor
- SENSOR   tilt rod ── ROD GEAR (24T, square bore) ── SENSOR GEAR (14T) ── magnet ··· AS5600 board
-          60° of slat travel = 103° at the magnet (absolute, single turn)
+ SENSOR   worm wheel (back side) ── SENSOR GEAR (20T) ── magnet ··· AS5600 board on standoffs on the lid
+          60° of slat travel = 48° at the magnet (absolute, single turn)
 ```
 
 ## Parts
 
 ### Printed (files in [stl/](stl/), settings there)
-`case_right`, `case_left`, `adapter`, `motor_pinion` (tilter) · `sensor_case_left`, `sensor_case_right`, `rod_gear`,
-`sensor_gear` (sensor module)
+`case_right`, `case_left`, `adapter`, `motor_pinion`, `sensor_gear`
 
 ### Hardware
 | Item | Qty | Notes |
@@ -32,7 +30,8 @@ Two units, both press-fit between the rail walls:
 | N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9.5 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full 60° ≈ 3 motor turns |
 | M1.6 × 4 screw | 2 | N20 gearbox face (heads sink into counterbores in the pinion pocket) |
 | M2 × 16 screw | 3 | Tilter halves (heads sit flush in the lid) |
-| M2 × 12 screw | 2 | Sensor module halves |
+| M2 heat-set insert | 2 | Lid, for the AS5600 standoffs (you have these) |
+| M2 × 5 mm standoff (male-female) + M2 × 4 screw | 2 + 2 | AS5600 board |
 | AS5600 breakout, ≤ 23.4 × 23.4 mm, chip centred | 1 | I²C to the controller |
 | 6 × 2.5 mm diametric neodymium magnet | 1 | Often sold with AS5600 boards |
 | Wire | — | 2-core motor lead, 4-core sensor lead (3V3, GND, SDA, SCL) |
@@ -49,18 +48,21 @@ Two units, both press-fit between the rail walls:
 6. **Hand check:** turn the loop. The worm wheel should turn smoothly, and so should the motor shaft. Nothing should rub.
 7. **Lid:** fit `case_left`. Its 2 pegs drop into the sockets in `case_right`. Then 3 × M2 × 16.
 
-## Sensor module assembly
-1. Press the magnet into the head of `sensor_gear`.
-2. Lay `rod_gear` and `sensor_gear` into `sensor_case_right`: shaft into its blind hole, magnet head toward the open side.
-3. Fit `sensor_case_left` (pegs locate it), 2 × M2 × 12. The magnet head sits flush in the face inside the board frame.
-4. Slide the AS5600 board into the frame from the top, chip facing the magnet.
+## Sensor (part of the tilter)
+1. Before closing the case: press the magnet into the head of `sensor_gear`, then drop the gear into its pocket in
+   `case_right` (shaft end into the blind hole) so it meshes with the back of the worm wheel. Close the lid as above.
+   The magnet head pokes ~2 mm out of the lid face.
+2. Press 2 × M2 heat-set inserts into the holes in the lid's outer face (soldering iron, ~220 °C for PETG).
+3. Screw 2 × M2 × 5 mm standoffs into the inserts, then the AS5600 board onto them **chip facing the magnet**
+   (2 × M2 × 4 screws). Chip-to-magnet gap = standoff − chip height − 2 mm protrusion ≈ 1.5 mm.
+4. Solder the 5-wire lead: motor + and − to the N20 tabs; 3V3, GND and OUT to the AS5600 header (tie GPO to VCC
+   for the analog output). Secure the lead with a zip tie to the case before it leaves the unit.
 
 ## Install in the headrail
-1. Take the rod out. Thread it through the sensor module's rod gear and through the tilter's worm wheel.
+1. Take the rod out and thread it through the tilter's worm wheel.
 2. Press the tilter down between the rail walls with the block in the corner notch. The small dome over the worm sits
    in the rail's open top slot.
-3. Press the sensor module in wherever there's ~18 mm free on the rod, board frame facing either way.
-4. Re-seat the rod through the tilt drums, hook the wand onto the teardrop loop, and run the wires to the controller.
+3. Re-seat the rod through the tilt drums, hook the wand onto the teardrop loop, and run the wires to the controller.
 
 ## First power-on test (bench)
 - Motor at low PWM first: the slats should tilt through the full ~60° in about a second.
