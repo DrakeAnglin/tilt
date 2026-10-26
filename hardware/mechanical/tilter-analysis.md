@@ -91,8 +91,12 @@ Changes from v0.2 (2026-10-25):
   36.5 mm rail, so the case now has a **dome** that rises 2.1 mm into the rail's open top slot (6.5 mm frame gap above).
   60° keeps the dome lowest while the gears still clear the floor by ≥ 1.1 mm (search: tools/layout_helical.py).
 - **Spline socket 0.10 mm** clearance (owner's fit test, cup #1).
-- **Position sensing:** AS5600 board + 6 × 2.5 mm diametric magnet on the rod end (magnet cap + sensor holder).
-- Motor screws counterbored inside the pinion pocket. Two alignment pegs between the case halves. 1 mm rounded outer edges.
+- **Position sensing:** a separate **sensor module** anywhere on the rod (the rod passes straight through, at any
+  length): 24T rod gear → 14T sensor gear with a 6 × 2.5 mm magnet in its head → AS5600 board in a frame on the
+  module face. 60° of rod = 103° at the magnet (absolute). An earlier rod-end magnet cap was dropped because the
+  rod's length past the tilter is unknown and the sensor shouldn't hang off the gearbox (owner feedback).
+- Motor screws counterbored inside the pinion pocket; lid screws counterbored flush. Two alignment pegs between the
+  case halves. 1 mm rounded outer edges.
 - Adapter collar gives 0.95 mm of wall around the spline socket, then a 45° taper to a 6 mm shaft.
 - Verification is automated (tools/fusion_verify.py): interference incl. the rail, clearances, gear phase + full-rev sweep.
 

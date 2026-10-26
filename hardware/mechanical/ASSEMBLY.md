@@ -2,67 +2,67 @@
 
 ![closed housing](../../docs/renders/v03-closed-iso.png)
 
-This replaces the blind's factory tilter with a printed housing that keeps the factory **worm** and **worm wheel**,
-adds a small N20 gear motor, and keeps the wand working by hand. An AS5600 magnetic sensor reads the tilt rod's angle.
+Two units, both press-fit between the rail walls:
+- **Tilter** replaces the blind's factory tilter. It keeps the factory **worm** and **worm wheel**, adds a small N20
+  gear motor, and keeps the wand working by hand.
+- **Sensor module** clips onto the tilt rod anywhere along the rail. The rod runs straight through it, at any length.
+  An AS5600 magnetic sensor reads the rod's angle through a pair of gears, so the controller always knows the slat
+  angle, even right after power-up or after someone used the wand.
 
 ```
- tilt rod ─── worm wheel (factory, 16 T) ◄── worm (factory, 16:1, self-locking)
-                                               │ 8-ridge spline
-                                     ADAPTER (printed): 8 T helical gear + teardrop wand loop
-                                               │ 45° crossed helical, 1 : 1.14
-                                     PINION (printed, 7 T) on the N20 motor
- rod end ── MAGNET CAP (printed) ── 6×2.5 mm magnet ··· AS5600 board in the SENSOR HOLDER (printed)
+ TILTER   tilt rod ── worm wheel (factory 16T) ◄── worm (factory, 16:1, self-locking)
+                                                     │ 8-ridge spline
+                                           ADAPTER (printed): 8T 45° helical gear + teardrop wand loop
+                                                     │ crossed helical, not self-locking → wand back-drives the motor
+                                           PINION (printed, 7T) on the N20 motor
+ SENSOR   tilt rod ── ROD GEAR (24T, square bore) ── SENSOR GEAR (14T) ── magnet ··· AS5600 board
+          60° of slat travel = 103° at the magnet (absolute, single turn)
 ```
 
 ## Parts
 
-### Printed (files in [stl/](stl/))
-| File | Qty | Material | Orientation | Notes |
-|---|---|---|---|---|
-| `case_right.stl` | 1 | PETG | split face down | Main half, holds everything |
-| `case_left.stl` | 1 | PETG | split face down | Lid |
-| `adapter.stl` | 1 | PETG or PLA+ | gear down, loop up | 0.12 mm layers |
-| `motor_pinion.stl` | 1 | PETG or PLA+ | gear down, hub up | 0.12 mm layers |
-| `magnet_cap.stl` | 1 | PETG / PLA | magnet pocket up | |
-| `sensor_holder.stl` | 1 | PETG / PLA | back plate down | |
-
-Suggested: 0.4 mm nozzle, 4 walls, 30–40 % infill, no supports needed.
+### Printed (files in [stl/](stl/), settings there)
+`case_right`, `case_left`, `adapter`, `motor_pinion` (tilter) · `sensor_case_left`, `sensor_case_right`, `rod_gear`,
+`sensor_gear` (sensor module)
 
 ### Hardware
 | Item | Qty | Notes |
 |---|---|---|
-| Factory worm, worm wheel | 1 each | From the blind's tilter (drill out the 3 rivets) |
-| N20 gear motor, **no encoder**, 3 mm D-shaft (≥ 9 mm long) | 1 | 5–6 V. **1:30–1:50 recommended** so the wand can still back-drive it; full 60° travel is ~3 motor turns |
-| M2 × 16 screw (self-tapping or machine) | 3 | Case halves |
-| M2 × 10 screw | 2 | Sensor holder to the lid |
-| M1.6 × 4 screw | 2 | N20 gearbox face (counterbored inside the case) |
-| AS5600 breakout board, ≤ 23.4 × 23.4 mm, chip centered | 1 | I²C to the controller |
+| Factory worm + worm wheel | 1 each | From the blind's tilter (drill out the 3 rivets) |
+| N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full 60° ≈ 3 motor turns |
+| M1.6 × 4 screw | 2 | N20 gearbox face (heads sink into counterbores in the pinion pocket) |
+| M2 × 16 screw | 3 | Tilter halves (heads sit flush in the lid) |
+| M2 × 12 screw | 2 | Sensor module halves |
+| AS5600 breakout, ≤ 23.4 × 23.4 mm, chip centred | 1 | I²C to the controller |
 | 6 × 2.5 mm diametric neodymium magnet | 1 | Often sold with AS5600 boards |
-| 2-wire motor lead + 4-wire sensor lead | — | To the controller |
+| Wire | — | 2-core motor lead, 4-core sensor lead (3V3, GND, SDA, SCL) |
 
-## Assembly
-1. **Strip the factory tilter:** drill out the 3 rivets, keep the worm and the worm wheel. The factory wand connector and
-   shell aren't used.
-2. **Motor:** push the N20 into the motor pod of `case_right` from the open end until the gearbox face seats against the
-   wall. Fit the 2 × M1.6 × 4 screws from inside the pinion pocket (the heads sink into counterbores).
-3. **Pinion:** press `motor_pinion` onto the shaft, hub toward the motor, until the hub touches the wall. If it's loose,
-   one drop of CA on the shaft's flat.
-4. **Worm wheel:** drop it into its pocket with the barrel through the bearing hole.
-5. **Worm + adapter:** slide `adapter` onto the worm's splined end (socket clearance is 0.10 mm, the fit you chose).
-   Lay the worm in its groove with the flanges in their pockets. The adapter's gear sits next to the lower flange
-   and meshes with the pinion. The loop hangs out through the notch block.
-6. **Check by hand:** turn the adapter loop. The worm wheel should turn smoothly, and so should the motor (it back-drives
-   through the gears). Nothing should rub.
-7. **Lid:** fit `case_left` (2 pegs locate it), then 3 × M2 × 16.
-8. **Sensor:** push the magnet into `magnet_cap` (any orientation, diametric magnets are symmetric for this). Push the
-   cap onto the rod end until it touches the worm wheel's barrel. Slide the AS5600 board into `sensor_holder` from the
-   top, chip facing the magnet, then screw the holder to the lid (2 × M2 × 10).
-9. **Install:** position the housing so the block lines up with the rail's corner notch and there's ≥ 15 mm between
-   the lid and the end cap for the sensor holder. Slide the rod through the worm wheel, press the housing down between
-   the walls until the block drops into the notch (the small dome over the worm sits in the rail's open top slot), and
-   hook the wand onto the teardrop loop.
+## Tilter assembly
+1. **Strip the factory tilter:** drill out the 3 rivets and keep the worm and worm wheel.
+2. **Motor:** push the N20 into the pod of `case_right` from the open end until the gearbox face seats. Fit 2 × M1.6 × 4
+   from inside the pinion pocket.
+3. **Pinion:** press `motor_pinion` onto the shaft, hub toward the motor, until the hub touches the wall (CA on the flat
+   if loose).
+4. **Worm wheel:** drop it into its pocket, barrel through the bearing hole.
+5. **Worm + adapter:** slide `adapter` onto the worm's splined end. Lay the worm in its groove with both flanges in their
+   pockets. The adapter gear meshes with the pinion, and the loop hangs out through the notch block.
+6. **Hand check:** turn the loop. The worm wheel should turn smoothly, and so should the motor shaft. Nothing should rub.
+7. **Lid:** fit `case_left` (2 pegs locate it), 3 × M2 × 16.
+
+## Sensor module assembly
+1. Press the magnet into the head of `sensor_gear`.
+2. Lay `rod_gear` and `sensor_gear` into `sensor_case_right`: shaft into its blind hole, magnet head toward the open side.
+3. Fit `sensor_case_left` (pegs locate it), 2 × M2 × 12. The magnet head sits flush in the face inside the board frame.
+4. Slide the AS5600 board into the frame from the top, chip facing the magnet.
+
+## Install in the headrail
+1. Take the rod out. Thread it through the sensor module's rod gear and through the tilter's worm wheel.
+2. Press the tilter down between the rail walls with the block in the corner notch. The small dome over the worm sits
+   in the rail's open top slot.
+3. Press the sensor module in wherever there's ~18 mm free on the rod, board frame facing either way.
+4. Re-seat the rod through the tilt drums, hook the wand onto the teardrop loop, and run the wires to the controller.
 
 ## First power-on test (bench)
-- 5 V through the motor driver, low PWM first. Slats should tilt smoothly through the full ~60° in about a second.
-- Read the AS5600 angle while tilting by hand: it should change by about 60° end to end, with no jumps.
-- Listen: any ticking means a gear rubs. Note where and report it, since each clearance is a parameter.
+- Motor at low PWM first: the slats should tilt through the full ~60° in about a second.
+- Read the AS5600 angle while tilting by hand. It should change by about 103° end to end, with no jumps.
+- Listen: any ticking means something rubs. Note where. Every clearance is a parameter in `TiltParts.py`.

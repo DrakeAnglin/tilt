@@ -93,6 +93,7 @@ res.append(shot('v03-assembly-iso.png', 'IsoTopRightViewOrientation', False))
 vis(); rail(False); res.append(shot('v03-closed-iso.png', 'IsoTopLeftViewOrientation', False))
 vis(show=('Adapter', 'Motor pinion', 'REF')); rail(False); res.append(shot('v03-drivetrain-iso.png', 'IsoTopRightViewOrientation', False))
 vis(show=('Case right',)); res.append(shot('v03-case-right.png', 'IsoTopLeftViewOrientation', False))
-vis(show=('Sensor holder', 'Magnet cap', 'Case left', 'REF')); rail(False); res.append(shot('v03-sensor.png', 'IsoTopLeftViewOrientation', False))
+vis(show=('Sensor', 'Rod gear', 'REF')); rail(False); res.append(shot('v03-sensor.png', 'IsoTopLeftViewOrientation', False))
+vis(show=('Sensor gear', 'Rod gear', 'Sensor case right', 'REF')); rail(False); res.append(shot('v03-sensor-open.png', 'IsoTopLeftViewOrientation', False))
 vis(); rail(True)
 result = {'build': report.split('\n'), 'renders': res}

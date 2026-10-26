@@ -65,8 +65,9 @@ for i in range(root.occurrences.count):
     for j in range(o.bRepBodies.count):
         B[o.bRepBodies.item(j).name] = o.bRepBodies.item(j)
 
-PRINTED = [n for n in ('Adapter', 'Motor pinion', 'Case left', 'Case right', 'Magnet cap', 'Sensor holder') if n in B]
-EXPECTED = {frozenset(p) for p in [('Adapter', 'Worm 6'), ('Motor pinion', 'N20 shaft')]}
+PRINTED = [n for n in ('Adapter', 'Motor pinion', 'Case left', 'Case right', 'Rod gear', 'Sensor gear',
+                        'Sensor case left', 'Sensor case right') if n in B]
+EXPECTED = {frozenset(p) for p in [('Adapter', 'Worm 6'), ('Motor pinion', 'N20 shaft'), ('Sensor gear', 'Magnet')]}
 
 
 def interference(names):
@@ -84,14 +85,7 @@ def interference(names):
     return out
 
 
-# --- gear phase + sweep
-ad, pn = occ('TP Adapter'), occ('TP Motor pinion')
-pbase = pn.transform2.copy()
-abase = ad.transform2.copy()
-pz = pbase.getAsCoordinateSystem()[3]
-az = abase.getAsCoordinateSystem()[3]
-porg = pbase.translation
-aorg = abase.translation
+# --- gear phase + full-revolution sweep, for each gear pair
 
 
 def rotated(base, axis, origin, ang):
@@ -102,53 +96,51 @@ def rotated(base, axis, origin, ang):
     return m
 
 
-def gear_overlap():
-    col = adsk.core.ObjectCollection.create()
-    col.add(ad.bRepBodies.item(0))
-    col.add(pn.bRepBodies.item(0))
-    res = design.analyzeInterference(design.createInterferenceInput(col))
-    return sum(res.item(k).interferenceBody.volume * 1000 for k in range(res.count))
+def check_pair(big_name, small_name, z_big, z_small, steps):
+    big, small = occ(big_name), occ(small_name)
+    bbase, sbase = big.transform2.copy(), small.transform2.copy()
+    bz, sz = bbase.getAsCoordinateSystem()[3], sbase.getAsCoordinateSystem()[3]
+    bo, so = bbase.translation, sbase.translation
+
+    def overlap():
+        col = adsk.core.ObjectCollection.create()
+        col.add(big.bRepBodies.item(0))
+        col.add(small.bRepBodies.item(0))
+        res = design.analyzeInterference(design.createInterferenceInput(col))
+        return sum(res.item(k).interferenceBody.volume * 1000 for k in range(res.count))
+
+    scan = []
+    for k in range(30):
+        small.transform2 = rotated(sbase, sz, so, 2 * math.pi / z_small * k / 30)
+        scan.append(overlap())
+    free = [i for i, v in enumerate(scan) if v < 1e-6]
+    phase = 2 * math.pi / z_small * (free[len(free) // 2] if free else scan.index(min(scan))) / 30
+    worst = {}
+    for sgn in (1, -1):
+        w = 0.0
+        for k in range(steps):
+            a = 2 * math.pi * k / steps
+            big.transform2 = rotated(bbase, bz, bo, a)
+            small.transform2 = rotated(sbase, sz, so, phase + sgn * a * z_big / z_small)
+            w = max(w, overlap())
+        worst[sgn] = w
+    big.transform2 = bbase
+    small.transform2 = rotated(sbase, sz, so, phase)
+    return dict(min_overlap_mm3=round(min(scan), 4), backlash_deg=round(360.0 / z_small * len(free) / 30, 1),
+                sweep_worst_mm3=round(min(worst.values()), 4), sweep_steps=steps)
 
 
-z_ad, z_pn = mod.P['z_adapter'], mod.P['z_pinion']
-best = None
-scan = []
-for k in range(30):
-    ang = 2 * math.pi / z_pn * k / 30
-    pn.transform2 = rotated(pbase, pz, porg, ang)
-    v = gear_overlap()
-    scan.append(v)
-    if best is None or v < best[0]:
-        best = (v, ang)
-free = [i for i, v in enumerate(scan) if v < 1e-6]
-# centre of the zero-overlap window = mid-backlash phase
-if free:
-    mid = free[len(free) // 2]
-    phase = 2 * math.pi / z_pn * mid / 30
-else:
-    phase = best[1]
-backlash_deg = 360.0 / z_pn * len(free) / 30
-# sweep: adapter turns a, pinion turns -a * z_ad / z_pn (direction found by trying both)
-sweep_res = {}
-for sgn in (1, -1):
-    worst = 0.0
-    for k in range(SWEEP_STEPS):
-        a = 2 * math.pi * k / SWEEP_STEPS
-        ad.transform2 = rotated(abase, az, aorg, a)
-        pn.transform2 = rotated(pbase, pz, porg, phase + sgn * a * z_ad / z_pn)
-        worst = max(worst, gear_overlap())
-    sweep_res[sgn] = worst
-good_sgn = min(sweep_res, key=sweep_res.get)
-ad.transform2 = abase
-pn.transform2 = rotated(pbase, pz, porg, phase)
+gear = check_pair('TP Adapter', 'TP Motor pinion', mod.P['z_adapter'], mod.P['z_pinion'], SWEEP_STEPS)
+sensor_gears = check_pair('TP Rod gear', 'TP Sensor gear', mod.P['sm_z_rod'], mod.P['sm_z_sensor'], 12)
 
 pairs = [('Adapter', 'Rail wall room'), ('Adapter', 'Rail floor'), ('Adapter', 'Case right'), ('Adapter', 'Case left'),
          ('Motor pinion', 'Case right'), ('Motor pinion', 'Rail floor'), ('Motor pinion', 'Worm 5'),
          ('Motor pinion', 'Worm 6'), ('N20', 'Rail floor'), ('N20', 'Rail wall room'), ('N20', 'Rod'),
          ('Case right', 'Rod'), ('Case left', 'Rod'), ('Case right', 'Rail floor'), ('Case right', 'Rail wall room'),
-         ('Case right', 'Rail wall back'), ('Magnet cap', 'Sensor holder'), ('Magnet cap', 'Case left'),
-         ('Magnet', 'AS5600 board'), ('Sensor holder', 'Rail floor'), ('Sensor holder', 'Rail wall room'),
-         ('Sensor holder', 'Rail wall back'), ('AS5600 board', 'Rail floor')]
+         ('Case right', 'Rail wall back'), ('Magnet', 'AS5600 board'), ('Rod gear', 'Sensor case right'),
+         ('Sensor gear', 'Sensor case right'), ('Sensor gear', 'Sensor case left'), ('Rod gear', 'Rod'),
+         ('Sensor case left', 'Rail floor'), ('Sensor case left', 'Rail wall back'), ('AS5600 board', 'Rail floor'),
+         ('AS5600 board', 'Rail wall back'), ('Sensor case right', 'N20')]
 dist = {}
 for a, b in pairs:
     if a in B and b in B:
@@ -163,10 +155,8 @@ result = dict(
     params={k: mod.P[k] for k in ('worm_angle', 'motor_rot', 'pinion_gap', 'adapter_face', 'spline_clear')},
     build=report.split('\n'),
     interference=interference(list(B.keys())) or 'none',
-    gear=dict(min_overlap_mm3=round(best[0], 4), backlash_deg=round(backlash_deg, 1),
-              sweep_worst_mm3=round(sweep_res[good_sgn], 4), sweep_steps=SWEEP_STEPS),
+    gear=gear, sensor_gears=sensor_gears,
     distances=dist,
     worm_top_z=round(worm_top, 2), case_top_z=round(case_max_z, 2),
-    holder_min_x=round(B['Sensor holder'].boundingBox.minPoint.x * 10, 2) if 'Sensor holder' in B else None,
     motor_max_x=round(B['N20'].boundingBox.maxPoint.x * 10, 2),
 )
