@@ -38,15 +38,18 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 
 ## Tilter assembly
 1. **Strip the factory tilter:** drill out the 3 rivets and keep the worm and worm wheel.
-2. **Motor:** push the N20's gearbox into the rectangular socket in the back face of `case_right` until its face seats
-   against the wall. Fit 1 × M1.6 × 4 from inside the pinion pocket (the socket stops rotation; one screw holds it in). The rest of the motor sticks out the back.
+2. **Motor:** push the N20's gearbox into the rectangular socket in the outer face of `case_left` (the lid) until its
+   face seats against the wall. Fit 1 × M1.6 × 4 from inside the pinion pocket (the socket stops rotation; one screw
+   holds it in). The rest of the motor sticks out of the lid, under the AS5600 board, away from the tilt drums.
 3. **Pinion:** press `motor_pinion` onto the shaft, hub toward the motor, until the hub touches the wall (CA on the flat
-   if loose).
+   if loose). The motor and pinion now ride in the lid: hold the lid split-face up and close it onto the main half
+   last (step 7), easing the pinion into mesh with the adapter gear.
 4. **Worm wheel:** drop it into its pocket, barrel through the bearing hole.
 5. **Worm + adapter:** slide `adapter` onto the worm's splined end. Lay the worm in its groove with both flanges in their
    pockets. The adapter gear meshes with the pinion, and the loop hangs out through the notch block.
 6. **Hand check:** turn the loop. The worm wheel should turn smoothly, and so should the motor shaft. Nothing should rub.
-7. **Lid:** fit `case_left`. Its 2 pegs drop into the sockets in `case_right`. Then 3 × M2 × 16.
+7. **Lid:** fit `case_left` (with the motor and pinion on it). Its 2 pegs drop into the sockets in `case_right`. Then
+   3 × M2 × 16 (6 mm of thread in the main half).
 
 ## Sensor (part of the tilter)
 1. Before closing the case: press the magnet into the head of `sensor_gear`, then drop the gear into its pocket in
@@ -67,6 +70,8 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 3. Re-seat the rod through the tilt drums, hook the wand onto the teardrop loop, and run the wires to the controller.
 
 ## First power-on test (bench)
+- The motor is now on the other side of the adapter gear, so it turns the opposite way for the same tilt direction
+  as the v0.3 drawings. Set the direction in software after the first run rather than swapping wires.
 - Motor at low PWM first: closed → open → closed is ~11–12 worm turns, about 2.5–4 s at full speed (half that from
   open to closed).
 - Read the AS5600 angle while tilting by hand. It should change by about 200–215° end to end, with no jumps.

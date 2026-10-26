@@ -41,6 +41,8 @@ P = dict(
     adapter_face=2.6, pinion_face=5.0, pinion_hub_d=6.5, pinion_hub=3.0,
     pinion_gap=5.0,           # pinion face to N20 gearbox face (room for a sealing wall between gear chamber and motor pocket)
     motor_rot=0.0,            # motor axis swung about the worm axis (0 = parallel to the rod)
+    motor_side=-1,            # -1: N20 sticks out of the lid (-X); +1: out of the main half toward the tilt drums
+                              # (owner: on +X it hit a tilt spindle)
     # adapter
     mouth_s=18.97, collar_d=8.2, body_d=6.0, body_len=19.0,
     spline_od=6.0, spline_root=5.0, spline_n=8, socket_depth=5.3, spline_clear=0.10,   # owner's fit test: 0.10 fits best
@@ -163,8 +165,9 @@ def layout():
     ga, gp = helical(P['z_adapter']), helical(P['z_pinion'])
     cd = ga['rp'] + gp['rp'] + P['cd_extra']
     rot = math.radians(P['motor_rot'])
-    u = unit(add(mul(X, math.cos(rot)), mul(n, math.sin(rot))))      # pinion / motor axis (toward the motor)
-    off = unit(mul(cross(d, u), -1.0))                                 # common perpendicular, away from the wall
+    u0 = unit(add(mul(X, math.cos(rot)), mul(n, math.sin(rot))))
+    off = unit(mul(cross(d, u0), -1.0))                                # common perpendicular, away from the wall
+    u = mul(u0, P['motor_side'])                                       # pinion / motor axis (toward the motor)
     gs = P['mouth_s'] + P['adapter_face'] / 2.0
     gear_c = S(gs)
     pin_c = add(gear_c, mul(off, cd))
@@ -432,9 +435,11 @@ def notch_box(grow=0.0):
                       -hw - grow, -hw + P['notch_d'] + grow, -t - grow, -t + P['notch_h'] + grow)
 
 
-def slab_right(L):
-    """X of the main half's back face: the N20 gearbox face plus the socket depth."""
-    return L['face'][0] + P['motor_socket']
+def slab_x(L):
+    """X of the lid's outer face and the main half's back face. The half the N20 sticks out of is thicker: its
+    gearbox face plus the socket depth."""
+    m = L['face'][0] + P['motor_socket'] * P['motor_side']
+    return min(-P['slab_half'], m), max(P['slab_half'], m)
 
 
 def case_shapes(L):
@@ -451,7 +456,7 @@ def case_shapes(L):
     pin_end = -7.0 - P['worm_pin_end_clear']
     named = [
         ('wheel teeth', Prim('cyl', p1=add(rc, (-4.15, 0, 0)), p2=add(rc, (4.15, 0, 0)), r=8.3)),
-        ('barrel bore', Prim('cyl', p1=add(rc, (-9.5, 0, 0)), p2=add(rc, (slab_right(L) + 1, 0, 0)), r=6.4)),
+        ('barrel bore', Prim('cyl', p1=add(rc, (slab_x(L)[0] - 1, 0, 0)), p2=add(rc, (slab_x(L)[1] + 1, 0, 0)), r=6.4)),
         # Worm: ONE thrust collar (the upper flange, tight both ways); every other end face has free play so only
         # one pair of faces ever carries thrust. Radial support: top-pin journal + shaft bearing between the flanges.
         ('worm top pin', cyl_s(L, pin_end, -4.5, 2.65)),
@@ -490,13 +495,13 @@ def case_shapes(L):
     for nm, pr in named:
         pr.label = nm
     cav = [pr for _, pr in named]
-    x_right = slab_right(L)        # main half is thicker: the N20 gearbox sits in a short socket in its back face
-    slab = box_minmax(-P['slab_half'], x_right, -hw, hw, P['case_floor'], P['case_top'])
+    x_left, x_right = slab_x(L)    # the motor's half is thicker: the N20 gearbox sits in a short socket in its outer face
+    slab = box_minmax(x_left, x_right, -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
     dome = [cyl_s(L, -4.5 - free - dw, 4.8, 5.9 + dw),                                 # over the threads
             cyl_s(L, pin_end, -4.5 - free - dw + 0.01, 2.65 + dw),                     # over the top pin
             Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=2.65 + dw, r2=2.0)]   # tapered end cap
-    plateau = box_minmax(-P['slab_half'], x_right, -(hw - P['lip_in'] - P['plateau_clear']),
+    plateau = box_minmax(x_left, x_right, -(hw - P['lip_in'] - P['plateau_clear']),
                          hw - P['lip_in'] - P['plateau_clear'], P['case_top'] - 1.0, P['plateau_top'])
     env = [
         slab,
@@ -590,13 +595,13 @@ def case_plan(L):
         return z < P['case_top'] - cb and not on_board(y, z)
     picks = pick_bosses(cav, screw_ok, count=5, clear_r=P['lid_cbore_d'] / 2 + P['screw_wall'])
     bosses, pegs = picks[:3], picks[3:]
-    x0 = -P['slab_half']
+    x0, x1 = slab_x(L)
     X = lambda xa, xb, y, z, r: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r)
     holes = {'Case left': [], 'Case right': []}
     for y, z in bosses:
-        holes['Case left'].append(('screw clearance', X(-9, 9, y, z, 1.1)))
+        holes['Case left'].append(('screw clearance', X(x0 - 1, x1 + 1, y, z, 1.1)))
         holes['Case left'].append(('screw counterbore', X(x0 - 1, x0 + P['lid_cbore'], y, z, P['lid_cbore_d'] / 2)))
-        holes['Case right'].append(('screw pilot', X(-9, 9, y, z, 0.85)))
+        holes['Case right'].append(('screw pilot', X(x0 - 1, x1 + 1, y, z, 0.85)))
     for y, z in pegs:
         holes['Case right'].append(('peg socket', X(-0.1, P['peg_h'] + 0.4, y, z, P['peg_d'] / 2 + 0.15)))
     for (y, z), kind, r, depth in board_hole_plan():
@@ -661,7 +666,7 @@ def sensor_layout():
     cd = wheel_rp + gs['rp'] + P['ss_cd_extra']
     y = P['ss_y']
     z = P['rod_z'] - math.sqrt(cd * cd - y * y)          # behind and slightly below the rod: clear of the worm
-    lid_face = -P['slab_half']
+    lid_face = slab_x(layout())[0]
     protrude = P['standoff_len'] - P['chip_h'] - P['sensor_gap']   # magnet head sticks out of the lid face by this
     magnet_x = lid_face - protrude
     head_x0 = magnet_x + P['ss_head_len']                  # inner end of the head
