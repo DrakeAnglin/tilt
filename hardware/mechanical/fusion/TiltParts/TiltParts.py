@@ -57,7 +57,7 @@ P = dict(
     worm_pin_end_clear=0.4,   # top pin end never touches   # top between the lips rises flush with the headrail top (owner: 2.8 mm room)
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0, lid_cbore_d=4.2, lid_cbore=1.8,
     # AS5600 sensor, integrated: a 20T sensor gear meshes with the BACK of the factory worm wheel (which turns with
-    # the rod); its shaft runs through the lid to a magnet head; the AS5600 board sits on standoffs screwed into
+    # the rod; full travel ≈ 250–270° of rod = ~200–215° at the magnet, still under one turn); its shaft runs through the lid to a magnet head; the AS5600 board sits on standoffs screwed into
     # heat-set inserts in the lid's outer face, chip facing the magnet.
     ss_z=20, ss_m=0.88, ss_face=4.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0, ss_shaft_right=3.5,
     ss_head_d=8.0, ss_head_len=3.4,

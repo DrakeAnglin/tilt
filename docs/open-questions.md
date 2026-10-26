@@ -72,7 +72,7 @@ Still unknown:
 - [x] Torque: low, finger-twistable. N20 strength is not a concern (exact number still nice to have)
 - [x] Tilter sits in the 110 mm pocket, rod passes through the worm wheel
 - [x] Clearance above the installed headrail: ~6.5 mm
-- [x] Tilt travel ≈ 60° (confirm: rod rotation, not wand)
+- [x] Tilt travel: **11–12 wand turns** closed → closed (5–6 open → closed) ≈ 250–270° of rod. (Earlier "60°" was the slat angle)
 - [x] Tilter housing: 16.5 mm thick, worm at ~67°, worm back end enclosed (see hardware/mechanical/tilter-analysis.md)
 - [ ] Open the tilter (3 screws): worm + wheel sizes, tooth count, worm starts, how the wand loop attaches
 - [ ] Exact wand turns closed → closed (when reassembled)

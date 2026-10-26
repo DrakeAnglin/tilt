@@ -15,7 +15,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
                                                      │ crossed helical, not self-locking → wand back-drives the motor
                                            PINION (printed, 7T) on the N20 motor
  SENSOR   worm wheel (back side) ── SENSOR GEAR (20T) ── magnet ··· AS5600 board on standoffs on the lid
-          60° of slat travel = 48° at the magnet (absolute, single turn)
+          full travel ≈ 250–270° of rod (11–12 wand turns) = ~200–215° at the magnet (absolute, single turn)
 ```
 
 ## Parts
@@ -27,7 +27,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 | Item | Qty | Notes |
 |---|---|---|
 | Factory worm + worm wheel | 1 each | From the blind's tilter (drill out the 3 rivets) |
-| N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9.5 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full 60° ≈ 3 motor turns |
+| N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9.5 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full travel ≈ 13 motor turns (~2.5–4 s) |
 | M1.6 × 4 screw | 2 | N20 gearbox face (heads sink into counterbores in the pinion pocket) |
 | M2 × 16 screw | 3 | Tilter halves (heads sit flush in the lid) |
 | M2 heat-set insert | 2 | Lid, for the AS5600 standoffs (you have these) |
@@ -65,6 +65,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 3. Re-seat the rod through the tilt drums, hook the wand onto the teardrop loop, and run the wires to the controller.
 
 ## First power-on test (bench)
-- Motor at low PWM first: the slats should tilt through the full ~60° in about a second.
-- Read the AS5600 angle while tilting by hand. It should change by about 103° end to end, with no jumps.
+- Motor at low PWM first: closed → open → closed is ~11–12 worm turns, about 2.5–4 s at full speed (half that from
+  open to closed).
+- Read the AS5600 angle while tilting by hand. It should change by about 200–215° end to end, with no jumps.
 - Listen: any ticking means something rubs. Note where. Every clearance is a parameter in `TiltParts.py`.

@@ -61,7 +61,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 |---|---|---|---|
 | P-1 | Must | **Quiet** | < 35 dBA at 1 m during a move (fridge level); measure with a phone SPL app vs. the old servo setup |
 | P-2 | Must | **Strong enough for the largest blind** | Motor *rated* torque ≥ 2× measured worst-case torque (see [measure-your-blinds.md](measure-your-blinds.md)) |
-| P-3 | Should | Full tilt travel time | 3–10 s |
+| P-3 | Should | Full tilt travel time (11–12 worm turns ≈ 13 motor turns) | 3–10 s (300 RPM N20 ≈ 2.5–4 s) |
 | P-4 | Must | Positioning repeatability | ±2% of travel |
 | P-5 | Should | Lifetime | 10 years at 6 moves/day ≈ 22,000 cycles |
 

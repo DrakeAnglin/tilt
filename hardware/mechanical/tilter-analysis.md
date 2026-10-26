@@ -18,8 +18,8 @@ Face photo scale: ruler 0–100 mm ≈ 10.4 px/mm. The face shown is the headrai
 | Housing | Two-half clear shell held by **3 rivets** (owner drilled them out). A printed housing would use M2 screws | Owner |
 | Worm back end | **Enclosed**, ends close to the top of the rail. No room for a coaxial motor | Owner + photo |
 | Wand travel | "A few full turns" closed → closed | Owner |
-| Rod travel | ≈ 60° closed → closed | Owner |
-| **Implied worm ratio** | (3–5 turns × 360°) / 60° ≈ **18–30 : 1** | Consistent with a single-start worm on a ~20-tooth, 15 mm wheel |
+| Rod travel | **≈ 250–270°** closed → closed (11–12 worm turns ÷ 16). The first estimate of 60° was the slat angle | Owner, measured on the printed unit |
+| Worm ratio | **16 : 1** (counted teeth, single start; see below) | Calipers |
 
 ## Packaging problem
 The worm's upper end runs almost into the top of the rail, so an N20 can't go coaxially behind it, and the lower end exits the
@@ -80,7 +80,7 @@ Axial pitch: "≈ 7 mm across 3 teeth" (≈ 2 pitches + one crest width) and 9 m
 which matches module 0.88 (π × 0.88 = 2.76). The worm and wheel are a matched module ≈ 0.88 pair.
 
 **Derived:**
-- **Worm ratio = 16 : 1** (single start). 60° of rod = **2.67 worm turns**.
+- **Worm ratio = 16 : 1** (single start). Full travel = **11–12 worm turns ≈ 250–270° of rod** (measured on the printed unit).
 - Worm pitch diameter ≈ 11.0 − 2 × 0.88 ≈ 9.24 mm → **center distance ≈ (9.24 + 14.0) / 2 ≈ 11.6 mm**.
 - Lead angle ≈ atan(2.76 / (π × 9.24)) ≈ 5.4°: **self-locking**.
 - The wand loop connector engages only the bottom ~5 mm splined section (5.6 mm Ø).
@@ -93,7 +93,8 @@ Changes from v0.2 (2026-10-25):
 - **Spline socket 0.10 mm** clearance (owner's fit test, cup #1).
 - **Position sensing:** a separate **sensor module** anywhere on the rod (the rod passes straight through, at any
   length): 24T rod gear → 14T sensor gear with a 6 × 2.5 mm magnet in its head → AS5600 board in a frame on the
-  module face. 60° of rod = 103° at the magnet (absolute). An earlier rod-end magnet cap was dropped because the
+  module face. (The geared module was later replaced by a sensor gear on the worm wheel inside the tilter: 20T on the 16T wheel, so
+  full travel ≈ 200–215° at the magnet, still absolute.) An earlier rod-end magnet cap was dropped because the
   rod's length past the tilter is unknown and the sensor shouldn't hang off the gearbox (owner feedback).
 - Motor screws counterbored inside the pinion pocket; lid screws counterbored flush. Two alignment pegs between the
   case halves. 1 mm rounded outer edges.
