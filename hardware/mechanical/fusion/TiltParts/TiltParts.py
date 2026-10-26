@@ -49,7 +49,7 @@ P = dict(
     n20_w=12.0, n20_h=10.0, n20_gbx=9.0, n20_motor=15.0, n20_end=1.0, n20_shaft_d=3.0, n20_flat=2.5,
     n20_screw_spacing=9.0,
     # case
-    wall=1.6, slab_half=8.33, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
+    wall=1.6, slab_half=8.33, motor_socket=4.0, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
     dome_wall=1.2, dome_max_y=21.0,   # cover over the worm's top end, allowed to rise into the rail's open top slot
     plateau_top=38.9, plateau_clear=0.3,
     worm_thrust_clear=0.15,   # upper flange: the single axial stop, both directions
@@ -427,6 +427,11 @@ def notch_box(grow=0.0):
                       -hw - grow, -hw + P['notch_d'] + grow, -t - grow, -t + P['notch_h'] + grow)
 
 
+def slab_right(L):
+    """X of the main half's back face: the N20 gearbox face plus the socket depth."""
+    return L['face'][0] + P['motor_socket']
+
+
 def case_shapes(L):
     wall = P['wall']
     rc, u, w, vz = L['rod_c'], L['u'], L['w'], L['vz']
@@ -439,7 +444,7 @@ def case_shapes(L):
     pin_end = -7.0 - P['worm_pin_end_clear']
     cav = [
         Prim('cyl', p1=add(rc, (-4.15, 0, 0)), p2=add(rc, (4.15, 0, 0)), r=8.3),       # wheel teeth
-        Prim('cyl', p1=add(rc, (-9.5, 0, 0)), p2=add(rc, (9.5, 0, 0)), r=6.4),         # barrel bearings
+        Prim('cyl', p1=add(rc, (-9.5, 0, 0)), p2=add(rc, (slab_right(L) + 1, 0, 0)), r=6.4),  # barrel bearings / rod
         # Worm: ONE thrust collar (the upper flange, tight both ways); every other end face has free play so only
         # one pair of faces ever carries thrust. Radial support: top-pin journal + shaft bearing between the flanges.
         cyl_s(L, pin_end, -4.5, 2.65),                                                   # top pin journal
@@ -462,22 +467,19 @@ def case_shapes(L):
         hp = add(L['pin_c'], mul(w, sgn * P['n20_screw_spacing'] / 2))
         cav.append(cyl_u(L, hp, pocket_end - 0.5, P['pinion_face'] / 2 + P['pinion_gap'] + 0.5, 0.9))
         cav.append(cyl_u(L, hp, pocket_end - 0.5, pocket_end + P['screw_cbore'], P['screw_cbore_d'] / 2))
-    slab = box_minmax(-P['slab_half'], P['slab_half'], -hw, hw, P['case_floor'], P['case_top'])
+    x_right = slab_right(L)        # main half is thicker: the N20 gearbox sits in a short socket in its back face
+    slab = box_minmax(-P['slab_half'], x_right, -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
     dome = [cyl_s(L, -4.5 - free - dw, 4.8, 5.9 + dw),                                 # over the threads
             cyl_s(L, pin_end, -4.5 - free - dw + 0.01, 2.65 + dw),                     # over the top pin
             Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=2.65 + dw, r2=2.0)]   # tapered end cap
-    plateau = box_minmax(-P['slab_half'], P['slab_half'], -(hw - P['lip_in'] - P['plateau_clear']),
+    plateau = box_minmax(-P['slab_half'], x_right, -(hw - P['lip_in'] - P['plateau_clear']),
                          hw - P['lip_in'] - P['plateau_clear'], P['case_top'] - 1.0, P['plateau_top'])
     env = [
         slab,
         plateau,
         *dome,
         notch_box(-P['notch_clear']),
-        Prim('box', c=add(L['face'], mul(u, (mo_len - 1) / 2)), u=u, w=w,
-             L=mo_len - 1, W=P['n20_w'] + 0.3 + 2 * wall, H=P['n20_h'] + 0.3 + 2 * wall),
-        cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5 - wall, P['pinion_face'] / 2 + P['pinion_gap'],
-              gp['ra'] + 0.6 + wall),
     ]
     # trims: stay under the rail's top lips, above the floor and inside the walls (except the notch block)
     trims = [

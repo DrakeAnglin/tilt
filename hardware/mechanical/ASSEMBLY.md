@@ -39,8 +39,8 @@ Two units, both press-fit between the rail walls:
 
 ## Tilter assembly
 1. **Strip the factory tilter:** drill out the 3 rivets and keep the worm and worm wheel.
-2. **Motor:** push the N20 into the pod of `case_right` from the open end until the gearbox face seats. Fit 2 × M1.6 × 4
-   from inside the pinion pocket.
+2. **Motor:** push the N20's gearbox into the rectangular socket in the back face of `case_right` until its face seats
+   against the wall. Fit 2 × M1.6 × 4 from inside the pinion pocket. The rest of the motor sticks out the back.
 3. **Pinion:** press `motor_pinion` onto the shaft, hub toward the motor, until the hub touches the wall (CA on the flat
    if loose).
 4. **Worm wheel:** drop it into its pocket, barrel through the bearing hole.
