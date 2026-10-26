@@ -456,7 +456,6 @@ def case_shapes(L):
         cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5, 0, 2.0),                       # shaft tip
         cyl_u(L, L['pin_c'], 0, P['pinion_face'] / 2 + P['pinion_gap'] + 0.1, 4.0),      # hub + gearbox boss
         Prim('box', c=mo_c, u=u, w=w, L=mo_len + 6, W=P['n20_w'] + 0.3, H=P['n20_h'] + 0.3),        # N20, open end
-        box_minmax(-P['slab_half'] + 2, P['slab_half'] - 2, 11.0, hw - 2, 3.0, 31.0),    # lightening pocket
     ]
     pocket_end = P['pinion_face'] / 2 + 0.3                                            # pinion pocket face (from pin_c)
     for sgn in (-1, 1):                                                                  # gearbox screws M1.6 x 4
@@ -680,7 +679,6 @@ def build_sensor_case(root):
         X(xm - half - 1, xm + half - 0.3, sc, P['sm_shaft_d'] / 2 + 0.15),    # shaft bearings (blind on the right)
         X(xm - half - 1, xm - half + P['sm_head_len'] + 0.3, sc, P['sm_head_d'] / 2 + 0.3),  # magnet head seat
         X(xm - half - 12, xm - half + 0.5, rod_c, P['sm_rod_clear']),         # rod passes through the board frame
-        box_minmax(xm - half + 2, xm + half - 2, -hw + 2, -(S['gr']['ra'] + 2.0), 3.0, 31.0),   # lightening pocket
     ]
     block = box_minmax(xm - half, xm + half, -hw, hw, P['case_floor'], P['case_top'])
     # AS5600 board frame on the left outer face, centred on the sensor shaft; board slides in from the top
