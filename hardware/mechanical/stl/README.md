@@ -54,6 +54,6 @@ solid (no lightening pockets, so there are no internal bridges).
 ## Envelope
 - **Tilter:** inside the 55.5 × 36.5 mm rail except a dome over the worm's top end, which rises 2.1 mm into the open slot
   between the rail's top lips (the window frame is 6.5 mm above). Length along the rod: −8.3 to +31 mm around the
-  tilter plane (the motor pod is on the tilt-drum side).
+  tilter plane, with the motor sticking out a further 21 mm toward the tilt drums (to +32 mm).
 - **Sensor module:** 14 mm thick plus a 3.6 mm board frame, fully inside the rail. Place it anywhere on the rod where
-  there's ~18 mm free between tilt drums or past the tilter's motor pod.
+  there's ~18 mm free between tilt drums or past the end of the tilter's motor.
