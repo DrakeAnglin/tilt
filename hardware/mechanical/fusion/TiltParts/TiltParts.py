@@ -31,12 +31,12 @@ import adsk.fusion
 
 # ------------------------------------------------------------------ parameters (mm / deg)
 P = dict(
-    worm_angle=60.0, cd_worm=11.64, rod_z=24.0, rod=4.0,
+    worm_angle=60.0, cd_worm=11.64 + 0.25, rod_z=24.0, rod=4.0,   # +0.25: printed test fit was tight
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0,
     # corner notch in the rail (measured from the outside): 12 tall, 10.5 into the floor, 12 wide along the rod
     notch_h=12.0, notch_d=10.5, notch_w=12.0, notch_clear=0.15,
     # crossed helical pair
-    mn=1.0, helix=45.0, pressure=20.0, addendum=0.85, dedendum=1.25, backlash=0.15, cd_extra=0.10,
+    mn=1.0, helix=45.0, pressure=20.0, addendum=0.85, dedendum=1.25, backlash=0.15, cd_extra=0.20,
     z_adapter=8, z_pinion=7,
     adapter_face=2.6, pinion_face=6.0, pinion_hub_d=6.5, pinion_hub=1.5,
     pinion_gap=3.0,           # pinion face to N20 gearbox face
@@ -51,6 +51,7 @@ P = dict(
     # case
     wall=1.6, slab_half=8.33, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
     dome_wall=1.2, dome_max_y=21.0,   # cover over the worm's top end, allowed to rise into the rail's open top slot
+    plateau_top=38.9, plateau_clear=0.3,   # top between the lips rises flush with the headrail top (owner: 2.8 mm room)
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0, lid_cbore_d=4.2, lid_cbore=1.8,
     # AS5600 sensor module: its own press-fit block anywhere on the rod. A 24T gear on the square rod drives a 14T
     # sensor gear (60° of rod = 103° at the magnet); the magnet sits in the sensor shaft's head, facing the board.
@@ -460,8 +461,11 @@ def case_shapes(L):
     dome = [cyl_s(L, -4.8 - dw, 4.8, 5.9 + dw),                                        # over the threads
             cyl_s(L, -7.3, -4.8 - dw + 0.01, 2.65 + dw),                               # over the top pin
             Prim('cyl', p1=L['S'](-7.3), p2=L['S'](-7.3 - dw), r=2.65 + dw, r2=2.0)]   # tapered end cap
+    plateau = box_minmax(-P['slab_half'], P['slab_half'], -(hw - P['lip_in'] - P['plateau_clear']),
+                         hw - P['lip_in'] - P['plateau_clear'], P['case_top'] - 1.0, P['plateau_top'])
     env = [
         slab,
+        plateau,
         *dome,
         notch_box(-P['notch_clear']),
         Prim('box', c=add(L['face'], mul(u, (mo_len - 1) / 2)), u=u, w=w,
@@ -473,7 +477,7 @@ def case_shapes(L):
     trims = [
         box_minmax(-60, 80, -hw - 5, -hw + P['lip_in'], P['case_top'] - P['lip_h'], 60),
         box_minmax(-60, 80, hw - P['lip_in'], hw + 5, P['case_top'] - P['lip_h'], 60),
-        box_minmax(-60, 80, -60, 60, P['case_top'], 80),
+        box_minmax(-60, 80, -60, 60, P['plateau_top'], 80),
         box_minmax(-60, 80, -60, 60, -20, P['case_floor']),          # below the floor
         box_minmax(-60, 80, -60, -hw, -20, 80),                       # past the room-side wall
         box_minmax(-60, 80, hw, 60, -20, 80),                         # past the back wall
