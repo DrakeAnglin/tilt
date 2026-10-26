@@ -95,5 +95,7 @@ vis(show=('Adapter', 'Motor pinion', 'REF')); rail(False); res.append(shot('v03-
 vis(show=('Case right',)); res.append(shot('v03-case-right.png', 'IsoTopLeftViewOrientation', False))
 vis(show=('Sensor', 'Rod gear', 'REF')); rail(False); res.append(shot('v03-sensor.png', 'IsoTopLeftViewOrientation', False))
 vis(show=('Sensor gear', 'Rod gear', 'Sensor case right', 'REF')); rail(False); res.append(shot('v03-sensor-open.png', 'IsoTopLeftViewOrientation', False))
+vis(show=('Adapter',)); rail(False); res.append(shot('v03-adapter.png', 'IsoTopRightViewOrientation', False))
+res.append(shot('v03-adapter-front.png', 'FrontViewOrientation'))
 vis(); rail(True)
 result = {'build': report.split('\n'), 'renders': res}

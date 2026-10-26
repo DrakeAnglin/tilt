@@ -44,7 +44,7 @@ P = dict(
     # adapter
     mouth_s=18.97, collar_d=8.2, body_d=6.0, body_len=19.0,
     spline_od=6.0, spline_root=5.0, spline_n=8, socket_depth=5.3, spline_clear=0.10,   # owner's fit test: 0.10 fits best
-    loop_center=25.0, loop_r_out=5.2, loop_r_in=2.6, loop_t=3.4,
+    loop_center=25.0, loop_r_out=5.4, loop_r_in=2.7, loop_t=4.0, loop_round=1.0,
     # N20 (no encoder)
     n20_w=12.0, n20_h=10.0, n20_gbx=9.0, n20_motor=15.0, n20_end=1.0, n20_shaft_d=3.0, n20_flat=2.5,
     n20_screw_spacing=9.0,
@@ -260,6 +260,27 @@ def merge_bodies(comp):
     comp.features.combineFeatures.add(inp)
 
 
+def round_region(comp, z_min, radii):
+    """Fillet every edge of the component's body lying above z_min (local mm): loop faces, hole edges and the
+    shaft-to-loop junction. Tries each radius in turn and keeps the first that Fusion accepts."""
+    body = comp.bRepBodies.item(0)
+    for r in radii:
+        edges = adsk.core.ObjectCollection.create()
+        for e in body.edges:
+            if e.boundingBox.minPoint.z * 10 >= z_min:
+                edges.add(e)
+        if edges.count == 0:
+            return None
+        try:
+            inp = comp.features.filletFeatures.createInput()
+            inp.addConstantRadiusEdgeSet(edges, VI(r), True)
+            comp.features.filletFeatures.add(inp)
+            return r
+        except Exception:
+            continue
+    return None
+
+
 def place(occ, origin, xaxis, zaxis):
     zaxis = unit(zaxis)
     xaxis = unit(sub(xaxis, mul(zaxis, dot(xaxis, zaxis))))
@@ -307,24 +328,23 @@ def build_adapter(root, L):
     rev.setAngleExtent(False, adsk.core.ValueInput.createByString('360 deg'))
     rev.participantBodies = own_bodies(comp)
     comp.features.revolveFeatures.add(rev)
-    # teardrop loop (local XZ plane): point toward the body like the factory loop, round end outward
+    # dome on the shaft end (a sphere fused on): it runs into the loop instead of leaving a flat shoulder
+    tbm = adsk.fusion.TemporaryBRepManager.get()
+    add_bodies(comp, [('dome', tbm.createSphere(P3((0, 0, P['body_len'])), rb / 10.0))])
+    merge_bodies(comp)
+    # wand loop (local XZ plane): fully round, no points; the shaft's dome runs into it
     sk = comp.sketches.add(comp.xZConstructionPlane)
-    sk.isComputeDeferred = True
-    toS = lambda q: sk.modelToSketchSpace(adsk.core.Point3D.create(q[0] / 10.0, 0, q[1] / 10.0))
+    c = P['loop_center']
     for r in (P['loop_r_out'], P['loop_r_in']):
-        c = P['loop_center']
-        tip = (0.0, c - r * math.sqrt(2))
-        t_r = (r / math.sqrt(2), c - r / math.sqrt(2))
-        t_l = (-r / math.sqrt(2), c - r / math.sqrt(2))
-        arc = sk.sketchCurves.sketchArcs.addByThreePoints(toS(t_r), toS((0.0, c + r)), toS(t_l))
-        l1 = sk.sketchCurves.sketchLines.addByTwoPoints(arc.endSketchPoint, toS(tip))
-        sk.sketchCurves.sketchLines.addByTwoPoints(l1.endSketchPoint, arc.startSketchPoint)
-    sk.isComputeDeferred = False
+        sk.sketchCurves.sketchCircles.addByCenterRadius(
+            sk.modelToSketchSpace(adsk.core.Point3D.create(0, 0, c / 10.0)), r / 10.0)
     ring = next(sk.profiles.item(i) for i in range(sk.profiles.count) if sk.profiles.item(i).profileLoops.count == 2)
     inp = comp.features.extrudeFeatures.createInput(ring, JOIN)
     inp.setSymmetricExtent(VI(P['loop_t']), True)
     inp.participantBodies = own_bodies(comp)
     comp.features.extrudeFeatures.add(inp)
+    merge_bodies(comp)
+    round_region(comp, z_min=P['body_len'] - 1.0, radii=(P['loop_round'], 0.8, 0.6))
     sk = comp.sketches.add(comp.xYConstructionPlane)
     polyline(sk, spline_socket_profile(P['spline_clear']))
     extrude(comp, largest_profile(sk), P['socket_depth'], CUT)
