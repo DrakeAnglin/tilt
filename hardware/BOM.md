@@ -25,4 +25,4 @@ sensor needs a **diametrically** magnetized 6 × 2.5 mm magnet, 0.5–2 mm from 
 | 6-core 24–26 AWG cable | ~25 m | One 5-wire run per blind to its controller: motor ±, 3V3, GND, sensor OUT |
 | Breadboard + jumper wire kit | 1 | Bench testing |
 | M2 × 5 mm brass standoffs (male-female) + M2 × 4 screws | 16 + 16 | AS5600 mounting, 2 per blind |
-| M2 heat-set inserts | 16 | Owner already has these |
+| M2 heat-set inserts | 8 | One per blind (owner already has these) |

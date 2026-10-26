@@ -30,7 +30,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 | N20 gear motor, **no encoder**, 3 mm D-shaft ≥ 9.5 mm | 1 | 5–6 V, **1:30–1:50 recommended** so the wand can back-drive it. Full travel ≈ 13 motor turns (~2.5–4 s) |
 | M1.6 × 4 screw | 2 | N20 gearbox face (heads sink into counterbores in the pinion pocket) |
 | M2 × 16 screw | 3 | Tilter halves (heads sit flush in the lid) |
-| M2 heat-set insert | 2 | Lid, for the AS5600 standoffs (you have these) |
+| M2 heat-set insert | 1 | Lid, bottom-right AS5600 standoff (the top-left one threads into a pilot hole) |
 | M2 × 5 mm standoff (male-female) + M2 × 4 screw | 2 + 2 | AS5600 board |
 | AS5600 breakout, ≤ 23.4 × 23.4 mm, chip centred | 1 | I²C to the controller |
 | 6 × 2.5 mm diametric neodymium magnet | 1 | Often sold with AS5600 boards |
@@ -52,8 +52,10 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 1. Before closing the case: press the magnet into the head of `sensor_gear`, then drop the gear into its pocket in
    `case_right` (shaft end into the blind hole) so it meshes with the back of the worm wheel. Close the lid as above.
    The magnet head pokes ~2 mm out of the lid face.
-2. Press 2 × M2 heat-set inserts into the holes in the lid's outer face (soldering iron, ~220 °C for PETG).
-3. Screw 2 × M2 × 5 mm standoffs into the inserts, then the AS5600 board onto them **chip facing the magnet**
+2. Press an M2 heat-set insert into the **bottom-right** hole in the lid's outer face (soldering iron, ~220 °C for
+   PETG). The **top-left** hole sits close to the side wall, so it's a Ø1.7 mm pilot instead: no insert, the standoff's
+   male thread cuts straight into the plastic (keeps the wall 2.5 mm thick).
+3. Screw the 2 × M2 × 5 mm standoffs in (one into the insert, one into the pilot), then the AS5600 board onto them **chip facing the magnet**
    (2 × M2 × 4 screws). Chip-to-magnet gap = standoff − chip height − 2 mm protrusion ≈ 1.5 mm.
 4. Solder the 5-wire lead: motor + and − to the N20 tabs; 3V3, GND and OUT to the AS5600 header (tie GPO to VCC
    for the analog output). Secure the lead with a zip tie to the case before it leaves the unit.

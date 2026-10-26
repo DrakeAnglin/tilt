@@ -63,7 +63,7 @@ P = dict(
     ss_head_d=8.0, ss_head_len=3.4,
     magnet_d=6.0, magnet_t=2.5, magnet_clear=0.15,
     board_w=23.4, board_t=1.6, chip_h=1.5, sensor_gap=1.5, standoff_len=5.0,
-    board_holes=((-9.0, 9.0), (9.0, -9.0)),   # TO MEASURE on the real board: hole centres relative to the chip (Y, Z)
+    board_holes=((9.0, 9.0), (-9.0, -9.0)),   # (+Y,+Z) and (-Y,-Z) diagonal: clear of the gear. TO MEASURE on the real board
     insert_d=3.2, insert_depth=4.5,          # M2 heat-set insert hole (check against your inserts)
 )
 
@@ -562,8 +562,15 @@ def build_case(root, L):
     env, cav, trims, mo_len, dome = case_shapes(L)
     hw = P['case_w'] / 2
     on_board = board_footprint(margin=2.0)        # case screws stay out from under the AS5600 board
-    picks = pick_bosses(cav, lambda y, z: abs(y) < hw - 3 and 3 < z < P['case_top'] - P['lip_h'] - 2
-                        and not on_board(y, z), count=5)
+    # keep screw counterbores (Ø%.1f) >= 2.5 mm from the side walls, the floor and the lip steps at the top corners
+    cb = P['lid_cbore_d'] / 2 + 2.5
+    def screw_ok(y, z):
+        if abs(y) > hw - cb or z < P['case_floor'] + cb:
+            return False
+        if abs(y) > hw - P['lip_in'] - cb and z > P['case_top'] - P['lip_h'] - cb:
+            return False                          # next to the lip step
+        return z < P['case_top'] - cb and not on_board(y, z)
+    picks = pick_bosses(cav, screw_ok, count=5)
     bosses, pegs = picks[:3], picks[3:]
     body = None
     for e in env:
@@ -608,13 +615,10 @@ def build_case(root, L):
                 tbm.booleanOperation(half, Prim('cyl', p1=(-0.1, y, z), p2=(P['peg_h'] + 0.4, y, z),
                                                 r=P['peg_d'] / 2 + 0.15).brep(tbm),
                                      adsk.fusion.BooleanTypes.DifferenceBooleanType)
-        if name == 'Case left':             # heat-set insert holes for the AS5600 standoffs
-            S = sensor_layout()
-            for dy, dz in P['board_holes']:
-                y, z = S['y'] + dy, S['z'] + dz
-                tbm.booleanOperation(half, Prim('cyl', p1=(S['lid_face'] - 1, y, z),
-                                                p2=(S['lid_face'] + P['insert_depth'], y, z),
-                                                r=P['insert_d'] / 2).brep(tbm),
+        if name == 'Case left':             # AS5600 standoff holes: heat-set insert, or a self-tap pilot near a wall
+            for (y, z), kind, r, depth in board_hole_plan():
+                tbm.booleanOperation(half, Prim('cyl', p1=(sensor_layout()['lid_face'] - 1, y, z),
+                                                p2=(sensor_layout()['lid_face'] + depth, y, z), r=r).brep(tbm),
                                      adsk.fusion.BooleanTypes.DifferenceBooleanType)
         occ, comp = new_component(root, name)
         add_bodies(comp, [(name, half)])
@@ -677,6 +681,21 @@ def sensor_cavities():
         X(S['head_x0'] + 0.3, P['ss_shaft_right'] + 0.3, P['ss_shaft_d'] / 2 + 0.15),  # shaft bearings (blind right)
         X(S['lid_face'] - 1.0, S['head_x0'] + 0.3, P['ss_head_d'] / 2 + 0.3),  # magnet head, out through the lid face
     ]
+
+
+def board_hole_plan(min_wall=2.5):
+    """For each AS5600 standoff hole: heat-set insert if it leaves >= min_wall to the case's side wall, otherwise a
+    pilot for an M2 self-tapping screw (much smaller hole, so the wall stays thick)."""
+    S = sensor_layout()
+    hw = P['case_w'] / 2
+    plan = []
+    for dy, dz in P['board_holes']:
+        y, z = S['y'] + dy, S['z'] + dz
+        if hw - abs(y) - P['insert_d'] / 2 >= min_wall:
+            plan.append(((y, z), 'insert', P['insert_d'] / 2, P['insert_depth']))
+        else:
+            plan.append(((y, z), 'self-tap M2', 0.85, 6.0))
+    return plan
 
 
 def board_footprint(margin=0.0):
@@ -787,6 +806,8 @@ def build(design, export_dir=None):
         'Pinion center (Y, Z): (%.1f, %.1f)' % (L['pin_c'][1], L['pin_c'][2]),
         'Screw holes (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in bosses),
         'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
+        'AS5600 standoff holes: %s' % ', '.join('(%.1f, %.1f) %s, wall %.1f mm' % (
+            pt[0], pt[1], kind, P['case_w'] / 2 - abs(pt[0]) - r) for pt, kind, r, _ in board_hole_plan()),
         'Sensor gear %dT m%.2f on the worm wheel, centres %.2f, axis (Y, Z)=(%.1f, %.1f), magnet face X=%.2f, board chip side X=%.2f' % (
             P['ss_z'], P['ss_m'], SL['cd'], SL['y'], SL['z'], SL['magnet_x'], SL['chip_x']),
         'Exported: %s' % ', '.join(os.path.basename(f) for f in files),
