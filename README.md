@@ -21,6 +21,11 @@ Alexa and Apple Home, and a setup app for calibration.
 | Mechanics | All 3D printed. Rigid PETG/PLA frame with soft TPU isolation for quiet operation |
 | Bonus | Motorized raise/lower using the cordless spring mechanism ([lift notes](docs/lift-bonus.md)) |
 
+## Parts
+
+Shopping list with Amazon links: [hardware/BOM.md](hardware/BOM.md). Print files and build guide:
+[hardware/mechanical/](hardware/mechanical/ASSEMBLY.md).
+
 ## Repository layout
 
 ```
