@@ -2,6 +2,12 @@
 
 CAD sources (parametric. Fusion/Onshape/OpenSCAD TBD) and exported 3MF/STL go here.
 
+## Versions
+| Version | Drive | Generator | Print files |
+|---|---|---|---|
+| v0.3 | Factory worm + worm wheel, printed spline adapter, crossed helicals to the N20 | [`fusion/TiltParts`](fusion/TiltParts/TiltParts.py) | [`stl/`](stl/README.md) |
+| **v0.4** (first test build) | **All printed**: worm with integrated bevel, worm wheel, wand shaft; straight bevel pair to the N20 | [`fusion/TiltPartsV4`](fusion/TiltPartsV4/TiltPartsV4.py) | [`stl/v0.4/`](stl/v0.4/README.md) |
+
 ## Known dimensions
 | What | Value | Source |
 |---|---|---|

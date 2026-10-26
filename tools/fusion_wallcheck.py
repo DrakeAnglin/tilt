@@ -1,6 +1,7 @@
 """Printability check for the two tilter case halves (run inside Fusion through FusionBridge).
 
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_wallcheck.py --timeout 600
+  (prepend GEN = '<generator path>' to the code to check another version)
 
 Uses exactly the geometry TiltParts builds (case_plan): envelope, trims, cavities, per-half holes and pegs, modelled
 as signed-distance functions. For every pocket / bore / hole surface it marches along the surface normal INTO the
@@ -17,7 +18,11 @@ import math
 import os
 
 REPO = os.path.expanduser('~/Documents/automated-blinds/blinds')
-mod = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/TiltParts/TiltParts.py'))
+try:
+    GEN                     # which generator to check (v0.3 by default; GEN = 'hardware/mechanical/fusion/TiltPartsV4/TiltPartsV4.py')
+except NameError:
+    GEN = 'hardware/mechanical/fusion/TiltParts/TiltParts.py'
+mod = load_script(os.path.join(REPO, GEN))
 try:
     OVERRIDES
 except NameError:
