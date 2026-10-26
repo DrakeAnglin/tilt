@@ -52,9 +52,10 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
    3 × M2 × 16 (6 mm of thread in the main half).
 
 ## Sensor (part of the tilter)
-1. Before closing the case: press the magnet into the head of `sensor_gear`, then drop the gear into its pocket in
-   `case_right` (shaft end into the blind hole) so it meshes with the back of the worm wheel. Close the lid as above.
-   The magnet head pokes ~2 mm out of the lid face.
+1. Before closing the case: press the magnet into the end of `sensor_gear`'s Ø8 head. Drop the gear into its pocket in
+   `case_right`, short Ø4 stub down into the blind hole, so it meshes with the back of the worm wheel. When you close
+   the lid, the Ø8 head slides out through the lid's bore. The gear's own faces locate it between the two halves.
+   The magnet end pokes ~2 mm out of the lid face.
 2. Press an M2 heat-set insert into the **bottom-right** hole in the lid's outer face (soldering iron, ~220 °C for
    PETG). The **top-left** hole sits close to the side wall, so it's a Ø1.7 mm pilot instead: no insert, the standoff's
    male thread cuts straight into the plastic (keeps the wall 2.5 mm thick).
