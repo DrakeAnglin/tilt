@@ -4,7 +4,7 @@
 
   1. interference between every printed part and everything else (rail included)
   2. worm / worm wheel: free phase + sweep through a full wheel tooth pitch x SWEEP_STEPS (16:1)
-  3. bevel pair: free phase + sweep through a full worm revolution (12:10)
+  3. crossed helicals: free phase + sweep through a full worm revolution (8:7)
   4. minimum distances for the pairs that matter
 Set EXPORT = True to also write the STLs to hardware/mechanical/stl/v0.4.
 """
@@ -125,15 +125,33 @@ def phase_free(drn_name, other, pitch):
     return free
 
 
+def set_free_phase(drn_name, other, pitch, n=30):
+    """Turn the driven gear to the middle of its contact-free phase window (the build doesn't set a mesh phase)."""
+    drn = occ(drn_name)
+    nb = drn.transform2.copy()
+    nz, no = nb.getAsCoordinateSystem()[3], nb.translation
+    scan = []
+    for k in range(n):
+        drn.transform2 = rotated(nb, nz, no, pitch * k / n)
+        scan.append(overlap(drn, occ(other)))
+    free = [k for k, v in enumerate(scan) if v < 1e-6]
+    k = free[len(free) // 2] if free else scan.index(min(scan))
+    drn.transform2 = rotated(nb, nz, no, pitch * k / n)
+    return round(min(scan), 4), round(360.0 / P_PIN * len(free) / n, 1)
+
+
+P_PIN = mod.P['z_pinion']
 z_w = mod.P['z_wheel']
 start_ww = round(overlap(occ('Worm'), occ('Worm wheel')), 4)
+hx_min, hx_backlash = set_free_phase('Motor pinion', 'Worm', 2 * math.pi / P_PIN)
 start_bv = round(overlap(occ('Worm'), occ('Motor pinion')), 4)
 # worm turns 2 revolutions (wheel moves 2 teeth); wheel turns -angle/16 (cut that way)
 ww = {s: check_pair('Worm', 'Worm wheel', z_w, 4 * math.pi, SWEEP_STEPS * 2, s) for s in (1, -1)}
-bv = {s: check_pair('Worm', 'Motor pinion', mod.P['z_bevel_motor'] / mod.P['z_bevel_worm'], 2 * math.pi, SWEEP_STEPS, s)
+bv = {s: check_pair('Worm', 'Motor pinion', mod.P['z_pinion'] / mod.P['z_worm_gear'], 2 * math.pi, SWEEP_STEPS, s)
       for s in (1, -1)}
 gear = dict(worm_wheel_start=start_ww, worm_wheel_sweep=ww, worm_wheel_free_deg=phase_free('Worm wheel', 'Worm', 2 * math.pi / z_w),
-            bevel_start=start_bv, bevel_sweep=bv, pinion_free_deg=phase_free('Motor pinion', 'Worm', 2 * math.pi / mod.P['z_bevel_motor']))
+            helical_start=start_bv, helical_backlash_deg=hx_backlash, helical_sweep=bv,
+            pinion_free_deg=phase_free('Motor pinion', 'Worm', 2 * math.pi / P_PIN))
 
 pairs = [('Wand shaft', 'Rail wall room'), ('Wand shaft', 'Rail floor'), ('Wand shaft', 'Case right'),
          ('Wand shaft', 'Case left'), ('Worm', 'Case right'), ('Worm', 'Case left'), ('Worm wheel', 'Case right'),

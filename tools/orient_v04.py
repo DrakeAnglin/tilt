@@ -15,15 +15,16 @@ OUT = os.path.join(SRC, 'print')
 ID = lambda x, y, z: (x, y, z)
 FLIP = lambda x, y, z: (x, -y, -z)          # 180° about X
 X_UP = lambda x, y, z: (z, y, -x)           # 90° about Y: -X becomes up
+X_DOWN = lambda x, y, z: (-z, y, x)         # -90° about Y: -X goes down onto the bed
 
 ORIENT = {
-    'case_left': (X_UP, 'split face down, motor pod and AS5600 pocket up'),
+    'case_left': (X_DOWN, 'outer face down (flat), split face and pockets up'),
     'case_right': (X_UP, 'back face down (insert holes on the bed), split face, pegs and pin up'),
-    'worm': (FLIP, 'bevel back face down, threads up'),
+    'worm': (FLIP, 'helical gear face (hex socket) down, threads up'),
     'worm_wheel': (ID, 'barrel end down'),
     'wand_shaft': (ID, 'collar face down, loop up'),
     'hex_key': (ID, 'standing on an end (clean hex faces all round)'),
-    'motor_pinion': (FLIP, 'toe (small end) down, hub up: the teeth widen at ~45°'),
+    'motor_pinion': (ID, 'on a gear face (45° helical teeth print as 45° overhangs)'),
     'sensor_gear': (ID, 'gear face down, magnet pocket up'),
 }
 

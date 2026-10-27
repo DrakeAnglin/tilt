@@ -1,17 +1,18 @@
-"""TiltPartsV4: printable parts for the motorized tilter, version v0.4 (all printed, bevel drive).
+"""TiltPartsV4: printable parts for the motorized tilter, version v0.4 (all printed, crossed-helical drive).
 
 Every moving part is printed now; nothing is reused from the factory tilter. The layout keeps the factory geometry
 that matters: the 4 mm rod, a worm at 60° so the wand hangs from the same teardrop loop at the same angle and
 leaves through the headrail's corner notch, and the 16:1 single-start ratio (self-locking, 11-12 wand turns end to end).
 
-  WORM          printed single-start worm (m 0.88, Ø9.6 pitch, 25° pressure angle) with a straight 12T bevel
-                gear on its lower end. Hex socket in the bevel's back face.
+  WORM          printed single-start worm (m 0.88, Ø9.6 pitch, 25° pressure angle), thrust ring, and the 8T 45°
+                helical gear (v0.3's tested pair) as part of the same print. Hex socket in the gear's lower face.
   WORM WHEEL    16T, teeth generated from the worm's motion ("hobbed" numerically), barrel journals in both case
                 halves, square bore for the rod.
   WAND SHAFT    collar + shaft + teardrop wand loop (same exit and loop position as v0.3), hex socket in the collar.
   HEX KEY       joins worm and wand shaft (or use 12 mm of a 4 mm steel hex key).
-  MOTOR PINION  10T straight bevel on the N20, motor axis parallel to the rod on the lid side (-X), meeting the worm
-                axis at the bevel apex. Bevel teeth touch along a line (the v0.3 crossed helicals touched at a point).
+  MOTOR PINION  7T 45° helical on the N20's D-flat (6 mm grip). Motor axis parallel to the rod on the lid side (-X),
+                beside the worm, so the uncut shaft runs on past the pinion into the main half; the gearbox sits in
+                a 1.5 mm square inset in the flat lid.
   CASE          two halves, press fit in the rail like v0.3; the lid carries the N20 socket and the AS5600 board.
   SENSOR GEAR   20T spur on the worm wheel, magnet head out through the lid (as v0.3).
 
@@ -33,7 +34,7 @@ P = dict(
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0,
     notch_h=12.0, notch_d=10.5, notch_w=12.0, notch_clear=0.15,
     pressure=25.0,            # all gears: 25° prints cleaner than 20° (less flank overhang on the vertical worm)
-    backlash=0.15, bevel_backlash=0.25,
+    backlash=0.15,
     ss_backlash=0.4,          # sensor spur on the (5° helix) worm wheel teeth: extra room for the helix mismatch
     # worm + worm wheel: same ratio / size class as the factory pair (16:1, m 0.88)
     module_worm=0.88, z_wheel=16, worm_d=9.6, worm_angle=60.0, cd_extra=0.2,
@@ -42,13 +43,16 @@ P = dict(
     wheel_face=7.5, barrel_r=6.25, wheel_slices=7, wheel_pts=16,
     worm_pin_len=2.0, worm_pin_r=2.5, journal_r=3.5,
     # thrust ring: the ONLY axial stop of the worm, both directions (owner: the factory worm rode up and down)
-    flange_r=4.4, flange_s=6.7, flange_t=1.4, flange_clear=0.1,   # r 4.8 left 0.25 mm to the motor bevel pocket
+    flange_r=4.4, flange_s=6.7, flange_t=1.4, flange_clear=0.1,
     thread_end_clear=0.3, worm_pin_end_clear=0.4, worm_thrust_clear=0.15,
-    # bevel pair (worm 12T : motor 10T)
-    bevel_m=1.25, z_bevel_worm=10, z_bevel_motor=9, bevel_face_frac=0.40,   # m1.25: 25 % thicker teeth than m1
-    bevel_back_s=20.0,        # s of the worm bevel's back face (= collar start), 1 mm further up than the first try
-    pinion_hub_d=6.5, pinion_hub=3.0, pinion_gap=5.0,
-    n20_shaft_len=10.0,       # from the gearbox face; a longer shaft must be trimmed (it would reach the worm)
+    # crossed 45° helicals (v0.3's tested 8T : 7T pair), the 8T now part of the worm. The two shafts don't meet, so
+    # the motor sits beside the worm and its shaft runs on past the pinion into the main half
+    mn=1.0, helix=45.0, addendum=0.85, dedendum=1.25, hx_cd_extra=0.20,
+    z_worm_gear=8, z_pinion=7, worm_gear_face=3.0, pinion_face=6.0,
+    worm_gear_s0=18.5,        # s of the worm gear's upper face; its lower face = collar start
+    n20_shaft_len=10.0,       # used uncut; the D-flat starts 3.2 mm from the gearbox face and the pinion sits on it
+    n20_d_start=3.2,
+    motor_inset=1.5,          # gearbox face sits in a square pocket this deep in the (flat) lid: stops it twisting
     hex_af=4.0, hex_depth=6.0, hex_clear=0.15,
     # wand shaft (same exit + loop as v0.3)
     collar_d=8.2, collar_len=2.5, body_d=6.0, body_end_s=37.97, loop_s=43.97,
@@ -65,6 +69,7 @@ P = dict(
     # case screws: M2 flat head from the lid (90° countersink) into M2 heat-set inserts pressed into the main half's
     # back face. The two under the AS5600 board go through the board (pan head there)
     cs_d=4.2, m2_clear_lid=2.4, m2_clear_main=2.2, insert_d=3.2, insert_depth=5.0, insert_wall=1.3, n_case_screws=2,
+    case_screw_len=16.0,      # M2 x 16 flat heads; the board screws go through the board + whole lid (M2 x 25 pan)
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
     ss_z=20, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0,
     ss_bore=3.5,              # the gear turns on a Ø4 pin moulded into the main half (gear prints flat, no stub)
@@ -77,11 +82,11 @@ P = dict(
 )
 
 PREFIX = 'T4 '
+LOFT_SECTIONS = 7
 WALL_HOLE = 1.3               # tools/fusion_wallcheck.py: min wall round screw / insert / peg holes (insert maker's spec)
-# both halves print with X pointing up (lid: split face down, its motor pod sticks out of the outer face; main half:
-# back face down), so the alignment pegs live on the main half
+# lid prints outer face down (flat, motor in a 1.5 mm inset), main half back face down; pegs + sensor pin on the main half
 PEG_HALF = 'Case right'
-PRINT_DIRS = {'Case left': (-1, 0, 0), 'Case right': (-1, 0, 0)}
+PRINT_DIRS = {'Case left': (1, 0, 0), 'Case right': (-1, 0, 0)}     # lid: outer face down; main: back face down
 
 
 # ------------------------------------------------------------------ vector helpers (mm)
@@ -141,26 +146,13 @@ def gear_profile(g, backlash=None):
     return involute_teeth(g['z'], g['rp'], g['rb'], g['ra'], g['rf'], g['at'], half)
 
 
-def bevel(z, z_mate):
-    """Straight bevel (90° shafts): Tredgold back-cone approximation, profile scaled toward the apex."""
-    m = P['bevel_m']
-    delta = math.atan2(z, z_mate)
-    rp = z * m / 2.0
-    A = math.hypot(rp, z_mate * m / 2.0)                  # cone distance
-    F = P['bevel_face_frac'] * A
-    zv = z / math.cos(delta)
-    rv = zv * m / 2.0
-    at = math.radians(P['pressure'])
-    return dict(z=z, m=m, delta=delta, rp=rp, A=A, F=F, zv=zv, rv=rv, at=at,
-                ra=rp + m * math.cos(delta), k=(A - F) / A, toe_dz=F * math.cos(delta))
-
-
-def bevel_section(g, scale=1.0, rot=0.0):
-    rv, m = g['rv'], g['m']
-    half = math.pi / (2 * g['zv']) - (P['bevel_backlash'] / 2.0) / rv
-    c = math.cos(g['delta'])
-    return involute_teeth(g['z'], rv, rv * math.cos(g['at']), rv + m, rv - 1.25 * m, g['at'], half,
-                          rscale=c * scale, ascale=1.0 / c, rot=rot)
+def helical(z):
+    b = math.radians(P['helix'])
+    mt = P['mn'] / math.cos(b)
+    at = math.atan(math.tan(math.radians(P['pressure'])) / math.cos(b))
+    rp = z * mt / 2.0
+    return dict(z=z, mt=mt, at=at, rp=rp, rb=rp * math.cos(at),
+                ra=rp + P['addendum'] * P['mn'], rf=rp - P['dedendum'] * P['mn'], beta=b)
 
 
 def worm_dims():
@@ -259,21 +251,20 @@ def layout():
     S = lambda s: add(p0, mul(d, s))
     # worm thread half-length: covers the wheel's tips
     half = math.sqrt(max(wh['ra'] ** 2 - (wh['cd'] - w['ra']) ** 2, 0)) + 0.5 * w['m']
-    gw, gm = bevel(P['z_bevel_worm'], P['z_bevel_motor']), bevel(P['z_bevel_motor'], P['z_bevel_worm'])
-    s_back = P['bevel_back_s']
-    s_toe = s_back - gw['toe_dz']
-    s_q = s_back - gm['rp']                        # bevel apex on the worm axis: the motor axis passes through it
-    q = S(s_q)
-    u = mul(X, P['motor_side'])                    # motor axis, toward the motor
+    ga, gp = helical(P['z_worm_gear']), helical(P['z_pinion'])
+    s_g0 = P['worm_gear_s0']
+    s_back = s_g0 + P['worm_gear_face']             # gear's lower face = wand collar start
+    gc = S((s_g0 + s_back) / 2)
+    off = unit(mul(cross(d, X), -1.0))              # common perpendicular, away from the room-side wall
+    cd = ga['rp'] + gp['rp'] + P['hx_cd_extra']
+    pin_c = add(gc, mul(off, cd))                   # pinion centre (X = 0)
+    u = mul(X, P['motor_side'])                     # motor axis, toward the motor
     vz = (0.0, 0.0, 1.0)
     wv = cross(u, vz)
-    t_heel = gw['rp']                              # motor pinion's back face, from the apex along u
-    t_toe = t_heel - gm['toe_dz']
-    t_face = t_heel + P['pinion_hub'] + P['pinion_gap']
-    face = add(q, mul(u, t_face))                  # N20 gearbox face
-    return dict(X=X, d=d, n=n, u=u, w=wv, vz=vz, rod_c=rod_c, p0=p0, S=S, half=half, gw=gw, gm=gm,
-                s_back=s_back, s_toe=s_toe, s_q=s_q, pin_c=q, t_heel=t_heel, t_toe=t_toe, t_face=t_face,
-                face=face, worm=w, wheel=wh)
+    t_face = P['slab_half'] - P['motor_inset']     # gearbox face, from the pinion centre along u (lid stays 8.33)
+    face = add(pin_c, mul(u, t_face))
+    return dict(X=X, d=d, n=n, u=u, w=wv, vz=vz, rod_c=rod_c, p0=p0, S=S, half=half, ga=ga, gp=gp, cd=cd, off=off,
+                s_g0=s_g0, s_back=s_back, gear_c=gc, pin_c=pin_c, t_face=t_face, face=face, worm=w, wheel=wh)
 
 
 # ------------------------------------------------------------------ Fusion helpers
@@ -428,6 +419,21 @@ def loft_sections(comp, sections, op=None, smooth=True):
     return comp.features.loftFeatures.add(loft)
 
 
+def helical_body(comp, g, z0, face, hand=1.0):
+    """Loft the transverse profile through sections rotated along the helix (right hand = +1), from z0."""
+    base = gear_profile(g)
+    loft = comp.features.loftFeatures.createInput(NEW)
+    for k in range(LOFT_SECTIONS):
+        zk = face * k / (LOFT_SECTIONS - 1)
+        th = hand * zk * math.tan(g['beta']) / g['rp']
+        c, s_ = math.cos(th), math.sin(th)
+        sk = comp.sketches.add(offset_plane(comp, z0 + zk))
+        polyline(sk, [(x * c - y * s_, x * s_ + y * c) for x, y in base])
+        loft.loftSections.add(largest_profile(sk))
+    loft.isSolid = True
+    return comp.features.loftFeatures.add(loft)
+
+
 def hex_profile(comp, z_mm, af):
     sk = comp.sketches.add(offset_plane(comp, z_mm))
     r = af / math.sqrt(3)
@@ -453,15 +459,12 @@ def build_worm(root, L):
     sw = comp.features.sweepFeatures.createInput(sk.profiles.item(0), comp.features.createPath(line, False), NEW)
     sw.twistAngle = adsk.core.ValueInput.createByReal(2 * math.pi * length / w['p'])
     comp.features.sweepFeatures.add(sw)
-    # top pin journal, bearing journal down to the bevel
+    # top pin journal, bearing journal down to the gear
     extrude(comp, circle_profile(comp, -half - P['worm_pin_len'], P['worm_pin_r']), P['worm_pin_len'] + 0.3, JOIN)
-    extrude(comp, circle_profile(comp, half - 0.3, P['journal_r']), L['s_toe'] - half + 0.6, JOIN)
+    extrude(comp, circle_profile(comp, half - 0.3, P['journal_r']), L['s_g0'] - half + 0.6, JOIN)
     extrude(comp, circle_profile(comp, P['flange_s'], P['flange_r']), P['flange_t'], JOIN)     # thrust ring
-    # 12T bevel: back face (heel) at s_back, teeth narrowing toward the apex (up the worm). Tooth at 180° = -X,
-    # where it meets the motor pinion
-    g = L['gw']
-    loft_sections(comp, [(L['s_back'], bevel_section(g, 1.0, math.pi)),
-                         (L['s_toe'], bevel_section(g, g['k'], math.pi))], smooth=False)
+    # 8T 45° helical (right hand), part of the worm: no spline joint to wear or slip
+    helical_body(comp, L['ga'], L['s_g0'], P['worm_gear_face'])
     merge_bodies(comp)
     cut = comp.features.extrudeFeatures.createInput(hex_profile(comp, L['s_back'], P['hex_af'] + P['hex_clear']), CUT)
     cut.setDistanceExtent(False, VI(-P['hex_depth']))
@@ -472,7 +475,7 @@ def build_worm(root, L):
 
 
 def build_wand(root, L):
-    """Collar + shaft + teardrop loop, local z along the worm axis from the collar's top face (= worm bevel heel)."""
+    """Collar + shaft + teardrop loop, local z along the worm axis from the collar's top face (= worm gear's lower face)."""
     occ, comp = new_component(root, 'Wand shaft')
     s0 = L['s_back']
     cl, body_end, loop_c = P['collar_len'], P['body_end_s'] - s0, P['loop_s'] - s0
@@ -538,20 +541,18 @@ def build_wheel(root, L):
 
 
 def build_pinion(root, L):
-    """Motor bevel. Local z points from the back face (heel) toward the apex (+X); hub on the motor side."""
+    """7T 45° helical (right hand) on the N20. Local z = the motor axis toward the motor; the whole gear sits on the
+    shaft's D-flat (D-bore all through, 6 mm of grip)."""
     occ, comp = new_component(root, 'Motor pinion')
-    g = L['gm']
-    loft_sections(comp, [(0.0, bevel_section(g, 1.0)), (g['toe_dz'], bevel_section(g, g['k']))], smooth=False)
-    extrude(comp, circle_profile(comp, 0.3, P['pinion_hub_d'] / 2), -(P['pinion_hub'] + 0.3), JOIN)
-    merge_bodies(comp)
-    sk = comp.sketches.add(offset_plane(comp, -P['pinion_hub']))
+    helical_body(comp, L['gp'], 0.0, P['pinion_face'])
+    sk = comp.sketches.add(comp.xYConstructionPlane)
     r = P['n20_shaft_d'] / 2.0 + 0.05
     fx = P['n20_flat'] - P['n20_shaft_d'] / 2.0 + 0.05
     fy = math.sqrt(r * r - fx * fx)
     pt = lambda x, y: adsk.core.Point3D.create(x / 10.0, y / 10.0, 0)
     arc = sk.sketchCurves.sketchArcs.addByThreePoints(pt(fx, fy), pt(-r, 0), pt(fx, -fy))
     sk.sketchCurves.sketchLines.addByTwoPoints(arc.startSketchPoint, arc.endSketchPoint)
-    extrude(comp, sk.profiles.item(0), P['pinion_hub'] + g['toe_dz'] + 0.5, CUT)
+    extrude(comp, sk.profiles.item(0), P['pinion_face'], CUT)
     comp.bRepBodies.item(0).name = 'Motor pinion'
     return occ, comp
 
@@ -612,22 +613,24 @@ def notch_box(grow=0.0):
 
 
 def slab_x(L):
-    """X of the lid's outer face and the main half's back face (the motor has its own pod, see motor_pod)."""
-    return -P['slab_half'], P['slab_half']
+    """X of the lid's outer face and the main half's back face. The lid is flat and as thick as the motor needs: its
+    gearbox face sits motor_inset deep in a square pocket in the lid's outer face."""
+    return min(-P['slab_half'], L['face'][0] + P['motor_inset'] * P['motor_side']), P['slab_half']
 
 
 def motor_pod(L):
     """Box on the lid around the N20 socket, from the split face to the socket's outer end."""
     q, pw = L['pin_c'], P['pod_wall']
-    x_out = L['face'][0] + P['motor_socket'] * P['motor_side']
+    x_out = L['face'][0] + P['motor_inset'] * P['motor_side']
     hy, hz = (P['n20_w'] + 0.3) / 2 + pw, (P['n20_h'] + 0.3) / 2 + pw
     return box_minmax(min(x_out, 0.0), max(x_out, 0.0), q[1] - hy, q[1] + hy, max(P['case_floor'], q[2] - hz), q[2] + hz)
 
 
 def case_shapes(L):
     rc, u, w = L['rod_c'], L['u'], L['w']
-    wd, wh, gw, gm = L['worm'], L['wheel'], L['gw'], L['gm']
+    wd, wh, ga, gp = L['worm'], L['wheel'], L['ga'], L['gp']
     half = L['half']
+    pf = P['pinion_face'] / 2 + 0.3
     mo_len = P['n20_gbx'] + P['n20_motor'] + P['n20_end']
     mo_c = add(L['face'], mul(u, (mo_len + 6) / 2))
     hw = P['case_w'] / 2
@@ -639,30 +642,27 @@ def case_shapes(L):
     named = [
         ('wheel teeth', Prim('cyl', p1=add(rc, (-fw, 0, 0)), p2=add(rc, (fw, 0, 0)), r=wh['ra'] + 0.45)),
         ('barrel bore', Prim('cyl', p1=add(rc, (x0 - 1, 0, 0)), p2=add(rc, (x1 + 1, 0, 0)), r=P['barrel_r'] + 0.15)),
-        # worm: thrust up on the thread's top face, down through the bevel heel -> wand collar -> case shoulder
+        # worm: thrust up on the thread's top face, the thrust ring both ways (wand pull: collar -> case shoulder)
         ('worm top pin', cyl_s(L, pin_end, -half, P['worm_pin_r'] + 0.15)),
         ('worm threads', cyl_s(L, -half - free, half + free, wd['ra'] + 0.45)),       # threads run free both ends
         *sensor_cavities(),
-        ('worm journal', cyl_s(L, half + free - 0.01, L['s_toe'] - 0.3, P['journal_r'] + 0.15)),
+        ('worm journal', cyl_s(L, half + free - 0.01, L['s_g0'] - 0.3, P['journal_r'] + 0.15)),
         ('worm thrust groove', cyl_s(L, P['flange_s'] - fc, P['flange_s'] + P['flange_t'] + fc, P['flange_r'] + 0.3)),
-        # pockets shaped like the bevels (cones), not cylinders: more wall to the rail and round the thrust groove
-        ('worm bevel', Prim('cyl', p1=L['S'](L['s_toe'] - 0.4), p2=L['S'](L['s_back']),
-                            r=gw['ra'] * gw['k'] + 0.45, r2=gw['ra'] + 0.45)),
-        ('worm bevel back', cyl_s(L, L['s_back'] - 0.01, L['s_back'] + 0.3, gw['ra'] + 0.45)),   # back face runs free
+        ('worm gear', cyl_s(L, L['s_g0'] - 0.3, L['s_back'] + 0.3, ga['ra'] + 0.4)),     # its faces run free
         ('wand collar', cyl_s(L, L['s_back'], collar_end + thr, P['collar_d'] / 2 + 0.3)),
         ('wand exit', cyl_s(L, collar_end + thr - 0.01, collar_end + 40, P['body_d'] / 2 + 0.3)),
-        ('motor bevel', Prim('cyl', p1=add(L['pin_c'], mul(u, L['t_toe'] - 0.4)), p2=add(L['pin_c'], mul(u, L['t_heel'])),
-                             r=gm['ra'] * gm['k'] + 0.45, r2=gm['ra'] + 0.45)),
-        ('motor bevel back', cyl_u(L, L['pin_c'], L['t_heel'] - 0.01, L['t_heel'] + 0.3, gm['ra'] + 0.45)),
-        ('motor hub', cyl_u(L, L['pin_c'], L['t_heel'], L['t_face'] + 0.1, P['pinion_hub_d'] / 2 + 0.45)),
+        ('pinion', cyl_u(L, L['pin_c'], -pf, pf, gp['ra'] + 0.5)),
+        ('motor shaft', cyl_u(L, L['pin_c'], -(L['t_face'] - P['n20_shaft_len']) - 0.5, L['t_face'] + 0.1,
+                              P['n20_shaft_d'] / 2 + 0.5)),     # the shaft runs on into the main half
         ('motor socket', Prim('box', c=mo_c, u=u, w=w, L=mo_len + 6, W=P['n20_w'] + 0.3, H=P['n20_h'] + 0.3)),
     ]
-    # gearbox screw M1.6 x 4: only the hole on the back-wall side (+Y); the socket stops rotation
-    pocket_end = L['t_heel'] + 0.3
-    hp = add(L['pin_c'], mul(w, P['n20_screw_spacing'] / 2))
+    # gearbox screw M1.6 x 4: only the hole away from the worm gear; the socket stops rotation
+    pocket_end = P['pinion_face'] / 2 + 0.3
+    far = max((-1, 1), key=lambda sg: norm(sub(add(L['pin_c'], mul(w, sg * P['n20_screw_spacing'] / 2)), L['gear_c'])))
+    hp = add(L['pin_c'], mul(w, far * P['n20_screw_spacing'] / 2))
     named.append(('motor screw hole', cyl_u(L, hp, pocket_end - 0.5, L['t_face'] + 0.5, 0.9)))
-    named.append(('motor screw counterbore', cyl_u(L, hp, pocket_end - 0.5, pocket_end + P['screw_cbore'],
-                                                   P['screw_cbore_d'] / 2)))
+    named.append(('motor screw counterbore', cyl_u(L, hp, pocket_end - 0.5, L['t_face'] - 2.0,   # M1.6 x 4: 2 mm
+                                                   P['screw_cbore_d'] / 2)))                    # wall + 2 mm thread
     for nm, pr in named:
         pr.label = nm
     cav = [pr for _, pr in named]
@@ -673,7 +673,7 @@ def case_shapes(L):
             Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=P['worm_pin_r'] + 0.15 + dw, r2=2.0)]
     py = hw - P['lip_in'] - P['plateau_clear']
     plateau = box_minmax(x0, x1, -py, py, P['case_top'] - 1.0, P['plateau_top'])
-    env = [slab, plateau, *dome, notch_box(-P['notch_clear']), motor_pod(L)]
+    env = [slab, plateau, *dome, notch_box(-P['notch_clear'])]
     trims = [
         box_minmax(-60, 80, -hw - 5, -py, P['case_top'] - P['lip_h'], 60),
         box_minmax(-60, 80, py, hw + 5, P['case_top'] - P['lip_h'], 60),
@@ -772,9 +772,12 @@ def case_plan(L):
     holes = {'Case left': [], 'Case right': []}
     for k, (y, z) in enumerate(bosses):
         holes['Case left'].append(('screw clearance', X(x0 - 1, 0.5, y, z, P['m2_clear_lid'] / 2)))
-        if (y, z) not in fixed:                   # 90° countersink for the flat head (board screws: head on the board)
-            cs = P['cs_d'] / 2
-            holes['Case left'].append(('screw countersink', X(x0 - 0.01, x0 + cs - P['m2_clear_lid'] / 2, y, z, cs,
+        if (y, z) not in fixed:                   # flat head (board screws: head on the board). In a lid thicker than
+            cs = P['cs_d'] / 2                    # the screw allows, a counterbore takes the head down to its seat
+            seat = max(x0, x1 - 0.8 - P['case_screw_len'])
+            if seat > x0:
+                holes['Case left'].append(('screw counterbore', X(x0 - 1, seat + 0.01, y, z, cs + 0.1)))
+            holes['Case left'].append(('screw countersink', X(seat - 0.01, seat + cs - P['m2_clear_lid'] / 2, y, z, cs,
                                                               P['m2_clear_lid'] / 2)))
         holes['Case right'].append(('screw clearance', X(-0.5, x1 - P['insert_depth'] + 0.01, y, z, P['m2_clear_main'] / 2)))
         holes['Case right'].append(('screw insert', X(x1 - P['insert_depth'], x1 + 1, y, z, P['insert_d'] / 2)))
@@ -971,10 +974,7 @@ def build(design, export_dir=None):
     place(occ_named('Wand shaft'), L['S'](L['s_back']), X, d)
     place(occ_named('Hex key'), L['S'](L['s_back']), X, d)
     place(occ_named('Worm wheel'), L['rod_c'], L['n'], X)
-    # motor pinion: back face on the motor side, axis toward the apex; a tooth GAP faces the worm bevel's tooth
-    zp = mul(L['u'], -1.0)
-    heel = add(L['pin_c'], mul(L['u'], L['t_heel']))
-    place(occ_named('Motor pinion'), heel, rotate_about(d, zp, math.pi / P['z_bevel_motor']), zp)
+    place(occ_named('Motor pinion'), add(L['pin_c'], mul(L['u'], -P['pinion_face'] / 2)), L['w'], L['u'])
     # sensor gear phase: a tooth space where the wheel has a tooth on the centre line, then rolled with the wheel
     v = sub((0, SL['y'], SL['z']), L['rod_c'])
     line_w = math.atan2(dot(v, L['d']), dot(v, L['n']))                # centre line, wheel-local angle
@@ -1006,16 +1006,18 @@ def build(design, export_dir=None):
             em.execute(opt)
             files.append(path)
 
-    wd, wh, gw, gm = L['worm'], L['wheel'], L['gw'], L['gm']
+    wd, wh, ga, gp = L['worm'], L['wheel'], L['ga'], L['gp']
     x0, x1 = slab_x(L)
     return '\n'.join([
         'Worm: single start m%.2f, pitch Ø%.2f, OD %.2f, lead angle %.1f° (self-locking), threads s ±%.2f' % (
             wd['m'], 2 * wd['rp'], 2 * wd['ra'], wd['lead_deg'], L['half']),
         'Worm wheel: %dT, OD %.2f, centre distance %.2f' % (wh['z'], 2 * wh['ra'], wh['cd']),
-        'Bevels: worm %dT / motor %dT m%.1f, cone distance %.2f, face %.2f, apex at s=%.2f (Y %.1f, Z %.1f)' % (
-            gw['z'], gm['z'], gw['m'], gw['A'], gw['F'], L['s_q'], L['pin_c'][1], L['pin_c'][2]),
-        'N20 gearbox face X=%.1f (shaft ≤ %.0f mm), case X %.1f .. %.1f, motor pod to X=%.1f' % (
-            L['face'][0], P['n20_shaft_len'], x0, x1, L['face'][0] + P['motor_socket'] * P['motor_side']),
+        'Crossed helicals: worm %dT (face %.1f) / motor %dT (face %.1f) mn%.1f 45°, centres %.2f, pinion at (Y %.1f, Z %.1f)' % (
+            ga['z'], P['worm_gear_face'], gp['z'], P['pinion_face'], P['mn'], L['cd'], L['pin_c'][1], L['pin_c'][2]),
+        'N20 gearbox face X=%.2f in a %.1f mm pocket, %.0f mm shaft uncut (tip at X=%.2f, in the main half), D-flat '
+        'from X=%.2f, pinion X %.1f..%.1f; case X %.2f .. %.2f' % (
+            L['face'][0], P['motor_inset'], P['n20_shaft_len'], L['face'][0] + P['n20_shaft_len'],
+            L['face'][0] + P['n20_d_start'], -P['pinion_face'] / 2, P['pinion_face'] / 2, x0, x1),
         'Screw holes (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in bosses),
         'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
         'AS5600 board screws (Y, Z): %s; magnet face X=%.2f, chip X=%.2f (gap %.2f mm)' % (
