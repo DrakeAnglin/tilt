@@ -31,7 +31,7 @@ and [`tilter_v04_H2D_white_PLA.3mf`](tilter_v04_H2D_white_PLA.3mf) is a ready Ba
 **Settings:** gears in PETG or PLA+ at 0.12 mm layers, 4 walls, 40 %+ infill. Cases PETG at 0.16–0.2 mm. No supports.
 The lid's AS5600 pocket floor and the motor inset print as bridges over the bed face (≤ 20 mm). PLA is fine for a test fit; for the
 real install PETG is safer, since a headrail in direct sun can pass PLA's ~55 °C softening point. Grease the
-worm, wheel, thrust ring and bevels (plastic-safe, e.g. PTFE/silicone).
+worm, wheel, thrust ring and helical gears (plastic-safe, e.g. PTFE/silicone).
 
 ## Hardware per unit
 | Item | Qty | Where |
@@ -47,7 +47,7 @@ through the board. The brass inserts don't matter.
 
 ## Assembly
 1. **Inserts:** press the 4 M2 inserts into the main half's back face (soldering iron, ~220 °C for PETG).
-2. **Worm + wand shaft:** push the hex key halfway into the worm's bevel face, then the wand shaft's collar onto it.
+2. **Worm + wand shaft:** push the hex key halfway into the socket in the worm's gear face, then the wand shaft's collar onto it.
 3. **Worm wheel** into `case_right` (barrel into the bearing). **Worm** into its groove, thrust ring in its slot,
    meshing with the wheel; the wand shaft runs out through the notch block.
 4. **Sensor gear:** glue the magnet into its head (face flush). Drop the gear onto the main half's pin.
@@ -75,5 +75,5 @@ through the board. The brass inserts don't matter.
 ## Still to confirm
 - **AS5600 board hole positions** (currently a placeholder diagonal 9 mm from the chip): measure the real board and
   set `board_holes` in `TiltPartsV4.py`.
-- How the printed worm pair feels and wears; whether the wheel's square bore needs ±0.1 mm; the bevel mesh by hand
-  (`bevel_backlash`, 0.25, opens it up).
+- How the printed worm pair feels and wears; whether the wheel's square bore needs ±0.1 mm; the helical mesh by hand
+  (`hx_cd_extra`, 0.20, opens it up).
