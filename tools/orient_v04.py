@@ -20,10 +20,8 @@ X_DOWN = lambda x, y, z: (-z, y, x)         # -90° about Y: -X goes down onto t
 ORIENT = {
     'case_left': (X_DOWN, 'outer face down (flat), split face and pockets up'),
     'case_right': (X_UP, 'back face down (insert holes on the bed), split face, pegs and pin up'),
-    'worm': (FLIP, 'helical gear face (hex socket) down, threads up'),
+    'worm': (ID, 'one piece, standing on its top pin (brim), loop up; no supports needed'),
     'worm_wheel': (ID, 'barrel end down'),
-    'wand_shaft': (ID, 'collar face down, loop up'),
-    'hex_key': (ID, 'standing on an end (clean hex faces all round)'),
     'motor_pinion': (ID, 'on a gear face (45° helical teeth print as 45° overhangs)'),
     'sensor_gear': (ID, 'gear face down, magnet pocket up'),
 }

@@ -52,7 +52,7 @@ for i in range(root.occurrences.count):
     for j in range(o.bRepBodies.count):
         B[o.bRepBodies.item(j).name] = o.bRepBodies.item(j)
 
-PRINTED = [n for n in ('Worm', 'Wand shaft', 'Hex key', 'Worm wheel', 'Motor pinion', 'Case left', 'Case right',
+PRINTED = [n for n in ('Worm', 'Worm wheel', 'Motor pinion', 'Case left', 'Case right',
                        'Sensor gear') if n in B]
 EXPECTED = {frozenset(p) for p in [('Motor pinion', 'N20 shaft'), ('Sensor gear', 'Magnet')]}
 
@@ -153,8 +153,7 @@ gear = dict(worm_wheel_start=start_ww, worm_wheel_sweep=ww, worm_wheel_free_deg=
             helical_start=start_bv, helical_backlash_deg=hx_backlash, helical_sweep=bv,
             pinion_free_deg=phase_free('Motor pinion', 'Worm', 2 * math.pi / P_PIN))
 
-pairs = [('Wand shaft', 'Rail wall room'), ('Wand shaft', 'Rail floor'), ('Wand shaft', 'Case right'),
-         ('Wand shaft', 'Case left'), ('Worm', 'Case right'), ('Worm', 'Case left'), ('Worm wheel', 'Case right'),
+pairs = [('Worm', 'Rail wall room'), ('Worm', 'Rail floor'), ('Worm', 'Case right'), ('Worm', 'Case left'), ('Worm wheel', 'Case right'),
          ('Worm wheel', 'Case left'), ('Worm wheel', 'Rod'), ('Motor pinion', 'Case left'), ('Motor pinion', 'Case right'),
          ('N20 shaft', 'Worm'), ('N20', 'Rail floor'), ('N20', 'Rail wall room'), ('N20', 'Rod'),
          ('Case right', 'Rod'), ('Case left', 'Rod'), ('Case right', 'Rail floor'), ('Case right', 'Rail wall room'),

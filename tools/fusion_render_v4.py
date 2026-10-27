@@ -79,7 +79,7 @@ def shot(name, orient, ortho=True):
     return p
 
 
-DRIVE = ('Worm', 'Wand shaft', 'Hex key', 'Motor pinion', 'REF')       # 'Worm' also shows the worm wheel
+DRIVE = ('Worm', 'Motor pinion', 'REF')       # 'Worm' also shows the worm wheel
 res = []
 vis(hide=('Case left',)); rail(True); res.append(shot('v04-assembly-end.png', 'RightViewOrientation'))
 vis(hide=('Case left',)); rail(False); res.append(shot('v04-assembly-iso.png', 'IsoTopRightViewOrientation', False))

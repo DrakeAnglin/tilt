@@ -4,17 +4,16 @@ Every moving part is printed now; nothing is reused from the factory tilter. The
 that matters: the 4 mm rod, a worm at 60° so the wand hangs from the same teardrop loop at the same angle and
 leaves through the headrail's corner notch, and the 16:1 single-start ratio (self-locking, 11-12 wand turns end to end).
 
-  WORM          printed single-start worm (m 0.88, Ø9.6 pitch, 25° pressure angle), thrust ring, and the 8T 45°
-                helical gear (v0.3's tested pair) as part of the same print. Hex socket in the gear's lower face.
+  WORM          ONE piece: printed single-start worm (m 0.88, Ø9.6 pitch, 25° pressure angle), thrust ring, the 8T
+                45° helical gear (v0.3's tested pair), and the wand shaft + teardrop loop (same exit and loop
+                position as v0.3). Prints standing on its top pin, no supports.
   WORM WHEEL    16T, teeth generated from the worm's motion ("hobbed" numerically), barrel journals in both case
                 halves, square bore for the rod.
-  WAND SHAFT    collar + shaft + teardrop wand loop (same exit and loop position as v0.3), hex socket in the collar.
-  HEX KEY       joins worm and wand shaft (or use 12 mm of a 4 mm steel hex key).
   MOTOR PINION  7T 45° helical on the N20's D-flat (6 mm grip). Motor axis parallel to the rod on the lid side (-X),
                 beside the worm, so the uncut shaft runs on past the pinion into the main half; the gearbox sits in
                 a 1.5 mm square inset in the flat lid.
   CASE          two halves, press fit in the rail like v0.3; the lid carries the N20 socket and the AS5600 board.
-  SENSOR GEAR   20T spur on the worm wheel, magnet head out through the lid (as v0.3).
+  SENSOR GEAR   20T spur on the worm wheel, turning on a pin in the main half; magnet glued into its short head.
 
 Global coordinates (mm): X along the rod (0 = tilter mid-plane, +X toward the tilt drums), Y across the rail
 (-Y = room side), Z up from the rail's inner floor. s = distance along the worm axis from its thread centre,
@@ -50,12 +49,13 @@ P = dict(
     # crossed 45° helicals (v0.3's tested 8T : 7T pair), the 8T now part of the worm. The two shafts don't meet, so
     # the motor sits beside the worm and its shaft runs on past the pinion into the main half
     mn=1.0, helix=45.0, addendum=0.85, dedendum=1.25, hx_cd_extra=0.20,
-    z_worm_gear=8, z_pinion=7, worm_gear_face=5.5, pinion_face=6.0,   # owner: 3 mm worm gear looked weak
-    worm_gear_s0=16.0,        # s of the worm gear's upper face (grown up the shaft); lower face = collar start, 21.5
+    z_worm_gear=8, z_pinion=7, worm_gear_face=6.5, pinion_face=6.0,   # owner: 3 mm worm gear looked weak
+    worm_gear_s0=15.0,        # s of the worm gear's thread-side face; its other face = collar start (21.5)
+    print_chamfer=True,       # one-piece worm prints standing on its top pin: the gear's thread-side tooth ends get a
+                              # 45° bevel (crossed helicals touch only at the gear's middle, which stays full width)
     n20_shaft_len=10.0,       # used uncut; the D-flat starts 3.2 mm from the gearbox face and the pinion sits on it
     n20_d_start=3.2,
     motor_inset=1.5,          # gearbox face sits in a square pocket this deep in the (flat) lid: stops it twisting
-    hex_af=4.0, hex_depth=6.0, hex_clear=0.35,   # first print: 0.15 had to be hammered on
     # wand shaft (same exit + loop as v0.3)
     collar_d=8.2, collar_len=2.5, body_d=6.0, body_end_s=34.5, loop_s=43.97,   # shaft ends early: long teardrop flanks
     loop_r_out=5.4, loop_r_in=2.7, loop_t=4.0, loop_round=1.0, blend_len=2.5,   # round shaft -> flat loop blend
@@ -436,13 +436,6 @@ def helical_body(comp, g, z0, face, hand=1.0):
     return comp.features.loftFeatures.add(loft)
 
 
-def hex_profile(comp, z_mm, af):
-    sk = comp.sketches.add(offset_plane(comp, z_mm))
-    r = af / math.sqrt(3)
-    polyline(sk, [(r * math.cos(math.pi / 3 * k), r * math.sin(math.pi / 3 * k)) for k in range(6)])
-    return sk.profiles.item(0)
-
-
 # ------------------------------------------------------------------ printed parts
 def build_worm(root, L):
     """Local z = s (worm axis toward the wand), origin at the thread centre; local x = the rod direction (X)."""
@@ -468,27 +461,54 @@ def build_worm(root, L):
     # 8T 45° helical (right hand), part of the worm: no spline joint to wear or slip
     helical_body(comp, L['ga'], L['s_g0'], P['worm_gear_face'])
     merge_bodies(comp)
-    cut = comp.features.extrudeFeatures.createInput(hex_profile(comp, L['s_back'], P['hex_af'] + P['hex_clear']), CUT)
-    cut.setDistanceExtent(False, VI(-P['hex_depth']))
-    cut.participantBodies = own_bodies(comp)
-    comp.features.extrudeFeatures.add(cut)
+    # the wand shaft + loop are part of the same print (one piece: no joint between worm and wand)
+    add_wand(comp, L, L['s_back'])
+    merge_bodies(comp)
+    # print bevels (the part stands on its top pin): 45° on the gear's downward tooth ends, 0.4 mm on the pin's foot
+    ga = L['ga']
+    if P['print_chamfer']:
+        revolve_cut(comp, [(ga['rf'], L['s_g0'] - 0.01), (ga['ra'] + 0.6, L['s_g0'] - 0.01),
+                           (ga['ra'] + 0.6, L['s_g0'] + ga['ra'] + 0.6 - ga['rf'])])
+    zp = -half - P['worm_pin_len']
+    revolve_cut(comp, [(P['worm_pin_r'] - 0.4, zp - 0.01), (P['worm_pin_r'] + 0.1, zp - 0.01),
+                       (P['worm_pin_r'] + 0.1, zp + 0.5)])
     comp.bRepBodies.item(0).name = 'Worm'
     return occ, comp
 
 
-def build_wand(root, L):
-    """Collar + shaft + teardrop wand loop, local z along the worm axis from the collar's top face (= worm gear's
-    lower face). The round shaft blends into the flat loop through a loft (no ball, no neck): from the front the
-    outline runs straight on into the teardrop's flanks, from the side it narrows smoothly from Ø6 to the loop's 4 mm."""
-    occ, comp = new_component(root, 'Wand shaft')
+def revolve_cut(comp, pts_rz):
+    """Cut the ring swept by a (radius, z) polygon around the component's z axis."""
+    sk = comp.sketches.add(comp.xZConstructionPlane)
+    toS = lambda r, z: sk.modelToSketchSpace(adsk.core.Point3D.create(r / 10.0, 0, z / 10.0))
+    lines = sk.sketchCurves.sketchLines
+    first = prev = None
+    for r, z in pts_rz:
+        q = toS(r, z)
+        if prev is None:
+            prev = q
+            continue
+        ln = lines.addByTwoPoints(prev, q)
+        first = first or ln.startSketchPoint
+        prev = ln.endSketchPoint
+    lines.addByTwoPoints(prev, first)
+    rev = comp.features.revolveFeatures.createInput(sk.profiles.item(0), comp.zConstructionAxis, CUT)
+    rev.setAngleExtent(False, adsk.core.ValueInput.createByString('360 deg'))
+    rev.participantBodies = own_bodies(comp)
+    comp.features.revolveFeatures.add(rev)
+
+
+def add_wand(comp, L, z0):
+    """Collar + shaft + teardrop wand loop, added to comp along its z axis from z0 (the worm gear's collar-side face).
+    The round shaft blends into the flat loop through a loft (no ball, no neck): from the front the outline runs
+    straight on into the teardrop's flanks, from the side it narrows smoothly from Ø6 to the loop's 4 mm."""
     s0 = L['s_back']
-    cl, body_end, loop_c = P['collar_len'], P['body_end_s'] - s0, P['loop_s'] - s0
+    cl, body_end, loop_c = z0 + P['collar_len'], z0 + P['body_end_s'] - s0, z0 + P['loop_s'] - s0
     rc, rb = P['collar_d'] / 2, P['body_d'] / 2
     R, t = P['loop_r_out'], P['loop_t']
     z1 = body_end + P['blend_len']                     # loft from the shaft's end (body_end) to the loop (z1)
     sk = comp.sketches.add(comp.xZConstructionPlane)
     toS = lambda x, z: sk.modelToSketchSpace(adsk.core.Point3D.create(x / 10.0, 0, z / 10.0))
-    pts = [toS(0, 0), toS(rc, 0), toS(rc, cl), toS(rb, cl), toS(rb, body_end), toS(0, body_end)]
+    pts = [toS(0, z0 - 0.3), toS(rc, z0 - 0.3), toS(rc, cl), toS(rb, cl), toS(rb, body_end), toS(0, body_end)]
     lines = sk.sketchCurves.sketchLines
     prev = lines.addByTwoPoints(pts[0], pts[1])
     first = prev.startSketchPoint
@@ -498,7 +518,6 @@ def build_wand(root, L):
     rev = comp.features.revolveFeatures.createInput(sk.profiles.item(0), axis_line, NEW)
     rev.setAngleExtent(False, adsk.core.ValueInput.createByString('360 deg'))
     comp.features.revolveFeatures.add(rev)
-    shaft = comp.bRepBodies.item(0)
     # teardrop plate from z1: flanks start at the shaft's width and run tangent onto the ring
     vx, vz = rb, z1 - loop_c
     dv = math.hypot(vx, vz)
@@ -516,6 +535,7 @@ def build_wand(root, L):
     inp = comp.features.extrudeFeatures.createInput(ring, NEW)
     inp.setSymmetricExtent(VI(t), True)
     plate = comp.features.extrudeFeatures.add(inp).bodies.item(0)
+    top_z = plate.boundingBox.maxPoint.z
     # round every plate edge except the ones in its bottom face (that face is where the blend lands)
     for r in (P['loop_round'], 0.8, 0.6):
         edges = adsk.core.ObjectCollection.create()
@@ -529,7 +549,8 @@ def build_wand(root, L):
             break
         except Exception:
             continue
-    plate = next(b for b in own_bodies(comp) if b != shaft and b.isSolid)
+    plate = next(b for b in own_bodies(comp) if abs(b.boundingBox.maxPoint.z - top_z) < 1e-4
+                 and b.boundingBox.minPoint.z * 10 > z1 - 0.01)
     base = min((f for f in plate.faces if abs(f.boundingBox.maxPoint.z - f.boundingBox.minPoint.z) < 1e-4),
                key=lambda f: f.boundingBox.minPoint.z)
     # blend: shaft's end circle -> plate's rounded bottom face, leaving both tangent to what they join
@@ -545,19 +566,6 @@ def build_wand(root, L):
             pass
     loft.isSolid = True
     comp.features.loftFeatures.add(loft)
-    merge_bodies(comp)
-    extrude(comp, hex_profile(comp, 0.0, P['hex_af'] + P['hex_clear']), P['hex_depth'], CUT)
-    merge_bodies(comp)
-    comp.bRepBodies.item(0).name = 'Wand shaft'
-    return occ, comp
-
-
-def build_hex_key(root):
-    occ, comp = new_component(root, 'Hex key')
-    ln = 2 * P['hex_depth'] - 0.6
-    extrude(comp, hex_profile(comp, -ln / 2, P['hex_af']), ln, NEW)
-    comp.bRepBodies.item(0).name = 'Hex key'
-    return occ, comp
 
 
 def build_wheel(root, L):
@@ -998,8 +1006,6 @@ def build(design, export_dir=None):
     root = design.rootComponent
     L = layout()
     _, worm = build_worm(root, L)
-    _, wand = build_wand(root, L)
-    _, key = build_hex_key(root)
     _, wheel = build_wheel(root, L)
     _, pinion = build_pinion(root, L)
     cases, bosses, mo_len, pegs = build_case(root, L)
@@ -1012,8 +1018,6 @@ def build(design, export_dir=None):
                     if root.occurrences.item(i).component.name == PREFIX + name)
     X, d = L['X'], L['d']
     place(occ_named('Worm'), L['p0'], X, d)                    # thread phase = the one the wheel was cut with
-    place(occ_named('Wand shaft'), L['S'](L['s_back']), X, d)
-    place(occ_named('Hex key'), L['S'](L['s_back']), X, d)
     place(occ_named('Worm wheel'), L['rod_c'], L['n'], X)
     place(occ_named('Motor pinion'), add(L['pin_c'], mul(L['u'], -P['pinion_face'] / 2)), L['w'], L['u'])
     # sensor gear phase: a tooth space where the wheel has a tooth on the centre line, then rolled with the wheel
@@ -1025,9 +1029,8 @@ def build(design, export_dir=None):
     rho = beta + dw * P['z_wheel'] / P['ss_z'] + math.pi / P['ss_z']
     place(occ_named('Sensor gear'), (SL['gear_x0'], SL['y'], SL['z']), rotate_about((0, 1, 0), (-1, 0, 0), rho), (-1, 0, 0))
 
-    for comp in (worm, wand, pinion):
+    for comp in (worm, pinion):
         color(design, comp, 'Plastic - Glossy (Yellow)')
-    color(design, key, 'Plastic - Glossy (Red)')
     color(design, wheel, 'Plastic - Glossy (Green)')
     color(design, cases['Case left'][1], 'Plastic - Translucent Matte (Blue)')
     color(design, cases['Case right'][1], 'Plastic - Matte (Blue)')
@@ -1038,7 +1041,7 @@ def build(design, export_dir=None):
     if export_dir:
         os.makedirs(export_dir, exist_ok=True)
         em = design.exportManager
-        for nm, comp in (('worm', worm), ('wand_shaft', wand), ('hex_key', key), ('worm_wheel', wheel),
+        for nm, comp in (('worm', worm), ('worm_wheel', wheel),
                          ('motor_pinion', pinion), ('sensor_gear', sgear),
                          ('case_left', cases['Case left'][1]), ('case_right', cases['Case right'][1])):
             path = os.path.join(export_dir, nm + '.stl')
