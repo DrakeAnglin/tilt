@@ -58,7 +58,7 @@ P = dict(
     hex_af=4.0, hex_depth=6.0, hex_clear=0.35,   # first print: 0.15 had to be hammered on
     # wand shaft (same exit + loop as v0.3)
     collar_d=8.2, collar_len=2.5, body_d=6.0, body_end_s=34.5, loop_s=43.97,   # shaft ends early: long teardrop flanks
-    loop_r_out=5.4, loop_r_in=2.7, loop_t=4.0, loop_round=1.0,
+    loop_r_out=5.4, loop_r_in=2.7, loop_t=4.0, loop_round=1.0, blend_len=2.5,   # round shaft -> flat loop blend
     # N20 (no encoder)
     n20_w=12.0, n20_h=10.0, n20_gbx=9.0, n20_motor=15.0, n20_end=1.0, n20_shaft_d=3.0, n20_flat=2.5,
     n20_screw_spacing=9.0,
@@ -477,13 +477,17 @@ def build_worm(root, L):
 
 
 def build_wand(root, L):
-    """Collar + shaft + teardrop loop, local z along the worm axis from the collar's top face (= worm gear's lower face)."""
+    """Collar + shaft + teardrop wand loop, local z along the worm axis from the collar's top face (= worm gear's
+    lower face). The round shaft blends into the flat loop through a loft (no ball, no neck): from the front the
+    outline runs straight on into the teardrop's flanks, from the side it narrows smoothly from Ø6 to the loop's 4 mm."""
     occ, comp = new_component(root, 'Wand shaft')
     s0 = L['s_back']
     cl, body_end, loop_c = P['collar_len'], P['body_end_s'] - s0, P['loop_s'] - s0
     rc, rb = P['collar_d'] / 2, P['body_d'] / 2
+    R, t = P['loop_r_out'], P['loop_t']
+    z1 = body_end + P['blend_len']                     # loft from the shaft's end (body_end) to the loop (z1)
     sk = comp.sketches.add(comp.xZConstructionPlane)
-    toS = lambda r, z: sk.modelToSketchSpace(adsk.core.Point3D.create(r / 10.0, 0, z / 10.0))
+    toS = lambda x, z: sk.modelToSketchSpace(adsk.core.Point3D.create(x / 10.0, 0, z / 10.0))
     pts = [toS(0, 0), toS(rc, 0), toS(rc, cl), toS(rb, cl), toS(rb, body_end), toS(0, body_end)]
     lines = sk.sketchCurves.sketchLines
     prev = lines.addByTwoPoints(pts[0], pts[1])
@@ -494,31 +498,54 @@ def build_wand(root, L):
     rev = comp.features.revolveFeatures.createInput(sk.profiles.item(0), axis_line, NEW)
     rev.setAngleExtent(False, adsk.core.ValueInput.createByString('360 deg'))
     comp.features.revolveFeatures.add(rev)
-    tbm = adsk.fusion.TemporaryBRepManager.get()
-    add_bodies(comp, [('dome', tbm.createSphere(P3((0, 0, body_end)), rb / 10.0))])
-    merge_bodies(comp)
-    # teardrop: straight flanks from inside the shaft, tangent to the ring's outside, so the outline runs from the
-    # shaft into the ring without a neck (the flank's start is buried in the shaft, its top corners inside r_b)
-    R, ax, az = P['loop_r_out'], math.sqrt(rb * rb - (P['loop_t'] / 2) ** 2) - 0.05, body_end
-    vx, vz = ax, az - loop_c
+    shaft = comp.bRepBodies.item(0)
+    # teardrop plate from z1: flanks start at the shaft's width and run tangent onto the ring
+    vx, vz = rb, z1 - loop_c
     dv = math.hypot(vx, vz)
-    th = math.atan2(vz, vx) + math.acos(R / dv)                 # tangent point on the +x side, toward the shaft
+    th = math.atan2(vz, vx) + math.acos(R / dv)            # tangent point on the +x side, toward the shaft
     tx, tz = R * math.cos(th), loop_c + R * math.sin(th)
     sk = comp.sketches.add(comp.xZConstructionPlane)
     toS = lambda x, z: sk.modelToSketchSpace(adsk.core.Point3D.create(x / 10.0, 0, z / 10.0))
     lines = sk.sketchCurves.sketchLines
-    top = lines.addByTwoPoints(toS(-ax, az), toS(ax, az))
-    right = lines.addByTwoPoints(top.endSketchPoint, toS(tx, tz))
-    left = lines.addByTwoPoints(toS(-tx, tz), top.startSketchPoint)
+    bottom = lines.addByTwoPoints(toS(-rb, z1), toS(rb, z1))
+    right = lines.addByTwoPoints(bottom.endSketchPoint, toS(tx, tz))
+    left = lines.addByTwoPoints(toS(-tx, tz), bottom.startSketchPoint)
     sk.sketchCurves.sketchArcs.addByThreePoints(right.endSketchPoint, toS(0, loop_c + R), left.startSketchPoint)
     sk.sketchCurves.sketchCircles.addByCenterRadius(toS(0, loop_c), P['loop_r_in'] / 10.0)
     ring = next(sk.profiles.item(i) for i in range(sk.profiles.count) if sk.profiles.item(i).profileLoops.count == 2)
-    inp = comp.features.extrudeFeatures.createInput(ring, JOIN)
-    inp.setSymmetricExtent(VI(P['loop_t']), True)
-    inp.participantBodies = own_bodies(comp)
-    comp.features.extrudeFeatures.add(inp)
+    inp = comp.features.extrudeFeatures.createInput(ring, NEW)
+    inp.setSymmetricExtent(VI(t), True)
+    plate = comp.features.extrudeFeatures.add(inp).bodies.item(0)
+    # round every plate edge except the ones in its bottom face (that face is where the blend lands)
+    for r in (P['loop_round'], 0.8, 0.6):
+        edges = adsk.core.ObjectCollection.create()
+        for e in plate.edges:
+            if e.boundingBox.maxPoint.z * 10 > z1 + 0.01:
+                edges.add(e)
+        try:
+            fi = comp.features.filletFeatures.createInput()
+            fi.addConstantRadiusEdgeSet(edges, VI(r), True)
+            comp.features.filletFeatures.add(fi)
+            break
+        except Exception:
+            continue
+    plate = next(b for b in own_bodies(comp) if b != shaft and b.isSolid)
+    base = min((f for f in plate.faces if abs(f.boundingBox.maxPoint.z - f.boundingBox.minPoint.z) < 1e-4),
+               key=lambda f: f.boundingBox.minPoint.z)
+    # blend: shaft's end circle -> plate's rounded bottom face, leaving both tangent to what they join
+    loft = comp.features.loftFeatures.createInput(NEW)
+    sec0 = loft.loftSections.add(circle_profile(comp, body_end, rb))
+    sec1 = loft.loftSections.add(base)
+    for sec, fn in ((sec0, lambda x: x.setDirectionEndCondition(adsk.core.ValueInput.createByString('0 deg'),
+                                                                 adsk.core.ValueInput.createByReal(1.0))),
+                    (sec1, lambda x: x.setTangentEndCondition(adsk.core.ValueInput.createByReal(1.0)))):
+        try:
+            fn(sec)
+        except Exception:
+            pass
+    loft.isSolid = True
+    comp.features.loftFeatures.add(loft)
     merge_bodies(comp)
-    round_region(comp, z_min=body_end - 0.5, radii=(P['loop_round'], 0.8, 0.6, 0.4))
     extrude(comp, hex_profile(comp, 0.0, P['hex_af'] + P['hex_clear']), P['hex_depth'], CUT)
     merge_bodies(comp)
     comp.bRepBodies.item(0).name = 'Wand shaft'
