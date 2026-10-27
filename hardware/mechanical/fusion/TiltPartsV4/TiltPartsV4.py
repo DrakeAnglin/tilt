@@ -43,8 +43,10 @@ P = dict(
     wheel_face=7.5, barrel_r=6.25, wheel_slices=7, wheel_pts=16,
     worm_pin_len=2.0, worm_pin_r=2.5, journal_r=3.5,
     # thrust ring: the ONLY axial stop of the worm, both directions (owner: the factory worm rode up and down)
-    flange_r=4.4, flange_s=6.7, flange_t=1.4, flange_clear=0.1,
-    thread_end_clear=0.3, worm_pin_end_clear=0.4, worm_thrust_clear=0.15,
+    flange_r=4.4, flange_s=6.7, flange_t=1.4, flange_clear=0.2, flange_rclear=0.45,   # first print: 0.1 was snug
+    worm_clear=0.35,          # radial room for the worm's journals and the wand shaft (first print: 0.15 nearly snapped)
+    thread_clear=0.6,         # worm thread OD to its pocket
+    thread_end_clear=0.3, worm_pin_end_clear=0.4, worm_thrust_clear=0.25,
     # crossed 45° helicals (v0.3's tested 8T : 7T pair), the 8T now part of the worm. The two shafts don't meet, so
     # the motor sits beside the worm and its shaft runs on past the pinion into the main half
     mn=1.0, helix=45.0, addendum=0.85, dedendum=1.25, hx_cd_extra=0.20,
@@ -53,7 +55,7 @@ P = dict(
     n20_shaft_len=10.0,       # used uncut; the D-flat starts 3.2 mm from the gearbox face and the pinion sits on it
     n20_d_start=3.2,
     motor_inset=1.5,          # gearbox face sits in a square pocket this deep in the (flat) lid: stops it twisting
-    hex_af=4.0, hex_depth=6.0, hex_clear=0.15,
+    hex_af=4.0, hex_depth=6.0, hex_clear=0.35,   # first print: 0.15 had to be hammered on
     # wand shaft (same exit + loop as v0.3)
     collar_d=8.2, collar_len=2.5, body_d=6.0, body_end_s=37.97, loop_s=43.97,
     loop_r_out=5.4, loop_r_in=2.7, loop_t=4.0, loop_round=1.0,
@@ -495,17 +497,28 @@ def build_wand(root, L):
     tbm = adsk.fusion.TemporaryBRepManager.get()
     add_bodies(comp, [('dome', tbm.createSphere(P3((0, 0, body_end)), rb / 10.0))])
     merge_bodies(comp)
+    # teardrop: straight flanks from inside the shaft, tangent to the ring's outside, so the outline runs from the
+    # shaft into the ring without a neck (the flank's start is buried in the shaft, its top corners inside r_b)
+    R, ax, az = P['loop_r_out'], math.sqrt(rb * rb - (P['loop_t'] / 2) ** 2) - 0.05, body_end
+    vx, vz = ax, az - loop_c
+    dv = math.hypot(vx, vz)
+    th = math.atan2(vz, vx) + math.acos(R / dv)                 # tangent point on the +x side, toward the shaft
+    tx, tz = R * math.cos(th), loop_c + R * math.sin(th)
     sk = comp.sketches.add(comp.xZConstructionPlane)
-    for r in (P['loop_r_out'], P['loop_r_in']):
-        sk.sketchCurves.sketchCircles.addByCenterRadius(
-            sk.modelToSketchSpace(adsk.core.Point3D.create(0, 0, loop_c / 10.0)), r / 10.0)
+    toS = lambda x, z: sk.modelToSketchSpace(adsk.core.Point3D.create(x / 10.0, 0, z / 10.0))
+    lines = sk.sketchCurves.sketchLines
+    top = lines.addByTwoPoints(toS(-ax, az), toS(ax, az))
+    right = lines.addByTwoPoints(top.endSketchPoint, toS(tx, tz))
+    left = lines.addByTwoPoints(toS(-tx, tz), top.startSketchPoint)
+    sk.sketchCurves.sketchArcs.addByThreePoints(right.endSketchPoint, toS(0, loop_c + R), left.startSketchPoint)
+    sk.sketchCurves.sketchCircles.addByCenterRadius(toS(0, loop_c), P['loop_r_in'] / 10.0)
     ring = next(sk.profiles.item(i) for i in range(sk.profiles.count) if sk.profiles.item(i).profileLoops.count == 2)
     inp = comp.features.extrudeFeatures.createInput(ring, JOIN)
     inp.setSymmetricExtent(VI(P['loop_t']), True)
     inp.participantBodies = own_bodies(comp)
     comp.features.extrudeFeatures.add(inp)
     merge_bodies(comp)
-    round_region(comp, z_min=body_end - 1.0, radii=(P['loop_round'], 0.8, 0.6))
+    round_region(comp, z_min=body_end - 0.5, radii=(P['loop_round'], 0.8, 0.6, 0.4))
     extrude(comp, hex_profile(comp, 0.0, P['hex_af'] + P['hex_clear']), P['hex_depth'], CUT)
     merge_bodies(comp)
     comp.bRepBodies.item(0).name = 'Wand shaft'
@@ -634,7 +647,7 @@ def case_shapes(L):
     mo_len = P['n20_gbx'] + P['n20_motor'] + P['n20_end']
     mo_c = add(L['face'], mul(u, (mo_len + 6) / 2))
     hw = P['case_w'] / 2
-    thr, free, fc = P['worm_thrust_clear'], P['thread_end_clear'], P['flange_clear']
+    thr, free, fc, wc = P['worm_thrust_clear'], P['thread_end_clear'], P['flange_clear'], P['worm_clear']
     pin_end = -half - P['worm_pin_len'] - P['worm_pin_end_clear']
     x0, x1 = slab_x(L)
     collar_end = L['s_back'] + P['collar_len']
@@ -643,14 +656,15 @@ def case_shapes(L):
         ('wheel teeth', Prim('cyl', p1=add(rc, (-fw, 0, 0)), p2=add(rc, (fw, 0, 0)), r=wh['ra'] + 0.45)),
         ('barrel bore', Prim('cyl', p1=add(rc, (x0 - 1, 0, 0)), p2=add(rc, (x1 + 1, 0, 0)), r=P['barrel_r'] + 0.15)),
         # worm: thrust up on the thread's top face, the thrust ring both ways (wand pull: collar -> case shoulder)
-        ('worm top pin', cyl_s(L, pin_end, -half, P['worm_pin_r'] + 0.15)),
-        ('worm threads', cyl_s(L, -half - free, half + free, wd['ra'] + 0.45)),       # threads run free both ends
+        ('worm top pin', cyl_s(L, pin_end, -half, P['worm_pin_r'] + wc)),
+        ('worm threads', cyl_s(L, -half - free, half + free, wd['ra'] + P['thread_clear'])),   # threads run free
         *sensor_cavities(),
-        ('worm journal', cyl_s(L, half + free - 0.01, L['s_g0'] - 0.3, P['journal_r'] + 0.15)),
-        ('worm thrust groove', cyl_s(L, P['flange_s'] - fc, P['flange_s'] + P['flange_t'] + fc, P['flange_r'] + 0.3)),
+        ('worm journal', cyl_s(L, half + free - 0.01, L['s_g0'] - 0.3, P['journal_r'] + wc)),
+        ('worm thrust groove', cyl_s(L, P['flange_s'] - fc, P['flange_s'] + P['flange_t'] + fc,
+                                     P['flange_r'] + P['flange_rclear'])),
         ('worm gear', cyl_s(L, L['s_g0'] - 0.3, L['s_back'] + 0.3, ga['ra'] + 0.4)),     # its faces run free
-        ('wand collar', cyl_s(L, L['s_back'], collar_end + thr, P['collar_d'] / 2 + 0.3)),
-        ('wand exit', cyl_s(L, collar_end + thr - 0.01, collar_end + 40, P['body_d'] / 2 + 0.3)),
+        ('wand collar', cyl_s(L, L['s_back'], collar_end + thr, P['collar_d'] / 2 + wc + 0.1)),
+        ('wand exit', cyl_s(L, collar_end + thr - 0.01, collar_end + 40, P['body_d'] / 2 + wc + 0.1)),
         ('pinion', cyl_u(L, L['pin_c'], -pf, pf, gp['ra'] + 0.5)),
         ('motor shaft', cyl_u(L, L['pin_c'], -(L['t_face'] - P['n20_shaft_len']) - 0.5, L['t_face'] + 0.1,
                               P['n20_shaft_d'] / 2 + 0.5)),     # the shaft runs on into the main half
@@ -668,9 +682,9 @@ def case_shapes(L):
     cav = [pr for _, pr in named]
     slab = box_minmax(x0, x1, -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
-    dome = [cyl_s(L, -half - free - dw, 4.8, wd['ra'] + 0.45 + dw),
-            cyl_s(L, pin_end, -half - free - dw + 0.01, P['worm_pin_r'] + 0.15 + dw),
-            Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=P['worm_pin_r'] + 0.15 + dw, r2=2.0)]
+    dome = [cyl_s(L, -half - free - dw, 4.8, wd['ra'] + P['thread_clear'] + dw),
+            cyl_s(L, pin_end, -half - free - dw + 0.01, P['worm_pin_r'] + P['worm_clear'] + dw),
+            Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=P['worm_pin_r'] + P['worm_clear'] + dw, r2=2.0)]
     py = hw - P['lip_in'] - P['plateau_clear']
     plateau = box_minmax(x0, x1, -py, py, P['case_top'] - 1.0, P['plateau_top'])
     env = [slab, plateau, *dome, notch_box(-P['notch_clear'])]
