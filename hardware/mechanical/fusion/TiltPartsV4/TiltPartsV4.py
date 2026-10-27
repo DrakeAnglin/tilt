@@ -41,10 +41,12 @@ P = dict(
     worm_root_clear=0.25,     # x module: worm tip to wheel root
     wheel_face=7.5, barrel_r=6.25, wheel_slices=7, wheel_pts=16,
     worm_pin_len=2.0, worm_pin_r=2.5, journal_r=3.5,
-    worm_thrust_clear=0.15, worm_free_clear=0.7, worm_pin_end_clear=0.4,
+    # thrust ring: the ONLY axial stop of the worm, both directions (owner: the factory worm rode up and down)
+    flange_r=4.4, flange_s=6.7, flange_t=1.4, flange_clear=0.1,   # r 4.8 left 0.25 mm to the motor bevel pocket
+    thread_end_clear=0.3, worm_pin_end_clear=0.4, worm_thrust_clear=0.15,
     # bevel pair (worm 12T : motor 10T)
-    bevel_m=1.0, z_bevel_worm=12, z_bevel_motor=10, bevel_face_frac=0.36,
-    bevel_back_s=21.0,        # s of the worm bevel's back face (= collar start); 21.5 left 0.28 mm of side wall
+    bevel_m=1.25, z_bevel_worm=10, z_bevel_motor=9, bevel_face_frac=0.40,   # m1.25: 25 % thicker teeth than m1
+    bevel_back_s=20.0,        # s of the worm bevel's back face (= collar start), 1 mm further up than the first try
     pinion_hub_d=6.5, pinion_hub=3.0, pinion_gap=5.0,
     n20_shaft_len=10.0,       # from the gearbox face; a longer shaft must be trimmed (it would reach the worm)
     hex_af=4.0, hex_depth=6.0, hex_clear=0.15,
@@ -55,23 +57,26 @@ P = dict(
     n20_w=12.0, n20_h=10.0, n20_gbx=9.0, n20_motor=15.0, n20_end=1.0, n20_shaft_d=3.0, n20_flat=2.5,
     n20_screw_spacing=9.0,
     motor_side=-1,            # N20 on the lid side (owner: +X hits a tilt spindle)
-    # case
-    wall=1.6, slab_half=8.33, motor_socket=4.0, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
+    # case: both halves 8.33 thick (factory barrel width); the N20 gets a pod on the lid only where it sits
+    wall=1.6, slab_half=8.33, motor_socket=4.0, pod_wall=1.6, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
     dome_wall=1.2, dome_max_y=21.0,
     plateau_top=38.9, plateau_clear=1.5,
-    screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0, lid_cbore_d=4.2, lid_cbore=1.8,
-    case_screw_len=16.0, case_screw_bite=6.3,   # M2 x 16; the lid counterbores get deeper as the lid gets thicker
-    screw_wall=2.0,
-    # AS5600 sensor (as v0.3)
-    ss_z=20, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0, ss_shaft_right=3.5,
+    screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0,
+    # case screws: M2 flat head from the lid (90° countersink) into M2 heat-set inserts pressed into the main half's
+    # back face. The two under the AS5600 board go through the board (pan head there)
+    cs_d=4.2, m2_clear_lid=2.4, m2_clear_main=2.2, insert_d=3.2, insert_depth=5.0, insert_wall=1.3, n_case_screws=2,
+    # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
+    ss_z=20, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0, ss_shaft_right=4.0,
+    ss_x0=1.5,                # X of the sensor gear's main-half face: centred on the wheel (a worm wheel's teeth change
+                              # shape toward its faces, a spur gear only meshes cleanly near the middle)
     ss_head_d=8.0,
-    magnet_d=6.0, magnet_t=2.5, magnet_clear=0.15,
-    board_w=23.4, board_t=1.6, chip_h=1.5, sensor_gap=1.5, standoff_len=5.0,
-    board_holes=((9.0, 9.0), (-9.0, -9.0)),
-    insert_d=3.2, insert_depth=4.5,
+    magnet_d=6.0, magnet_t=2.5, magnet_clear=0.15, magnet_gap=0.3, cover_wall=0.8,
+    board_w=23.4, board_t=1.6, chip_h=1.5, board_pocket=2.0, board_rim=1.5, board_land=4.7,
+    board_holes=((9.0, 9.0), (-9.0, -9.0)),   # (+Y,+Z) and (-Y,-Z) diagonal. TO MEASURE on the real board
 )
 
 PREFIX = 'T4 '
+WALL_HOLE = 1.3               # tools/fusion_wallcheck.py: min wall round screw / insert / peg holes (insert maker's spec)
 
 
 # ------------------------------------------------------------------ vector helpers (mm)
@@ -227,9 +232,9 @@ def wheel_section(zz):
     return out
 
 
-def wheel_tooth_angle():
-    """Wheel-local angle of a tooth centre in the mid-plane (middle of the tip land)."""
-    pts = wheel_section(0.0)
+def wheel_tooth_angle(zz=0.0):
+    """Wheel-local angle of a tooth centre in the plane zz (middle of the tip land)."""
+    pts = wheel_section(zz)
     n = P['wheel_pts']
     rs = [math.hypot(*q) for q in pts[:n]]
     top = max(rs)
@@ -446,6 +451,7 @@ def build_worm(root, L):
     # top pin journal, bearing journal down to the bevel
     extrude(comp, circle_profile(comp, -half - P['worm_pin_len'], P['worm_pin_r']), P['worm_pin_len'] + 0.3, JOIN)
     extrude(comp, circle_profile(comp, half - 0.3, P['journal_r']), L['s_toe'] - half + 0.6, JOIN)
+    extrude(comp, circle_profile(comp, P['flange_s'], P['flange_r']), P['flange_t'], JOIN)     # thrust ring
     # 12T bevel: back face (heel) at s_back, teeth narrowing toward the apex (up the worm). Tooth at 180° = -X,
     # where it meets the motor pinion
     g = L['gw']
@@ -601,10 +607,16 @@ def notch_box(grow=0.0):
 
 
 def slab_x(L):
-    """X of the lid's outer face and the main half's back face. The half the N20 sticks out of is thicker: its
-    gearbox face plus the socket depth."""
-    m = L['face'][0] + P['motor_socket'] * P['motor_side']
-    return min(-P['slab_half'], m), max(P['slab_half'], m)
+    """X of the lid's outer face and the main half's back face (the motor has its own pod, see motor_pod)."""
+    return -P['slab_half'], P['slab_half']
+
+
+def motor_pod(L):
+    """Box on the lid around the N20 socket, from the split face to the socket's outer end."""
+    q, pw = L['pin_c'], P['pod_wall']
+    x_out = L['face'][0] + P['motor_socket'] * P['motor_side']
+    hy, hz = (P['n20_w'] + 0.3) / 2 + pw, (P['n20_h'] + 0.3) / 2 + pw
+    return box_minmax(min(x_out, 0.0), max(x_out, 0.0), q[1] - hy, q[1] + hy, max(P['case_floor'], q[2] - hz), q[2] + hz)
 
 
 def case_shapes(L):
@@ -614,7 +626,7 @@ def case_shapes(L):
     mo_len = P['n20_gbx'] + P['n20_motor'] + P['n20_end']
     mo_c = add(L['face'], mul(u, (mo_len + 6) / 2))
     hw = P['case_w'] / 2
-    thr, free = P['worm_thrust_clear'], P['worm_free_clear']
+    thr, free, fc = P['worm_thrust_clear'], P['thread_end_clear'], P['flange_clear']
     pin_end = -half - P['worm_pin_len'] - P['worm_pin_end_clear']
     x0, x1 = slab_x(L)
     collar_end = L['s_back'] + P['collar_len']
@@ -624,13 +636,19 @@ def case_shapes(L):
         ('barrel bore', Prim('cyl', p1=add(rc, (x0 - 1, 0, 0)), p2=add(rc, (x1 + 1, 0, 0)), r=P['barrel_r'] + 0.15)),
         # worm: thrust up on the thread's top face, down through the bevel heel -> wand collar -> case shoulder
         ('worm top pin', cyl_s(L, pin_end, -half, P['worm_pin_r'] + 0.15)),
-        ('worm threads', cyl_s(L, -half - thr, half + free, wd['ra'] + 0.45)),
-        *zip(('sensor gear', 'sensor shaft', 'magnet head'), sensor_cavities()),
+        ('worm threads', cyl_s(L, -half - free, half + free, wd['ra'] + 0.45)),       # threads run free both ends
+        *sensor_cavities(),
         ('worm journal', cyl_s(L, half + free - 0.01, L['s_toe'] - 0.3, P['journal_r'] + 0.15)),
-        ('worm bevel', cyl_s(L, L['s_toe'] - 0.4, L['s_back'] + 0.3, gw['ra'] + 0.35)),   # back face runs free
+        ('worm thrust groove', cyl_s(L, P['flange_s'] - fc, P['flange_s'] + P['flange_t'] + fc, P['flange_r'] + 0.3)),
+        # pockets shaped like the bevels (cones), not cylinders: more wall to the rail and round the thrust groove
+        ('worm bevel', Prim('cyl', p1=L['S'](L['s_toe'] - 0.4), p2=L['S'](L['s_back']),
+                            r=gw['ra'] * gw['k'] + 0.45, r2=gw['ra'] + 0.45)),
+        ('worm bevel back', cyl_s(L, L['s_back'] - 0.01, L['s_back'] + 0.3, gw['ra'] + 0.45)),   # back face runs free
         ('wand collar', cyl_s(L, L['s_back'], collar_end + thr, P['collar_d'] / 2 + 0.3)),
         ('wand exit', cyl_s(L, collar_end + thr - 0.01, collar_end + 40, P['body_d'] / 2 + 0.3)),
-        ('motor bevel', cyl_u(L, L['pin_c'], L['t_toe'] - 0.4, L['t_heel'] + 0.3, gm['ra'] + 0.45)),
+        ('motor bevel', Prim('cyl', p1=add(L['pin_c'], mul(u, L['t_toe'] - 0.4)), p2=add(L['pin_c'], mul(u, L['t_heel'])),
+                             r=gm['ra'] * gm['k'] + 0.45, r2=gm['ra'] + 0.45)),
+        ('motor bevel back', cyl_u(L, L['pin_c'], L['t_heel'] - 0.01, L['t_heel'] + 0.3, gm['ra'] + 0.45)),
         ('motor hub', cyl_u(L, L['pin_c'], L['t_heel'], L['t_face'] + 0.1, P['pinion_hub_d'] / 2 + 0.45)),
         ('motor socket', Prim('box', c=mo_c, u=u, w=w, L=mo_len + 6, W=P['n20_w'] + 0.3, H=P['n20_h'] + 0.3)),
     ]
@@ -645,12 +663,12 @@ def case_shapes(L):
     cav = [pr for _, pr in named]
     slab = box_minmax(x0, x1, -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
-    dome = [cyl_s(L, -half - thr - dw, 4.8, wd['ra'] + 0.45 + dw),
-            cyl_s(L, pin_end, -half - thr - dw + 0.01, P['worm_pin_r'] + 0.15 + dw),
+    dome = [cyl_s(L, -half - free - dw, 4.8, wd['ra'] + 0.45 + dw),
+            cyl_s(L, pin_end, -half - free - dw + 0.01, P['worm_pin_r'] + 0.15 + dw),
             Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=P['worm_pin_r'] + 0.15 + dw, r2=2.0)]
     py = hw - P['lip_in'] - P['plateau_clear']
     plateau = box_minmax(x0, x1, -py, py, P['case_top'] - 1.0, P['plateau_top'])
-    env = [slab, plateau, *dome, notch_box(-P['notch_clear'])]
+    env = [slab, plateau, *dome, notch_box(-P['notch_clear']), motor_pod(L)]
     trims = [
         box_minmax(-60, 80, -hw - 5, -py, P['case_top'] - P['lip_h'], 60),
         box_minmax(-60, 80, py, hw + 5, P['case_top'] - P['lip_h'], 60),
@@ -662,7 +680,7 @@ def case_shapes(L):
     return env, cav, trims, mo_len, dome
 
 
-def pick_bosses(cav, keep_in, count=3, clear_r=1.9):
+def pick_bosses(cav, keep_in, count=3, clear_r=1.9, chosen=None):
     """M2 screw positions along X through the slab: clear of every cavity, inside the slab cross-section."""
     cands = []
     for yi in range(-25, 26):
@@ -683,7 +701,8 @@ def pick_bosses(cav, keep_in, count=3, clear_r=1.9):
                     break
             if ok:
                 cands.append((y, z))
-    chosen = []
+    chosen = list(chosen or [])
+    count += len(chosen)
     while cands and len(chosen) < count:
         pick = max(cands, key=lambda c: c[1]) if not chosen else \
             max(cands, key=lambda c: min(math.hypot(c[0] - q[0], c[1] - q[1]) for q in chosen))
@@ -723,32 +742,39 @@ def round_outer_edges(comp, r):
 
 def case_plan(L):
     """Everything that defines the two case halves: envelope, cavities, trims, and the per-half holes / pegs.
-    Used by build_case() and by tools/fusion_wallcheck.py (so the checker sees exactly what gets built)."""
+    Used by build_case() and by tools/fusion_wallcheck.py (so the checker sees exactly what gets built).
+    Case screws: M2 flat head from the lid's outer face into heat-set inserts pressed into the main half's back face.
+    The two AS5600 holes are case screws too (through the board)."""
     env, cav, trims, mo_len, dome = case_shapes(L)
     hw = P['case_w'] / 2
-    on_board = board_footprint(margin=2.0)        # case screws stay out from under the AS5600 board
-    cb = P['lid_cbore_d'] / 2 + P['screw_wall']   # counterbore radius + wall to the side walls, floor and lip steps
+    on_board = board_footprint(margin=2.0)
+    pod = motor_pod(L)
+    ir = P['insert_d'] / 2 + P['insert_wall']      # insert hole radius + the insert's minimum wall
+
     def screw_ok(y, z):
-        if abs(y) > hw - cb or z < P['case_floor'] + cb:
+        if abs(y) > hw - ir or z < P['case_floor'] + ir:
             return False
-        if abs(y) > hw - P['lip_in'] - P['plateau_clear'] - cb and z > P['case_top'] - P['lip_h'] - cb:
+        if abs(y) > hw - P['lip_in'] - P['plateau_clear'] - ir and z > P['case_top'] - P['lip_h'] - ir:
             return False                          # next to the lip step
-        return z < P['case_top'] - cb and not on_board(y, z)
-    picks = pick_bosses(cav, screw_ok, count=5, clear_r=P['lid_cbore_d'] / 2 + P['screw_wall'])
-    bosses, pegs = picks[:3], picks[3:]
+        if pod.contains((pod.c[0], y, z), grow=ir):
+            return False
+        return z < P['case_top'] - ir and not on_board(y, z)
+    fixed = board_holes()
+    picks = pick_bosses(cav, screw_ok, count=P['n_case_screws'] + 2, clear_r=ir, chosen=fixed)
+    bosses, pegs = picks[:len(fixed) + P['n_case_screws']], picks[len(fixed) + P['n_case_screws']:]
     x0, x1 = slab_x(L)
-    X = lambda xa, xb, y, z, r: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r)
-    # deeper counterbores in a thick lid, so the same M2 x 16 still bites case_screw_bite into the main half
-    cb_depth = max(P['lid_cbore'], -x0 - (P['case_screw_len'] - P['case_screw_bite']))
+    X = lambda xa, xb, y, z, r, r2=None: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r, **({} if r2 is None else {'r2': r2}))
     holes = {'Case left': [], 'Case right': []}
-    for y, z in bosses:
-        holes['Case left'].append(('screw clearance', X(x0 - 1, x1 + 1, y, z, 1.1)))
-        holes['Case left'].append(('screw counterbore', X(x0 - 1, x0 + cb_depth, y, z, P['lid_cbore_d'] / 2)))
-        holes['Case right'].append(('screw pilot', X(x0 - 1, x1 + 1, y, z, 0.85)))
+    for k, (y, z) in enumerate(bosses):
+        holes['Case left'].append(('screw clearance', X(x0 - 1, 0.5, y, z, P['m2_clear_lid'] / 2)))
+        if (y, z) not in fixed:                   # 90° countersink for the flat head (board screws: head on the board)
+            cs = P['cs_d'] / 2
+            holes['Case left'].append(('screw countersink', X(x0 - 0.01, x0 + cs - P['m2_clear_lid'] / 2, y, z, cs,
+                                                              P['m2_clear_lid'] / 2)))
+        holes['Case right'].append(('screw clearance', X(-0.5, x1 - P['insert_depth'] + 0.01, y, z, P['m2_clear_main'] / 2)))
+        holes['Case right'].append(('screw insert', X(x1 - P['insert_depth'], x1 + 1, y, z, P['insert_d'] / 2)))
     for y, z in pegs:
         holes['Case right'].append(('peg socket', X(-0.1, P['peg_h'] + 0.4, y, z, P['peg_d'] / 2 + 0.15)))
-    for (y, z), kind, r, depth in board_hole_plan():
-        holes['Case left'].append(('AS5600 ' + kind, X(x0 - 1, x0 + depth, y, z, r)))
     peg_solids = [X(0, P['peg_h'], y, z, P['peg_d'] / 2) for y, z in pegs]      # on the lid
     return dict(env=env, cav=cav, trims=trims, dome=dome, mo_len=mo_len, bosses=bosses, pegs=pegs,
                 holes=holes, peg_solids=peg_solids)
@@ -796,37 +822,37 @@ def build_case(root, L):
     return out, plan['bosses'], mo_len, plan['pegs']
 
 def sensor_layout():
-    """Sensor gear axis (parallel to the rod), magnet face and board plane, in assembly coordinates."""
+    """Sensor gear axis (parallel to the rod), magnet and board planes. The board lies flush on the lid's outer face,
+    chip facing in, over a shallow pocket; the magnet sits in the gear's short head, 0.8 mm of lid below the pocket."""
     gs = spur(P['ss_z'], P['ss_m'])
-    wheel_rp = 16 * P['module_worm'] / 2.0
+    wheel_rp = P['z_wheel'] * P['module_worm'] / 2.0
     cd = wheel_rp + gs['rp'] + P['ss_cd_extra']
     y = P['ss_y']
-    z = P['rod_z'] - math.sqrt(cd * cd - y * y)          # behind and slightly below the rod: clear of the worm
+    z = P['rod_z'] - math.sqrt(cd * cd - y * y)
     lid_face = slab_x(layout())[0]
-    protrude = P['standoff_len'] - P['chip_h'] - P['sensor_gap']   # magnet head sticks out of the lid face by this
-    magnet_x = lid_face - protrude
-    head_x0 = -P['ss_face'] / 2                            # head starts right at the gear face: nothing wider outside
-    return dict(gs=gs, cd=cd, y=y, z=z, lid_face=lid_face, magnet_x=magnet_x, head_x0=head_x0,
-                chip_x=lid_face - P['standoff_len'], board_back_x=lid_face - P['standoff_len'] - P['board_t'])
+    floor_x = lid_face + P['board_pocket']               # pocket floor (chip side)
+    magnet_x = floor_x + P['cover_wall'] + P['magnet_gap']  # magnet face = end of the gear's head
+    return dict(gs=gs, cd=cd, y=y, z=z, lid_face=lid_face, floor_x=floor_x, magnet_x=magnet_x,
+                gear_x0=P['ss_x0'], gear_x1=P['ss_x0'] - P['ss_face'],
+                chip_x=lid_face + P['chip_h'], board_back_x=lid_face - P['board_t'])
 
 
 def build_sensor_gear(root):
-    """20T spur meshing with the worm wheel, shaft + magnet head. Local Z points to the board (-X in the assembly);
-    local origin = gear centre plane (assembly X = 0)."""
+    """20T spur meshing with the worm wheel, short head holding the magnet, stub shaft into the main half.
+    Local z points to the lid (-X); local origin = the gear's rod-side face (X = ss_x0)."""
     occ, comp = new_component(root, 'Sensor gear')
     S = sensor_layout()
-    head_l0 = -S['head_x0']                                # local z where the head starts
-    magnet_l = -S['magnet_x']                              # local z of the head's end face (magnet face)
-    shaft_l0 = -P['ss_shaft_right']
-    extrude(comp, circle_profile(comp, shaft_l0, P['ss_shaft_d'] / 2), head_l0 + 0.3 - shaft_l0, NEW)
-    sk = comp.sketches.add(offset_plane(comp, -P['ss_face'] / 2))
+    head_end = S['gear_x0'] - S['magnet_x']                # local z of the magnet face
+    extrude(comp, circle_profile(comp, -(P['ss_shaft_right'] - S['gear_x0']), P['ss_shaft_d'] / 2),
+            P['ss_shaft_right'] - S['gear_x0'] + 0.3, NEW)
+    sk = comp.sketches.add(comp.xYConstructionPlane)
     polyline(sk, gear_profile(S['gs'], P['ss_backlash']))
     extrude(comp, largest_profile(sk), P['ss_face'], JOIN)
-    extrude(comp, circle_profile(comp, head_l0, P['ss_head_d'] / 2), magnet_l - head_l0, JOIN)
+    extrude(comp, circle_profile(comp, P['ss_face'] - 0.3, P['ss_head_d'] / 2), head_end - P['ss_face'] + 0.3, JOIN)
     merge_bodies(comp)
     cut = comp.features.extrudeFeatures.createInput(
-        circle_profile(comp, magnet_l, P['magnet_d'] / 2 + P['magnet_clear']), CUT)
-    cut.setDistanceExtent(False, VI(-(P['magnet_t'] + 0.1)))
+        circle_profile(comp, head_end, P['magnet_d'] / 2 + P['magnet_clear']), CUT)
+    cut.setDistanceExtent(False, VI(-(P['magnet_t'] + 0.1)))     # glue the magnet in, face flush with the head
     cut.participantBodies = own_bodies(comp)
     comp.features.extrudeFeatures.add(cut)
     comp.bRepBodies.item(0).name = 'Sensor gear'
@@ -837,34 +863,30 @@ def sensor_cavities():
     S = sensor_layout()
     c = (0.0, S['y'], S['z'])
     X = lambda x0, x1, r: Prim('cyl', p1=(x0, c[1], c[2]), p2=(x1, c[1], c[2]), r=r)
-    fc = P['ss_face'] / 2 + 0.3                # just the gear: keeps 1.5 mm between it and the AS5600 insert hole
+    hb, rim, land = P['board_w'] / 2, P['board_rim'], P['board_land']
+    pin = hb - rim
+    B = lambda y0, y1, z0, z1: box_minmax(S['lid_face'] - 1.0, S['floor_x'], c[1] + y0, c[1] + y1, c[2] + z0, c[2] + z1)
     return [
-        X(-fc, fc, S['gs']['ra'] + 0.4),                                       # sensor gear (meshes with the wheel)
-        X(S['head_x0'] + 0.3, P['ss_shaft_right'] + 0.3, P['ss_shaft_d'] / 2 + 0.15),  # shaft bearings (blind right)
-        X(S['lid_face'] - 1.0, S['head_x0'] + 0.3, P['ss_head_d'] / 2 + 0.15),  # head bearing, out through the lid face
+        ('sensor gear', X(S['gear_x0'] + 0.3, S['gear_x1'] - 0.3, S['gs']['ra'] + 0.4)),     # straddles the split
+        ('sensor shaft', X(S['gear_x0'] + 0.01, P['ss_shaft_right'] + 0.3, P['ss_shaft_d'] / 2 + 0.15)),
+        ('magnet head', X(S['gear_x1'] + 0.01, S['magnet_x'] - P['magnet_gap'], P['ss_head_d'] / 2 + 0.3)),
+        # pocket under the board for the chip, parts and solder joints; the board rests on its rim and on two lands
+        # round the screw holes (the (+Y,+Z) and (-Y,-Z) corners)
+        ('AS5600 pocket', B(-pin, pin, -(hb - land), hb - land)),
+        ('AS5600 pocket', B(-pin, hb - land, hb - land, pin)),
+        ('AS5600 pocket', B(-(hb - land), pin, -pin, -(hb - land))),
     ]
 
 
-def board_hole_plan(min_wall=2.5):
-    """For each AS5600 standoff hole: heat-set insert if it leaves >= min_wall to the case's side wall, otherwise a
-    pilot for an M2 self-tapping screw (much smaller hole, so the wall stays thick)."""
+def board_holes():
     S = sensor_layout()
-    hw = P['case_w'] / 2
-    plan = []
-    for dy, dz in P['board_holes']:
-        y, z = S['y'] + dy, S['z'] + dz
-        if hw - abs(y) - P['insert_d'] / 2 >= min_wall:
-            plan.append(((y, z), 'insert', P['insert_d'] / 2, P['insert_depth']))
-        else:
-            plan.append(((y, z), 'self-tap M2', 0.85, 6.0))
-    return plan
+    return [(round(S['y'] + dy, 2), round(S['z'] + dz, 2)) for dy, dz in P['board_holes']]
 
 
 def board_footprint(margin=0.0):
     S = sensor_layout()
     hb = P['board_w'] / 2 + margin
     return lambda y, z: abs(y - S['y']) < hb and abs(z - S['z']) < hb
-
 
 
 def build_refs(root, L, mo_len):
@@ -881,11 +903,9 @@ def build_refs(root, L, mo_len):
     sy, sz = SL['y'], SL['z']
     items.append(('Magnet', Prim('cyl', p1=(SL['magnet_x'] + P['magnet_t'], sy, sz), p2=(SL['magnet_x'] + 0.05, sy, sz),
                                  r=P['magnet_d'] / 2)))
-    items.append(('AS5600 board', box_minmax(SL['board_back_x'], SL['chip_x'], sy - 11.5, sy + 11.5, sz - 11.5, sz + 11.5)))
-    items.append(('AS5600 chip', box_minmax(SL['chip_x'], SL['chip_x'] + P['chip_h'], sy - 2.5, sy + 2.5, sz - 2.0, sz + 2.0)))
-    for k, (dy, dz) in enumerate(P['board_holes']):
-        items.append(('Standoff %d' % k, Prim('cyl', p1=(SL['lid_face'], sy + dy, sz + dz),
-                                              p2=(SL['chip_x'], sy + dy, sz + dz), r=1.75)))
+    hb = P['board_w'] / 2
+    items.append(('AS5600 board', box_minmax(SL['board_back_x'], SL['lid_face'] - 0.02, sy - hb, sy + hb, sz - hb, sz + hb)))
+    items.append(('AS5600 chip', box_minmax(SL['lid_face'], SL['chip_x'], sy - 2.5, sy + 2.5, sz - 2.0, sz + 2.0)))
     w2, h, t = P['rail_w'] / 2, P['rail_h'], P['rail_wall']
     rail = [('Rail floor', box_minmax(-50, 100, -w2 - t, w2 + t, -t, 0)),
             ('Rail wall room', box_minmax(-50, 100, -w2 - t, -w2, -t, h)),
@@ -954,10 +974,10 @@ def build(design, export_dir=None):
     v = sub((0, SL['y'], SL['z']), L['rod_c'])
     line_w = math.atan2(dot(v, L['d']), dot(v, L['n']))                # centre line, wheel-local angle
     pw = 2 * math.pi / P['z_wheel']
-    dw = (wheel_tooth_angle() - line_w + pw / 2) % pw - pw / 2           # nearest wheel tooth's offset from it
+    dw = (wheel_tooth_angle((SL['gear_x0'] + SL['gear_x1']) / 2) - line_w + pw / 2) % pw - pw / 2   # nearest tooth
     beta = math.atan2(v[2], -v[1])                                       # toward the rod, sensor-local angle
     rho = beta + dw * P['z_wheel'] / P['ss_z'] + math.pi / P['ss_z']
-    place(occ_named('Sensor gear'), (0, SL['y'], SL['z']), rotate_about((0, 1, 0), (-1, 0, 0), rho), (-1, 0, 0))
+    place(occ_named('Sensor gear'), (SL['gear_x0'], SL['y'], SL['z']), rotate_about((0, 1, 0), (-1, 0, 0), rho), (-1, 0, 0))
 
     for comp in (worm, wand, pinion):
         color(design, comp, 'Plastic - Glossy (Yellow)')
@@ -989,11 +1009,12 @@ def build(design, export_dir=None):
         'Worm wheel: %dT, OD %.2f, centre distance %.2f' % (wh['z'], 2 * wh['ra'], wh['cd']),
         'Bevels: worm %dT / motor %dT m%.1f, cone distance %.2f, face %.2f, apex at s=%.2f (Y %.1f, Z %.1f)' % (
             gw['z'], gm['z'], gw['m'], gw['A'], gw['F'], L['s_q'], L['pin_c'][1], L['pin_c'][2]),
-        'N20 gearbox face X=%.1f (shaft ≤ %.0f mm), case X %.1f .. %.1f' % (L['face'][0], P['n20_shaft_len'], x0, x1),
+        'N20 gearbox face X=%.1f (shaft ≤ %.0f mm), case X %.1f .. %.1f, motor pod to X=%.1f' % (
+            L['face'][0], P['n20_shaft_len'], x0, x1, L['face'][0] + P['motor_socket'] * P['motor_side']),
         'Screw holes (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in bosses),
         'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
-        'AS5600 standoff holes: %s' % ', '.join('(%.1f, %.1f) %s' % (pt[0], pt[1], kind)
-                                                for pt, kind, r, _ in board_hole_plan()),
+        'AS5600 board screws (Y, Z): %s; magnet face X=%.2f, chip X=%.2f (gap %.2f mm)' % (
+            ', '.join('(%.1f, %.1f)' % b for b in board_holes()), SL['magnet_x'], SL['chip_x'], SL['magnet_x'] - SL['chip_x']),
         'Exported: %s' % ', '.join(os.path.basename(f) for f in files),
     ])
 

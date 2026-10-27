@@ -32,8 +32,8 @@ P = mod.P
 L = mod.layout()
 plan = mod.case_plan(L)
 
-GENERAL, HOLE = 1.2, 1.6
-HOLE_KINDS = ('screw', 'peg', 'AS5600')
+GENERAL, HOLE = 1.2, getattr(mod, 'WALL_HOLE', 1.6)      # v0.4: 1.3 (heat-set insert spec)
+HOLE_KINDS = ('screw', 'peg', 'insert')
 
 
 def add(a, b): return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
