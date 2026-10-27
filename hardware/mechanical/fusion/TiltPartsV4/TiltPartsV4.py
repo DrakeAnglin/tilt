@@ -48,8 +48,8 @@ P = dict(
     # crossed 45° helicals (v0.3's tested 8T : 7T pair), the 8T now part of the worm. The two shafts don't meet, so
     # the motor sits beside the worm and its shaft runs on past the pinion into the main half
     mn=1.0, helix=45.0, addendum=0.85, dedendum=1.25, hx_cd_extra=0.20,
-    z_worm_gear=8, z_pinion=7, worm_gear_face=3.0, pinion_face=6.0,
-    worm_gear_s0=18.5,        # s of the worm gear's upper face; its lower face = collar start
+    z_worm_gear=8, z_pinion=7, worm_gear_face=5.5, pinion_face=6.0,   # owner: 3 mm worm gear looked weak
+    worm_gear_s0=16.0,        # s of the worm gear's upper face (grown up the shaft); lower face = collar start, 21.5
     n20_shaft_len=10.0,       # used uncut; the D-flat starts 3.2 mm from the gearbox face and the pinion sits on it
     n20_d_start=3.2,
     motor_inset=1.5,          # gearbox face sits in a square pocket this deep in the (flat) lid: stops it twisting
