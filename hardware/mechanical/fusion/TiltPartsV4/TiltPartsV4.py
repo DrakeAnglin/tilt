@@ -57,7 +57,7 @@ P = dict(
     motor_inset=1.5,          # gearbox face sits in a square pocket this deep in the (flat) lid: stops it twisting
     hex_af=4.0, hex_depth=6.0, hex_clear=0.35,   # first print: 0.15 had to be hammered on
     # wand shaft (same exit + loop as v0.3)
-    collar_d=8.2, collar_len=2.5, body_d=6.0, body_end_s=37.97, loop_s=43.97,
+    collar_d=8.2, collar_len=2.5, body_d=6.0, body_end_s=34.5, loop_s=43.97,   # shaft ends early: long teardrop flanks
     loop_r_out=5.4, loop_r_in=2.7, loop_t=4.0, loop_round=1.0,
     # N20 (no encoder)
     n20_w=12.0, n20_h=10.0, n20_gbx=9.0, n20_motor=15.0, n20_end=1.0, n20_shaft_d=3.0, n20_flat=2.5,
