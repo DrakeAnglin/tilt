@@ -124,8 +124,8 @@ def sd_outer(p, half):
     for t in plan['trims']:
         s = max(s, -max(sd(t, p), -k))
     s = max(s, -p[0] if half == 'Case right' else p[0])       # the half's side of the split plane
-    if half == 'Case left':
-        s = min(s, min(sd(g, p) for g in plan['peg_solids']))
+    if half == getattr(mod, 'PEG_HALF', 'Case left'):
+        s = min(s, min(sd(g, p) for g in plan['peg_solids'] + plan.get('pin_solids', [])))
     return s
 
 
@@ -205,7 +205,8 @@ def run(half, build_dir):
     return sorted(findings, key=lambda d: d['wall_mm']), oh_sum
 
 
-left, left_oh = run('Case left', (1, 0, 0))       # lid prints outer face down: build direction +X
-right, right_oh = run('Case right', (-1, 0, 0))   # main half prints back face down: build direction -X
+DIRS = getattr(mod, 'PRINT_DIRS', {'Case left': (1, 0, 0), 'Case right': (-1, 0, 0)})   # v0.3: both on their backs
+left, left_oh = run('Case left', DIRS['Case left'])
+right, right_oh = run('Case right', DIRS['Case right'])
 result = dict(case_left_thin=left, case_right_thin=right, case_left_overhangs=left_oh, case_right_overhangs=right_oh,
               screws=plan['bosses'], pegs=plan['pegs'])

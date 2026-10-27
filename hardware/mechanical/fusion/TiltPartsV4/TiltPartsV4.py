@@ -66,7 +66,8 @@ P = dict(
     # back face. The two under the AS5600 board go through the board (pan head there)
     cs_d=4.2, m2_clear_lid=2.4, m2_clear_main=2.2, insert_d=3.2, insert_depth=5.0, insert_wall=1.3, n_case_screws=2,
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
-    ss_z=20, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0, ss_shaft_right=4.0,
+    ss_z=20, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0,
+    ss_bore=3.5,              # the gear turns on a Ø4 pin moulded into the main half (gear prints flat, no stub)
     ss_x0=1.5,                # X of the sensor gear's main-half face: centred on the wheel (a worm wheel's teeth change
                               # shape toward its faces, a spur gear only meshes cleanly near the middle)
     ss_head_d=8.0,
@@ -77,6 +78,10 @@ P = dict(
 
 PREFIX = 'T4 '
 WALL_HOLE = 1.3               # tools/fusion_wallcheck.py: min wall round screw / insert / peg holes (insert maker's spec)
+# both halves print with X pointing up (lid: split face down, its motor pod sticks out of the outer face; main half:
+# back face down), so the alignment pegs live on the main half
+PEG_HALF = 'Case right'
+PRINT_DIRS = {'Case left': (-1, 0, 0), 'Case right': (-1, 0, 0)}
 
 
 # ------------------------------------------------------------------ vector helpers (mm)
@@ -774,10 +779,12 @@ def case_plan(L):
         holes['Case right'].append(('screw clearance', X(-0.5, x1 - P['insert_depth'] + 0.01, y, z, P['m2_clear_main'] / 2)))
         holes['Case right'].append(('screw insert', X(x1 - P['insert_depth'], x1 + 1, y, z, P['insert_d'] / 2)))
     for y, z in pegs:
-        holes['Case right'].append(('peg socket', X(-0.1, P['peg_h'] + 0.4, y, z, P['peg_d'] / 2 + 0.15)))
-    peg_solids = [X(0, P['peg_h'], y, z, P['peg_d'] / 2) for y, z in pegs]      # on the lid
+        holes['Case left'].append(('peg socket', X(-(P['peg_h'] + 0.4), 0.1, y, z, P['peg_d'] / 2 + 0.15)))
+    peg_solids = [X(0.5, -P['peg_h'], y, z, P['peg_d'] / 2) for y, z in pegs]   # on the main half (prints split face up)
+    S = sensor_layout()                           # sensor gear pin, grows up from the main half's pocket floor
+    pin_solids = [X(S['gear_x0'] + 0.8, S['gear_x0'] - P['ss_bore'] + 0.2, S['y'], S['z'], P['ss_shaft_d'] / 2)]
     return dict(env=env, cav=cav, trims=trims, dome=dome, mo_len=mo_len, bosses=bosses, pegs=pegs,
-                holes=holes, peg_solids=peg_solids)
+                holes=holes, peg_solids=peg_solids, pin_solids=pin_solids)
 
 
 def build_case(root, L):
@@ -810,8 +817,8 @@ def build_case(root, L):
         cutter = tbm.createBox(adsk.core.OrientedBoundingBox3D.create(
             P3((xc, 0, 18)), V3((1, 0, 0)), V3((0, 1, 0)), 10.0, 20.0, 20.0))
         tbm.booleanOperation(half, cutter, adsk.fusion.BooleanTypes.IntersectionBooleanType)
-        if name == 'Case left':                 # pegs on the lid (prints on its back, pegs up)
-            for peg in plan['peg_solids']:
+        if name == PEG_HALF:                    # alignment pegs + sensor gear pin: main half, printed split face up
+            for peg in plan['peg_solids'] + plan['pin_solids']:
                 tbm.booleanOperation(half, peg.brep(tbm), adsk.fusion.BooleanTypes.UnionBooleanType)
         for _, h in plan['holes'][name]:
             tbm.booleanOperation(half, h.brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
@@ -838,16 +845,14 @@ def sensor_layout():
 
 
 def build_sensor_gear(root):
-    """20T spur meshing with the worm wheel, short head holding the magnet, stub shaft into the main half.
-    Local z points to the lid (-X); local origin = the gear's rod-side face (X = ss_x0)."""
+    """20T spur meshing with the worm wheel, short head holding the magnet, bore for the case pin.
+    Local z points to the lid (-X); local origin = the gear's main-half face (X = ss_x0): it prints on that face."""
     occ, comp = new_component(root, 'Sensor gear')
     S = sensor_layout()
     head_end = S['gear_x0'] - S['magnet_x']                # local z of the magnet face
-    extrude(comp, circle_profile(comp, -(P['ss_shaft_right'] - S['gear_x0']), P['ss_shaft_d'] / 2),
-            P['ss_shaft_right'] - S['gear_x0'] + 0.3, NEW)
     sk = comp.sketches.add(comp.xYConstructionPlane)
     polyline(sk, gear_profile(S['gs'], P['ss_backlash']))
-    extrude(comp, largest_profile(sk), P['ss_face'], JOIN)
+    extrude(comp, largest_profile(sk), P['ss_face'], NEW)
     extrude(comp, circle_profile(comp, P['ss_face'] - 0.3, P['ss_head_d'] / 2), head_end - P['ss_face'] + 0.3, JOIN)
     merge_bodies(comp)
     cut = comp.features.extrudeFeatures.createInput(
@@ -855,6 +860,7 @@ def build_sensor_gear(root):
     cut.setDistanceExtent(False, VI(-(P['magnet_t'] + 0.1)))     # glue the magnet in, face flush with the head
     cut.participantBodies = own_bodies(comp)
     comp.features.extrudeFeatures.add(cut)
+    extrude(comp, circle_profile(comp, 0.0, P['ss_shaft_d'] / 2 + 0.15), P['ss_bore'], CUT)
     comp.bRepBodies.item(0).name = 'Sensor gear'
     return occ, comp
 
@@ -868,7 +874,6 @@ def sensor_cavities():
     B = lambda y0, y1, z0, z1: box_minmax(S['lid_face'] - 1.0, S['floor_x'], c[1] + y0, c[1] + y1, c[2] + z0, c[2] + z1)
     return [
         ('sensor gear', X(S['gear_x0'] + 0.3, S['gear_x1'] - 0.3, S['gs']['ra'] + 0.4)),     # straddles the split
-        ('sensor shaft', X(S['gear_x0'] + 0.01, P['ss_shaft_right'] + 0.3, P['ss_shaft_d'] / 2 + 0.15)),
         ('magnet head', X(S['gear_x1'] + 0.01, S['magnet_x'] - P['magnet_gap'], P['ss_head_d'] / 2 + 0.3)),
         # pocket under the board for the chip, parts and solder joints; the board rests on its rim and on two lands
         # round the screw holes (the (+Y,+Z) and (-Y,-Z) corners)
