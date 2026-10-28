@@ -476,9 +476,32 @@ def build_worm(root, L):
     # knife-edge thread run-outs (the bottom one also stops elephant's foot)
     ga, jr, sg = L['ga'], P['journal_r'], L['s_g0']
     if P['print_chamfer']:
-        revolve_cut(comp, [(ga['rf'], sg - 0.01), (ga['ra'] + 0.6, sg - 0.01), (ga['ra'] + 0.6, sg + ga['ra'] + 0.6 - ga['rf'])])
-        revolve_cut(comp, [(jr - 0.2, sg - (ga['rf'] - jr)), (jr - 0.2, sg + 0.3), (ga['rf'], sg + 0.3), (ga['rf'], sg)],
-                    JOIN)
+        # 1) 45° bevel on the gear's downward tooth ends (r = rf + (s - s_g0) and inside it stays)
+        # 2) the tooth spaces' ends are filled with a 45° ramp up from the journal, but only as deep as the pinion's
+        #    tips never reach (its swept envelope is a torus round the gear axis), so the mesh is untouched
+        # Solid booleans on a copy of the body (revolve features on the curved tooth faces leave sliver bodies).
+        tbm = adsk.fusion.TemporaryBRepManager.get()
+        rf, ra, gp = ga['rf'], ga['ra'], L['gp']
+        old = comp.bRepBodies.item(0)
+        body = tbm.copy(old)
+        s0, s3 = sg - 0.5, sg + (ra + 2.0 - rf)
+        tool = tbm.createCylinderOrCone(P3((0, 0, s0)), (ra + 2.0) / 10, P3((0, 0, s3)), (ra + 2.0) / 10)
+        keep = tbm.createCylinderOrCone(P3((0, 0, s0)), (rf - 0.5) / 10, P3((0, 0, s3)), (ra + 2.0) / 10)
+        tbm.booleanOperation(tool, keep, adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        tbm.booleanOperation(body, tool, adsk.fusion.BooleanTypes.DifferenceBooleanType)
+        sc = (L['s_g0'] + L['s_back']) / 2                   # gear centre: the pinion crosses here
+
+        def r_top(z):
+            line = rf + (z - sg) - 0.02
+            d = abs(sc - z)
+            safe = L['cd'] - math.sqrt(gp['ra'] ** 2 - d * d) - 0.3 if d < gp['ra'] else ra
+            return max(min(line, safe, ra), jr - 0.3)
+        zs = [sg - (rf - jr) - 0.3 + k * 0.2 for k in range(int(((ra - rf) + (rf - jr) + 0.3) / 0.2) + 1)]
+        for z0, z1 in zip(zs, zs[1:]):
+            seg = tbm.createCylinderOrCone(P3((0, 0, z0)), r_top(z0) / 10, P3((0, 0, z1)), r_top(z1) / 10)
+            tbm.booleanOperation(body, seg, adsk.fusion.BooleanTypes.UnionBooleanType)
+        add_bodies(comp, [('Worm', body)])
+        old.deleteMe()
     ch = 0.6
     for z, sgn in ((-half, 1), (half, -1)):
         revolve_cut(comp, [(w['ra'] - ch, z - sgn * 0.01), (w['ra'] + 0.2, z - sgn * 0.01), (w['ra'] + 0.2, z + sgn * (ch + 0.2))])
@@ -770,6 +793,38 @@ def pick_bosses(cav, keep_in, count=3, clear_r=1.9, chosen=None):
     return chosen
 
 
+def pick_pegs(cav, bosses, L):
+    """The two alignment pegs: the widest-spaced pair of spots on the split face that clear every pocket (peg socket
+    + 1.2 mm wall, checked through the peg's length on both sides of the split) and every bolt."""
+    hw = P['case_w'] / 2
+    pr = P['peg_d'] / 2 + 0.15 + 1.3
+    rod = (L['rod_c'][1], L['rod_c'][2])
+    cands = []
+    for yi in range(-26, 27):
+        for zi in range(1, 37):
+            y, z = float(yi), float(zi)
+            if abs(y) > hw - pr or z < P['case_floor'] + pr or z > P['case_top'] - P['lip_h'] - pr:
+                continue
+            if math.hypot(y - rod[0], z - rod[1]) < L['wheel']['ra'] + 0.45 + pr:
+                continue
+            if any(math.hypot(y - by, z - bz) < P['m3_clear'] / 2 + pr + 0.5 for by, bz in bosses):
+                continue
+            ok = True
+            for x in (-(P['peg_h'] + 0.4), -1.0, 0.0, 1.0, P['peg_h']):
+                for k in range(16):
+                    a = k * math.pi / 8
+                    if any(c.contains((x, y + pr * math.cos(a), z + pr * math.sin(a))) for c in cav):
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if ok:
+                cands.append((y, z))
+    best = max(((a, b) for i, a in enumerate(cands) for b in cands[i + 1:]),
+               key=lambda ab: math.hypot(ab[0][0] - ab[1][0], ab[0][1] - ab[1][1]))
+    return list(best)
+
+
 def round_outer_edges(comp, r):
     """Round the straight edges that run along X on the case's outer outline (rail corners, top, motor pod).
     Best effort: if Fusion can't fillet a set, the edges stay sharp."""
@@ -823,9 +878,8 @@ def case_plan(L):
             return False                          # insert wall to the worm wheel's pocket (the grid check is coarse)
         return z < P['case_top'] - ir and not on_board(y, z)
     fixed = board_holes()                         # the board's diagonal pair are case bolts
-    picks = pick_bosses(cav, screw_ok, count=P['n_case_screws'] + 2, clear_r=ir, chosen=fixed)
-    nb = len(fixed) + P['n_case_screws']
-    bosses, pegs = picks[:nb], picks[nb:]
+    bosses = pick_bosses(cav, screw_ok, count=P['n_case_screws'], clear_r=ir, chosen=fixed)
+    pegs = pick_pegs(cav, bosses, L)
     x0, x1 = slab_x(L)
     X = lambda xa, xb, y, z, r, r2=None: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r, **({} if r2 is None else {'r2': r2}))
     holes = {'Case left': [], 'Case right': []}
