@@ -34,7 +34,7 @@ P = dict(
     notch_h=12.0, notch_d=10.5, notch_w=12.0, notch_clear=0.15,
     pressure=25.0,            # all gears: 25° prints cleaner than 20° (less flank overhang on the vertical worm)
     backlash=0.15,
-    ss_backlash=0.4,          # sensor spur on the (5° helix) worm wheel teeth: extra room for the helix mismatch
+    ss_backlash=0.6,          # sensor spur on the (5° helix) worm wheel teeth: extra room for the helix mismatch
     # worm + worm wheel: same ratio / size class as the factory pair (16:1, m 0.88)
     module_worm=0.88, z_wheel=16, worm_d=9.6, worm_angle=60.0, cd_extra=0.2,
     worm_backlash=0.2,        # axial, cut into the wheel teeth
@@ -64,18 +64,22 @@ P = dict(
     n20_screw_spacing=9.0,
     motor_side=-1,            # N20 on the lid side (owner: +X hits a tilt spindle)
     # case: both halves 8.33 thick (factory barrel width); the N20 gets a pod on the lid only where it sits
-    wall=1.6, slab_half=8.33, motor_socket=4.0, pod_wall=1.6, case_w=55.4, case_floor=0.2, case_top=36.3, edge_round=1.0,
+    wall=1.6, slab_half=8.33, main_half=9.3, motor_socket=4.0, pod_wall=1.6, case_w=55.4, case_floor=0.2, case_top=36.3,
+    edge_round=1.0,           # main_half: 1 mm more than the lid, room for the 6.7 mm M3 inserts
     dome_wall=1.2, dome_max_y=21.0,
     plateau_top=38.9, plateau_clear=1.5,
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0,
     # case screws: M2 flat head from the lid (90° countersink) into M2 heat-set inserts pressed into the main half's
     # back face. The two under the AS5600 board go through the board (pan head there)
-    cs_d=4.2, m2_clear_lid=2.4, m2_clear_main=2.2, insert_d=3.2, insert_depth=5.0, insert_wall=1.3, n_case_screws=4,
-    case_screw_len=16.0,      # M2 x 16 flat heads; the board screws go through the board + whole lid (M2 x 25 pan)
+    # case bolts: M3 flat head from the lid side into M3 heat-set inserts (Ø4.0 x 6.7 min) pressed into the main
+    # half's back face. Two of them go through the AS5600 board's diagonal holes (clamping board and case at once),
+    # one more sits in a countersink: 3 bolts in all
+    cs_d=6.0, m3_clear=3.4, insert_d=4.0, insert_depth=6.7, insert_wall=1.3, n_case_screws=1,
+    case_screw_len=16.0,      # M3 x 16 flat head (countersunk one); the two through the board are M3 x 18
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
-    ss_z=20, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0,
+    ss_z=18, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=14.45, ss_shaft_d=4.0,   # 18T: the board bolts pass it
     ss_bore=3.5,              # the gear turns on a Ø4 pin moulded into the main half (gear prints flat, no stub)
-    ss_x0=1.5,                # X of the sensor gear's main-half face: centred on the wheel (a worm wheel's teeth change
+    ss_x0=1.0,                # X of the sensor gear's main-half face: near the wheel's middle (a worm wheel's teeth change
                               # shape toward its faces, a spur gear only meshes cleanly near the middle)
     ss_head_d=8.0,
     magnet_d=4.0, magnet_t=2.0, magnet_clear=0.15, magnet_gap=0.2, cover_wall=0.6,   # the boards' magnet: Ø4 x 2
@@ -84,6 +88,7 @@ P = dict(
     # inserts in the lid (the sensor gear turns under the board, so they can't reach the main half). The corner over
     # the rod's bearing bore gets no insert (no room for its wall); the board still rests on all four corners
     board_holes=((-8.0, -8.0), (8.0, -8.0), (-8.0, 8.0), (8.0, 8.0)), board_hole_d=3.7,
+    board_bolts=((-8.0, -8.0), (8.0, 8.0)),   # the diagonal pair away from the rod: these are case bolts
 )
 
 PREFIX = 'T4 '
@@ -668,7 +673,7 @@ def notch_box(grow=0.0):
 def slab_x(L):
     """X of the lid's outer face and the main half's back face. The lid is flat and as thick as the motor needs: its
     gearbox face sits motor_inset deep in a square pocket in the lid's outer face."""
-    return min(-P['slab_half'], L['face'][0] + P['motor_inset'] * P['motor_side']), P['slab_half']
+    return min(-P['slab_half'], L['face'][0] + P['motor_inset'] * P['motor_side']), P['main_half']
 
 
 def motor_pod(L):
@@ -798,13 +803,14 @@ def round_outer_edges(comp, r):
 def case_plan(L):
     """Everything that defines the two case halves: envelope, cavities, trims, and the per-half holes / pegs.
     Used by build_case() and by tools/fusion_wallcheck.py (so the checker sees exactly what gets built).
-    Case screws: M2 flat head from the lid's outer face into heat-set inserts pressed into the main half's back face.
-    The two AS5600 holes are case screws too (through the board)."""
+    Case bolts: M3 flat head from the lid side into M3 heat-set inserts pressed into the main half's back face; two of
+    them go through the AS5600 board's diagonal holes."""
     env, cav, trims, mo_len, dome = case_shapes(L)
     hw = P['case_w'] / 2
     on_board = board_footprint(margin=2.0)
     pod = motor_pod(L)
     ir = P['insert_d'] / 2 + P['insert_wall']      # insert hole radius + the insert's minimum wall
+    ir = max(ir, P['cs_d'] / 2 + 0.1 + P['insert_wall'])   # ... or the countersink / counterbore, whichever is wider
 
     def screw_ok(y, z):
         if abs(y) > hw - ir or z < P['case_floor'] + ir:
@@ -816,25 +822,24 @@ def case_plan(L):
         if math.hypot(y - L['rod_c'][1], z - L['rod_c'][2]) < L['wheel']['ra'] + 0.45 + ir + 0.3:
             return False                          # insert wall to the worm wheel's pocket (the grid check is coarse)
         return z < P['case_top'] - ir and not on_board(y, z)
-    fixed = []                                    # board screws go into the lid only (see board_holes)
+    fixed = board_holes()                         # the board's diagonal pair are case bolts
     picks = pick_bosses(cav, screw_ok, count=P['n_case_screws'] + 2, clear_r=ir, chosen=fixed)
-    bosses, pegs = picks[:P['n_case_screws']], picks[P['n_case_screws']:]
+    nb = len(fixed) + P['n_case_screws']
+    bosses, pegs = picks[:nb], picks[nb:]
     x0, x1 = slab_x(L)
     X = lambda xa, xb, y, z, r, r2=None: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r, **({} if r2 is None else {'r2': r2}))
     holes = {'Case left': [], 'Case right': []}
     for k, (y, z) in enumerate(bosses):
-        holes['Case left'].append(('screw clearance', X(x0 - 1, 0.5, y, z, P['m2_clear_lid'] / 2)))
+        holes['Case left'].append(('screw clearance', X(x0 - 1, 0.5, y, z, P['m3_clear'] / 2)))
         if (y, z) not in fixed:                   # flat head (board screws: head on the board). In a lid thicker than
             cs = P['cs_d'] / 2                    # the screw allows, a counterbore takes the head down to its seat
             seat = max(x0, x1 - 0.8 - P['case_screw_len'])
             if seat > x0:
                 holes['Case left'].append(('screw counterbore', X(x0 - 1, seat + 0.01, y, z, cs + 0.1)))
-            holes['Case left'].append(('screw countersink', X(seat - 0.01, seat + cs - P['m2_clear_lid'] / 2, y, z, cs,
-                                                              P['m2_clear_lid'] / 2)))
-        holes['Case right'].append(('screw clearance', X(-0.5, x1 - P['insert_depth'] + 0.01, y, z, P['m2_clear_main'] / 2)))
+            holes['Case left'].append(('screw countersink', X(seat - 0.01, seat + cs - P['m3_clear'] / 2, y, z, cs,
+                                                              P['m3_clear'] / 2)))
+        holes['Case right'].append(('screw clearance', X(-0.5, x1 - P['insert_depth'] + 0.01, y, z, P['m3_clear'] / 2)))
         holes['Case right'].append(('screw insert', X(x1 - P['insert_depth'], x1 + 1, y, z, P['insert_d'] / 2)))
-    for y, z in board_holes():                    # AS5600: M2 heat-set inserts in the lid's outer face
-        holes['Case left'].append(('AS5600 insert', X(x0 - 1, x0 + P['insert_depth'], y, z, P['insert_d'] / 2)))
     for y, z in pegs:
         holes['Case left'].append(('peg socket', X(-(P['peg_h'] + 0.4), 0.1, y, z, P['peg_d'] / 2 + 0.15)))
     peg_solids = [X(0.5, -P['peg_h'], y, z, P['peg_d'] / 2) for y, z in pegs]   # on the main half (prints split face up)
@@ -941,15 +946,9 @@ def sensor_cavities():
 
 
 def board_holes():
-    """The board's holes that get an M2 insert: all but any that would sit too close to the rod's bearing bore."""
+    """The board holes that take case bolts (the diagonal pair away from the rod)."""
     S = sensor_layout()
-    keep = P['barrel_r'] + 0.15 + P['insert_d'] / 2 + P['insert_wall']
-    out = []
-    for dy, dz in P['board_holes']:
-        y, z = S['y'] + dy, S['z'] + dz
-        if math.hypot(y, z - P['rod_z']) >= keep:
-            out.append((round(y, 2), round(z, 2)))
-    return out
+    return [(round(S['y'] + dy, 2), round(S['z'] + dz, 2)) for dy, dz in P['board_bolts']]
 
 
 def board_footprint(margin=0.0):
@@ -1074,9 +1073,9 @@ def build(design, export_dir=None):
         'from X=%.2f, pinion X %.1f..%.1f; case X %.2f .. %.2f' % (
             L['face'][0], P['motor_inset'], P['n20_shaft_len'], L['face'][0] + P['n20_shaft_len'],
             L['face'][0] + P['n20_d_start'], -P['pinion_face'] / 2, P['pinion_face'] / 2, x0, x1),
-        'Screw holes (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in bosses),
+        'Case bolts (Y, Z): %s' % ', '.join('(%.1f, %.1f)' % b for b in bosses),
         'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
-        'AS5600 inserts in the lid (Y, Z): %s; magnet face X=%.2f, chip X=%.2f (gap %.2f mm)' % (
+        'AS5600 board bolts (Y, Z): %s; magnet face X=%.2f, chip X=%.2f (gap %.2f mm)' % (
             ', '.join('(%.1f, %.1f)' % b for b in board_holes()), SL['magnet_x'], SL['chip_x'], SL['magnet_x'] - SL['chip_x']),
         'Exported: %s' % ', '.join(os.path.basename(f) for f in files),
     ])
