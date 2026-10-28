@@ -37,7 +37,7 @@ supports.
 **Settings:** gears in PETG or PLA+ at 0.12 mm layers, 4 walls, 40 %+ infill. Cases PETG at 0.16–0.2 mm. No supports.
 The lid's AS5600 pocket floor and the motor inset print as bridges over the bed face (≤ 20 mm). PLA is fine for a test fit; for the
 real install PETG is safer, since a headrail in direct sun can pass PLA's ~55 °C softening point. Grease the
-worm, wheel, thrust steps and helical gears (plastic-safe, e.g. PTFE/silicone). Print the worm and the worm wheel
+worm, wheel, thrust steps and helical gears (plastic-safe PTFE grease: Super Lube 21030, see the BOM). Print the worm and the worm wheel
 in different plastics (e.g. PETG worm, PLA wheel): the same plastic rubbing on itself has more friction.
 
 ## Hardware per unit
