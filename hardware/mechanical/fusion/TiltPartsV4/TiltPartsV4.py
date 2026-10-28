@@ -80,9 +80,10 @@ P = dict(
     ss_head_d=8.0,
     magnet_d=4.0, magnet_t=2.0, magnet_clear=0.15, magnet_gap=0.2, cover_wall=0.6,   # the boards' magnet: Ø4 x 2
     board_w=23.4, board_t=1.6, chip_h=1.5, board_pocket=1.8, board_rim=1.5, board_land=3.0,
-    # measured: Ø3.7 holes 15.8 apart, chip midway. Laid out one above and one below the chip (dy, dz); they screw
-    # into M2 inserts in the lid (they can't reach the main half: the sensor gear turns under them)
-    board_holes=((0.0, -7.9), (0.0, 7.9)), board_hole_d=3.7,
+    # measured: 4 x Ø3.7 holes on a 16 mm square, chip in the middle (dy, dz from the chip). They screw into M2
+    # inserts in the lid (the sensor gear turns under the board, so they can't reach the main half). The corner over
+    # the rod's bearing bore gets no insert (no room for its wall); the board still rests on all four corners
+    board_holes=((-8.0, -8.0), (8.0, -8.0), (-8.0, 8.0), (8.0, 8.0)), board_hole_d=3.7,
 )
 
 PREFIX = 'T4 '
@@ -927,24 +928,28 @@ def sensor_cavities():
     X = lambda x0, x1, r: Prim('cyl', p1=(x0, c[1], c[2]), p2=(x1, c[1], c[2]), r=r)
     hb, rim, land = P['board_w'] / 2, P['board_rim'], P['board_land']
     pin = hb - rim
-    hz = abs(P['board_holes'][0][1])              # holes at (0, +-hz) from the chip
+    h = abs(P['board_holes'][0][0])               # holes at (+-h, +-h) from the chip
     B = lambda y0, y1, z0, z1: box_minmax(S['lid_face'] - 1.0, S['floor_x'], c[1] + y0, c[1] + y1, c[2] + z0, c[2] + z1)
     return [
         ('sensor gear', X(S['gear_x0'] + 0.3, S['gear_x1'] - 0.3, S['gs']['ra'] + 0.4)),     # straddles the split
         ('magnet head', X(S['gear_x1'] + 0.01, S['magnet_x'] - P['magnet_gap'], P['ss_head_d'] / 2 + 0.3)),
-        # pocket under the board for the chip, parts and solder joints; the board rests on its rim and on a land
-        # round each screw hole (one above, one below the chip)
-        ('AS5600 pocket', B(-pin, pin, -(hz - land), hz - land)),
-        ('AS5600 pocket', B(-pin, -land, hz - land, pin)),
-        ('AS5600 pocket', B(land, pin, hz - land, pin)),
-        ('AS5600 pocket', B(-pin, -land, -pin, -(hz - land))),
-        ('AS5600 pocket', B(land, pin, -pin, -(hz - land))),
+        # pocket under the board for the chip, parts and solder joints (a plus shape); the board rests on its rim
+        # and on a land round each corner hole
+        ('AS5600 pocket', B(-(h - land), h - land, -pin, pin)),
+        ('AS5600 pocket', B(-pin, pin, -(h - land), h - land)),
     ]
 
 
 def board_holes():
+    """The board's holes that get an M2 insert: all but any that would sit too close to the rod's bearing bore."""
     S = sensor_layout()
-    return [(round(S['y'] + dy, 2), round(S['z'] + dz, 2)) for dy, dz in P['board_holes']]
+    keep = P['barrel_r'] + 0.15 + P['insert_d'] / 2 + P['insert_wall']
+    out = []
+    for dy, dz in P['board_holes']:
+        y, z = S['y'] + dy, S['z'] + dz
+        if math.hypot(y, z - P['rod_z']) >= keep:
+            out.append((round(y, 2), round(z, 2)))
+    return out
 
 
 def board_footprint(margin=0.0):
