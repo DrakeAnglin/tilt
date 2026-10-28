@@ -70,7 +70,7 @@ P = dict(
     screw_cbore_d=3.4, screw_cbore=1.2, peg_d=2.5, peg_h=2.0,
     # case screws: M2 flat head from the lid (90° countersink) into M2 heat-set inserts pressed into the main half's
     # back face. The two under the AS5600 board go through the board (pan head there)
-    cs_d=4.2, m2_clear_lid=2.4, m2_clear_main=2.2, insert_d=3.2, insert_depth=5.0, insert_wall=1.3, n_case_screws=2,
+    cs_d=4.2, m2_clear_lid=2.4, m2_clear_main=2.2, insert_d=3.2, insert_depth=5.0, insert_wall=1.3, n_case_screws=4,
     case_screw_len=16.0,      # M2 x 16 flat heads; the board screws go through the board + whole lid (M2 x 25 pan)
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
     ss_z=20, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=15.3, ss_shaft_d=4.0,
@@ -78,9 +78,11 @@ P = dict(
     ss_x0=1.5,                # X of the sensor gear's main-half face: centred on the wheel (a worm wheel's teeth change
                               # shape toward its faces, a spur gear only meshes cleanly near the middle)
     ss_head_d=8.0,
-    magnet_d=6.0, magnet_t=2.5, magnet_clear=0.15, magnet_gap=0.3, cover_wall=0.8,
-    board_w=23.4, board_t=1.6, chip_h=1.5, board_pocket=2.0, board_rim=1.5, board_land=4.7,
-    board_holes=((9.0, 9.0), (-9.0, -9.0)),   # (+Y,+Z) and (-Y,-Z) diagonal. TO MEASURE on the real board
+    magnet_d=4.0, magnet_t=2.0, magnet_clear=0.15, magnet_gap=0.2, cover_wall=0.6,   # the boards' magnet: Ø4 x 2
+    board_w=23.4, board_t=1.6, chip_h=1.5, board_pocket=1.8, board_rim=1.5, board_land=3.0,
+    # measured: Ø3.7 holes 15.8 apart, chip midway. Laid out one above and one below the chip (dy, dz); they screw
+    # into M2 inserts in the lid (they can't reach the main half: the sensor gear turns under them)
+    board_holes=((0.0, -7.9), (0.0, 7.9)), board_hole_d=3.7,
 )
 
 PREFIX = 'T4 '
@@ -812,10 +814,12 @@ def case_plan(L):
             return False                          # next to the lip step
         if pod.contains((pod.c[0], y, z), grow=ir):
             return False
+        if math.hypot(y - L['rod_c'][1], z - L['rod_c'][2]) < L['wheel']['ra'] + 0.45 + ir + 0.3:
+            return False                          # insert wall to the worm wheel's pocket (the grid check is coarse)
         return z < P['case_top'] - ir and not on_board(y, z)
-    fixed = board_holes()
+    fixed = []                                    # board screws go into the lid only (see board_holes)
     picks = pick_bosses(cav, screw_ok, count=P['n_case_screws'] + 2, clear_r=ir, chosen=fixed)
-    bosses, pegs = picks[:len(fixed) + P['n_case_screws']], picks[len(fixed) + P['n_case_screws']:]
+    bosses, pegs = picks[:P['n_case_screws']], picks[P['n_case_screws']:]
     x0, x1 = slab_x(L)
     X = lambda xa, xb, y, z, r, r2=None: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r, **({} if r2 is None else {'r2': r2}))
     holes = {'Case left': [], 'Case right': []}
@@ -830,6 +834,8 @@ def case_plan(L):
                                                               P['m2_clear_lid'] / 2)))
         holes['Case right'].append(('screw clearance', X(-0.5, x1 - P['insert_depth'] + 0.01, y, z, P['m2_clear_main'] / 2)))
         holes['Case right'].append(('screw insert', X(x1 - P['insert_depth'], x1 + 1, y, z, P['insert_d'] / 2)))
+    for y, z in board_holes():                    # AS5600: M2 heat-set inserts in the lid's outer face
+        holes['Case left'].append(('AS5600 insert', X(x0 - 1, x0 + P['insert_depth'], y, z, P['insert_d'] / 2)))
     for y, z in pegs:
         holes['Case left'].append(('peg socket', X(-(P['peg_h'] + 0.4), 0.1, y, z, P['peg_d'] / 2 + 0.15)))
     peg_solids = [X(0.5, -P['peg_h'], y, z, P['peg_d'] / 2) for y, z in pegs]   # on the main half (prints split face up)
@@ -923,15 +929,18 @@ def sensor_cavities():
     X = lambda x0, x1, r: Prim('cyl', p1=(x0, c[1], c[2]), p2=(x1, c[1], c[2]), r=r)
     hb, rim, land = P['board_w'] / 2, P['board_rim'], P['board_land']
     pin = hb - rim
+    hz = abs(P['board_holes'][0][1])              # holes at (0, +-hz) from the chip
     B = lambda y0, y1, z0, z1: box_minmax(S['lid_face'] - 1.0, S['floor_x'], c[1] + y0, c[1] + y1, c[2] + z0, c[2] + z1)
     return [
         ('sensor gear', X(S['gear_x0'] + 0.3, S['gear_x1'] - 0.3, S['gs']['ra'] + 0.4)),     # straddles the split
         ('magnet head', X(S['gear_x1'] + 0.01, S['magnet_x'] - P['magnet_gap'], P['ss_head_d'] / 2 + 0.3)),
-        # pocket under the board for the chip, parts and solder joints; the board rests on its rim and on two lands
-        # round the screw holes (the (+Y,+Z) and (-Y,-Z) corners)
-        ('AS5600 pocket', B(-pin, pin, -(hb - land), hb - land)),
-        ('AS5600 pocket', B(-pin, hb - land, hb - land, pin)),
-        ('AS5600 pocket', B(-(hb - land), pin, -pin, -(hb - land))),
+        # pocket under the board for the chip, parts and solder joints; the board rests on its rim and on a land
+        # round each screw hole (one above, one below the chip)
+        ('AS5600 pocket', B(-pin, pin, -(hz - land), hz - land)),
+        ('AS5600 pocket', B(-pin, -land, hz - land, pin)),
+        ('AS5600 pocket', B(land, pin, hz - land, pin)),
+        ('AS5600 pocket', B(-pin, -land, -pin, -(hz - land))),
+        ('AS5600 pocket', B(land, pin, -pin, -(hz - land))),
     ]
 
 
@@ -1064,7 +1073,7 @@ def build(design, export_dir=None):
             L['face'][0] + P['n20_d_start'], -P['pinion_face'] / 2, P['pinion_face'] / 2, x0, x1),
         'Screw holes (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in bosses),
         'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
-        'AS5600 board screws (Y, Z): %s; magnet face X=%.2f, chip X=%.2f (gap %.2f mm)' % (
+        'AS5600 inserts in the lid (Y, Z): %s; magnet face X=%.2f, chip X=%.2f (gap %.2f mm)' % (
             ', '.join('(%.1f, %.1f)' % b for b in board_holes()), SL['magnet_x'], SL['chip_x'], SL['magnet_x'] - SL['chip_x']),
         'Exported: %s' % ', '.join(os.path.basename(f) for f in files),
     ])
