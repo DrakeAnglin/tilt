@@ -40,12 +40,12 @@ P = dict(
     worm_backlash=0.2,        # axial, cut into the wheel teeth
     worm_root_clear=0.25,     # x module: worm tip to wheel root
     wheel_face=7.5, barrel_r=6.25, wheel_slices=7, wheel_pts=16,
-    worm_pin_len=2.0, worm_pin_r=2.5, journal_r=3.5,
+    journal_r=3.5,            # the worm's only journal (no top pin: the part prints standing on its thread end)
     # thrust ring: the ONLY axial stop of the worm, both directions (owner: the factory worm rode up and down)
     flange_r=4.4, flange_s=6.7, flange_t=1.4, flange_clear=0.2, flange_rclear=0.45,   # first print: 0.1 was snug
     worm_clear=0.35,          # radial room for the worm's journals and the wand shaft (first print: 0.15 nearly snapped)
     thread_clear=0.6,         # worm thread OD to its pocket
-    thread_end_clear=0.3, worm_pin_end_clear=0.4, worm_thrust_clear=0.25,
+    thread_end_clear=0.3, worm_thrust_clear=0.25,
     # crossed 45° helicals (v0.3's tested 8T : 7T pair), the 8T now part of the worm. The two shafts don't meet, so
     # the motor sits beside the worm and its shaft runs on past the pinion into the main half
     mn=1.0, helix=45.0, addendum=0.85, dedendum=1.25, hx_cd_extra=0.20,
@@ -456,8 +456,7 @@ def build_worm(root, L):
     sw = comp.features.sweepFeatures.createInput(sk.profiles.item(0), comp.features.createPath(line, False), NEW)
     sw.twistAngle = adsk.core.ValueInput.createByReal(2 * math.pi * length / w['p'])
     comp.features.sweepFeatures.add(sw)
-    # top pin journal, bearing journal down to the gear
-    extrude(comp, circle_profile(comp, -half - P['worm_pin_len'], P['worm_pin_r']), P['worm_pin_len'] + 0.3, JOIN)
+    # bearing journal from the threads down to the gear
     extrude(comp, circle_profile(comp, half - 0.3, P['journal_r']), L['s_g0'] - half + 0.6, JOIN)
     extrude(comp, circle_profile(comp, P['flange_s'], P['flange_r']), P['flange_t'], JOIN)     # thrust ring
     # 8T 45° helical (right hand), part of the worm: no spline joint to wear or slip
@@ -466,20 +465,23 @@ def build_worm(root, L):
     # the wand shaft + loop are part of the same print (one piece: no joint between worm and wand)
     add_wand(comp, L, L['s_back'])
     merge_bodies(comp)
-    # print bevels (the part stands on its top pin): 45° on the gear's downward tooth ends, 0.4 mm on the pin's foot
-    ga = L['ga']
+    # print shaping (the part stands on its thread end): 45° bevel on the gear's downward tooth ends and a 45° cone
+    # blending the journal into the gear's root (no flat ledges); 45° chamfers at both thread ends take off the
+    # knife-edge thread run-outs (the bottom one also stops elephant's foot)
+    ga, jr, sg = L['ga'], P['journal_r'], L['s_g0']
     if P['print_chamfer']:
-        revolve_cut(comp, [(ga['rf'], L['s_g0'] - 0.01), (ga['ra'] + 0.6, L['s_g0'] - 0.01),
-                           (ga['ra'] + 0.6, L['s_g0'] + ga['ra'] + 0.6 - ga['rf'])])
-    zp = -half - P['worm_pin_len']
-    revolve_cut(comp, [(P['worm_pin_r'] - 0.4, zp - 0.01), (P['worm_pin_r'] + 0.1, zp - 0.01),
-                       (P['worm_pin_r'] + 0.1, zp + 0.5)])
+        revolve_cut(comp, [(ga['rf'], sg - 0.01), (ga['ra'] + 0.6, sg - 0.01), (ga['ra'] + 0.6, sg + ga['ra'] + 0.6 - ga['rf'])])
+        revolve_cut(comp, [(jr - 0.2, sg - (ga['rf'] - jr)), (jr - 0.2, sg + 0.3), (ga['rf'], sg + 0.3), (ga['rf'], sg)],
+                    JOIN)
+    ch = 0.6
+    for z, sgn in ((-half, 1), (half, -1)):
+        revolve_cut(comp, [(w['ra'] - ch, z - sgn * 0.01), (w['ra'] + 0.2, z - sgn * 0.01), (w['ra'] + 0.2, z + sgn * (ch + 0.2))])
     comp.bRepBodies.item(0).name = 'Worm'
     return occ, comp
 
 
-def revolve_cut(comp, pts_rz):
-    """Cut the ring swept by a (radius, z) polygon around the component's z axis."""
+def revolve_cut(comp, pts_rz, op=None):
+    """Cut (or with op=JOIN, add) the ring swept by a (radius, z) polygon around the component's z axis."""
     sk = comp.sketches.add(comp.xZConstructionPlane)
     toS = lambda r, z: sk.modelToSketchSpace(adsk.core.Point3D.create(r / 10.0, 0, z / 10.0))
     lines = sk.sketchCurves.sketchLines
@@ -493,7 +495,7 @@ def revolve_cut(comp, pts_rz):
         first = first or ln.startSketchPoint
         prev = ln.endSketchPoint
     lines.addByTwoPoints(prev, first)
-    rev = comp.features.revolveFeatures.createInput(sk.profiles.item(0), comp.zConstructionAxis, CUT)
+    rev = comp.features.revolveFeatures.createInput(sk.profiles.item(0), comp.zConstructionAxis, op or CUT)
     rev.setAngleExtent(False, adsk.core.ValueInput.createByString('360 deg'))
     rev.participantBodies = own_bodies(comp)
     comp.features.revolveFeatures.add(rev)
@@ -685,7 +687,6 @@ def case_shapes(L):
     mo_c = add(L['face'], mul(u, (mo_len + 6) / 2))
     hw = P['case_w'] / 2
     thr, free, fc, wc = P['worm_thrust_clear'], P['thread_end_clear'], P['flange_clear'], P['worm_clear']
-    pin_end = -half - P['worm_pin_len'] - P['worm_pin_end_clear']
     x0, x1 = slab_x(L)
     collar_end = L['s_back'] + P['collar_len']
     fw = P['wheel_face'] / 2 + 0.4
@@ -693,13 +694,12 @@ def case_shapes(L):
         ('wheel teeth', Prim('cyl', p1=add(rc, (-fw, 0, 0)), p2=add(rc, (fw, 0, 0)), r=wh['ra'] + 0.45)),
         ('barrel bore', Prim('cyl', p1=add(rc, (x0 - 1, 0, 0)), p2=add(rc, (x1 + 1, 0, 0)), r=P['barrel_r'] + 0.15)),
         # worm: thrust up on the thread's top face, the thrust ring both ways (wand pull: collar -> case shoulder)
-        ('worm top pin', cyl_s(L, pin_end, -half, P['worm_pin_r'] + wc)),
         ('worm threads', cyl_s(L, -half - free, half + free, wd['ra'] + P['thread_clear'])),   # threads run free
         *sensor_cavities(),
-        ('worm journal', cyl_s(L, half + free - 0.01, L['s_g0'] - 0.3, P['journal_r'] + wc)),
+        ('worm journal', cyl_s(L, half + free - 0.01, L['s_g0'] - (ga['rf'] - P['journal_r']) - 0.3, P['journal_r'] + wc)),
         ('worm thrust groove', cyl_s(L, P['flange_s'] - fc, P['flange_s'] + P['flange_t'] + fc,
                                      P['flange_r'] + P['flange_rclear'])),
-        ('worm gear', cyl_s(L, L['s_g0'] - 0.3, L['s_back'] + 0.3, ga['ra'] + 0.4)),     # its faces run free
+        ('worm gear', cyl_s(L, L['s_g0'] - (ga['rf'] - P['journal_r']) - 0.4, L['s_back'] + 0.3, ga['ra'] + 0.4)),
         ('wand collar', cyl_s(L, L['s_back'], collar_end + thr, P['collar_d'] / 2 + wc + 0.1)),
         ('wand exit', cyl_s(L, collar_end + thr - 0.01, collar_end + 40, P['body_d'] / 2 + wc + 0.1)),
         ('pinion', cyl_u(L, L['pin_c'], -pf, pf, gp['ra'] + 0.5)),
@@ -719,9 +719,7 @@ def case_shapes(L):
     cav = [pr for _, pr in named]
     slab = box_minmax(x0, x1, -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
-    dome = [cyl_s(L, -half - free - dw, 4.8, wd['ra'] + P['thread_clear'] + dw),
-            cyl_s(L, pin_end, -half - free - dw + 0.01, P['worm_pin_r'] + P['worm_clear'] + dw),
-            Prim('cyl', p1=L['S'](pin_end), p2=L['S'](pin_end - dw), r=P['worm_pin_r'] + P['worm_clear'] + dw, r2=2.0)]
+    dome = [cyl_s(L, -half - free - dw, 4.8, wd['ra'] + P['thread_clear'] + dw)]      # cover over the thread end
     py = hw - P['lip_in'] - P['plateau_clear']
     plateau = box_minmax(x0, x1, -py, py, P['case_top'] - 1.0, P['plateau_top'])
     env = [slab, plateau, *dome, notch_box(-P['notch_clear'])]
