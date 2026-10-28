@@ -22,6 +22,7 @@ sensor needs a **diametrically** magnetized 6 × 2.5 mm magnet, 0.5–2 mm from 
 | M1.6 × 4 screws | 8+ | N20 gearbox face, 1 per motor |
 | M2 screws: × 16 (24) and × 12 (16) | — | Tilter halves (3 each), sensor halves (2 each). An M2 assortment covers both |
 | Plastic-safe grease: [Super Lube 21030 (PTFE)](https://www.amazon.com/dp/B000XBH9HI) | 1 tube | Worm, worm wheel, thrust steps, helical gears; one tube covers all units |
+| Ø2 × 6 mm steel dowel pin: [HARFINGTON 50 pcs, 304 stainless](https://www.amazon.com/s?k=HARFINGTON+50pcs+Dowel+Pins+M2+2mm+x+6mm+304+Stainless+Steel) | 1 per unit | Worm top bearing, pressed into the case's dome (50-pack covers every unit) |
 | 6-core 24–26 AWG cable | ~25 m | One 5-wire run per blind to its controller: motor ±, 3V3, GND, sensor OUT |
 | Breadboard + jumper wire kit | 1 | Bench testing |
 | M2 × 5 mm brass standoffs (male-female) + M2 × 4 screws | 16 + 16 | AS5600 mounting, 2 per blind |
