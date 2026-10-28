@@ -34,7 +34,10 @@ P = dict(
     notch_h=12.0, notch_d=10.5, notch_w=12.0, notch_clear=0.15,
     pressure=25.0,            # all gears: 25° prints cleaner than 20° (less flank overhang on the vertical worm)
     backlash=0.15,
-    ss_backlash=0.6,          # sensor spur on the (5° helix) worm wheel teeth: extra room for the helix mismatch
+    ss_backlash=0.3,          # the sensor gear now has the wheel's helix: a normal mesh (0.6 as a straight spur thinned its teeth)
+    ss_hand=-1.0,             # helix hand of the sensor gear: opposite to the (right-hand) worm wheel
+    ss_phase_trim=-0.25,      # deg: centre of the measured contact-free window (Fusion scan)
+          # sensor spur on the (5° helix) worm wheel teeth: extra room for the helix mismatch
     # worm + worm wheel: same ratio / size class as the factory pair (16:1, m 0.88)
     module_worm=0.88, z_wheel=16, worm_d=9.6, worm_angle=60.0, cd_extra=0.2,
     worm_backlash=0.2,        # axial, cut into the wheel teeth
@@ -82,7 +85,10 @@ P = dict(
     ss_x0=1.0,                # X of the sensor gear's main-half face: near the wheel's middle (a worm wheel's teeth change
                               # shape toward its faces, a spur gear only meshes cleanly near the middle)
     ss_head_d=8.0,
-    magnet_d=4.0, magnet_t=2.0, magnet_clear=0.15, magnet_gap=0.2, cover_wall=0.6,   # the boards' magnet: Ø4 x 2
+    magnet_d=4.0, magnet_t=2.0, magnet_clear=0.15,
+    # press-fit pocket for the magnet (no glue): smooth crush ribs, peaks grip 0.1 mm per side, valleys give the
+    # squeezed plastic somewhere to go, small lead-in at the mouth
+    rib_n=8, rib_grip=0.1, rib_relief=0.2, rib_lead=0.3, magnet_gap=0.2, cover_wall=0.6,   # the boards' magnet: Ø4 x 2
     board_w=23.4, board_t=1.6, chip_h=1.5, board_pocket=1.8, board_rim=1.5, board_land=3.0,
     # measured: 4 x Ø3.7 holes on a 16 mm square, chip in the middle (dy, dz from the chip). They screw into M2
     # inserts in the lid (the sensor gear turns under the board, so they can't reach the main half). The corner over
@@ -429,9 +435,9 @@ def loft_sections(comp, sections, op=None, smooth=True):
     return comp.features.loftFeatures.add(loft)
 
 
-def helical_body(comp, g, z0, face, hand=1.0):
+def helical_body(comp, g, z0, face, hand=1.0, backlash=None):
     """Loft the transverse profile through sections rotated along the helix (right hand = +1), from z0."""
-    base = gear_profile(g)
+    base = gear_profile(g, backlash)
     loft = comp.features.loftFeatures.createInput(NEW)
     for k in range(LOFT_SECTIONS):
         zk = face * k / (LOFT_SECTIONS - 1)
@@ -951,7 +957,7 @@ def build_case(root, L):
 def sensor_layout():
     """Sensor gear axis (parallel to the rod), magnet and board planes. The board lies flush on the lid's outer face,
     chip facing in, over a shallow pocket; the magnet sits in the gear's short head, 0.8 mm of lid below the pocket."""
-    gs = spur(P['ss_z'], P['ss_m'])
+    gs = dict(spur(P['ss_z'], P['ss_m']), beta=math.radians(worm_dims()['lead_deg']))   # wheel's helix angle
     wheel_rp = P['z_wheel'] * P['module_worm'] / 2.0
     cd = wheel_rp + gs['rp'] + P['ss_cd_extra']
     y = P['ss_y']
@@ -965,19 +971,29 @@ def sensor_layout():
 
 
 def build_sensor_gear(root):
-    """20T spur meshing with the worm wheel, short head holding the magnet, bore for the case pin.
-    Local z points to the lid (-X); local origin = the gear's main-half face (X = ss_x0): it prints on that face."""
+    """Sensor gear meshing with the worm wheel, short head holding the magnet, bore for the case pin. Helical with the
+    wheel's own helix (the wheel's teeth are cut by the worm, ~5° helix): a straight spur only meshed with extra
+    backlash, which thinned its teeth. Local z points to the lid (-X); local origin = the gear's main-half face
+    (X = ss_x0): it prints on that face."""
     occ, comp = new_component(root, 'Sensor gear')
     S = sensor_layout()
     head_end = S['gear_x0'] - S['magnet_x']                # local z of the magnet face
-    sk = comp.sketches.add(comp.xYConstructionPlane)
-    polyline(sk, gear_profile(S['gs'], P['ss_backlash']))
-    extrude(comp, largest_profile(sk), P['ss_face'], NEW)
+    helical_body(comp, S['gs'], 0.0, P['ss_face'], P['ss_hand'], P['ss_backlash'])
     extrude(comp, circle_profile(comp, P['ss_face'] - 0.3, P['ss_head_d'] / 2), head_end - P['ss_face'] + 0.3, JOIN)
     merge_bodies(comp)
-    cut = comp.features.extrudeFeatures.createInput(
-        circle_profile(comp, head_end, P['magnet_d'] / 2 + P['magnet_clear']), CUT)
-    cut.setDistanceExtent(False, VI(-(P['magnet_t'] + 0.1)))     # glue the magnet in, face flush with the head
+    # magnet pocket: press fit on smooth crush ribs (no glue), lead-in at the mouth
+    rm = P['magnet_d'] / 2
+    r_lo, r_hi = rm - P['rib_grip'], rm + P['rib_relief']
+    n = P['rib_n']
+    wave = [((r_lo + r_hi) / 2 - (r_hi - r_lo) / 2 * math.cos(n * 2 * math.pi * k / 96)) for k in range(96)]
+    sk = comp.sketches.add(offset_plane(comp, head_end))
+    polyline(sk, [(r * math.cos(2 * math.pi * k / 96), r * math.sin(2 * math.pi * k / 96)) for k, r in enumerate(wave)])
+    cut = comp.features.extrudeFeatures.createInput(largest_profile(sk), CUT)
+    cut.setDistanceExtent(False, VI(-(P['magnet_t'] + 0.1)))
+    cut.participantBodies = own_bodies(comp)
+    comp.features.extrudeFeatures.add(cut)
+    cut = comp.features.extrudeFeatures.createInput(circle_profile(comp, head_end, r_hi), CUT)
+    cut.setDistanceExtent(False, VI(-P['rib_lead']))
     cut.participantBodies = own_bodies(comp)
     comp.features.extrudeFeatures.add(cut)
     extrude(comp, circle_profile(comp, 0.0, P['ss_shaft_d'] / 2 + 0.15), P['ss_bore'], CUT)
@@ -1095,7 +1111,9 @@ def build(design, export_dir=None):
     pw = 2 * math.pi / P['z_wheel']
     dw = (wheel_tooth_angle((SL['gear_x0'] + SL['gear_x1']) / 2) - line_w + pw / 2) % pw - pw / 2   # nearest tooth
     beta = math.atan2(v[2], -v[1])                                       # toward the rod, sensor-local angle
-    rho = beta + dw * P['z_wheel'] / P['ss_z'] + math.pi / P['ss_z']
+    gs = SL['gs']                                                        # helix twist up to the gear's mid-face
+    rho = beta + dw * P['z_wheel'] / P['ss_z'] + math.pi / P['ss_z'] - P['ss_hand'] * (P['ss_face'] / 2) * math.tan(gs['beta']) / gs['rp'] \
+        + math.radians(P['ss_phase_trim'])
     place(occ_named('Sensor gear'), (SL['gear_x0'], SL['y'], SL['z']), rotate_about((0, 1, 0), (-1, 0, 0), rho), (-1, 0, 0))
 
     for comp in (worm, pinion):
