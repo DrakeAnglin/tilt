@@ -47,6 +47,7 @@ in different plastics (e.g. PETG worm, PLA wheel): the same plastic rubbing on i
 | M3 × 18 flat head | 2 | Through the AS5600 board's two diagonal holes and the lid → inserts (clamp board and case) |
 | M3 × 16 flat head (90° countersunk) | 1 | Lid → insert, top corner on the worm side |
 | M1.6 × 4 | 1 | N20 gearbox face |
+| Ø2 × 6 mm steel dowel pin | 1 | Pressed into the case's dome; the worm's thread end turns on it (bearing above the threads) |
 | Ø4 × 2 mm diametric magnet | 1 | Comes with the AS5600 board; pressed into the sensor gear's head (no glue) |
 
 Steel screws close to the magnet can bend its field a little: stainless (A2) screws are the safer choice for the two
@@ -55,7 +56,8 @@ through the board. The brass inserts don't matter.
 ## Assembly
 1. **Inserts:** press 3 M3 inserts into the main half's back face (soldering iron, ~220 °C for PETG).
 2. **Worm wheel** into `case_right` (barrel into the bearing).
-3. **Worm** (one piece with the wand loop) into its groove, barrel in its bearing, meshing with the wheel; the
+3. **Top pin:** press the Ø2 × 6 dowel into the hole at the top of the worm's groove (2 mm in, 4 mm sticking out).
+   **Worm** (one piece with the wand loop) onto it (the pin goes into the hole in the thread end), barrel in its bearing, meshing with the wheel; the
    loop runs out through the notch block.
 4. **Sensor gear:** press the magnet into its head with a flat tool (vise or a bolt head) until it bottoms, about
    0.1 mm below flush. Eight smooth crush ribs grip it, no glue. Drop the gear onto the main half's pin.
@@ -73,6 +75,10 @@ through the board. The brass inserts don't matter.
 
 ## Fits (after the first print)
 - Worm journals, top pin and wand shaft: 0.35 mm radial (0.15 was nearly a snap fit); worm threads 0.6 mm.
+- Worm tilt (tools/worm_tilt.py): with both bearings below the threads the worm could tip 2.8° and its thread end
+  rubbed the case walls; the thread centre could drift 0.72 mm off the wheel. A Ø2 steel pin above the threads plus
+  0.25 mm (barrel) / 0.3 mm (collar, wand exit) radial fits limit it to 0.8° and 0.11 mm, and nothing but the
+  bearings can touch the case even at that tilt.
 - Worm thrust (after the load test bound up): axial load goes only onto two small steps, up onto the barrel's top
   step and down onto the collar's step at the wand exit (mean radius ~3.7 mm; thrust friction grows with that
   radius), 0.1 mm end play each. Every other end face runs clear: 1 mm at the thread end and the gear's thread side,

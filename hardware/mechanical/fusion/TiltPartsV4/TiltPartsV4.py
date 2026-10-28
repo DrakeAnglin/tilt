@@ -53,6 +53,11 @@ P = dict(
     worm_clear=0.35,          # radial room for the worm's journals and the wand shaft (first print: 0.15 nearly snapped)
     thread_clear=0.6,         # worm thread OD to its pocket
     thread_end_clear=1.0, worm_thrust_clear=0.1, gear_end_clear=1.0,
+    # tilt control (tools/worm_tilt.py): with both bearings below the threads the worm could tip ~2.8° and its thread
+    # end rubbed the case. A Ø2 steel dowel pressed into the dome runs in a hole in the worm's thread end (bearing on
+    # the far side of the threads); the barrel / collar fits are set from the tilt model
+    top_pin_d=2.0, top_pin_len=6.0, top_pin_case=2.0, top_pin_hole_clear=0.1,
+    barrel_clear=0.25, collar_clear=0.3, neck_clear=0.5,
     gear_end_clear_collar=0.4,    # the gear's collar-side face: less room there (the pocket nears the room-side wall)
     # crossed 45° helicals (v0.3's tested 8T : 7T pair), the 8T now part of the worm. The two shafts don't meet, so
     # the motor sits beside the worm and its shaft runs on past the pinion into the main half
@@ -473,6 +478,12 @@ def build_worm(root, L):
     sw = comp.features.sweepFeatures.createInput(sk.profiles.item(0), comp.features.createPath(line, False), NEW)
     sw.twistAngle = adsk.core.ValueInput.createByReal(2 * math.pi * length / w['p'])
     comp.features.sweepFeatures.add(sw)
+    # hole for the steel top pin in the thread end (prints as a hole in the bed face)
+    hole = P['top_pin_len'] - P['top_pin_case'] - P['thread_end_clear'] + 0.4
+    cut = comp.features.extrudeFeatures.createInput(circle_profile(comp, -half, P['top_pin_d'] / 2 + P['top_pin_hole_clear']), CUT)
+    cut.setDistanceExtent(False, VI(hole))
+    cut.participantBodies = own_bodies(comp)
+    comp.features.extrudeFeatures.add(cut)
     # bearing journal from the threads down to the gear
     extrude(comp, circle_profile(comp, half - 0.3, P['journal_r']), P['thrust_s'] - half + 0.6, JOIN)          # neck
     extrude(comp, circle_profile(comp, P['thrust_s'], P['collar_d'] / 2), L['s_g0'] - P['thrust_s'] + 0.6, JOIN)  # barrel
@@ -741,11 +752,12 @@ def case_shapes(L):
         # worm: thrust up on the thread's top face, the thrust ring both ways (wand pull: collar -> case shoulder)
         ('worm threads', cyl_s(L, -half - free, half + free, wd['ra'] + P['thread_clear'])),   # threads run free
         *sensor_cavities(),
-        ('worm neck', cyl_s(L, half + free - 0.01, P['thrust_s'] - thr, P['journal_r'] + wc)),
-        ('worm barrel', cyl_s(L, P['thrust_s'] - thr - 0.01, L['s_g0'], br + wc)),         # up-thrust step at its top
+        ('worm top pin', cyl_s(L, -half - free + 0.01, -half - free - P['top_pin_case'], P['top_pin_d'] / 2)),  # press
+        ('worm neck', cyl_s(L, half + free - 0.01, P['thrust_s'] - thr, P['journal_r'] + P['neck_clear'])),
+        ('worm barrel', cyl_s(L, P['thrust_s'] - thr - 0.01, L['s_g0'], br + P['barrel_clear'])),   # up-thrust step at top
         ('worm gear', cyl_s(L, L['s_g0'] - (ga['rf'] - br) - gec, L['s_back'] + P['gear_end_clear_collar'], ga['ra'] + 0.4)),
-        ('wand collar', cyl_s(L, L['s_back'], collar_end + thr, br + wc + 0.1)),             # down-thrust step
-        ('wand exit', cyl_s(L, collar_end + thr - 0.01, collar_end + 40, P['body_d'] / 2 + wc + 0.1)),
+        ('wand collar', cyl_s(L, L['s_back'], collar_end + thr, br + P['collar_clear'])),   # down-thrust step
+        ('wand exit', cyl_s(L, collar_end + thr - 0.01, collar_end + 40, P['body_d'] / 2 + P['collar_clear'])),
         ('pinion', cyl_u(L, L['pin_c'], -pf, pf, gp['ra'] + 0.5)),
         ('motor shaft', cyl_u(L, L['pin_c'], -(L['t_face'] - P['n20_shaft_len']) - 0.5, L['t_face'] + 0.1,
                               P['n20_shaft_d'] / 2 + 0.5)),     # the shaft runs on into the main half
@@ -763,7 +775,10 @@ def case_shapes(L):
     cav = [pr for _, pr in named]
     slab = box_minmax(x0, x1, -hw, hw, P['case_floor'], P['case_top'])
     dw = P['dome_wall']
-    dome = [cyl_s(L, -half - free - dw, 4.8, wd['ra'] + P['thread_clear'] + dw)]      # cover over the thread end
+    pin_end = -half - free - P['top_pin_case']
+    dome = [cyl_s(L, -half - free - dw, 4.8, wd['ra'] + P['thread_clear'] + dw),       # cover over the thread end
+            Prim('cyl', p1=L['S'](-half - free - dw + 0.01), p2=L['S'](pin_end - 0.6),     # boss round the pin
+                 r=P['top_pin_d'] / 2 + 1.0 + 0.5, r2=P['top_pin_d'] / 2 + 1.0)]
     py = hw - P['lip_in'] - P['plateau_clear']
     plateau = box_minmax(x0, x1, -py, py, P['case_top'] - 1.0, P['plateau_top'])
     env = [slab, plateau, *dome, notch_box(-P['notch_clear'])]
