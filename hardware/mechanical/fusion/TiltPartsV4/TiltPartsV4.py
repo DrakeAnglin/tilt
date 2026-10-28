@@ -477,8 +477,9 @@ def build_worm(root, L):
     ga, jr, sg = L['ga'], P['journal_r'], L['s_g0']
     if P['print_chamfer']:
         # 1) 45° bevel on the gear's downward tooth ends (r = rf + (s - s_g0) and inside it stays)
-        # 2) the tooth spaces' ends are filled with a 45° ramp up from the journal, but only as deep as the pinion's
-        #    tips never reach (its swept envelope is a torus round the gear axis), so the mesh is untouched
+        # 2) the tooth-space floor is raised to one smooth surface: a 45° ramp up from the journal, then 0.3 mm clear of
+        #    the pinion's swept envelope (a torus round the gear axis) across the rest of the width, so the mesh is
+        #    untouched and there is no ledge anywhere
         # Solid booleans on a copy of the body (revolve features on the curved tooth faces leave sliver bodies).
         tbm = adsk.fusion.TemporaryBRepManager.get()
         rf, ra, gp = ga['rf'], ga['ra'], L['gp']
@@ -496,7 +497,10 @@ def build_worm(root, L):
             d = abs(sc - z)
             safe = L['cd'] - math.sqrt(gp['ra'] ** 2 - d * d) - 0.3 if d < gp['ra'] else ra
             return max(min(line, safe, ra), jr - 0.3)
-        zs = [sg - (rf - jr) - 0.3 + k * 0.2 for k in range(int(((ra - rf) + (rf - jr) + 0.3) / 0.2) + 1)]
+        # the floor runs the gear's whole width (stopping part-way left a ledge in every tooth space)
+        z_lo, z_hi = sg - (rf - jr) - 0.3, L['s_back'] + 0.01
+        n = int((z_hi - z_lo) / 0.1) + 1
+        zs = [z_lo + (z_hi - z_lo) * k / n for k in range(n + 1)]
         for z0, z1 in zip(zs, zs[1:]):
             seg = tbm.createCylinderOrCone(P3((0, 0, z0)), r_top(z0) / 10, P3((0, 0, z1)), r_top(z1) / 10)
             tbm.booleanOperation(body, seg, adsk.fusion.BooleanTypes.UnionBooleanType)
