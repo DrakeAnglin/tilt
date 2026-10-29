@@ -102,3 +102,13 @@ through the board. The brass inserts don't matter.
   square (`board_w`), which only sizes the pocket's rim.
 - How the printed worm pair feels and wears; whether the wheel's square bore needs ±0.1 mm; the helical mesh by hand
   (`hx_cd_extra`, 0.20, opens it up).
+
+## Drive housing (2026-10-28)
+`drive_housing.stl` + `drive_cover.stl` (print/ has them oriented). **case_left / case_right changed too:** a new
+case bolt at (Y 22.0, Z 5.5) and the lid's countersink at (-23, 27) became a plain through hole; both now take the
+housing's M3 × 20 bolts. Reprint both case halves.
+
+Assembly: (1) build the tilter as before (board bolts M3 × 18). (2) Housing onto the lid face, two M3 × 20 from inside
+the empty housing (2 mm hex key straight down it). (3) Solder the RJ12 breakout and the DRV8833 leads, then: RJ12
+board onto its pegs, DRV8833 slid into its rails (components facing in). (4) Wire motor tabs → OUT1/OUT2 and the
+AS5600's pads → RJ12 (the housing has no wall at the lid, so the pads face into it). (5) Cover on, 3 × M3 × 8.

@@ -1,5 +1,6 @@
-"""Tilter v0.4 + the RJ12 / driver pod, in a fresh document: interference check of every pod body against every tilter
-body (case halves, worm, gears, N20, AS5600, rail) and the rod's sweep; STL export of the pod; renders.
+"""Tilter v0.4 + drive housing (TiltPod), fresh document: rebuilds the tilter (case STLs re-exported: the housing's two
+bolts are new case bolts), checks every housing / cover / inside part against every tilter body and each other, exports
+housing + cover STLs, renders with sketches hidden.
 
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_tiltpod.py --timeout 1500
 """
@@ -9,6 +10,7 @@ import os
 REPO = os.path.expanduser('~/Documents/automated-blinds/blinds')
 T4 = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/TiltPartsV4/TiltPartsV4.py'))
 POD = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/TiltPod/TiltPod.py'))
+STL = os.path.join(REPO, 'hardware/mechanical/stl/v0.4')
 tbm = adsk.fusion.TemporaryBRepManager.get()
 B = adsk.fusion.BooleanTypes
 
@@ -27,6 +29,10 @@ def bx(x0, x1, y0, y1, z0, z1):
 
 def cyl(p1, p2, r):
     return tbm.createCylinderOrCone(P3(*p1), r / 10, P3(*p2), r / 10)
+
+
+def cone(p1, r1, p2, r2):
+    return tbm.createCylinderOrCone(P3(*p1), r1 / 10, P3(*p2), r2 / 10)
 
 
 def uni(a, *bs):
@@ -56,27 +62,19 @@ design.designIntent = adsk.fusion.DesignIntentTypes.HybridDesignIntentType
 design.designType = adsk.fusion.DesignTypes.DirectDesignType
 for d in old:
     d.close(False)
-T4.build(design)
+t4_report = T4.build(design, STL)
 root = design.rootComponent
 
-groups = POD.build(tbm, bx, cyl, uni, cut)
-# rod continuing on the pod side (only matters if the blind's rod runs on past the tilter here)
-obb = adsk.core.OrientedBoundingBox3D.create(P3(-35, 0, POD.P['rod_z']), adsk.core.Vector3D.create(1, 0, 0),
-                                             adsk.core.Vector3D.create(0, math.cos(math.pi / 4), math.sin(math.pi / 4)),
-                                             6.0, 0.4, 0.4)
-sweep = cyl((-65, 0, POD.P['rod_z']), (-8.4, 0, POD.P['rod_z']), POD.P['rod'] * math.sqrt(2) / 2)
-
-# tilter bodies (world space: T4 occurrences are placed with transforms)
+groups = POD.build(tbm, bx, cyl, cone, uni, cut)
 tilter = []
 for i in range(root.occurrences.count):
     o = root.occurrences.item(i)
     for j in range(o.bRepBodies.count):
         b = o.bRepBodies.item(j)
-        if b.name in ('Rod', 'N20 shaft', 'Magnet'):
-            continue
-        tilter.append(('T4 ' + b.name, tbm.copy(b)))      # occurrence proxies are already in world space
-
-pod = [(nm, b) for g in ('Pod tray', 'Pod lid', 'Pod parts', 'Pod plug') for nm, b in groups[g]]
+        if b.name not in ('Rod', 'N20 shaft', 'Magnet'):
+            tilter.append(('T4 ' + b.name, tbm.copy(b)))            # occurrence proxies: already in world space
+own = [(g, nm, b) for g in ('Housing', 'Cover', 'Inside', 'Screws', 'Plug') for nm, b in groups[g]]
+sweep = cyl((-80, 0, POD.P['rod_z']), (-8.4, 0, POD.P['rod_z']), POD.P['rod'] * math.sqrt(2) / 2)
 
 
 def vol(a, b):
@@ -92,26 +90,31 @@ def vol(a, b):
         return 0.0
 
 
+SAME = [{'RJ12 board', 'RJ12 jack'}, {'RJ12 board', 'RJ12 pins'}, {'RJ12 jack', 'RJ12 plug'}, {'RJ12 plug', 'White cord'},
+        {'DRV8833', 'DRV8833 chip'}, {'DRV8833', 'C 10uF'}]
 hits = []
-for na, a in pod:
-    for nb, b in tilter + [('rod sweep', sweep)]:
+for g, na, a in own:
+    for nb, b in tilter:
         v = vol(a, b)
         if v > 0.01:
             hits.append('%s / %s: %.2f mm3' % (na, nb, v))
-for i in range(len(pod)):
-    for j in range(i + 1, len(pod)):
-        if {pod[i][0], pod[j][0]} in ({'RJ12 board', 'RJ12 jack'}, {'RJ12 jack', 'RJ12 plug'}, {'RJ12 plug', 'White cord'},
-                                      {'DRV8833 PCB', 'DRV8833 chip'}, {'DRV8833 PCB', 'C 10uF'}, {'RJ12 board', 'RJ12 jack pins'}):
+for i in range(len(own)):
+    for j in range(i + 1, len(own)):
+        if own[i][0] == own[j][0] and own[i][0] in ('Housing', 'Cover', 'Screws', 'Plug'):
             continue
-        v = vol(pod[i][1], pod[j][1])
+        if {own[i][1], own[j][1]} in SAME:
+            continue
+        v = vol(own[i][2], own[j][2])
         if v > 0.01:
-            hits.append('%s / %s: %.2f mm3' % (pod[i][0], pod[j][0], v))
-# the AS5600 board vs the rod sweep (existing tilter, matters only if the rod continues on this side)
-as_board = next(b for n, b in tilter if n.endswith('AS5600 board'))
-v_as = vol(as_board, sweep)
+            hits.append('%s / %s: %.2f mm3' % (own[i][1], own[j][1], v))
+rod_hits = []
+for g, na, a in own:
+    v = vol(a, sweep)
+    if v > 0.01:
+        rod_hits.append('%s: %.2f mm3' % (na, v))
 
-APPEAR = {'Pod tray': 'Plastic - Matte (White)', 'Pod lid': 'Plastic - Translucent Matte (Blue)',
-          'Pod parts': 'Plastic - Matte (Black)', 'Pod plug': 'Plastic - Matte (White)'}
+APPEAR = {'Housing': 'Plastic - Matte (White)', 'Cover': 'Plastic - Matte (White)', 'Inside': 'Plastic - Matte (Black)',
+          'Screws': 'Steel - Satin', 'Plug': 'Plastic - Matte (White)'}
 
 
 def appearance(name):
@@ -127,67 +130,128 @@ def appearance(name):
             return design.appearances.addByCopy(src, name)
 
 
-comps = {}
+comps, occs = {}, {}
 for g, lst in groups.items():
     occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     occ.component.name = 'T4 ' + g
-    comps[g] = occ.component
+    comps[g], occs[g] = occ.component, occ
     ap = appearance(APPEAR[g])
     for nm, b in lst:
         bb = occ.component.bRepBodies.add(b)
         bb.name = nm
         if ap:
             bb.appearance = ap
+def round_x_edges(comp, r, min_len):
+    """Fillet the outline's edges that run along X (rounded long edges, like the tilter case)."""
+    body = comp.bRepBodies.item(0)
+    bb = body.boundingBox
+    picked = adsk.core.ObjectCollection.create()
+    for e in body.edges:
+        if not isinstance(e.geometry, adsk.core.Line3D) or e.length < min_len:
+            continue
+        a, b = e.startVertex.geometry, e.endVertex.geometry
+        if abs(a.y - b.y) > 1e-4 or abs(a.z - b.z) > 1e-4:
+            continue
+        if abs(a.y - bb.minPoint.y) < 0.02 or abs(a.y - bb.maxPoint.y) < 0.02 or abs(a.z - bb.minPoint.z) < 0.02 \
+                or abs(a.z - bb.maxPoint.z) < 0.02:
+            picked.add(e)
+    if picked.count == 0:
+        return 0
+    try:
+        inp = comp.features.filletFeatures.createInput()
+        inp.addConstantRadiusEdgeSet(picked, adsk.core.ValueInput.createByReal(r / 10), True)
+        comp.features.filletFeatures.add(inp)
+        return picked.count
+    except Exception:
+        return -1
 
-out_stl = os.path.join(REPO, 'hardware/mechanical/stl/v0.4')
-em = design.exportManager
+
+fillets = {'Housing': round_x_edges(comps['Housing'], POD.P['edge_r'], 0.5),
+           'Cover': round_x_edges(comps['Cover'], POD.P['edge_r'], 0.15)}
+
 files = []
-for g, nm in (('Pod tray', 'pod_tray'), ('Pod lid', 'pod_lid')):
-    path = os.path.join(out_stl, nm + '.stl')
+em = design.exportManager
+for g, nm in (('Housing', 'drive_housing'), ('Cover', 'drive_cover')):
+    path = os.path.join(STL, nm + '.stl')
     opt = em.createSTLExportOptions(comps[g], path)
     opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
     em.execute(opt)
     files.append(path)
+for old_stl in ('pod_tray.stl', 'pod_lid.stl'):
+    try:
+        os.remove(os.path.join(STL, old_stl))
+    except OSError:
+        pass
 
+# ---------------- renders: sketches, construction geometry and origins hidden
+ui.activeSelections.clear()
+for k in range(design.allComponents.count):
+    c = design.allComponents.item(k)
+    for attr in ('isSketchFolderLightBulbOn', 'isConstructionFolderLightBulbOn', 'isOriginFolderLightBulbOn',
+                 'isJointsFolderLightBulbOn'):
+        try:
+            setattr(c, attr, False)
+        except Exception:
+            pass
+    for s in range(c.sketches.count):
+        c.sketches.item(s).isLightBulbOn = False
 vp = app.activeViewport
 try:
-    vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
+    vp.visualStyle = adsk.core.VisualStyles.ShadedVisualStyle
 except Exception:
     pass
 out = os.path.join(REPO, 'docs/renders')
 
 
-def vis(hide=()):
+def vis(hide=(), ghost=()):
     for i in range(root.occurrences.count):
         o = root.occurrences.item(i)
         o.isLightBulbOn = not any(h in o.component.name for h in hide)
-    for i in range(root.occurrences.count):
-        c = root.occurrences.item(i).component
-        for j in range(c.bRepBodies.count):
-            b = c.bRepBodies.item(j)
+        for j in range(o.component.bRepBodies.count):
+            b = o.component.bRepBodies.item(j)
             if b.name.startswith('Rail'):
                 b.isLightBulbOn = 'Rail' not in hide
+                b.opacity = 0.25
+            elif o.component.name.startswith('T4 REF'):
+                b.opacity = 1.0
+            else:
+                b.opacity = 0.35 if any(gh in o.component.name for gh in ghost) else 1.0
 
 
-def shot(name, orient, ortho=False):
+def move(g, dx):
+    m = adsk.core.Matrix3D.create()
+    m.translation = adsk.core.Vector3D.create(dx / 10.0, 0, 0)
+    occs[g].transform2 = m
+
+
+def shot(name, orient, ortho=False, eye=None):
     cam = vp.camera
     cam.cameraType = adsk.core.CameraTypes.OrthographicCameraType if ortho else adsk.core.CameraTypes.PerspectiveCameraType
-    cam.viewOrientation = getattr(adsk.core.ViewOrientations, orient)
+    if eye:
+        cam.eye = P3(*eye)
+        cam.target = P3(-10, 0, 18)
+        cam.upVector = adsk.core.Vector3D.create(0, 0, 1)
+    else:
+        cam.viewOrientation = getattr(adsk.core.ViewOrientations, orient)
     cam.isFitView = True
     vp.camera = cam
     vp.fit()
     p = os.path.join(out, name)
-    vp.saveAsImageFile(p, 1800, 1000)
+    vp.saveAsImageFile(p, 1800, 1100)
     return p
 
 
 res = []
-vis(hide=('Rail', 'Pod lid')); res.append(shot('pod-open.png', 'IsoTopLeftViewOrientation'))
-vis(hide=('Rail', 'Pod lid', 'Pod plug')); res.append(shot('pod-top.png', 'TopViewOrientation', True))
-vis(hide=('Rail',)); res.append(shot('pod-closed.png', 'IsoTopLeftViewOrientation'))
-vis(hide=('Rail', 'Pod lid', 'Pod parts', 'Pod plug')); res.append(shot('pod-tray.png', 'IsoTopLeftViewOrientation'))
-vis(); res.append(shot('pod-end.png', 'LeftViewOrientation', True))
-vis(hide=('Rail',))
+EYE = (-260, -170, 140)                      # from the cover end, room side, above
+vis(hide=('Rail', 'Plug')); res.append(shot('drive-closed.png', None, eye=EYE))
+move('Cover', -35); move('Screws', 0)
+vis(hide=('Rail', 'Plug')); res.append(shot('drive-exploded.png', None, eye=EYE))
+vis(hide=('Rail', 'Plug', 'Cover')); res.append(shot('drive-inside.png', None, eye=EYE))
+vis(hide=('Rail', 'Plug', 'Cover', 'Screws'), ghost=('Housing',)); res.append(shot('drive-xray.png', None, eye=(-200, 160, 160)))
+move('Cover', 0)
+vis(hide=('Rail',)); res.append(shot('drive-cover.png', 'LeftViewOrientation', True))
+vis(); res.append(shot('drive-in-rail.png', None, eye=(-260, -60, 90)))
+vis(hide=('Rail', 'Plug'))
 result = {'summary': POD.summary(), 'interference': hits or 'none',
-          'AS5600 board vs rod sweep (if the rod continues on this side)': round(v_as, 3),
-          'exported': files, 'renders': res}
+          'rod sweep (only if the rod runs on past the tilter on this side)': rod_hits or 'clear',
+          'fillets (edges)': fillets, 'tilter': t4_report.split('\n'), 'exported': files, 'renders': res}

@@ -86,8 +86,15 @@ Dropped from the earlier plan: ESP32-S3 boards and 5 V wall supplies (now cordle
 magnets (the boards' own Ø4 × 2 magnets are used), M2 standoffs and M2 inserts (the AS5600 now bolts through the
 case with M3).
 
-## Changes from the tilter plug pod (2026-10-28)
-- The AS5600 board bolts are now **M3 × 20** flat head (they also clamp the pod): 2 per tilter, from the Zmbroll kit
-  (it has 20 mm). The separate **M3 × 18 pack is no longer needed**.
-- One DRV8833 per tilter (8 of the 10-pack); 10 µF ceramic across each driver's VCC/GND (ceramic kit).
-- One RJ12 breakout per tilter is unchanged (8 of the 20).
+## Drive housing on each tilter (2026-10-28)
+Each tilter carries its own DRV8833 and RJ12 jack in a drive housing ([TiltPod.py](mechanical/fusion/TiltPod/TiltPod.py)).
+Per tilter:
+| Part | Qty | From |
+|---|---|---|
+| M3 × 18 flat head (AS5600 board bolts, unchanged) | 2 | M3 × 18 pack: **still needed** |
+| M3 × 20 flat head (housing → tilter, through the lid into main-half inserts) | 2 | Zmbroll kit |
+| M3 × 8 flat head (cover) | 3 | Zmbroll kit |
+| M3 heat-set inserts | 7 (2 board bolts, 2 housing bolts, 3 cover) | **56 for 8 tilters**; ruthex listing unavailable, replacement to pick |
+| DRV8833 | 1 | 10-pack (8 used) |
+| RJ12 breakout | 1 | 20 bought |
+| 10 µF ceramic | 1 | ceramic kit |

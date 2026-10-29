@@ -87,8 +87,12 @@ P = dict(
     # case bolts: M3 flat head from the lid side into M3 heat-set inserts (Ø4.0 x 6.7 min) pressed into the main
     # half's back face. Two of them go through the AS5600 board's diagonal holes (clamping board and case at once),
     # one more sits in a countersink: 3 bolts in all
-    cs_d=6.0, m3_clear=3.4, insert_d=4.0, insert_depth=6.7, insert_wall=1.3, n_case_screws=1,
-    case_screw_len=16.0,      # M3 x 16 flat head (countersunk one); the two through the board are M3 x 18
+    cs_d=6.0, m3_clear=3.4, insert_d=4.0, insert_depth=6.7, insert_wall=1.3, n_case_screws=0,
+    case_screw_len=16.0,      # (only for auto-picked countersunk bolts; none now)
+    # the drive housing (TiltPod) bolts on with two more case bolts: M3 x 20 flat head, head in the housing's 4 mm
+    # boss, through the lid into M3 inserts in the main half. (-23, 27) was the lid's countersunk bolt; (22, 5.5) is
+    # the only other spot clear of every pocket, the board, the motor and the pegs (grid search, insert wall 1.3)
+    pod_bolts=((-23.0, 27.0), (22.0, 5.5)),
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
     ss_z=18, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=14.45, ss_shaft_d=4.0,   # 18T: the board bolts pass it
     ss_bore=3.5,              # the gear turns on a Ø4 pin moulded into the main half (gear prints flat, no stub)
@@ -908,14 +912,15 @@ def case_plan(L):
             return False                          # insert wall to the worm wheel's pocket (the grid check is coarse)
         return z < P['case_top'] - ir and not on_board(y, z)
     fixed = board_holes()                         # the board's diagonal pair are case bolts
-    bosses = pick_bosses(cav, screw_ok, count=P['n_case_screws'], clear_r=ir, chosen=fixed)
+    pod_bolts = [tuple(b) for b in P['pod_bolts']]
+    bosses = pick_bosses(cav, screw_ok, count=P['n_case_screws'], clear_r=ir, chosen=fixed + pod_bolts)
     pegs = pick_pegs(cav, bosses, L)
     x0, x1 = slab_x(L)
     X = lambda xa, xb, y, z, r, r2=None: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r, **({} if r2 is None else {'r2': r2}))
     holes = {'Case left': [], 'Case right': []}
     for k, (y, z) in enumerate(bosses):
         holes['Case left'].append(('screw clearance', X(x0 - 1, 0.5, y, z, P['m3_clear'] / 2)))
-        if (y, z) not in fixed:                   # flat head (board screws: head on the board). In a lid thicker than
+        if (y, z) not in fixed and (y, z) not in pod_bolts:   # flat head (board / housing bolts: head outside). In a lid thicker than
             cs = P['cs_d'] / 2                    # the screw allows, a counterbore takes the head down to its seat
             seat = max(x0, x1 - 0.8 - P['case_screw_len'])
             if seat > x0:

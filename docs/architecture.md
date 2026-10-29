@@ -95,8 +95,10 @@ complete unit (motor + driver + sensor + plug). 8 drivers from the 10-pack.
 Motor wires: DRV8833 OUT1 / OUT2 → N20 tabs, inside the pod. Each tilter uses one channel of its DRV8833; the other
 is spare. A reversed cord would put VBAT on IN2 and EN on ANGLE's neighbour, so the continuity check matters.
 
-- On the tilter: the **plug pod** ([TiltPod.py](../hardware/mechanical/fusion/TiltPod/TiltPod.py)) bolts on with the
-  tilter's own two AS5600 board bolts (now M3 × 20) and holds the RJ12 jack and the driver.
+- On the tilter: the **drive housing** ([TiltPod.py](../hardware/mechanical/fusion/TiltPod/TiltPod.py)) continues the
+  tilter case's cross-section 30 mm past the lid and holds the N20, the AS5600's back, the DRV8833 and the RJ12 jack.
+  It touches only the lid (never the sensor board), held by two M3 × 20 case bolts through 4 mm bosses; its end
+  cover carries the jack window and fixes with 3 × M3 × 8 into inserts.
 - **Colour:** visible parts are white: white cords, white PLA cases. The solar panel's cells are black (a white
   cell can't absorb light), so it sits in a white printed frame with the cells facing the glass; from inside the
   room only the white back shows.

@@ -24,6 +24,8 @@ ORIENT = {
     'worm_wheel': (ID, 'barrel end down'),
     'motor_pinion': (ID, 'on a gear face (45° helical teeth print as 45° overhangs)'),
     'sensor_gear': (ID, 'gear face down, magnet pocket up'),
+    'drive_housing': (X_UP, 'standing on its tilter end, cover end up; no supports'),
+    'drive_cover': (X_DOWN, 'outer face down (countersinks on the bed), jack tab up'),
 }
 
 
