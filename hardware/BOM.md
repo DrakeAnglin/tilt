@@ -50,7 +50,7 @@ Removed from the cart: Sunnytech 2 W panel (too large) and the BTF 5-wire cable 
 
 **Added 2026-10-28:** [1N5819 Schottky diodes, 150 pcs (EEEEE) B0FC2CWKPL](https://www.amazon.com/dp/B0FC2CWKPL),
 $7.99: 3 per controller (USB in, solar in, ESP 5V); the charger has one PWR input.
-**Still to add:** 30 AWG stranded hookup wire (silicone, 6 colours) for the point-to-point wiring under the board.
+**Added 2026-10-28:** [30 AWG silicone stranded wire, 6 colours × 66 ft (TUOFENG) B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19), $16.29: point-to-point wiring under the perfboard. Cart now 38 items, $403.29.
 
 **Wiring notes** (full list in [docs/dev-board.md](../docs/dev-board.md))
 - **Solar extension:** the panel's lead is only 4". Make one white extension per controller: ZH socket + white 22/2
