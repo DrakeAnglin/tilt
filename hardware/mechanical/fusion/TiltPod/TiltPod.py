@@ -8,7 +8,8 @@ AS5600's back, the tilter's own DRV8833 and the RJ12 jack, so tilter + motor + d
              the lid into M3 inserts in the main half (TiltPartsV4 pod_bolts). They go in with the cover off, straight
              down the empty housing, before anything else is fitted.
   COVER      2 mm plate flush with the housing's outline, 3 x M3 x 8 flat head into heat-set inserts in the housing's
-             corners; the RJ12 jack's mouth sits in a chamfered window; a tab on its inside holds the jack down.
+             corners; the RJ12 jack's body fills a window in it, face flush with the cover (like a wall plate), so the
+             plug's latch is reachable; a tab on its inside holds the jack down.
   INSIDE     RJ12 breakout on two pegs on the floor (mouth at the cover), DRV8833 sliding in along X between two
              grooved rails on the room-side wall (stop at the far end, the cover closes the rails), cradle under the
              N20's end. 10 uF ceramic across the DRV8833's VCC/GND.
@@ -39,14 +40,15 @@ P = dict(
     # RJ12 breakout (listing photo): board 19.4 W x 19.9 D, jack 13.5 W x 14.7 L x 13.0 H overhanging 4.5;
     # holes 7.0 from the back edge, 2.1 from the sides
     rj_bw=19.4, rj_bd=19.9, rj_jw=13.5, rj_jl=14.7, rj_jh=13.0, rj_over=4.5, rj_hole=7.0, rj_hole_side=2.1,
-    rj_y=9.5, rj_x0=-14.0, rj_z=5.0, rj_mouth_w=9.9, rj_mouth_h=8.6,
+    rj_y=9.5, rj_x0=-16.0,      # jack face flush with the cover's outer face
+    rj_z=5.0, rj_mouth_w=9.9, rj_mouth_h=8.6,
     # DRV8833 (18.5 x 16): stands in the XZ plane, 16 along X, pin rows (on the 18.5 edges) vertical at its X ends
     drv_l=16.0, drv_h=18.5, drv_t=1.6, drv_y=-23.2, drv_x1=-14.5, drv_z0=11.0,
 )
 p = P
 P['iw'] = p['half_w'] - p['wall']
-P['rj_face'] = p['rj_x0'] - p['rj_bd'] - p['rj_over']      # jack mouth = cover's inner face
-P['end_x'] = p['rj_face']                                   # housing's -X end
+P['rj_face'] = p['rj_x0'] - p['rj_bd'] - p['rj_over']      # jack mouth, flush with the cover's outer face
+P['end_x'] = p['rj_face'] + p['cover_t']                    # housing's -X end = cover's inner face
 P['cover_x0'] = p['end_x'] - p['cover_t']
 P['boss_x'] = p['lid_x'] - p['boss_len']
 
@@ -130,8 +132,8 @@ def build(tbm, bx, cyl, cone, uni, cut):
         cover = cut(cover, cyl((x0 - 0.01, cy, cz), (x0 + 2, cy, cz), ir + 0.3))
     cover = uni(cover, bx(x0, x0 + 5.0, p['rj_y'] - 3.0, p['rj_y'] + 3.0, jz0 + p['rj_jh'] + 0.1, jz0 + p['rj_jh'] + 1.6))  # jack tab
     cover = uni(cover, bx(x0, x0 + 4.0, p['rj_y'] - 3.0, p['rj_y'] + 3.0, jz0 + p['rj_jh'] + 0.1, p['step_z'] - p['ceil'] - 0.2))
-    win = bx(p['cover_x0'] - 1, x0 + 1, p['rj_y'] - p['rj_mouth_w'] / 2 - 0.4, p['rj_y'] + p['rj_mouth_w'] / 2 + 0.4,
-             mzc - p['rj_mouth_h'] / 2 - 0.4, mzc + p['rj_mouth_h'] / 2 + 0.4)
+    win = bx(p['cover_x0'] - 1, x0 + 1, p['rj_y'] - p['rj_jw'] / 2 - 0.15, p['rj_y'] + p['rj_jw'] / 2 + 0.15,
+             jz0 - 0.15, jz0 + p['rj_jh'] + 0.15)                    # the jack's body fills the window, face flush
     cover = cut(cover, win)
     for cy, cz in p['cov_screws']:
         cover = cut(cover, cyl((p['cover_x0'] - 1, cy, cz), (x0 + 3, cy, cz), p['m3'] / 2),
