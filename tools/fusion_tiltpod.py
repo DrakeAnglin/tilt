@@ -66,14 +66,15 @@ t4_report = T4.build(design, STL)
 root = design.rootComponent
 
 groups = POD.build(tbm, bx, cyl, cone, uni, cut)
+groups['Plug'].append(('Tilt rod (on through the module)', bx(-80, -8.33, -2, 2, POD.P['rod_z'] - 2, POD.P['rod_z'] + 2)))
 tilter = []
 for i in range(root.occurrences.count):
     o = root.occurrences.item(i)
     for j in range(o.bRepBodies.count):
         b = o.bRepBodies.item(j)
-        if b.name not in ('Rod', 'N20 shaft', 'Magnet'):
+        if b.name not in ('Rod', 'N20 shaft', 'Magnet', 'AS5600 board', 'AS5600 chip'):   # the module carries the board now
             tilter.append(('T4 ' + b.name, tbm.copy(b)))            # occurrence proxies: already in world space
-own = [(g, nm, b) for g in ('Housing', 'Cover', 'Inside', 'Screws', 'Plug') for nm, b in groups[g]]
+own = [(g, nm, b) for g in ('Module', 'Inside', 'Screws', 'Plug') for nm, b in groups[g]]
 sweep = cyl((-80, 0, POD.P['rod_z']), (-8.4, 0, POD.P['rod_z']), POD.P['rod'] * math.sqrt(2) / 2)
 
 
@@ -91,7 +92,7 @@ def vol(a, b):
 
 
 SAME = [{'RJ12 board', 'RJ12 jack'}, {'RJ12 board', 'RJ12 pins'}, {'RJ12 jack', 'RJ12 plug'}, {'RJ12 plug', 'White cord'},
-        {'DRV8833', 'DRV8833 chip'}, {'DRV8833', 'C 10uF'}]
+        {'DRV8833', 'DRV8833 chip'}, {'DRV8833', 'C 10uF'}, {'AS5600 board', 'AS5600 chip'}]
 hits = []
 for g, na, a in own:
     for nb, b in tilter:
@@ -100,7 +101,7 @@ for g, na, a in own:
             hits.append('%s / %s: %.2f mm3' % (na, nb, v))
 for i in range(len(own)):
     for j in range(i + 1, len(own)):
-        if own[i][0] == own[j][0] and own[i][0] in ('Housing', 'Cover', 'Screws', 'Plug'):
+        if own[i][0] == own[j][0] and own[i][0] in ('Module', 'Screws', 'Plug'):
             continue
         if {own[i][1], own[j][1]} in SAME:
             continue
@@ -113,7 +114,7 @@ for g, na, a in own:
     if v > 0.01:
         rod_hits.append('%s: %.2f mm3' % (na, v))
 
-APPEAR = {'Housing': 'Plastic - Matte (White)', 'Cover': 'Plastic - Matte (White)', 'Inside': 'Plastic - Matte (Black)',
+APPEAR = {'Module': 'Plastic - Matte (White)', 'Inside': 'Plastic - Matte (Black)',
           'Screws': 'Steel - Satin', 'Plug': 'Plastic - Matte (White)'}
 
 
@@ -166,18 +167,18 @@ def round_x_edges(comp, r, min_len):
         return -1
 
 
-fillets = {'Housing': round_x_edges(comps['Housing'], POD.P['edge_r'], 0.5),
-           'Cover': round_x_edges(comps['Cover'], POD.P['edge_r'], 0.15)}
+fillets = {'Module': round_x_edges(comps['Module'], POD.P['edge_r'], 0.5)}
 
 files = []
 em = design.exportManager
-for g, nm in (('Housing', 'drive_housing'), ('Cover', 'drive_cover')):
+for g, nm in (('Module', 'sensor_module'),):
     path = os.path.join(STL, nm + '.stl')
     opt = em.createSTLExportOptions(comps[g], path)
     opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
     em.execute(opt)
     files.append(path)
-for old_stl in ('pod_tray.stl', 'pod_lid.stl'):
+for old_stl in ('pod_tray.stl', 'pod_lid.stl', 'drive_housing.stl', 'drive_cover.stl', 'print/drive_housing.stl',
+                'print/drive_cover.stl'):
     try:
         os.remove(os.path.join(STL, old_stl))
     except OSError:
@@ -214,6 +215,8 @@ def vis(hide=(), ghost=()):
                 b.opacity = 0.25
             elif o.component.name.startswith('T4 REF'):
                 b.opacity = 1.0
+                if b.name.startswith('AS5600'):              # the module carries the board now
+                    b.isLightBulbOn = False
             else:
                 b.opacity = 0.35 if any(gh in o.component.name for gh in ghost) else 1.0
 
@@ -242,15 +245,19 @@ def shot(name, orient, ortho=False, eye=None):
 
 
 res = []
-EYE = (-260, -170, 140)                      # from the cover end, room side, above
-vis(hide=('Rail', 'Plug')); res.append(shot('drive-closed.png', None, eye=EYE))
-move('Cover', -35); move('Screws', 0)
-vis(hide=('Rail', 'Plug')); res.append(shot('drive-exploded.png', None, eye=EYE))
-vis(hide=('Rail', 'Plug', 'Cover')); res.append(shot('drive-inside.png', None, eye=EYE))
-vis(hide=('Rail', 'Plug', 'Cover', 'Screws'), ghost=('Housing',)); res.append(shot('drive-xray.png', None, eye=(-200, 160, 160)))
-move('Cover', 0)
-vis(hide=('Rail',)); res.append(shot('drive-cover.png', 'LeftViewOrientation', True))
-vis(); res.append(shot('drive-in-rail.png', None, eye=(-260, -60, 90)))
+EYE = (-260, -170, 140)                      # from the module end, room side, above
+EYE_OPEN = (120, -190, 150)                  # into the module's open face
+vis(hide=('Rail', 'Plug')); res.append(shot('module-closed.png', None, eye=EYE))
+vis(hide=('Rail',)); res.append(shot('module-plugged.png', None, eye=EYE))
+move('Module', -45); move('Inside', -45)
+vis(hide=('Rail', 'Plug', 'Screws')); res.append(shot('module-exploded.png', None, eye=(-150, -230, 160)))
+move('Module', 0); move('Inside', 0)
+for i in range(root.occurrences.count):                 # module alone, from its open face
+    o = root.occurrences.item(i)
+    o.isLightBulbOn = o.component.name in ('T4 Module', 'T4 Inside')
+res.append(shot('module-open-face.png', None, eye=EYE_OPEN))
+vis(hide=('Rail', 'Plug', 'Screws'), ghost=('Module', 'Case left', 'Case right')); res.append(shot('module-xray.png', None, eye=(-200, 170, 160)))
+vis(); res.append(shot('module-in-rail.png', None, eye=(-260, -60, 90)))
 vis(hide=('Rail', 'Plug'))
 result = {'summary': POD.summary(), 'interference': hits or 'none',
           'rod sweep (only if the rod runs on past the tilter on this side)': rod_hits or 'clear',

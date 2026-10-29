@@ -103,12 +103,18 @@ through the board. The brass inserts don't matter.
 - How the printed worm pair feels and wears; whether the wheel's square bore needs ±0.1 mm; the helical mesh by hand
   (`hx_cd_extra`, 0.20, opens it up).
 
-## Drive housing (2026-10-28)
-`drive_housing.stl` + `drive_cover.stl` (print/ has them oriented). **case_left / case_right changed too:** a new
-case bolt at (Y 22.0, Z 5.5) and the lid's countersink at (-23, 27) became a plain through hole; both now take the
-housing's M3 × 20 bolts. Reprint both case halves.
+## Sensor module (2026-10-29)
+`sensor_module.stl` (print/ has it end wall down, open face up, no supports). **case_left / case_right changed:** all
+four case bolts now go in from the main half's back face (countersunk there) and through the lid; no inserts in the
+case any more. Reprint both halves.
 
-Assembly: (1) build the tilter as before (board bolts M3 × 18). (2) Housing onto the lid face, two M3 × 20 from inside
-the empty housing (2 mm hex key straight down it). (3) Solder the RJ12 breakout and the DRV8833 leads, then: RJ12
-board onto its pegs, DRV8833 slid into its rails (components facing in). (4) Wire motor tabs → OUT1/OUT2 and the
-AS5600's pads → RJ12 (the housing has no wall at the lid, so the pads face into it). (5) Cover on, 3 × M3 × 8.
+Assembly
+1. Tilter: worm, wheel, gears, sensor gear + magnet, N20 in the lid (M1.6 screw). No case bolts yet.
+2. Module on the bench: press 4 inserts into its bosses. AS5600 board into the seat at the open face, chip facing out,
+   pressed onto its two pins (**file ~1 mm off the board edge nearest the rod**: the rod's corners pass 0.1 mm into it
+   otherwise; keep the header edge away from that side). RJ12 breakout slid in on its rails until the jack is flush
+   (it clicks past a detent). DRV8833 slid into its rails, components facing in. Wire it all; leave two leads from
+   OUT1/OUT2.
+3. Solder the leads to the N20's tabs, slide the module onto the lid face (the can drops into the cradle), and fit
+   4 × M3 × 25 flat head from the main half's back face.
+4. Tilt rod in through the module's tube.

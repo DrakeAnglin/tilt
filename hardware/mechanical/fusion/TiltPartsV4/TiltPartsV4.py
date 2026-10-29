@@ -89,9 +89,11 @@ P = dict(
     # one more sits in a countersink: 3 bolts in all
     cs_d=6.0, m3_clear=3.4, insert_d=4.0, insert_depth=6.7, insert_wall=1.3, n_case_screws=0,
     case_screw_len=16.0,      # (only for auto-picked countersunk bolts; none now)
-    # the drive housing (TiltPod) bolts on with two more case bolts: M3 x 20 flat head, head in the housing's 4 mm
-    # boss, through the lid into M3 inserts in the main half. (-23, 27) was the lid's countersunk bolt; (22, 5.5) is
-    # the only other spot clear of every pocket, the board, the motor and the pegs (grid search, insert wall 1.3)
+    # the sensor module (TiltPod) holds the AS5600 board and closes the lid side. ALL case bolts now go in from the
+    # main half's back face (countersunk M3 x 25 flat head), through both halves (and the board) into heat-set inserts
+    # in the module: every head is on an open outside face. Bolts: the board's diagonal pair + these two. (-23, 27)
+    # was the lid's countersunk bolt; (22, 5.5) is the only other spot clear of every pocket, the board, the motor and
+    # the pegs (grid search, insert wall 1.3)
     pod_bolts=((-23.0, 27.0), (22.0, 5.5)),
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
     ss_z=18, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=14.45, ss_shaft_d=4.0,   # 18T: the board bolts pass it
@@ -918,17 +920,12 @@ def case_plan(L):
     x0, x1 = slab_x(L)
     X = lambda xa, xb, y, z, r, r2=None: Prim('cyl', p1=(xa, y, z), p2=(xb, y, z), r=r, **({} if r2 is None else {'r2': r2}))
     holes = {'Case left': [], 'Case right': []}
-    for k, (y, z) in enumerate(bosses):
-        holes['Case left'].append(('screw clearance', X(x0 - 1, 0.5, y, z, P['m3_clear'] / 2)))
-        if (y, z) not in fixed and (y, z) not in pod_bolts:   # flat head (board / housing bolts: head outside). In a lid thicker than
-            cs = P['cs_d'] / 2                    # the screw allows, a counterbore takes the head down to its seat
-            seat = max(x0, x1 - 0.8 - P['case_screw_len'])
-            if seat > x0:
-                holes['Case left'].append(('screw counterbore', X(x0 - 1, seat + 0.01, y, z, cs + 0.1)))
-            holes['Case left'].append(('screw countersink', X(seat - 0.01, seat + cs - P['m3_clear'] / 2, y, z, cs,
-                                                              P['m3_clear'] / 2)))
-        holes['Case right'].append(('screw clearance', X(-0.5, x1 - P['insert_depth'] + 0.01, y, z, P['m3_clear'] / 2)))
-        holes['Case right'].append(('screw insert', X(x1 - P['insert_depth'], x1 + 1, y, z, P['insert_d'] / 2)))
+    for k, (y, z) in enumerate(bosses):           # bolts from the main half's back face: countersink there,
+        holes['Case left'].append(('screw clearance', X(x0 - 1, 0.5, y, z, P['m3_clear'] / 2)))    # clearance through
+        holes['Case right'].append(('screw clearance', X(-0.5, x1 + 1, y, z, P['m3_clear'] / 2)))
+        cs = P['cs_d'] / 2
+        holes['Case right'].append(('screw countersink', X(x1 + 0.01, x1 - (cs - P['m3_clear'] / 2), y, z, cs,
+                                                           P['m3_clear'] / 2)))
     for y, z in pegs:
         holes['Case left'].append(('peg socket', X(-(P['peg_h'] + 0.4), 0.1, y, z, P['peg_d'] / 2 + 0.15)))
     peg_solids = [X(0.5, -P['peg_h'], y, z, P['peg_d'] / 2) for y, z in pegs]   # on the main half (prints split face up)
@@ -1082,7 +1079,22 @@ def build_refs(root, L, mo_len):
         b = pr.brep(tbm)
         tbm.booleanOperation(b, notch_box().brep(tbm), adsk.fusion.BooleanTypes.DifferenceBooleanType)
         bodies.append((nm, b))
-    for b in add_bodies(comp, [(nm, pr.brep(tbm)) for nm, pr in items] + bodies):
+    # N20: square gearbox, then the can (Ø12 round with two flats 10 apart, flats top and bottom), end cap, tabs
+    items = [it for it in items if it[0] != 'N20']
+    u, q = L['u'], L['face']
+    gb = Prim('box', c=add(q, mul(u, P['n20_gbx'] / 2)), u=u, w=L['w'], L=P['n20_gbx'], W=P['n20_w'], H=P['n20_h']).brep(tbm)
+    can_l = P['n20_motor']
+    can = Prim('cyl', p1=add(q, mul(u, P['n20_gbx'])), p2=add(q, mul(u, P['n20_gbx'] + can_l)), r=P['n20_w'] / 2).brep(tbm)
+    tbm.booleanOperation(can, Prim('box', c=add(q, mul(u, P['n20_gbx'] + can_l / 2)), u=u, w=L['w'], L=can_l + 1,
+                                   W=P['n20_w'] + 1, H=P['n20_h']).brep(tbm), adsk.fusion.BooleanTypes.IntersectionBooleanType)
+    tbm.booleanOperation(gb, can, adsk.fusion.BooleanTypes.UnionBooleanType)
+    endc = Prim('cyl', p1=add(q, mul(u, P['n20_gbx'] + can_l)), p2=add(q, mul(u, mo_len)), r=4.5).brep(tbm)
+    tbm.booleanOperation(gb, endc, adsk.fusion.BooleanTypes.UnionBooleanType)
+    for sy in (-1, 1):
+        tab = Prim('box', c=add(add(q, mul(u, mo_len + 1.25)), mul(L['w'], sy * 2.5)), u=u, w=L['w'], L=2.5, W=1.0, H=2.0).brep(tbm)
+        tbm.booleanOperation(gb, tab, adsk.fusion.BooleanTypes.UnionBooleanType)
+    extra = [('N20', gb)]
+    for b in add_bodies(comp, [(nm, pr.brep(tbm)) for nm, pr in items] + extra + bodies):
         if b.name.startswith('Rail'):
             b.opacity = 0.25
     return occ, comp
