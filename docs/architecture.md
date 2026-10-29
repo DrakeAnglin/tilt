@@ -1,77 +1,70 @@
-# System architecture
+# System architecture (v0.4: cordless, Matter over Thread)
+
+Decided 2026-10-28 with the owner: **ESP32-C6 SuperMini, Matter over Thread, controller inside a headrail, one 18650
+cell charged from USB-C or a small solar panel facing the window.** One controller drives up to 3 blinds.
 
 ```
- Wall outlet
-     │  (certified 5 V / 3 A USB-C adapter: the only thing touching mains)
-     ▼
-┌──────────────────────── Controller PCB ────────────────────────┐
-│ USB-C in ─► bulk caps ─┬─► 3.3 V buck/LDO ─► ESP32-S3 module    │
-│                        │                    (Wi-Fi + BLE)      │
-│                        └─► 2× DRV8833 dual H-bridge (4 ch)     │
-│                                 │   │   │   │(spare/lift)      │
-│ Button + status LED           M1  M2  M3  M4                   │
-└────────────────────────────────┼───┼───┼───────────────────────┘
-                                 │   │   │  6-wire cables (≤3 m)
-                              N20 N20 N20  motor + Hall encoder, in each headrail
+ 6 V solar panel ──┐                                   (facing the glass)
+ USB-C 5 V ────────┤
+                   ▼
+            ┌──────────────┐   VBAT 3.0–4.2 V   ┌──────────────────────────────────────────────┐
+            │ Li-ion charger│──────────────────►│ ESP32-C6 SuperMini (5V pin; on-board 3.3 V LDO)│
+            │ (bq24074,     │   ▲  18650 cell    │  Matter over Thread, sleepy end device        │
+            │  power-path)  │───┘  (protected)   └──┬───────────┬───────────┬────────────┬───────┘
+            └──────────────┘                       │ PWM ×6     │ ADC ×3     │ EN lines   │ ADC
+                   │ VBAT                           ▼            ▲           ▼            ▼
+                   ├──► 5 V boost (EN, motors only)─► 2 × DRV8833 (nSLEEP) ─► M1 M2 M3   VBAT/2 divider
+                   └──► sensor power switch (P-FET) ─► 3.3 V to the three AS5600 boards
+                                                        │
+                       5-pin JST-PH per blind ──────────┘  (motor +, motor −, 3V3, GND, angle OUT)
 ```
 
-## Microcontroller: ESP32-S3 (module: ESP32-S3-WROOM-1-**N8**, 8 MB flash)
-- **Hardware pulse counters (PCNT, 4 units):** one per encoder, counting quadrature in hardware with zero CPU load. 3 tilt motors + 1 spare. (The ESP32-**C3 has no PCNT**, so avoid it. The classic ESP32 has 8 units if we ever need 6 motors for tilt + lift.)
-- **8 MB flash** because Matter firmware is large, and OTA needs two app slots. (4 MB forces the "Huge APP, no OTA" partition, which conflicts with requirement C-6.)
-- Native USB for flashing and logs, so no USB-UART chip is needed.
-- Dev phase: **ESP32-S3-DevKitC-1 (N8R2 or N8R8)**. Anything "ESP32 Arduino" works with this.
+## Why these choices
+- **Thread, not Wi-Fi.** On battery the radio dominates. A Wi-Fi ESP32 in power-save mode averages ~3–6 mA
+  (~70–150 mAh/day); an ESP32-C6 as a Thread *sleepy end device* averages well under 1 mA. The owner has a Thread
+  border router, and Matter over Thread works with both Apple Home and Alexa.
+- **ESP32-C6 SuperMini.** Small (≈ 22.5 × 18 mm), Wi-Fi 6 + Thread + BLE (BLE for commissioning), enough GPIO
+  including the 4 ADC inputs needed. The S3 (Wi-Fi only) would cost weeks of battery instead of months.
+- **AS5600 analog OUT, not I²C.** All AS5600s share one I²C address; three analog inputs avoid a multiplexer. The
+  sensors are absolute, so they are **powered only while a motor moves** (3 × 6.5 mA would otherwise drain
+  ~470 mAh/day). A wand move while they're off is still read correctly next time.
+- **Motors on a switched 5 V boost.** The N20s are 6 V parts; at 5 V they run ~250 RPM. The boost is enabled only
+  while moving, so its idle draw is zero. The DRV8833s sleep (≈ 2 µA) between moves.
+- **Charger with power-path (bq24074).** Takes USB-C 5 V or a 5–6 V solar panel, charges the cell, and powers the
+  load at the same time.
 
-## Motor driver: 2× TI DRV8833
-- 2.7–10.8 V, ~1.5 A RMS per channel: far above an N20's needs; runs straight from the 5 V rail.
-- **Built-in current limiting** via a sense resistor on each bridge: a hardware torque limit that protects the N20 gearbox even if firmware hangs. Set it just below the measured stall current.
-- PWM at 20–25 kHz (inaudible), slow-decay (brake) mode for smooth low-speed control and idle damping.
-- JLCPCB stocks it, so it suits one-order assembly.
-- Alternative: TB6612FNG (similar, no built-in current limit).
+## Power budget (estimates, 3 blinds, ~4 moves each per day)
+| Load | mAh / day |
+|---|---|
+| ESP32-C6, Thread sleepy end device + LDO + charger quiescent | ~15–25 |
+| Motors: 12 moves × ~3 s × ~250 mA from the cell (5 V boost) | ~3–5 |
+| AS5600 ×3, only during moves | < 1 |
+| **Total** | **~20–30** |
 
-## Power: single 5 V USB-C
-- **Why 5 V:** USB-C adapters are everywhere, certified, and cheap. The ESP32 and DRV8833 both run from it directly. A 6 V N20 at 5 V just runs ~17% slower and quieter.
-- Budget: ESP32 peak ~0.5 A + 3 motors × stall ~0.5 A = ~2 A worst case → **5 V/3 A adapter**. USB-C CC pull-downs (5.1 kΩ) so any USB-C charger supplies 5 V.
-- Brownout protection: ≥ 470 µF bulk on the motor rail, LC/ferrite split between motor and logic rails, firmware staggers motor starts by ~100 ms.
-- **Future option:** a footprint for a USB-PD trigger chip (CH224K) to request 9 V if we ever move to 9 V/12 V motors for very heavy blinds or lift.
-- Long cable runs to the outlet: USB-C cables up to 3 m are fine at 2 A. Beyond that, put a 5 V barrel-jack adapter footprint as an alternative input.
+18650 at ~3000 mAh usable → **~3–4 months with no sun**. A 6 V 1 W panel behind glass gives maybe 100–300 mAh on a
+sunny day, so in a window it should stay charged. To verify on the bench with a USB power meter.
 
-## Motor cabling
-- 6 conductors per motor: M+, M−, encoder VCC (3.3 V), GND, A, B.
-- Suggested connector: **RJ12 (6P6C)**: cheap, locking, pre-made cables in any length, 26 AWG is fine for < 0.5 A at 3 m. Alternative: JST-XH 6-pin + custom cable.
-- Encoder lines over 3 m: 10 kΩ pull-ups at the controller, RC filter (~100 Ω/1 nF), ESD diodes (TVS array) on every connector pin. PCNT glitch filter enabled.
-- A tiny breakout board at the motor end (or direct solder + heat shrink) turns the N20's 6-pin header into the RJ12 jack.
+## Pin plan (ESP32-C6 SuperMini, to confirm against the board's printed pinout)
+| Function | Pins |
+|---|---|
+| Motor 1 / 2 / 3 (DRV8833 IN1/IN2, 20 kHz PWM) | GPIO18+19, GPIO20+21, GPIO22+23 |
+| Angle sensors 1 / 2 / 3 (AS5600 OUT, ADC) | GPIO0, GPIO1, GPIO2 |
+| Battery voltage (VBAT/2 divider, 2 × 1 MΩ, ADC) | GPIO3 |
+| DRV8833 nSLEEP (both) | GPIO4 |
+| 5 V boost EN | GPIO5 |
+| Sensor power (P-FET gate) | GPIO6 |
+| Charger status (CHG, PGOOD) | GPIO7, GPIO14 |
+| Boot button / on-board LED | GPIO9 / GPIO15 (LED: remove or leave off to save power) |
 
-## Firmware (overview, details later in `firmware/`)
-- **Framework:** Arduino-ESP32 core 3.x via PlatformIO/Arduino IDE. It now includes a `MatterWindowCovering` class with lift + tilt and covering types such as `BLIND_TILT_ONLY` and `BLIND_LIFT_AND_TILT`. If Arduino Matter hits limits, fall back to ESP-IDF + esp-matter (same chip, more control).
-- **Motion control per motor:** target position in encoder counts → trapezoidal speed profile → PI speed loop on encoder rate → stop + brake at target.
-- **Stall detection:** commanded PWM high but encoder rate ≈ 0 for > 150 ms → stop. Doubles as **homing**: drive gently into the fully closed end stop, zero the count there.
-- **Position persistence:** write position to NVS (flash) on every stop. Re-home opportunistically whenever a move targets a hard end.
-- **Matter endpoints:** one Window Covering endpoint per enabled motor (3 named blinds in Alexa/Home).
-- **Local API:** HTTP + WebSocket JSON API for the setup app; mDNS name `blinds-<id>.local`.
-- **OTA:** dual-partition, from the setup app (upload or GitHub release URL).
+## Cabling: one plug per blind
+- **5-pin JST-PH (2.0 mm, latching):** 1 motor +, 2 motor −, 3 3V3 (sensor), 4 GND, 5 angle OUT.
+- On the tilter: a printed cover on the lid holds the socket and covers the motor tabs and the AS5600's solder
+  joints, so tilter + motor + sensor + plug are one closed unit.
+- At the controller: three JST-PH sockets on the case end.
+- Runs between headrails: 26 AWG 5-core, pre-crimped JST-PH leads or crimped to length.
 
-## Smart home: Matter over Wi-Fi
-One protocol covers **Apple Home, Alexa, Google Home, SmartThings, and Home Assistant**, works locally, and needs no cloud
-account or skill.
-
-- Commissioning: scan the Matter QR code in Apple Home or the Alexa app. That also provisions Wi-Fi over BLE.
-- Multi-admin: the same blind can be in Apple Home and Alexa simultaneously.
-- **Risk to verify early:** ecosystems differ in how they show *tilt*. Apple Home has tilt controls. Alexa's handling of Matter
-  tilt is unclear. **Mitigation:** a firmware setting to expose tilt-only blinds as a simple *lift* position (0% = closed,
-  100% = slats open/horizontal). Every ecosystem handles that, and "Alexa, open/close/set to 50%" just works.
-  Switch to true lift + tilt when the lift bonus lands.
-- Fallback for Alexa if Matter disappoints: Sinric Pro (free tier, Alexa skill with blinds support) or a custom Alexa Smart Home skill (more work, needs a cloud endpoint).
-- Matter requires an Echo/HomePod/Apple TV/Google Nest as a hub for remote access. Local control works without it.
-
-## Setup app
-1. **Phase 1: web app hosted by the controller** (served from flash). Works on any phone/PC, no App Store, no $99/yr Apple fee. Covers naming, calibration wizard, sliders, schedules, OTA, logs.
-2. **Phase 2 (optional): native Flutter app** that discovers all controllers via mDNS and shows the whole house. Mostly a wrapper around the same local API.
-
-Provisioning paths: Matter commissioning (preferred) → or BLE "Improv Wi-Fi" from the web flasher → or a SoftAP captive portal fallback.
-
-## Calibration flow (per motor)
-1. Jog buttons, confirm direction ("does this tilt slats **down**?"), and flip it if not.
-2. Drive to slats-down-closed → firmware detects stall → sets **0**.
-3. Drive to slats-up-closed → stall → sets **max**. Firmware backs off a few % from each stall point so normal moves never hit the hard stop.
-4. Pick what "Close" means: down (privacy, default) or up (blocks more sun).
-5. "Open" = slats horizontal = midpoint (adjustable).
+## Still open
+- Free length inside the headrail for the controller (case is ~50 × 30 mm in section; length set by the 18650 holder
+  plus boards, ~100–110 mm).
+- Which rail face looks at the glass (where the solar panel and its lead go).
+- Cable lengths to the other two blinds.
