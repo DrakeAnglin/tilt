@@ -9,12 +9,12 @@ cell charged from USB-C or a small solar panel facing the window.** One controll
                    ▼
             ┌──────────────┐   VBAT 3.0–4.2 V   ┌──────────────────────────────────────────────┐
             │ Li-ion charger│──────────────────►│ ESP32-C6 SuperMini (5V pin; on-board 3.3 V LDO)│
-            │ (bq24074,     │   ▲  18650 cell    │  Matter over Thread, sleepy end device        │
+            │ (MCP73871,    │   ▲  18650 cell    │  Matter over Thread, sleepy end device        │
             │  power-path)  │───┘  (protected)   └──┬───────────┬───────────┬────────────┬───────┘
             └──────────────┘                       │ PWM ×6     │ ADC ×3     │ EN lines   │ ADC
                    │ VBAT                           ▼            ▲           ▼            ▼
                    ├──► 5 V boost (EN, motors only)─► 2 × DRV8833 (nSLEEP) ─► M1 M2 M3   VBAT/2 divider
-                   └──► sensor power switch (P-FET) ─► 3.3 V to the three AS5600 boards
+                   └──► (sensor 3V3 from a GPIO) ──► the three AS5600 boards
                                                         │
                        5-pin JST-PH per blind ──────────┘  (motor +, motor −, 3V3, GND, angle OUT)
 ```
@@ -30,8 +30,9 @@ cell charged from USB-C or a small solar panel facing the window.** One controll
   ~470 mAh/day). A wand move while they're off is still read correctly next time.
 - **Motors on a switched 5 V boost.** The N20s are 6 V parts; at 5 V they run ~250 RPM. The boost is enabled only
   while moving, so its idle draw is zero. The DRV8833s sleep (≈ 2 µA) between moves.
-- **Charger with power-path (bq24074).** Takes USB-C 5 V or a 5–6 V solar panel, charges the cell, and powers the
-  load at the same time.
+- **Charger with power-path (MCP73871).** Takes 5 V from a USB-C breakout or a 5–6 V solar panel, charges the
+  cell, and powers the load at the same time.
+- **Sensors powered from a GPIO.** Three AS5600s draw ≈ 20 mA together, within one GPIO's drive, so no MOSFET.
 
 ## Power budget (estimates, 3 blinds, ~4 moves each per day)
 | Load | mAh / day |
@@ -52,7 +53,7 @@ sunny day, so in a window it should stay charged. To verify on the bench with a 
 | Battery voltage (VBAT/2 divider, 2 × 1 MΩ, ADC) | GPIO3 |
 | DRV8833 nSLEEP (both) | GPIO4 |
 | 5 V boost EN | GPIO5 |
-| Sensor power (P-FET gate) | GPIO6 |
+| Sensor power (GPIO drives the 3V3 line directly) | GPIO6 |
 | Charger status (CHG, PGOOD) | GPIO7, GPIO14 |
 | Boot button / on-board LED | GPIO9 / GPIO15 (LED: remove or leave off to save power) |
 
