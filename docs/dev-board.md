@@ -21,7 +21,7 @@ row-to-row spacing (modelled 15.24, the next grid option 17.78 is kept free) and
 | | |
 |---|---|
 | Case | **136.4 × 46.0 × 23.0 mm** outer, wall/floor/lid 1.2 |
-| Perfboard | one piece cut from the 70 × 90 board along hole rows: ear A 10 × 16 holes, strip 28 × 9, ear B 4 × 9; **448 holes, 100 used** |
+| Perfboard | one piece cut from the 9 × 15 cm board along hole rows (needs 42 × 16 holes: 107 × 41 mm): ear A 10 × 16 holes, strip 28 × 9, ear B 4 × 9; **448 holes, 100 used** |
 | Heights (Z from rail floor) | hung breakouts 2.7–4.3 · perfboard 6.8–8.4 · module PCBs from 10.9 · tallest top part 16.9 (XH plug) · lid underside 21.8, rod groove 19.0 |
 | Under the strip | 5.6 mm from the floor to the board's underside for wiring and trimmed pin tails |
 | Pins | every pin on a hole of the cut outline, no hole shared |
