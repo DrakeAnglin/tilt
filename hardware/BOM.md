@@ -23,9 +23,12 @@ Controller hardware follows [docs/architecture.md](../docs/architecture.md) (cor
 | 18650 2600 mAh, protected, JST XH2.54 lead (XINLANTECH) | 1 → **set to 4** | 3 (+1) | [B0CHY872T5](https://www.amazon.com/dp/B0CHY872T5) | $11.72 each |
 | 5 V synchronous boost with EN pin, 10-pack (QEBIDUM) | 1 | 3 | [B0CPJNTJ96](https://www.amazon.com/dp/B0CPJNTJ96) | $6.99 |
 | USB-C female breakout, 5.1 kΩ CC resistors, 10-pack (Teansic) | 1 | 3 | [B0GYNCFDDX](https://www.amazon.com/dp/B0GYNCFDDX) | $9.99 |
-| 6 V 2 W 330 mA solar panel, 136 × 110 mm (Sunnytech) | 1 → **set to 3** | 3 | [B00HQXQOIQ](https://www.amazon.com/dp/B00HQXQOIQ) | $7.99 each |
-| JST-PH 2.0 connector kit, 2–9 pin housings + headers, 120 pre-crimped leads (EGSCST) | 1 | 8 plugs + 8 sockets | [B0H3WF134X](https://www.amazon.com/dp/B0H3WF134X) | $16.99 |
-| 5-conductor 24 AWG cable, 10 m (BTF-LIGHTING) | 1 → **set to 3** | ~25 m | [B0D5GM23PS](https://www.amazon.com/dp/B0D5GM23PS) | $13.99 each |
+| 6 V 0.8 W 130 mA monocrystalline ETFE panel, 70 × 69 mm, ZH 1.5 2-pin lead, 3-pack | 1 | 3 | [B0H1LQFFPN](https://www.amazon.com/dp/B0H1LQFFPN) | $19.xx |
+| ~~6 V 2 W solar panel, 136 × 110 mm (Sunnytech)~~ **remove from cart:** too large | 1 → 0 | 0 | [B00HQXQOIQ](https://www.amazon.com/dp/B00HQXQOIQ) | $7.99 |
+| RJ12 6P6C cord, **white, straight-wired**, 10 ft, 2-pack (LanSenSu) | 1 → **set to 2** | 4 cords (far blinds) | [B0C1VK4W51](https://www.amazon.com/dp/B0C1VK4W51) | $7.15 |
+| RJ12 6P6C cord, **white, straight-wired**, 6.6 ft, 2-pack (LanSenSu) | 1 → **set to 2** | 4 cords (near blinds) | [B0C1VJN3DL](https://www.amazon.com/dp/B0C1VJN3DL) | $5.98 |
+| JST-PH 2.0 connector kit, 2–9 pin housings + headers, 120 pre-crimped leads (EGSCST) | 1 | internal leads | [B0H3WF134X](https://www.amazon.com/dp/B0H3WF134X) | $16.99 |
+| ~~5-conductor 24 AWG cable (BTF-LIGHTING)~~ **remove from cart:** replaced by RJ12 cords | 1 → 0 | 0 | [B0D5GM23PS](https://www.amazon.com/dp/B0D5GM23PS) | $13.99 each |
 | ruthex M3 heat-set inserts RX-M3x5.7 (Ø4.0 hole), 100 pcs | 1 | 24 | [B08BCRZZS3](https://www.amazon.com/dp/B08BCRZZS3) | $9.99 |
 | M3 countersunk socket screws, 4–20 mm, 500 pcs (Zmbroll; has M3 × 16) | 1 | 8 × M3×16 | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) | $9.98 |
 | M3 × 18 countersunk socket screws, 50 pcs (HirtuOtter) | 1 | 16 | [B0DKY7NFVH](https://www.amazon.com/dp/B0DKY7NFVH) | $5.63 |
@@ -50,8 +53,8 @@ with the USB meter before relying on it; if it browns out, swap for a ≥ 1 A bo
 The 18650 holders are printed into the controller case (the cells come with a JST XH lead). Sensors are powered
 from a GPIO (≈ 20 mA for three), so no MOSFET.
 
-**Solar panel size:** 136 × 110 mm is the 2 W size. If it doesn't fit the glass-side face of the headrail, swap for a
-smaller 6 V panel (output drops roughly with area).
+RJ12 6P6C jacks: 17 (8 tilters + 3 ports × 3 controllers), not in the cart; from the owner's breakout stock for
+the prototype. Path: breadboard → soldered dev board → custom PCB.
 
 Dropped from the earlier plan: ESP32-S3 boards and 5 V wall supplies (now cordless), the separate 6 × 2.5 mm
 magnets (the boards' own Ø4 × 2 magnets are used), M2 standoffs and M2 inserts (the AS5600 now bolts through the

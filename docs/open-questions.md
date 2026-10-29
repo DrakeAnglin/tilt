@@ -24,12 +24,12 @@
 | D1 | Drive point: tilter input (A) or tilt rod with tilter removed (B)? | **C: motorized tilter** (keep worm + wand, N20 on the worm input). B fallback | Reopened: C recommended |
 | D2 | N20 gear ratio | Choose from measured torque; 40 RPM for A, likely 15 RPM or worm N20 for B on large blinds | Needs measurements |
 | D3 | Motor ports per controller: 4 (3 tilt + spare) or 6 (tilt + lift ×3)? | 4 for v1 board unless lift is proven early | Open |
-| D4 | MCU | ESP32-S3-WROOM-1-N8 | Proposed |
+| D4 | MCU | ESP32-C6 (SuperMini for the prototype) | Decided 2026-10-28 |
 | D5 | Firmware framework | Arduino-ESP32 3.x (Matter built in), ESP-IDF fallback | Proposed |
-| D6 | Smart home protocol | Matter over Wi-Fi | Proposed: verify Alexa tilt handling early |
+| D6 | Smart home protocol | Matter over Thread (sleepy end device) | Decided 2026-10-28: verify Alexa tilt handling early |
 | D7 | Setup app | Device-hosted web app first, Flutter later | Proposed |
-| D8 | Motor connector | RJ12 6P6C | Proposed |
-| D9 | Supply | 5 V/3 A USB-C | Proposed |
+| D8 | Motor connector | RJ12 6P6C, white straight-wired cords | Decided 2026-10-28 |
+| D9 | Supply | 18650 + solar (6 V 0.8 W) + USB-C charging | Decided 2026-10-28 |
 | D10 | Isolation material | Test 95A TPU vs Bambu TPU for AMS (68D) | Test |
 | D11 | Keep the manual wand? | Yes, with Option C | Owner prefers keeping it |
 | D12 | License | CERN-OHL-S / MIT / CC BY-SA | Ask |

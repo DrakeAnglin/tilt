@@ -3,6 +3,9 @@
 Decided 2026-10-28 with the owner: **ESP32-C6 SuperMini, Matter over Thread, controller inside a headrail, one 18650
 cell charged from USB-C or a small solar panel facing the window.** One controller drives up to 3 blinds.
 
+**Path to hardware:** breakout boards on a breadboard first, then everything soldered onto a perfboard dev board,
+then a custom PCB once that works. Everything is modular: every device plugs in, nothing is hard-wired between units.
+
 ```
  6 V solar panel ──┐                                   (facing the glass)
  USB-C 5 V ────────┤
@@ -16,7 +19,7 @@ cell charged from USB-C or a small solar panel facing the window.** One controll
                    ├──► 5 V boost (EN, motors only)─► 2 × DRV8833 (nSLEEP) ─► M1 M2 M3   VBAT/2 divider
                    └──► (sensor 3V3 from a GPIO) ──► the three AS5600 boards
                                                         │
-                       5-pin JST-PH per blind ──────────┘  (motor +, motor −, 3V3, GND, angle OUT)
+                       RJ12 6P6C per blind ─────────────┘  (motor +, motor −, 3V3, GND, angle OUT, GND)
 ```
 
 ## Why these choices
@@ -42,7 +45,7 @@ cell charged from USB-C or a small solar panel facing the window.** One controll
 | AS5600 ×3, only during moves | < 1 |
 | **Total** | **~20–30** |
 
-18650 at ~3000 mAh usable → **~3–4 months with no sun**. A 6 V 1 W panel behind glass gives maybe 100–300 mAh on a
+18650 at ~3000 mAh usable → **~3–4 months with no sun**. A 6 V 0.8 W panel (70 × 69 mm) behind glass gives maybe 80–250 mAh on a
 sunny day, so in a window it should stay charged. To verify on the bench with a USB power meter.
 
 ## Pin plan (ESP32-C6 SuperMini, to confirm against the board's printed pinout)
@@ -57,12 +60,22 @@ sunny day, so in a window it should stay charged. To verify on the bench with a 
 | Charger status (CHG, PGOOD) | GPIO7, GPIO14 |
 | Boot button / on-board LED | GPIO9 / GPIO15 (LED: remove or leave off to save power) |
 
-## Cabling: one plug per blind
-- **5-pin JST-PH (2.0 mm, latching):** 1 motor +, 2 motor −, 3 3V3 (sensor), 4 GND, 5 angle OUT.
-- On the tilter: a printed cover on the lid holds the socket and covers the motor tabs and the AS5600's solder
-  joints, so tilter + motor + sensor + plug are one closed unit.
-- At the controller: three JST-PH sockets on the case end.
-- Runs between headrails: 26 AWG 5-core, pre-crimped JST-PH leads or crimped to length.
+## Connectors (everything modular)
+| Link | Connector |
+|---|---|
+| Tilter ↔ controller | **RJ12 6P6C** jack on the tilter's plug cover and 3 on the controller; white straight-wired phone cords |
+| Solar panel ↔ controller | 2-pin ZH 1.5 mm (comes on the panel's lead); matching socket on the controller |
+| Battery ↔ controller | JST-XH 2-pin (comes on the cell) |
+| Charging | USB-C on the controller end |
+
+**RJ12 pinout** (cords must be *straight-wired*, pin 1 to pin 1; ordinary phone cords are reversed):
+1 motor +, 2 motor −, 3 3V3 (sensor), 4 angle OUT, 5 GND, 6 GND.
+
+- On the tilter: a printed cover on the lid holds the RJ12 jack and covers the motor tabs and the AS5600's solder
+  joints, so tilter + motor + sensor + plug are one closed unit. Short JST-PH or soldered leads inside the cover.
+- **Colour:** visible parts are white: white cords, white PLA cases. The solar panel's cells are black (a white
+  cell can't absorb light), so it sits in a white printed frame with the cells facing the glass; from inside the
+  room only the white back shows.
 
 ## Still open
 - Free length inside the headrail for the controller (case is ~50 × 30 mm in section; length set by the 18650 holder
