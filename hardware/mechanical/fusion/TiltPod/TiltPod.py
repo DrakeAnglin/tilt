@@ -31,15 +31,16 @@ P = dict(
     ins_d=4.0, ins_hole=8.0, ins_wall=1.5,
     # AS5600 board seat: rests on 4 bosses behind its corners, front flush with the open face
     board=(2.75, 26.15, 7.88, 31.28), board_t=1.6, chip=(14.45, 19.58), hole_off=8.0, board_hole=3.7,
-    pin_holes=((22.45, 11.58), (6.45, 27.58)), pin_d=3.75,
+    pin_holes=((6.45, 27.58),), pin_d=3.75,     # one pin; the board's other spare hole stays free
     # N20
     n20_axis=(-10.19, 8.81), n20_w=12.0, n20_h=10.0, gbx=(-6.83, -15.83), can=(-15.83, -30.83), cap_end=-31.83,
     tab_end=-34.3, motor_clear=0.4,
     # RJ12 breakout (listing photo): board 19.4 W x 19.9 D x 1.6, jack 13.5 W x 14.7 L x 13.0 H overhanging 4.5
-    rj_bw=19.4, rj_bd=19.9, rj_jw=13.5, rj_jl=14.7, rj_jh=13.0, rj_over=4.5, rj_y=13.5, rj_z=5.0,
+    rj_bw=19.4, rj_bd=19.9, rj_jw=13.5, rj_jl=14.7, rj_jh=13.0, rj_over=4.5, rj_y=-11.85, rj_z=17.0,
     rj_mouth_w=9.9, rj_mouth_h=8.6,
-    # DRV8833 (18.5 x 16): in the XZ plane against the room-side wall, 16 along X, its +X end next to the open face
-    drv_l=16.0, drv_h=18.5, drv_t=1.6, drv_y=-23.2, drv_x1=-9.8, drv_z0=2.2,
+    # DRV8833 (18.5 x 16): standing in the XZ plane in the back-middle, 16 along X; its +X end stops just behind the
+    # AS5600 board, which closes its rails
+    drv_l=16.0, drv_h=18.5, drv_t=1.6, drv_y=14.7, drv_x1=-10.5, drv_z0=4.0,
 )
 p = P
 P['iw'] = p['half_w'] - p['wall']
@@ -112,6 +113,8 @@ def build(tbm, bx, cyl, cone, uni, cut):
         if min(dz_floor, dz_ceil) < 6:
             zw = (p['step_z'] - p['ceil'] + 0.5) if dz_ceil < dz_floor else fz - 0.5
             body = uni(body, bx(xin, xb, y - r * 0.85, y + r * 0.85, z, zw))
+            if dw < 6:                                    # in a corner: fill it solid (no slot between the ribs)
+                body = uni(body, bx(xin, xb, y, sy * (iw + 0.5), z, zw))
         return body
 
     def stub(y, z, r, xa, xb, taper=True):
@@ -135,11 +138,11 @@ def build(tbm, bx, cyl, cone, uni, cut):
     seat = x1 - bt                                        # board's back face
     bA, bB = p['bolts_board']                             # (6.45, 11.58), (22.45, 27.58)
     rC, rD = p['bolts_rim']                               # (-23, 27), (22, 5.5)
-    pE, pF = p['pin_holes']                               # (22.45, 11.58), (6.45, 27.58)
+    pF, = p['pin_holes']                                  # (6.45, 27.58)
     # bolt A sits over the RJ12 jack's path: its boss is carried down to the end wall by a rib beside the jack
-    # (Y 2.95..6.6, clear of the jack at Y >= 6.75 and above the RJ12 board)
+    # (Y 2.95..6.3, clear of the jack's opening at Y >= 6.45 and above the RJ12 board)
     cup = uni(cup, cyl((seat - p['ins_hole'] - 1.0, bA[0], bA[1]), (seat, bA[0], bA[1]), ir),
-              bx(xin, seat, bA[0] - ir, 6.6, bA[1] - 3.0, bA[1] + 3.0),
+              bx(xin, seat, bA[0] - ir, 6.3, bA[1] - 3.0, bA[1] + 3.0),
               cone((seat - p['ins_hole'] - 1.0, bA[0], bA[1]), ir, (seat - p['ins_hole'] - 1.0 - ir + 0.3, bA[0], bA[1]), 0.3))
     cup = uni(cup, column(bB[0], bB[1], ir, seat))        # bolt B: a full column (nothing below it)
     cup = uni(cup, column(rC[0], rC[1], ir, x1))          # bolt C: a full column above the DRV8833 rails
@@ -147,7 +150,6 @@ def build(tbm, bx, cyl, cone, uni, cut):
     # carried up to meet it and a floor rib + gusset carries the rest
     cup = uni(cup, stub(rD[0], rD[1], ir, x1 - p['ins_hole'] - 1.0, x1, taper=False))
     cup = uni(cup, column(pF[0], pF[1], 3.0, seat))       # pin F: a column, merges with the rod tube
-    cup = uni(cup, stub(pE[0], pE[1], 3.0, seat - 3.0, seat))
     for y, z in p['pin_holes']:                           # locating pins through the board's spare holes
         cup = uni(cup, cyl((seat - 0.01, y, z), (x1 - 0.2, y, z), p['pin_d'] / 2))
     # the board pocket in the side wall: the board is wider than the cup's inside on the back side
@@ -159,27 +161,42 @@ def build(tbm, bx, cyl, cone, uni, cut):
     cy0, cy1 = ay - p['n20_w'] / 2 - 1.6, ay + p['n20_w'] / 2 + 1.6
     cr = uni(bx(cx0, cx1, cy0, cy1, fz - 0.5, az + 2.0), gusset(cx0, cy0, cy1, fz - 0.5, az + 2.0, 'floor'))
     cup = uni(cup, cut(cr, n20_section(bx, cyl, cut, uni, cx0 - 12, cx1 + 1, 0.15)))
-    # RJ12 rails: grooved bars along X under the board's two long edges; the board slides in from the open face until
-    # its front edge meets the stop (the jack then sits flush in the end wall); a 0.35 mm bump behind its back edge
-    # snaps it in place
+    # RJ12 breakout: room side, above the motor. That is the one channel from the open face to the end wall that every
+    # boss, rib and the rod tube stay out of, so the board (with its leads soldered) slides straight in on two grooved
+    # rails until the jack sits flush in the end wall. A spring latch in the room-side rail snaps behind the board's back
+    # edge, so pushing a plug in can't move it (release: press the latch toward the wall from the open face).
     gz0, gz1 = p['rj_z'] - 0.1, p['rj_z'] + 1.6 + 0.1
-    for ye, sg in ((p['rj_y'] - p['rj_bw'] / 2, -1), (p['rj_y'] + p['rj_bw'] / 2, 1)):
-        rail = bx(xin, p['rj_x1'] + 2.3, ye - sg * 1.2, ye + sg * 1.6, fz - 0.5, gz1 + 1.2)   # from the end wall
-        rail = cut(rail, bx(p['rj_x0'] - 1, p['rj_x1'] + 2, ye - sg * 1.3, ye + sg * 0.2, gz0, gz1))
-        rail = uni(rail, bx(p['rj_x1'] + 0.15, p['rj_x1'] + 1.0, ye - sg * 1.2, ye + sg * 0.2, gz0, gz0 + 0.35))
-        cup = uni(cup, rail)
-    cup = uni(cup, bx(p['in_x0'] - 0.01, p['rj_x0'], p['rj_y'] - p['rj_bw'] / 2 + 1.0, p['rj_y'] + p['rj_bw'] / 2 - 1.0,
-                      fz - 0.5, p['rj_z'] + 1.5))                     # front stop, under the jack's overhang
+    ry0, ry1 = p['rj_y'] - p['rj_bw'] / 2, p['rj_y'] + p['rj_bw'] / 2       # -20.8 .. -1.4
     jz0 = p['rj_z'] + 1.6
-    cup = cut(cup, bx(x0 - 1, p['in_x0'] + 0.01, p['rj_y'] - p['rj_jw'] / 2 - 0.15, p['rj_y'] + p['rj_jw'] / 2 + 0.15,
-                      jz0 - 0.15, jz0 + p['rj_jh'] + 0.15))           # the jack's window, face flush
-    # DRV8833 rails on the room-side wall, open toward the tilter (the lid face closes them)
+    rj_back = p['rj_x1']
+    # room-side rail: a block from the side wall to 1.2 mm under the board's edge, from the end wall to the latch
+    blk = bx(xin, rj_back + 1.6, -iw - 0.5, ry0 + 1.2, p['rj_z'] - 2.5, gz1 + 1.8)
+    blk = cut(blk, bx(xin - 1, x1 + 1, ry0 - 0.2, ry0 + 1.3, gz0, gz1))                # groove (open to the face)
+    blk = cut(blk, bx(rj_back - 12.0, rj_back + 2.0, ry0 - 3.2, ry0 - 0.2, gz0 - 0.6, gz1 + 0.6))   # latch relief
+    cup = uni(cup, blk)
+    arm = bx(rj_back - 13.6, rj_back + 1.6, ry0 - 2.2, ry0 - 1.0, gz0, gz1)          # spring arm, anchored at -X
+    hook = uni(bx(rj_back + 0.1, rj_back + 0.5, ry0 - 1.0, ry0 + 0.8, gz0, gz1),        # stop face behind the board
+               bx(rj_back + 0.5, rj_back + 0.9, ry0 - 1.0, ry0 + 0.5, gz0, gz1),        # ramp (stepped)
+               bx(rj_back + 0.9, rj_back + 1.3, ry0 - 1.0, ry0 + 0.0, gz0, gz1),
+               bx(rj_back + 1.3, rj_back + 1.6, ry0 - 1.0, ry0 - 0.5, gz0, gz1))
+    cup = uni(cup, arm, hook)
+    # inner rail: hangs from the rod tube, along the board's other edge
+    bar = bx(xin, rj_back + 1.6, ry1 - 1.2, ry1 + 1.6, p['rj_z'] - 2.5, p['rod_z'] - 4.0)
+    bar = cut(bar, bx(xin - 1, x1 + 1, ry1 - 1.3, ry1 + 0.2, gz0, gz1))
+    cup = uni(cup, bar)
+    # front stop for the board's front edge, under the jack's overhang
+    cup = uni(cup, bx(xin, p['rj_x0'], ry0 + 2.0, ry1 - 2.0, p['rj_z'] - 2.5, p['rj_z'] + 1.5))
+    jy0, jy1 = p['rj_y'] - p['rj_jw'] / 2 - 0.15, p['rj_y'] + p['rj_jw'] / 2 + 0.15
+    cup = cut(cup, bx(x0 - 1, p['in_x0'] + 0.01, jy0, jy1, jz0 - 0.15, jz0 + p['rj_jh'] + 0.15))   # jack window, flush
+    # DRV8833: stands on a grooved floor rail, top edge in a rail webbed to bolt B's column; slides in from the open
+    # face to a stop; the AS5600 board covers its +X end once fitted
     dg0, dg1 = p['drv_y'] - 0.15, p['drv_y'] + p['drv_t'] + 0.15
     za, zb = p['drv_z0'], p['drv_z0'] + p['drv_h']
-    xa, xb = p['drv_x1'] - p['drv_l'] - 1.5, x1
-    for rz0, rz1, cz0, cz1 in ((fz - 0.5, za + 2.0, za - 0.2, za + 3.0), (zb - 1.2, zb + 1.2, zb - 3.0, zb + 0.2)):
-        rail = cut(bx(xin, xb, -iw - 0.5, dg1 + 1.4, rz0, rz1), bx(xa + 1.5, xb + 1, dg0, dg1, cz0, cz1))   # from the end wall
+    dx0 = p['drv_x1'] - p['drv_l']
+    for rz0, rz1, cz0, cz1 in ((fz - 0.5, za + 1.5, za - 0.2, za + 3.0), (zb - 1.5, zb + 1.8, zb - 3.0, zb + 0.2)):
+        rail = cut(bx(xin, x1 - 1.6, dg0 - 1.6, dg1 + 1.6, rz0, rz1), bx(dx0 - 0.2, x1 + 1, dg0, dg1, cz0, cz1))
         cup = uni(cup, rail)
+    cup = uni(cup, bx(xin, x1 - 1.6, dg1 + 1.0, bB[0] - 2.0, zb, zb + 1.8))         # web: top rail -> bolt B column
     # rod tube (closed through the module; the rod goes in from outside and may stay sticking out)
     rr = p['rod'] * math.sqrt(2) / 2 + p['rod_clear']
     cup = uni(cup, cyl((x0, 0, p['rod_z']), (p['tube_x1'], 0, p['rod_z']), rr + p['tube_wall']))
@@ -208,7 +225,7 @@ def build(tbm, bx, cyl, cone, uni, cut):
     jack = cut(jack, bx(x0 - 1, x0 + 13, p['rj_y'] - p['rj_mouth_w'] / 2, p['rj_y'] + p['rj_mouth_w'] / 2,
                         mzc - p['rj_mouth_h'] / 2, mzc + p['rj_mouth_h'] / 2))
     parts.append(('RJ12 jack', jack))
-    parts.append(('RJ12 pins', bx(p['rj_x0'] + 1.0, p['rj_x0'] + 10.0, p['rj_y'] - 5, p['rj_y'] + 5, fz + 0.3, p['rj_z'])))
+    parts.append(('RJ12 pins', bx(p['rj_x0'] + 1.0, p['rj_x0'] + 10.0, p['rj_y'] - 5, p['rj_y'] + 5, p['rj_z'] - 3.0, p['rj_z'])))
     dx1, dx0 = p['drv_x1'], p['drv_x1'] - p['drv_l']
     parts.append(('DRV8833', bx(dx0, dx1, p['drv_y'], p['drv_y'] + p['drv_t'], za, zb)))
     parts.append(('DRV8833 chip', bx((dx0 + dx1) / 2 - 2.5, (dx0 + dx1) / 2 + 2.5, p['drv_y'] + p['drv_t'],

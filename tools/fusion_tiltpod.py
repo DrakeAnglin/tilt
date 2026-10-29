@@ -177,7 +177,7 @@ for g, nm in (('Module', 'sensor_module'),):
     opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
     em.execute(opt)
     files.append(path)
-for old_stl in ('pod_tray.stl', 'pod_lid.stl', 'drive_housing.stl', 'drive_cover.stl', 'print/drive_housing.stl',
+for old_stl in ('jack_plate.stl', 'print/jack_plate.stl', 'pod_tray.stl', 'pod_lid.stl', 'drive_housing.stl', 'drive_cover.stl', 'print/drive_housing.stl',
                 'print/drive_cover.stl'):
     try:
         os.remove(os.path.join(STL, old_stl))

@@ -110,11 +110,16 @@ case any more. Reprint both halves.
 
 Assembly
 1. Tilter: worm, wheel, gears, sensor gear + magnet, N20 in the lid (M1.6 screw). No case bolts yet.
-2. Module on the bench: press 4 inserts into its bosses. AS5600 board into the seat at the open face, chip facing out,
-   pressed onto its two pins (**file ~1 mm off the board edge nearest the rod**: the rod's corners pass 0.1 mm into it
-   otherwise; keep the header edge away from that side). RJ12 breakout slid in on its rails until the jack is flush
-   (it clicks past a detent). DRV8833 slid into its rails, components facing in. Wire it all; leave two leads from
-   OUT1/OUT2.
-3. Solder the leads to the N20's tabs, slide the module onto the lid face (the can drops into the cradle), and fit
+2. Module on the bench, everything in through the open face:
+   - press 4 inserts into its bosses;
+   - RJ12 breakout (leads soldered first): room side, above where the motor will go; slide it along its two grooved
+     rails until the jack sits flush in the end wall and the spring latch clicks behind its back edge (release: push
+     the latch toward the side wall with a small screwdriver);
+   - DRV8833 (J2 cut, leads soldered): back-middle, standing on its floor rail, top edge in the upper rail, components
+     facing the middle; slide in to the stop;
+   - AS5600 board into its seat at the open face, chip facing out, pressed onto its pin (**file ~1 mm off the board
+     edge nearest the rod**, header edge away from the rod). It also closes the DRV8833's rails.
+   - Wire it all; leave two leads from OUT1/OUT2 for the motor.
+3. Solder the two leads to the N20's tabs, slide the module onto the lid face (the can drops into the cradle), and fit
    4 × M3 × 25 flat head from the main half's back face.
-4. Tilt rod in through the module's tube.
+4. Tilt rod in through the module's tube at any time.

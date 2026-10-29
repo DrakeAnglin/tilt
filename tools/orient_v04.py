@@ -24,7 +24,7 @@ ORIENT = {
     'worm_wheel': (ID, 'barrel end down'),
     'motor_pinion': (ID, 'on a gear face (45° helical teeth print as 45° overhangs)'),
     'sensor_gear': (ID, 'gear face down, magnet pocket up'),
-    'sensor_module': (X_DOWN, 'end wall (jack window) on the bed, open face up; no supports'),
+    'sensor_module': (X_DOWN, 'end wall on the bed, open face up; no supports'),
 }
 
 
