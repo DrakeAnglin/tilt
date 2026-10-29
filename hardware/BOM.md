@@ -48,8 +48,9 @@ parts are for the breadboard and soldered dev-board stages; the custom PCB comes
 
 Removed from the cart: Sunnytech 2 W panel (too large) and the BTF 5-wire cable (replaced by RJ12 cords).
 
-**Still to add:** 1N5819 Schottky diodes (3 per controller: USB in, solar in, ESP 5V), e.g. EEEEE 150 pcs. The
-charger has a single PWR input, so USB and solar must be diode-ORed.
+**Added 2026-10-28:** [1N5819 Schottky diodes, 150 pcs (EEEEE) B0FC2CWKPL](https://www.amazon.com/dp/B0FC2CWKPL),
+$7.99: 3 per controller (USB in, solar in, ESP 5V); the charger has one PWR input.
+**Still to add:** 30 AWG stranded hookup wire (silicone, 6 colours) for the point-to-point wiring under the board.
 
 **Wiring notes** (full list in [docs/dev-board.md](../docs/dev-board.md))
 - **Solar extension:** the panel's lead is only 4". Make one white extension per controller: ZH socket + white 22/2
