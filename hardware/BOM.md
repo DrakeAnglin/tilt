@@ -22,26 +22,36 @@ Controller hardware follows [docs/architecture.md](../docs/architecture.md) (cor
 | MCP73871 USB/DC/Solar Li-ion charger with power path (Comimark) | 1 → **set to 3** | 3 | [B07V4PHKNX](https://www.amazon.com/dp/B07V4PHKNX) | $8.99 each |
 | 18650 2600 mAh, protected, JST XH2.54 lead (XINLANTECH) | 1 → **set to 4** | 3 (+1) | [B0CHY872T5](https://www.amazon.com/dp/B0CHY872T5) | $11.72 each |
 | 5 V synchronous boost with EN pin, 10-pack (QEBIDUM) | 1 | 3 | [B0CPJNTJ96](https://www.amazon.com/dp/B0CPJNTJ96) | $6.99 |
+| USB-C female breakout, 5.1 kΩ CC resistors, 10-pack (Teansic) | 1 | 3 | [B0GYNCFDDX](https://www.amazon.com/dp/B0GYNCFDDX) | $9.99 |
+| 6 V 2 W 330 mA solar panel, 136 × 110 mm (Sunnytech) | 1 → **set to 3** | 3 | [B00HQXQOIQ](https://www.amazon.com/dp/B00HQXQOIQ) | $7.99 each |
+| JST-PH 2.0 connector kit, 2–9 pin housings + headers, 120 pre-crimped leads (EGSCST) | 1 | 8 plugs + 8 sockets | [B0H3WF134X](https://www.amazon.com/dp/B0H3WF134X) | $16.99 |
+| 5-conductor 24 AWG cable, 10 m (BTF-LIGHTING) | 1 → **set to 3** | ~25 m | [B0D5GM23PS](https://www.amazon.com/dp/B0D5GM23PS) | $13.99 each |
+| ruthex M3 heat-set inserts RX-M3x5.7 (Ø4.0 hole), 100 pcs | 1 | 24 | [B08BCRZZS3](https://www.amazon.com/dp/B08BCRZZS3) | $9.99 |
+| M3 countersunk socket screws, 4–20 mm, 500 pcs (Zmbroll; has M3 × 16) | 1 | 8 × M3×16 | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) | $9.98 |
+| M3 × 18 countersunk socket screws, 50 pcs (HirtuOtter) | 1 | 16 | [B0DKY7NFVH](https://www.amazon.com/dp/B0DKY7NFVH) | $5.63 |
+| M1.6 socket screw kit, 4–12 mm, 250 pcs (Kozelo) | 1 | 8 × M1.6×4 | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) | $11.59 |
+| Metal-film resistor kit, 525 pcs incl. 1 MΩ (ELEGOO) | 1 | 6 × 1 MΩ | [B072BL2VX1](https://www.amazon.com/dp/B072BL2VX1) | $9.99 |
+| Breadboards 4 × 830 + 400 + jumper wires (BOJACK) | 1 | bench | [B08Y59P6D1](https://www.amazon.com/dp/B08Y59P6D1) | $9.99 |
+| Dupont jumper wires M-F/M-M/F-F, 120 pcs (ELEGOO) | 1 | bench | [B01EV70C78](https://www.amazon.com/dp/B01EV70C78) | $6.98 |
 
 **Boost check:** the QEBIDUM board is listed at 0.3 A out. That runs one N20 (~250 mA at 5 V), but not at stall.
 Only one motor runs at a time, and firmware stops on stall (angle not changing), so it should be OK. Bench test it
 with the USB meter before relying on it; if it browns out, swap for a ≥ 1 A board with EN.
 
-## Still to add (Amazon stopped the session with a human check)
+## Already bought (2026-10-28)
+- Plastic-safe grease: [Super Lube 21030 (PTFE)](https://www.amazon.com/dp/B000XBH9HI): worm, worm wheel, thrust steps, helical gears.
+- Ø2 × 6 mm 304 stainless dowel pins, 50 pcs: [HARFINGTON](https://www.amazon.com/s?k=HARFINGTON+50pcs+Dowel+Pins+M2+2mm+x+6mm+304+Stainless+Steel): worm top bearing.
+
+## Still to add
 | Item | Qty | Notes |
 |---|---|---|
-| USB-C breakout (5 V in) | 3 | Feeds the charger's DC input |
-| 6 V 1–2 W solar panel (~80 × 55 mm or smaller) | 3 | Faces the glass |
-| 2 × 1 MΩ resistors (resistor kit) | 3 sets | Battery-voltage divider. Sensors are powered from a GPIO (≈ 20 mA total), so no MOSFET |
-| JST-PH 2.0 mm 5-pin connectors + pre-crimped leads | 8 + 8, spares | One plug per blind (tilter end + controller end) |
-| 5-core 26 AWG cable | ~25 m | Controller to each blind |
-| M1.6 × 4 screws | 8+ | N20 gearbox face, 1 per motor |
-| M3 heat-set inserts (Ø4.0 × 6.7 mm hole) + M3 flat head × 16 / × 18 | 24 + 24 | 3 per tilter |
-| Plastic-safe grease: [Super Lube 21030 (PTFE)](https://www.amazon.com/dp/B000XBH9HI) | 1 tube | Worm, worm wheel, thrust steps, helical gears; one tube covers all units |
-| Ø2 × 6 mm steel dowel pin: [HARFINGTON 50 pcs, 304 stainless](https://www.amazon.com/s?k=HARFINGTON+50pcs+Dowel+Pins+M2+2mm+x+6mm+304+Stainless+Steel) | 1 per unit | Worm top bearing, pressed into the case's dome. Was in the cart earlier, no longer there |
-| Breadboard + jumper wire kit | 1 | Bench testing |
-| USB power meter (USB-C) | 1 | Measure the real sleep current and charge rate |
-| 18650 holder (printed) | 3 | Printed into the controller case; the cells come with a JST XH lead |
+| USB-C power meter | 1 | Measure the real sleep current and charge rate |
+
+The 18650 holders are printed into the controller case (the cells come with a JST XH lead). Sensors are powered
+from a GPIO (≈ 20 mA for three), so no MOSFET.
+
+**Solar panel size:** 136 × 110 mm is the 2 W size. If it doesn't fit the glass-side face of the headrail, swap for a
+smaller 6 V panel (output drops roughly with area).
 
 Dropped from the earlier plan: ESP32-S3 boards and 5 V wall supplies (now cordless), the separate 6 × 2.5 mm
 magnets (the boards' own Ø4 × 2 magnets are used), M2 standoffs and M2 inserts (the AS5600 now bolts through the
