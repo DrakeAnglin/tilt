@@ -9,10 +9,10 @@ Bought on Amazon (Prime, delivery within the week) on 2026-10-25. Quantities cov
 | 2 | AS5600 magnetic angle sensor boards, 23 × 23 mm, I²C / PWM / analog voltage output, 5-pack | Slat angle sensing (one per blind, analog OUT to the ESP32) | 2 packs | 10 boards | [B097QNG1CN](https://www.amazon.com/dp/B097QNG1CN) | $9.99 / pack |
 
 **AS5600 notes (from buyer reviews):** run them at **3.3 V**; for the analog output tie **GPO to VCC** (some boards
-also need resistor R4 removed for PWM/analog). The magnets that come in these kits are often the wrong kind. The
-sensor needs a **diametrically** magnetized 6 × 2.5 mm magnet, 0.5–2 mm from the chip.
+also need resistor R4 removed for PWM/analog). Some kits ship axially magnetized magnets; the owner checked
+these kits' Ø4 × 2 magnets and they are fine (diametric).
 
-## In the Amazon cart (validated 2026-10-28, not checked out: 32 items, $339.21)
+## In the Amazon cart (validated 2026-10-28, not checked out: 37 items, $389.00)
 Controller hardware follows [docs/architecture.md](../docs/architecture.md) (cordless, Matter over Thread). These
 parts are for the breadboard and soldered dev-board stages; the custom PCB comes after.
 
@@ -39,6 +39,12 @@ parts are for the breadboard and soldered dev-board stages; the custom PCB comes
 | Breadboards 4 × 830 + 400 + jumper wires (BOJACK) | 1 | bench | [B08Y59P6D1](https://www.amazon.com/dp/B08Y59P6D1) | $9.99 |
 | Dupont jumper wires M-F/M-M/F-F, 120 pcs (ELEGOO) | 1 | bench | [B01EV70C78](https://www.amazon.com/dp/B01EV70C78) | $6.98 |
 | USB-C / USB-A power meter (YEREADW) | 1 | charge current, motor current | [B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC) | $16.97 |
+| Ceramic capacitor kit, 24 values 10 pF–10 µF (ALLECIN) | 1 | 100 nF ADC/divider filters, decoupling | [B0C1V8Q93P](https://www.amazon.com/dp/B0C1V8Q93P) | $9.99 |
+| Electrolytic capacitor kit, 24 values 0.1–1000 µF (ALLECIN) | 1 | 10–100 µF bulk at ESP32 and DRV8833 | [B0C1VBXCQM](https://www.amazon.com/dp/B0C1VBXCQM) | $9.99 |
+| 10 kΩ NTC thermistor, B3950 class, 100 mm leads, 10 pcs | 1 | 1 per cell on the charger's THERM pin | [B0F3X2G4D2](https://www.amazon.com/dp/B0F3X2G4D2) | $7.99 |
+| 1 W zener diode kit, 3–47 V incl. 6.2 V (1N4735A), 300 pcs (Chanzon) | 1 | solar input clamp | [B07BTKVRG8](https://www.amazon.com/dp/B07BTKVRG8) | $7.99 |
+| Double-sided perfboard kit, 6 sizes, male/female headers, screw terminals (ALLECIN) | 1 | soldered dev boards (modules in female headers) | [B0CKZ7GFSK](https://www.amazon.com/dp/B0CKZ7GFSK) | $13.99 |
+| Heat-shrink tubing kit, 2:1, 580 pcs, 6 colours incl. white (Ginsco) | 1 | solar extension splices | [B01MFA3OFA](https://www.amazon.com/dp/B01MFA3OFA) | $7.99 |
 
 Removed from the cart: Sunnytech 2 W panel (too large) and the BTF 5-wire cable (replaced by RJ12 cords).
 
@@ -51,10 +57,15 @@ Removed from the cart: Sunnytech 2 W panel (too large) and the BTF 5-wire cable 
   the ZH socket to its pads instead.
 - **Power meter:** good for charge and motor current; it can't resolve the µA–mA sleep current. Use a multimeter's
   mA/µA range for that.
+- **Thermistor:** tape one NTC to each cell and wire it to the MCP73871 THERM pin, replacing the board's fixed
+  resistor, so charging stops above ~45 °C (headrails in sun get hot).
+- **Zener:** 6.2 V 1 W across the solar input (after measuring the panel's open-circuit voltage behind glass).
+- **ESP32-C6 SuperMini:** desolder the RGB LED (GPIO8) and the power LED before battery tests.
+- **RJ12 cords:** check pin 1 → pin 1 continuity on every cord before use.
 
-**Boost check:** the QEBIDUM board is listed at 0.3 A out. That runs one N20 (~250 mA at 5 V), but not at stall.
-Only one motor runs at a time, and firmware stops on stall (angle not changing), so it should be OK. Bench test it
-with the USB meter before relying on it; if it browns out, swap for a ≥ 1 A board with EN.
+**Boost: bench comparison only.** The plan is now to run the motors straight from the battery (DRV8833 VM = VBAT,
+see [architecture](../docs/architecture.md)). The QEBIDUM boost is limited to 0.3 A, which caps torque at stall.
+It stays in the cart ($7) to compare torque on the bench; if battery drive is strong enough, it's dropped.
 
 ## Already bought (2026-10-28)
 - Plastic-safe grease: [Super Lube 21030 (PTFE)](https://www.amazon.com/dp/B000XBH9HI): worm, worm wheel, thrust steps, helical gears.
