@@ -63,17 +63,11 @@ then a custom PCB once that works. Everything is modular: every device plugs in,
 gives maybe 80–250 mAh on a sunny day (less behind low-E glass), so in a window it should stay charged. Verify on
 the bench: USB meter for charge and motor current, a multimeter's µA/mA range for sleep current.
 
-## Pin plan (ESP32-C6 SuperMini, to confirm against the board's printed pinout)
-| Function | Pins |
-|---|---|
-| Motor 1 / 2 / 3 (DRV8833 IN1/IN2, 20 kHz PWM) | GPIO18+19, GPIO20+21, GPIO22+23 |
-| Angle sensors 1 / 2 / 3 (AS5600 OUT, ADC, RC filtered) | GPIO0, GPIO1, GPIO2 |
-| Battery voltage (VBAT/2 divider, 2 × 1 MΩ + 100 nF, ADC) | GPIO3 |
-| DRV8833 nSLEEP (both) | GPIO4 |
-| Sensor 1 / 2 / 3 power (3V3 out, one on at a time) | GPIO5, GPIO6, GPIO7 |
-| Charger status (CHG, PGOOD) | GPIO14, GPIO15 (on-board LED removed) |
-| 5 V boost EN (bench comparison only) | GPIO8 (RGB LED removed; strapping pin, must not be pulled low at boot) |
-| Boot button | GPIO9 |
+## Pin plan
+See [dev-board.md](dev-board.md#pin-plan-header-pins-only-physical-order-to-confirm-against-the-board): header pins
+only (the SuperMini's GPIO 21–23 are bottom pads), motors on 18/19, 20/14, 16/17, sensors on ADC 0/1/2 with power
+from 4/5/6, battery on 3, driver sleep on 15. The case's USB-C breakout carries D+/D− to GPIO 13/12, and three
+1N5819 diodes OR the USB and solar inputs into the charger and protect the ESP's 5V pin.
 
 ## Connectors (everything modular)
 | Link | Connector |

@@ -48,13 +48,17 @@ parts are for the breadboard and soldered dev-board stages; the custom PCB comes
 
 Removed from the cart: Sunnytech 2 W panel (too large) and the BTF 5-wire cable (replaced by RJ12 cords).
 
-**Wiring notes**
+**Still to add:** 1N5819 Schottky diodes (3 per controller: USB in, solar in, ESP 5V), e.g. EEEEE 150 pcs. The
+charger has a single PWR input, so USB and solar must be diode-ORed.
+
+**Wiring notes** (full list in [docs/dev-board.md](../docs/dev-board.md))
 - **Solar extension:** the panel's lead is only 4". Make one white extension per controller: ZH socket + white 22/2
   cable cut to length + ZH plug, soldered and heat-shrunk.
 - **Battery plug:** the cells have JST-XH; Adafruit-style MCP73871 boards usually take JST-PH. Check on arrival;
   if so, make a short XH-to-PH adapter (or solder to the BAT pads on the dev board).
-- **Charger solar input:** these boards usually have a 5.5 × 2.1 barrel jack for DC/solar; on the dev board, wire
-  the ZH socket to its pads instead.
+- **Charger:** the Comimark board has solder pads only (PWR, BATT, LOAD, THERM) and a 5-pin header, no USB or DC
+  jack. USB-C and solar both feed PWR through diodes.
+- **DRV8833:** cut the J2 pad on each board so the ULT pin can put it to sleep.
 - **Power meter:** good for charge and motor current; it can't resolve the µA–mA sleep current. Use a multimeter's
   mA/µA range for that.
 - **Thermistor:** tape one NTC to each cell and wire it to the MCP73871 THERM pin, replacing the board's fixed
