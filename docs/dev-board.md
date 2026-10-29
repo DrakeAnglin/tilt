@@ -119,18 +119,19 @@ diode" warning on its 5V pin is handled by D3).
 - Charger LOAD+ → D3 (1N5819) → ESP **5V** pin; LOAD+ → both DRV8833 **VCC** (motors run from the battery);
   electrolytic across LOAD+/GND; 10 µF at the ESP 5V pin.
 
-**Each tilter port (RJ12 n = 1, 2, 3)**
-| RJ12 pin | Net |
+**Each tilter port (RJ12 n = 1, 2, 3)**: drivers are now at the tilters (see
+[architecture](architecture.md#connectors-everything-modular)).
+| RJ12 pin | Net at the controller |
 |---|---|
-| 1 | Motor + (DRV OUT) |
-| 2 | Motor − (DRV OUT) |
+| 1 | VBAT (charger LOAD) |
+| 2 | IN1 ← ESP PWM |
 | 3 | GND |
-| 4 | Angle OUT → 1 kΩ → ADC GPIO (0/1/2), 100 nF to GND |
-| 5 | 3V3 sensor power ← GPIO 4/5/6 |
-| 6 | GND |
+| 4 | ANGLE → 1 kΩ → ADC GPIO (0/1/2), 100 nF to GND |
+| 5 | EN ← ESP GPIO (4/5/6): powers the sensor and wakes the driver |
+| 6 | IN2 ← ESP PWM |
 
-Ports 1 and 2 use DRV8833 #1 (OUT1/2, OUT3/4); port 3 uses DRV8833 #2 OUT1/2. DRV8833 #2's second channel is a
-spare (lift later).
+**Rework pending:** ControllerV2 still shows the two DRV8833s on the board; they move to the tilters, which frees
+rows 3–10 and shortens the board and case.
 
 ## Before soldering (check on arrival)
 - **DRV8833:** cut the **J2** pad on the back of each board, or the ULT (sleep) pin does nothing (per the listing).

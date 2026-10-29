@@ -85,3 +85,9 @@ the prototype. Path: breadboard → soldered dev board → custom PCB.
 Dropped from the earlier plan: ESP32-S3 boards and 5 V wall supplies (now cordless), the separate 6 × 2.5 mm
 magnets (the boards' own Ø4 × 2 magnets are used), M2 standoffs and M2 inserts (the AS5600 now bolts through the
 case with M3).
+
+## Changes from the tilter plug pod (2026-10-28)
+- The AS5600 board bolts are now **M3 × 20** flat head (they also clamp the pod): 2 per tilter, from the Zmbroll kit
+  (it has 20 mm). The separate **M3 × 18 pack is no longer needed**.
+- One DRV8833 per tilter (8 of the 10-pack); 10 µF ceramic across each driver's VCC/GND (ceramic kit).
+- One RJ12 breakout per tilter is unchanged (8 of the 20).

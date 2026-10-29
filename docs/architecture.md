@@ -77,13 +77,26 @@ from 4/5/6, battery on 3, driver sleep on 15. The case's USB-C breakout carries 
 | Battery ↔ controller | JST-XH 2-pin (comes on the cell) |
 | Charging | USB-C on the controller end |
 
-**RJ12 pinout** (cords must be *straight-wired*, pin 1 to pin 1; ordinary phone cords are reversed):
-**1 motor +, 2 motor −, 3 GND, 4 angle OUT, 5 3V3 (sensor), 6 GND.** The angle wire sits between two quiet
-wires, away from the PWM pair; motor current never flows on GND. Check every cord for pin 1 → pin 1 continuity
-before use: "straight-wired" is used loosely in listings, and a reversed cord would put 3V3 on the sensor's OUT.
+**Motor driver at each tilter** (decided 2026-10-28): every tilter carries its own DRV8833 in the plug pod on its
+sensor side, so the phone cord carries battery power and logic instead of the 20 kHz motor PWM. The flat, untwisted
+cord no longer couples motor noise into the angle wire, the controller loses both drivers, and a tilter is a
+complete unit (motor + driver + sensor + plug). 8 drivers from the 10-pack.
 
-- On the tilter: a printed cover on the lid holds the RJ12 jack and covers the motor tabs and the AS5600's solder
-  joints, so tilter + motor + sensor + plug are one closed unit. Short JST-PH or soldered leads inside the cover.
+**RJ12 pinout** (cords must be *straight-wired*, pin 1 to pin 1; check continuity on every cord before use):
+| Pin | Net | At the tilter |
+|---|---|---|
+| 1 | VBAT (3.0–4.2 V) | DRV8833 VCC, 10 µF to GND |
+| 2 | IN1 (PWM) | DRV8833 IN1 |
+| 3 | GND | DRV8833 GND, AS5600 GND |
+| 4 | ANGLE | AS5600 OUT (GPO tied to VCC) |
+| 5 | EN (3.3 V from an ESP GPIO) | AS5600 VCC **and** DRV8833 ULT (sleep): one line wakes both |
+| 6 | IN2 (PWM) | DRV8833 IN2 |
+
+Motor wires: DRV8833 OUT1 / OUT2 → N20 tabs, inside the pod. Each tilter uses one channel of its DRV8833; the other
+is spare. A reversed cord would put VBAT on IN2 and EN on ANGLE's neighbour, so the continuity check matters.
+
+- On the tilter: the **plug pod** ([TiltPod.py](../hardware/mechanical/fusion/TiltPod/TiltPod.py)) bolts on with the
+  tilter's own two AS5600 board bolts (now M3 × 20) and holds the RJ12 jack and the driver.
 - **Colour:** visible parts are white: white cords, white PLA cases. The solar panel's cells are black (a white
   cell can't absorb light), so it sits in a white printed frame with the cells facing the glass; from inside the
   room only the white back shows.
