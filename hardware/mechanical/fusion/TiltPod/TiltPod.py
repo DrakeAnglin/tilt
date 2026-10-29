@@ -73,39 +73,98 @@ def build(tbm, bx, cyl, cone, uni, cut):
                 bx(p['in_x0'], x1 + 1, -p['plateau_hw'] + w, p['plateau_hw'] - w, p['step_z'] - 2, p['plateau_z'] - p['ceil']))
     cup = cut(profile(bx, uni, x0, x1), inner)
 
-    def to_wall(y, z, r, xa, xb):
-        """Boss of radius r at (y, z) from xa to xb, webbed to the nearest side wall and to the floor or ceiling."""
+    # PRINTING: the module prints end wall down, so -X is "down" and every face that looks toward -X and doesn't sit on
+    # the end wall is an overhang. Every feature below either runs all the way down to the end wall (a column) or ends
+    # in a 45° taper (a cone or a gusset), so nothing needs support.
+    xin = p['in_x0'] - 0.01
+
+    def gusset(xf, y0, y1, z0, z1, base):
+        """45° support under a face at X = xf spanning y0..y1 / z0..z1, growing out of the floor ('floor'), the ceiling
+        ('ceil') or a side wall ('wall-' / 'wall+')."""
+        import adsk.core, adsk.fusion
+        k = math.sqrt(0.5)
+        INTER = adsk.fusion.BooleanTypes.IntersectionBooleanType
+        if base in ('floor', 'ceil'):
+            zc = z0 if base == 'floor' else z1
+            d = z1 - z0
+            obb = adsk.core.OrientedBoundingBox3D.create(adsk.core.Point3D.create(xf / 10, (y0 + y1) / 20, zc / 10),
+                                                         adsk.core.Vector3D.create(k, 0, k), adsk.core.Vector3D.create(0, 1, 0),
+                                                         d * math.sqrt(2) / 10, (y1 - y0) / 10, d * math.sqrt(2) / 10)
+            g = tbm.createBox(obb)
+            tbm.booleanOperation(g, bx(xf - d, xf, y0, y1, z0, z1), INTER)
+        else:
+            yc = y0 if base == 'wall-' else y1
+            d = y1 - y0
+            obb = adsk.core.OrientedBoundingBox3D.create(adsk.core.Point3D.create(xf / 10, yc / 10, (z0 + z1) / 20),
+                                                         adsk.core.Vector3D.create(k, k, 0), adsk.core.Vector3D.create(0, 0, 1),
+                                                         d * math.sqrt(2) / 10, (z1 - z0) / 10, d * math.sqrt(2) / 10)
+            g = tbm.createBox(obb)
+            tbm.booleanOperation(g, bx(xf - d, xf, y0, y1, z0, z1), INTER)
+        return g
+
+    def column(y, z, r, xb):
+        """Boss of radius r from the end wall up to xb, with ribs to the nearest wall / floor / ceiling (all full length)."""
         sy = -1 if y < 0 else 1
-        zw = (p['step_z'] - p['ceil'] + 0.5) if z > 16 else fz - 0.5
-        return uni(cyl((xa, y, z), (xb, y, z), r), bx(xa, xb, y, sy * (iw + 0.5), z - r * 0.85, z + r * 0.85),
-                   bx(xa, xb, y - r * 0.85, y + r * 0.85, z, zw))
+        body = cyl((xin, y, z), (xb, y, z), r)
+        dw, dz_floor, dz_ceil = iw - abs(y), z - fz, (p['step_z'] - p['ceil']) - z
+        if dw < 6:
+            body = uni(body, bx(xin, xb, y, sy * (iw + 0.5), z - r * 0.85, z + r * 0.85))
+        if min(dz_floor, dz_ceil) < 6:
+            zw = (p['step_z'] - p['ceil'] + 0.5) if dz_ceil < dz_floor else fz - 0.5
+            body = uni(body, bx(xin, xb, y - r * 0.85, y + r * 0.85, z, zw))
+        return body
+
+    def stub(y, z, r, xa, xb, taper=True):
+        """Short boss from xa to xb that can't reach the end wall: 45° cone under it, short ribs with 45° gussets."""
+        sy = -1 if y < 0 else 1
+        body = cyl((xa, y, z), (xb, y, z), r)
+        if taper:
+            body = uni(body, cone((xa, y, z), r, (xa - r + 0.3, y, z), 0.3))
+        dw, dz_floor = iw - abs(y), z - fz
+        if dw <= dz_floor:
+            y0, y1 = sorted((y, sy * (iw + 0.5)))
+            body = uni(body, bx(xa, xb, y0, y1, z - r * 0.85, z + r * 0.85),
+                       gusset(xa, y0, y1, z - r * 0.85, z + r * 0.85, 'wall+' if sy > 0 else 'wall-'))
+        else:
+            body = uni(body, bx(xa, xb, y - r * 0.85, y + r * 0.85, fz - 0.5, z),
+                       gusset(xa, y - r * 0.85, y + r * 0.85, fz - 0.5, z, 'floor'))
+        return body
 
     ir = p['ins_d'] / 2 + p['ins_wall']
     bt = p['board_t']
     seat = x1 - bt                                        # board's back face
-    # insert bosses: behind the board for the board's bolts, at the open face for the other two
-    for y, z in p['bolts_board']:
-        cup = uni(cup, to_wall(y, z, ir, seat - p['ins_hole'] - 1.0, seat))
-    for y, z in p['bolts_rim']:
-        cup = uni(cup, to_wall(y, z, ir, x1 - p['ins_hole'] - 1.0, x1))
-    # board-seat bosses at the two spare holes, with the locating pins
-    for y, z in p['pin_holes']:
-        cup = uni(cup, to_wall(y, z, 3.0, seat - 3.0, seat),
-                  cyl((seat - 0.01, y, z), (x1 - 0.2, y, z), p['pin_d'] / 2))
+    bA, bB = p['bolts_board']                             # (6.45, 11.58), (22.45, 27.58)
+    rC, rD = p['bolts_rim']                               # (-23, 27), (22, 5.5)
+    pE, pF = p['pin_holes']                               # (22.45, 11.58), (6.45, 27.58)
+    # bolt A sits over the RJ12 jack's path: its boss is carried down to the end wall by a rib beside the jack
+    # (Y 2.95..6.6, clear of the jack at Y >= 6.75 and above the RJ12 board)
+    cup = uni(cup, cyl((seat - p['ins_hole'] - 1.0, bA[0], bA[1]), (seat, bA[0], bA[1]), ir),
+              bx(xin, seat, bA[0] - ir, 6.6, bA[1] - 3.0, bA[1] + 3.0),
+              cone((seat - p['ins_hole'] - 1.0, bA[0], bA[1]), ir, (seat - p['ins_hole'] - 1.0 - ir + 0.3, bA[0], bA[1]), 0.3))
+    cup = uni(cup, column(bB[0], bB[1], ir, seat))        # bolt B: a full column (nothing below it)
+    cup = uni(cup, column(rC[0], rC[1], ir, x1))          # bolt C: a full column above the DRV8833 rails
+    # bolt D sits right over the RJ12 board's corner: no cone (it would reach the board); the RJ12 rail under it is
+    # carried up to meet it and a floor rib + gusset carries the rest
+    cup = uni(cup, stub(rD[0], rD[1], ir, x1 - p['ins_hole'] - 1.0, x1, taper=False))
+    cup = uni(cup, column(pF[0], pF[1], 3.0, seat))       # pin F: a column, merges with the rod tube
+    cup = uni(cup, stub(pE[0], pE[1], 3.0, seat - 3.0, seat))
+    for y, z in p['pin_holes']:                           # locating pins through the board's spare holes
+        cup = uni(cup, cyl((seat - 0.01, y, z), (x1 - 0.2, y, z), p['pin_d'] / 2))
     # the board pocket in the side wall: the board is wider than the cup's inside on the back side
     b0, b1, c0, c1 = p['board']
     cup = cut(cup, bx(seat - 0.3, x1 + 1, b0 - 0.3, b1 + 0.3, c0 - 0.3, c1 + 0.3))
     # N20 cradle under the can's end, shaped to the can
     cx0, cx1 = p['can'][1] + 1.0, p['can'][1] + 5.0
     ay, az = p['n20_axis']
-    cr = bx(cx0, cx1, ay - p['n20_w'] / 2 - 1.6, ay + p['n20_w'] / 2 + 1.6, fz - 0.5, az + 2.0)
-    cup = uni(cup, cut(cr, n20_section(bx, cyl, cut, uni, cx0 - 1, cx1 + 1, 0.15)))
+    cy0, cy1 = ay - p['n20_w'] / 2 - 1.6, ay + p['n20_w'] / 2 + 1.6
+    cr = uni(bx(cx0, cx1, cy0, cy1, fz - 0.5, az + 2.0), gusset(cx0, cy0, cy1, fz - 0.5, az + 2.0, 'floor'))
+    cup = uni(cup, cut(cr, n20_section(bx, cyl, cut, uni, cx0 - 12, cx1 + 1, 0.15)))
     # RJ12 rails: grooved bars along X under the board's two long edges; the board slides in from the open face until
     # its front edge meets the stop (the jack then sits flush in the end wall); a 0.35 mm bump behind its back edge
     # snaps it in place
     gz0, gz1 = p['rj_z'] - 0.1, p['rj_z'] + 1.6 + 0.1
     for ye, sg in ((p['rj_y'] - p['rj_bw'] / 2, -1), (p['rj_y'] + p['rj_bw'] / 2, 1)):
-        rail = bx(p['rj_x0'], p['rj_x1'] + 1.5, ye - sg * 1.2, ye + sg * 1.6, fz - 0.5, gz1 + 1.2)
+        rail = bx(xin, p['rj_x1'] + 2.3, ye - sg * 1.2, ye + sg * 1.6, fz - 0.5, gz1 + 1.2)   # from the end wall
         rail = cut(rail, bx(p['rj_x0'] - 1, p['rj_x1'] + 2, ye - sg * 1.3, ye + sg * 0.2, gz0, gz1))
         rail = uni(rail, bx(p['rj_x1'] + 0.15, p['rj_x1'] + 1.0, ye - sg * 1.2, ye + sg * 0.2, gz0, gz0 + 0.35))
         cup = uni(cup, rail)
@@ -119,7 +178,7 @@ def build(tbm, bx, cyl, cone, uni, cut):
     za, zb = p['drv_z0'], p['drv_z0'] + p['drv_h']
     xa, xb = p['drv_x1'] - p['drv_l'] - 1.5, x1
     for rz0, rz1, cz0, cz1 in ((fz - 0.5, za + 2.0, za - 0.2, za + 3.0), (zb - 1.2, zb + 1.2, zb - 3.0, zb + 0.2)):
-        rail = cut(bx(xa, xb, -iw - 0.5, dg1 + 1.4, rz0, rz1), bx(xa + 1.5, xb + 1, dg0, dg1, cz0, cz1))
+        rail = cut(bx(xin, xb, -iw - 0.5, dg1 + 1.4, rz0, rz1), bx(xa + 1.5, xb + 1, dg0, dg1, cz0, cz1))   # from the end wall
         cup = uni(cup, rail)
     # rod tube (closed through the module; the rod goes in from outside and may stay sticking out)
     rr = p['rod'] * math.sqrt(2) / 2 + p['rod_clear']
