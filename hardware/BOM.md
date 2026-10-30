@@ -99,11 +99,11 @@ the tilter's DRV8833 and the RJ12 jack. One set of bolts holds the tilter halves
 
 No longer needed: the M3 × 18 pack (no bolts go into the main half from the lid side any more).
 
-## Controller box (ControllerV3, 2026-10-29), per controller
+## Controller box (ControllerV4, 2026-10-29), per controller
 | Part | Qty | From |
 |---|---|---|
-| M3 × 8 flat head (lid) | 3 | Zmbroll kit |
-| M3 heat-set inserts (lid bosses) | 3 | insert pack (with the tilters' 24: 33 total) |
+| M3 × 8 flat head (lid) | 4 | Zmbroll kit |
+| M3 heat-set inserts (lid pillars) | 4 | insert pack (with the tilters' 24: 36 total) |
 | 1N5819 | 3 | diode pack |
 | 6.2 V zener | 1 | zener kit |
 | Resistors 1 k ×3, 1 M ×2, 10 k ×1 | | resistor kit |
