@@ -103,34 +103,21 @@ def build(tbm, bx, cyl, cone, uni, cut):
             tbm.booleanOperation(g, bx(xf - d, xf, y0, y1, z0, z1), INTER)
         return g
 
-    def column(y, z, r, xb):
-        """Boss of radius r from the end wall up to xb, with ribs to the nearest wall / floor / ceiling (all full length)."""
+    def column(y, z, r, xb, ribs=True):
+        """Boss of radius r from the end wall up to xb. Near a wall / floor / ceiling it is tied to it by a rib as wide as
+        the boss (tangent, so the boss blends straight into it); in a corner the corner is filled solid."""
         sy = -1 if y < 0 else 1
         body = cyl((xin, y, z), (xb, y, z), r)
+        if not ribs:
+            return body
         dw, dz_floor, dz_ceil = iw - abs(y), z - fz, (p['step_z'] - p['ceil']) - z
         if dw < 6:
-            body = uni(body, bx(xin, xb, y, sy * (iw + 0.5), z - r * 0.85, z + r * 0.85))
+            body = uni(body, bx(xin, xb, y, sy * (iw + 0.5), z - r, z + r))
         if min(dz_floor, dz_ceil) < 6:
             zw = (p['step_z'] - p['ceil'] + 0.5) if dz_ceil < dz_floor else fz - 0.5
-            body = uni(body, bx(xin, xb, y - r * 0.85, y + r * 0.85, z, zw))
+            body = uni(body, bx(xin, xb, y - r, y + r, z, zw))
             if dw < 6:                                    # in a corner: fill it solid (no slot between the ribs)
                 body = uni(body, bx(xin, xb, y, sy * (iw + 0.5), z, zw))
-        return body
-
-    def stub(y, z, r, xa, xb, taper=True):
-        """Short boss from xa to xb that can't reach the end wall: 45° cone under it, short ribs with 45° gussets."""
-        sy = -1 if y < 0 else 1
-        body = cyl((xa, y, z), (xb, y, z), r)
-        if taper:
-            body = uni(body, cone((xa, y, z), r, (xa - r + 0.3, y, z), 0.3))
-        dw, dz_floor = iw - abs(y), z - fz
-        if dw <= dz_floor:
-            y0, y1 = sorted((y, sy * (iw + 0.5)))
-            body = uni(body, bx(xa, xb, y0, y1, z - r * 0.85, z + r * 0.85),
-                       gusset(xa, y0, y1, z - r * 0.85, z + r * 0.85, 'wall+' if sy > 0 else 'wall-'))
-        else:
-            body = uni(body, bx(xa, xb, y - r * 0.85, y + r * 0.85, fz - 0.5, z),
-                       gusset(xa, y - r * 0.85, y + r * 0.85, fz - 0.5, z, 'floor'))
         return body
 
     ir = p['ins_d'] / 2 + p['ins_wall']
@@ -139,17 +126,12 @@ def build(tbm, bx, cyl, cone, uni, cut):
     bA, bB = p['bolts_board']                             # (6.45, 11.58), (22.45, 27.58)
     rC, rD = p['bolts_rim']                               # (-23, 27), (22, 5.5)
     pF, = p['pin_holes']                                  # (6.45, 27.58)
-    # bolt A sits over the RJ12 jack's path: its boss is carried down to the end wall by a rib beside the jack
-    # (Y 2.95..6.3, clear of the jack's opening at Y >= 6.45 and above the RJ12 board)
-    cup = uni(cup, cyl((seat - p['ins_hole'] - 1.0, bA[0], bA[1]), (seat, bA[0], bA[1]), ir),
-              bx(xin, seat, bA[0] - ir, 6.3, bA[1] - 3.0, bA[1] + 3.0),
-              cone((seat - p['ins_hole'] - 1.0, bA[0], bA[1]), ir, (seat - p['ins_hole'] - 1.0 - ir + 0.3, bA[0], bA[1]), 0.3))
-    cup = uni(cup, column(bB[0], bB[1], ir, seat))        # bolt B: a full column (nothing below it)
-    cup = uni(cup, column(rC[0], rC[1], ir, x1))          # bolt C: a full column above the DRV8833 rails
-    # bolt D sits right over the RJ12 board's corner: no cone (it would reach the board); the RJ12 rail under it is
-    # carried up to meet it and a floor rib + gusset carries the rest
-    cup = uni(cup, stub(rD[0], rD[1], ir, x1 - p['ins_hole'] - 1.0, x1, taper=False))
-    cup = uni(cup, column(pF[0], pF[1], 3.0, seat))       # pin F: a column, merges with the rod tube
+    # every boss is a plain column from the end wall (nothing sits in their way any more)
+    cup = uni(cup, column(bA[0], bA[1], ir, seat))        # bolt A: free-standing cylinder
+    cup = uni(cup, column(bB[0], bB[1], ir, seat))        # bolt B: top back corner
+    cup = uni(cup, column(rC[0], rC[1], ir, x1))          # bolt C: top room-side corner
+    cup = uni(cup, column(rD[0], rD[1], ir, x1))          # bolt D: bottom back corner
+    cup = uni(cup, column(pF[0], pF[1], 3.0, seat, ribs=False))   # pin F: cylinder + the locating pin on top
     for y, z in p['pin_holes']:                           # locating pins through the board's spare holes
         cup = uni(cup, cyl((seat - 0.01, y, z), (x1 - 0.2, y, z), p['pin_d'] / 2))
     # the board pocket in the side wall: the board is wider than the cup's inside on the back side
@@ -173,12 +155,14 @@ def build(tbm, bx, cyl, cone, uni, cut):
     blk = bx(xin, rj_back + 1.6, -iw - 0.5, ry0 + 1.2, p['rj_z'] - 2.5, gz1 + 1.8)
     blk = cut(blk, bx(xin - 1, x1 + 1, ry0 - 0.2, ry0 + 1.3, gz0, gz1))                # groove (open to the face)
     blk = cut(blk, bx(rj_back - 12.0, rj_back + 2.0, ry0 - 3.2, ry0 - 0.2, gz0 - 0.6, gz1 + 0.6))   # latch relief
+    blk = cut(blk, bx(rj_back - 0.6, rj_back + 2.0, ry0 - 3.2, ry0 + 1.3, gz0 - 0.6, gz1 + 0.6))     # rail cut back at the hook
     cup = uni(cup, blk)
-    arm = bx(rj_back - 13.6, rj_back + 1.6, ry0 - 2.2, ry0 - 1.0, gz0, gz1)          # spring arm, anchored at -X
-    hook = uni(bx(rj_back + 0.1, rj_back + 0.5, ry0 - 1.0, ry0 + 0.8, gz0, gz1),        # stop face behind the board
-               bx(rj_back + 0.5, rj_back + 0.9, ry0 - 1.0, ry0 + 0.5, gz0, gz1),        # ramp (stepped)
-               bx(rj_back + 0.9, rj_back + 1.3, ry0 - 1.0, ry0 + 0.0, gz0, gz1),
-               bx(rj_back + 1.3, rj_back + 1.6, ry0 - 1.0, ry0 - 0.5, gz0, gz1))
+    hz0, hz1 = gz0 + 0.25, gz1 - 0.25           # latch 0.25 mm clear of the rail above and below: they print apart
+    arm = bx(rj_back - 13.6, rj_back + 1.6, ry0 - 2.2, ry0 - 1.0, hz0, hz1)          # spring arm, anchored at -X
+    hook = uni(bx(rj_back + 0.1, rj_back + 0.5, ry0 - 1.0, ry0 + 0.8, hz0, hz1),        # stop face behind the board
+               bx(rj_back + 0.5, rj_back + 0.9, ry0 - 1.0, ry0 + 0.5, hz0, hz1),        # ramp (stepped)
+               bx(rj_back + 0.9, rj_back + 1.3, ry0 - 1.0, ry0 + 0.0, hz0, hz1),
+               bx(rj_back + 1.3, rj_back + 1.6, ry0 - 1.0, ry0 - 0.5, hz0, hz1))
     cup = uni(cup, arm, hook)
     # inner rail: hangs from the rod tube, along the board's other edge
     bar = bx(xin, rj_back + 1.6, ry1 - 1.2, ry1 + 1.6, p['rj_z'] - 2.5, p['rod_z'] - 4.0)
@@ -188,7 +172,7 @@ def build(tbm, bx, cyl, cone, uni, cut):
     cup = uni(cup, bx(xin, p['rj_x0'], ry0 + 2.0, ry1 - 2.0, p['rj_z'] - 2.5, p['rj_z'] + 1.5))
     jy0, jy1 = p['rj_y'] - p['rj_jw'] / 2 - 0.15, p['rj_y'] + p['rj_jw'] / 2 + 0.15
     cup = cut(cup, bx(x0 - 1, p['in_x0'] + 0.01, jy0, jy1, jz0 - 0.15, jz0 + p['rj_jh'] + 0.15))   # jack window, flush
-    # DRV8833: stands on a grooved floor rail, top edge in a rail webbed to bolt B's column; slides in from the open
+    # DRV8833: stands on a grooved floor rail, top edge in a rail standing up from the end wall; slides in from the open
     # face to a stop; the AS5600 board covers its +X end once fitted
     dg0, dg1 = p['drv_y'] - 0.15, p['drv_y'] + p['drv_t'] + 0.15
     za, zb = p['drv_z0'], p['drv_z0'] + p['drv_h']
@@ -196,7 +180,6 @@ def build(tbm, bx, cyl, cone, uni, cut):
     for rz0, rz1, cz0, cz1 in ((fz - 0.5, za + 1.5, za - 0.2, za + 3.0), (zb - 1.5, zb + 1.8, zb - 3.0, zb + 0.2)):
         rail = cut(bx(xin, x1 - 1.6, dg0 - 1.6, dg1 + 1.6, rz0, rz1), bx(dx0 - 0.2, x1 + 1, dg0, dg1, cz0, cz1))
         cup = uni(cup, rail)
-    cup = uni(cup, bx(xin, x1 - 1.6, dg1 + 1.0, bB[0] - 2.0, zb, zb + 1.8))         # web: top rail -> bolt B column
     # rod tube (closed through the module; the rod goes in from outside and may stay sticking out)
     rr = p['rod'] * math.sqrt(2) / 2 + p['rod_clear']
     cup = uni(cup, cyl((x0, 0, p['rod_z']), (p['tube_x1'], 0, p['rod_z']), rr + p['tube_wall']))
