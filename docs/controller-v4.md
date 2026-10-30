@@ -9,7 +9,7 @@ wiring table) and `tools/fusion_controller_v4.py` (Fusion model, exact interfere
 ![in the rail](renders/ctrl-v4-in-rail.png)
 
 ## Box
-- **127.5 x 55.4 x 33.3 mm**, tray + lid, white. Vertical corners r4, other outer edges r1.5, a 0.6 mm reveal at the
+- **126.5 x 55.4 x 33.3 mm**, tray + lid, white. Vertical corners r4, other outer edges r1.5, a 0.6 mm reveal at the
   lid joint, a rounded rod groove along the lid (the box sits under the tilt rod, 0.97 mm below its sweep), port marks
   (1-3 engraved dots) under the jacks.
 - **Nothing floats:** the four lid-screw pillars are full-height columns from the floor, built into the side walls,
@@ -24,7 +24,7 @@ wiring table) and `tools/fusion_controller_v4.py` (Fusion model, exact interfere
 | Ports, X 4.5-25.8 | three RJ12 breakouts trimmed to 15 mm wide, on ledges with a front step and a 1 mm rear lip |
 | Pillars, X ~31 | room for the 18 port leads to cross to the dev board |
 | Electronics, X 40-110 | 18650 along the room side (two saddles + end stops), dev board (26 x 12 holes) beside it on 6 posts |
-| USB-C, X 112-125 | the breakout in its own pocket, socket in end wall B; solar lead hole beside it |
+| USB-C, X 110-124 | the breakout on two pegs through its own mounting holes, its front edge in a pocket in end wall B so the socket is flush with the outside; solar lead hole beside it |
 
 ## Dev board
 Hole map: [ctrl-v4-holemap.svg](renders/ctrl-v4-holemap.svg). Wiring: [ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md).
@@ -48,5 +48,5 @@ it, later updates over the air.
    sits at the step and the back edge drops behind the lip.
 2. Dev board (bench-tested) onto its posts with the USB-C breakout's socket in its window; solar lead through its hole.
 3. 18650 into its saddles, XH plug onto the battery pins.
-4. USB-C breakout into its pocket (2 leads to the dev board's USB pads).
+4. USB-C breakout: front edge into the wall pocket, mounting holes onto the two pegs (2 leads to the dev board's USB pads).
 5. Lid, 4 × M3 × 8.

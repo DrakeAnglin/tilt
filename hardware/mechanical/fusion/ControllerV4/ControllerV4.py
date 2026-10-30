@@ -31,8 +31,10 @@ C = dict(
     bat_d=19.05, bat_l=68.1, bat_x0=40.0,
     # dev board (perfboard) beside the cell
     pb_z=8.0, pb_t=1.6, plastic=2.5,
-    # USB-C breakout (22.1 x 13.05) standing in its own pocket at end B
-    usb_bw=22.1, usb_bd=13.05, usb_y=6.0, usb_z=2.8,
+    # USB-C breakout (Teansic drawing: 22.1 x 13.05; the socket, 9.07 x 3.26, sticks out 1.45 past the board's front
+    # edge; two Ø3.0 holes 3.05 from the front edge, 8.05 either side of the centre)
+    usb_bw=22.1, usb_bd=13.05, usb_y=6.0, usb_z=2.8, usb_stick=1.45, usb_sw=9.07, usb_sh=3.26, usb_sl=7.8,
+    usb_hole=3.0, usb_hole_x=3.05, usb_hole_y=8.05,
     # lid screws: M3 x 8 flat head into heat-set inserts (Ø4.0 x 6.7) in four pillars
     ins_d=4.0, ins_depth=6.7, pillar_r=3.6,
 )
@@ -66,8 +68,10 @@ def Y(m):
 
 
 PB = (X(0) - 1.27, X(NI - 1) + 1.27, Y(0) - 1.27, Y(NM - 1) + 1.27)
-C['usb_x0'] = PB[1] + 6.0                                  # USB-C pocket starts 6 mm past the dev board
-C['in_b'] = max(C['usb_x0'] + c['usb_bd'], c['bat_x0'] + c['bat_l'] + 14.0)
+C['usb_x0'] = PB[1] + 6.0                                  # USB-C board's back edge, 6 mm past the dev board
+# the socket's face is flush with end B's outer face, so the board's front edge sits 1.45 inside it, in a pocket in the wall
+C['in_b'] = max(C['usb_x0'] + c['usb_bd'] + c['usb_stick'] - c['end_t'], c['bat_x0'] + c['bat_l'] + 14.0)
+C['usb_x0'] = C['in_b'] + c['end_t'] - c['usb_stick'] - c['usb_bd']
 C['L'] = C['in_b'] + c['end_t']
 # pillars: two between the port bay and the electronics bay, two at end B; centred 0.5 inside the side walls' faces
 PY = C['iw'] - c['pillar_r'] + 0.5
@@ -262,14 +266,19 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
         for m in (0, 10):
             xx, yy = X(i) + 1.27, Y(m) + 1.27
             tray = uni(tray, bx(xx - 0.7, xx + 0.7, yy - 0.7, yy + 0.7, fz - 0.1, c['pb_z']))
-    # USB-C breakout: pocket of 4 corner posts, socket in end wall B; plug opening; solar lead hole
+    # USB-C breakout: two posts with locating pegs through its mounting holes; its front edge in a pocket in end wall B
+    # so the socket's face is flush with the outside; socket window; solar lead hole
     ux0, ux1 = C['usb_x0'], C['usb_x0'] + c['usb_bd']
     uy0, uy1 = c['usb_y'] - c['usb_bw'] / 2, c['usb_y'] + c['usb_bw'] / 2
-    for xa, ya in ((ux0 - 1.6, uy0 - 1.6), (ux0 - 1.6, uy1), (ux1 - 6.0, uy0 - 1.6), (ux1 - 6.0, uy1)):
-        tray = uni(tray, bx(xa, xa + 1.6 if xa < ux0 else ux1 - 2.0, ya, ya + 1.6, fz - 0.1, c['usb_z'] + 1.6 + 1.0))
-    tray = uni(tray, bx(ux0, ux1 - 7.4, uy0 + 1.0, uy1 - 1.0, fz - 0.1, c['usb_z']))        # board rests on this pad
-    sz = c['usb_z'] + 1.6 + 1.63
-    tray = cut(tray, bx(C['in_b'] - 0.01, L + 1, c['usb_y'] - 6.3, c['usb_y'] + 6.3, sz - 3.4, sz + 3.4))
+    hx = ux1 - c['usb_hole_x']
+    bz0, bz1 = c['usb_z'], c['usb_z'] + 1.6
+    for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
+        tray = uni(tray, cyl((hx, hy, fz - 0.1), (hx, hy, bz0), 2.8),
+                   cyl((hx, hy, bz0 - 0.1), (hx, hy, bz1 + 0.8), c['usb_hole'] / 2 - 0.12))
+    tray = cut(tray, bx(C['in_b'] - 0.01, ux1 + 0.15, uy0 - 0.2, uy1 + 0.2, bz0 - 0.2, bz1 + 0.2))      # board-edge pocket
+    sz0 = bz1
+    tray = cut(tray, bx(ux1 - 1, L + 1, c['usb_y'] - c['usb_sw'] / 2 - 0.15, c['usb_y'] + c['usb_sw'] / 2 + 0.15,
+                        sz0 - 0.15, sz0 + c['usb_sh'] + 0.15))                                          # socket window
     tray = cut(tray, cyl((C['in_b'] - 1, -12.0, 9.0), (L + 1, -12.0, 9.0), 1.75))
     out['Tray'] = [('Tray', tray)]
 
@@ -292,9 +301,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
         lid = uni(lid, bx(fx, fx + 4, C['bat_y'] - 2, C['bat_y'] + 2, btop + 0.1, zl + 0.01))
     for xx in (PB[0] + 0.3, PB[1] - 2.3):
         lid = uni(lid, bx(xx, xx + 2.0, PB[3] - 2.0, PB[3] - 0.3, C['pb_top'] + 0.1, zl + 0.01))
-    for fy in (uy0 + 1.0, uy1 - 3.0):                       # under the groove they hang from the groove's underside
-        ztop = C['g_under'] + 0.01 if abs(fy + 1.0) < C['gw_out'] + 1.0 else zl + 0.01
-        lid = uni(lid, bx(ux0 + 1, ux0 + 3, fy, fy + 2.0, c['usb_z'] + 1.7, ztop))
+    for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):   # press the board down beside each peg
+        fx0 = hx - 5.0
+        ztop = C['g_under'] + 0.01 if abs(hy) < C['gw_out'] + 2.5 else zl + 0.01
+        lid = uni(lid, bx(fx0, fx0 + 2.0, hy - 1.0, hy + 1.0, bz1 + 0.1, ztop))
     lid = cut(lid, tbm.copy(tray))
     for px, py in PILLARS:
         lid = cut(lid, cyl((px, py, zl - 2), (px, py, c['top'] + 1), 1.7),
@@ -317,9 +327,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
             parts.append((b[0], bx(*b[1:])))
         for nm, p1, p2, r in p.cyls:
             parts.append((nm, cyl(p1, p2, r)))
-    parts.append(('USB-C board', bx(ux0, ux1, uy0, uy1, c['usb_z'], c['usb_z'] + 1.6)))
-    rec = bx(ux1 - 7.35, ux1, c['usb_y'] - 4.47, c['usb_y'] + 4.47, c['usb_z'] + 1.6, c['usb_z'] + 1.6 + 3.26)
-    parts.append(('USB-C socket', rec))
+    ub = bx(ux0, ux1, uy0, uy1, bz0, bz1)
+    for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
+        ub = cut(ub, cyl((hx, hy, bz0 - 1), (hx, hy, bz1 + 1), c['usb_hole'] / 2))
+    parts.append(('USB-C board', ub))
+    parts.append(('USB-C socket', bx(ux1 + c['usb_stick'] - c['usb_sl'], ux1 + c['usb_stick'], c['usb_y'] - c['usb_sw'] / 2,
+                                     c['usb_y'] + c['usb_sw'] / 2, bz1, bz1 + c['usb_sh'])))
     out['Parts'] = parts
     return out
 
