@@ -31,10 +31,11 @@ C = dict(
     bat_d=19.05, bat_l=68.1, bat_x0=40.0,
     # dev board (perfboard) beside the cell
     pb_z=8.0, pb_t=1.6, plastic=2.5,
-    # USB-C breakout (Teansic drawing: 22.1 x 13.05; the socket, 9.07 x 3.26, sticks out 1.45 past the board's front
-    # edge; two Ø3.0 holes 3.05 from the front edge, 8.05 either side of the centre)
-    usb_bw=22.1, usb_bd=13.05, usb_y=6.0, usb_z=2.8, usb_stick=1.45, usb_sw=9.07, usb_sh=3.26, usb_sl=7.8,
-    usb_hole=3.0, usb_hole_x=3.05, usb_hole_y=8.05,
+    # USB-C breakout: Cermant 16P (B0CB2VFJ54), 21.6 x 12.8 (listing drawing). Scaled from its photo (confirm on the
+    # board): socket 8.94 x 3.26 sticks out ~1.8 past the front edge; two ~Ø3.6 holes ~2.4 from the front edge,
+    # ~17.3 apart; pin row (VBUS GND CC1 D- D+ CC2) centred, 1.3 from the back edge
+    usb_bw=21.6, usb_bd=12.8, usb_y=6.0, usb_z=2.8, usb_stick=1.8, usb_sw=8.94, usb_sh=3.26, usb_sl=7.5,
+    usb_hole=3.6, usb_hole_x=2.4, usb_hole_y=8.65,
     # lid screws: M3 x 8 flat head into heat-set inserts (Ø4.0 x 6.7) in four pillars
     ins_d=4.0, ins_depth=6.7, pillar_r=3.6,
 )
@@ -310,7 +311,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     # collar round each presses the board onto its post. The board slides in flat; the lid locks it.
     for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
         ztop = C['g_under'] + 0.01 if abs(hy) < C['gw_out'] + 2.0 else zl + 0.01
-        lid = uni(lid, cyl((hx, hy, bz1 + 0.1), (hx, hy, ztop), 1.95),                         # collar (end wall 2.1 away)
+        cr = min(1.95, C['in_b'] - hx - 0.1)                                                    # clear of end wall B
+        lid = uni(lid, cyl((hx, hy, bz1 + 0.1), (hx, hy, ztop), cr),                           # collar
                   cyl((hx, hy, bz0 - 0.6), (hx, hy, bz1 + 0.2), 1.3),                        # pin, Ø2.6 in the Ø3.0 hole
                   cone((hx, hy, bz0 - 0.59), 1.3, (hx, hy, bz0 - 1.0), 0.9))                 # tapered tip
     # the register lip simply stops at each pillar: a square-ended gap across that side of the lip (no slivers)

@@ -11,7 +11,7 @@ controllers** (3 + 3 + 2) plus spares. Everything is from Amazon; prices are wha
 | Super Lube 21030 PTFE grease | 1 | worm, worm wheel, thrust steps, gears | [B000XBH9HI](https://www.amazon.com/dp/B000XBH9HI) | |
 | Ø2 × 6 mm 304 stainless dowel pins, 50 pcs (HARFINGTON) | 1 | worm top bearing, 1 per tilter | [search](https://www.amazon.com/s?k=HARFINGTON+50pcs+Dowel+Pins+M2+2mm+x+6mm+304+Stainless+Steel) | |
 
-## In the cart (35 items, $366.86, not checked out)
+## In the cart (2026-10-29)
 ### Electronics
 | Item | Qty | Covers | Link | Price | Arrives |
 |---|---|---|---|---|---|
@@ -19,7 +19,7 @@ controllers** (3 + 3 + 2) plus spares. Everything is from Amazon; prices are wha
 | DRV8833 dual motor driver, 10-pack (Suuoo) | 1 | 1 per tilter (8) + 2 spare | [B0GX9F695H](https://www.amazon.com/dp/B0GX9F695H) | $14.88 | Oct 31 |
 | MCP73871 USB/solar Li-ion charger, power path (Comimark) | 3 | 1 per controller | [B07V4PHKNX](https://www.amazon.com/dp/B07V4PHKNX) | $8.99 each | Oct 31 |
 | 18650 2600 mAh protected cell, JST-XH lead (XINLANTECH) | 4 | 3 + 1 spare | [B0CHY872T5](https://www.amazon.com/dp/B0CHY872T5) | $11.72 each | Oct 31 |
-| USB-C female breakout, 5.1 kΩ CC resistors, 10-pack (Teansic) | 1 | 1 per controller (charge port) | [B0GYNCFDDX](https://www.amazon.com/dp/B0GYNCFDDX) | $9.99 | Nov 1 |
+| USB-C female breakout, 5.1 kΩ CC resistors, 21.6 × 12.8 mm, 10-pack (Cermant) | 1 | 1 per controller (charge port) | [B0CB2VFJ54](https://www.amazon.com/dp/B0CB2VFJ54) | $9.99 | Oct 31 |
 | RJ11/RJ12 6P6C breakout, 4-pack (risingsaplings) | 5 | 20 jacks: 8 tilters + 9 controller ports = 17 | [B0B9BHX7T3](https://www.amazon.com/dp/B0B9BHX7T3) | $9.99 each | Nov 3 |
 
 ### Solar (optional: drop all four rows to save ~$46; the controllers then charge only over USB-C)
@@ -72,6 +72,8 @@ magnet), 1 DRV8833 + 10 µF, 1 RJ12 breakout, 1 dowel pin, 3 × M3 × 25 + 3 ins
 - **RJ12 cords:** check pin 1 → pin 1 continuity on every cord ("straight-wired" is used loosely in listings).
 - **Solar:** measure the panel's open-circuit voltage behind glass; the zener clamps it if it exceeds ~6.8 V.
 - **Power meter:** reads charge and motor current; use a multimeter's µA/mA range for sleep current.
+- **USB-C breakout (Cermant):** measure the board, the socket's stick-out past the front edge and the two holes
+  (position, spacing). The box uses photo-scaled values (`usb_*` in ControllerV4.py); correct them before printing.
 
 ## Removed during design (not needed)
 JST-PH connector kit, electrolytic capacitor kit, M3 × 18 screws, 5 V boost converter (motors run from the battery;
