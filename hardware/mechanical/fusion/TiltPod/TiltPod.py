@@ -8,8 +8,8 @@ Assembly
      its spare holes); RJ12 breakout slid in along its rails until the jack is flush in the end wall (a detent holds
      it); DRV8833 slid into its rails on the room-side wall. Wire everything; leave two leads from OUT1/OUT2.
   3. Solder the two leads to the N20's tabs, slide the module onto the lid face (the motor goes into its cavity and
-     its can drops into the cradle), and fit 4 x M3 x 25 flat head from the main half's back face: through both case
-     halves (two of them through the AS5600 board) into heat-set inserts in the module. To open it up, undo those 4.
+     its can drops into the cradle), and fit 3 x M3 x 25 flat head from the main half's back face: through both case
+     halves (two of them through the AS5600 board) into heat-set inserts in the module. To open it up, undo those 3.
   4. The tilt rod slides in through the module's tube from outside at any time and may stay sticking out.
 
 RJ12 (pin 1 -> pin 1 cords): 1 VBAT, 2 IN1, 3 GND, 4 ANGLE, 5 EN (AS5600 VCC + DRV8833 sleep), 6 IN2.
@@ -27,7 +27,7 @@ P = dict(
     wall=1.8, floor=1.8, ceil=1.8, end_x=-37.5, end_t=2.0,    # end wall just behind the N20's tabs
     rod_z=24.0, rod=4.0, rod_clear=0.65, tube_wall=1.2, tube_x1=-9.93,     # tube ends level with the pin column, under the board's back
     # 4 bolts from the main half; inserts (Ø4.0 x 6.7, M3 x 5.7 ruthex) in the module
-    bolts_board=((6.45, 11.58), (22.45, 27.58)), bolts_rim=((-23.0, 27.0), (22.0, 5.5)),
+    bolts_board=((6.45, 11.58), (22.45, 27.58)), bolts_rim=((-23.0, 27.0),),
     ins_d=4.0, ins_hole=8.0, ins_wall=1.5,
     # AS5600 board seat: rests on 4 bosses behind its corners, front flush with the open face
     board=(2.75, 26.15, 7.88, 31.28), board_t=1.6, chip=(14.45, 19.58), hole_off=8.0, board_hole=3.7,
@@ -38,9 +38,9 @@ P = dict(
     # RJ12 breakout (listing photo): board 19.4 W x 19.9 D x 1.6, jack 13.5 W x 14.7 L x 13.0 H overhanging 4.5
     rj_bw=19.4, rj_bd=19.9, rj_jw=13.5, rj_jl=14.7, rj_jh=13.0, rj_over=4.5, rj_y=-11.85, rj_z=17.0,
     rj_mouth_w=9.9, rj_mouth_h=8.6,
-    # DRV8833 (18.5 x 16): standing in the XZ plane in the back-middle, 16 along X; its +X end stops just behind the
-    # AS5600 board, which closes its rails
-    drv_l=16.0, drv_h=18.5, drv_t=1.6, drv_y=14.7, drv_x1=-10.5, drv_z0=4.0,
+    # DRV8833 (18.5 x 16): standing in the XZ plane against the back wall (components facing in, 1.8 mm behind it for
+    # its solder joints), 16 along X; its +X end stops just behind the AS5600 board, which closes its rails
+    drv_l=16.0, drv_h=18.5, drv_t=1.6, drv_y=22.5, drv_x1=-10.5, drv_z0=2.6,
 )
 p = P
 P['iw'] = p['half_w'] - p['wall']
@@ -124,13 +124,12 @@ def build(tbm, bx, cyl, cone, uni, cut):
     bt = p['board_t']
     seat = x1 - bt                                        # board's back face
     bA, bB = p['bolts_board']                             # (6.45, 11.58), (22.45, 27.58)
-    rC, rD = p['bolts_rim']                               # (-23, 27), (22, 5.5)
+    rC, = p['bolts_rim']                                  # (-23, 27)
     pF, = p['pin_holes']                                  # (6.45, 27.58)
     # every boss is a plain column from the end wall (nothing sits in their way any more)
     cup = uni(cup, column(bA[0], bA[1], ir, seat))        # bolt A: free-standing cylinder
     cup = uni(cup, column(bB[0], bB[1], ir, seat))        # bolt B: top back corner
     cup = uni(cup, column(rC[0], rC[1], ir, x1))          # bolt C: top room-side corner
-    cup = uni(cup, column(rD[0], rD[1], ir, x1))          # bolt D: bottom back corner
     cup = uni(cup, column(pF[0], pF[1], 3.0, seat, ribs=False))   # pin F: cylinder + the locating pin on top
     # the board pocket in the side wall: the board is wider than the cup's inside on the back side
     b0, b1, c0, c1 = p['board']
@@ -172,13 +171,13 @@ def build(tbm, bx, cyl, cone, uni, cut):
     cup = uni(cup, bar)
     jy0, jy1 = p['rj_y'] - p['rj_jw'] / 2 - 0.15, p['rj_y'] + p['rj_jw'] / 2 + 0.15
     cup = cut(cup, bx(x0 - 1, p['in_x0'] + 0.01, jy0, jy1, jz0 - 0.15, jz0 + p['rj_jh'] + 0.15))   # jack window, flush
-    # DRV8833: stands on a grooved floor rail, top edge in a rail standing up from the end wall; slides in from the open
+    # DRV8833: against the back wall, bottom and top edges in grooved rails tied to the wall; slides in from the open
     # face to a stop; the AS5600 board covers its +X end once fitted
     dg0, dg1 = p['drv_y'] - 0.15, p['drv_y'] + p['drv_t'] + 0.15
     za, zb = p['drv_z0'], p['drv_z0'] + p['drv_h']
     dx0 = p['drv_x1'] - p['drv_l']
     for rz0, rz1, cz0, cz1 in ((fz - 0.5, za + 1.5, za - 0.2, za + 3.0), (zb - 1.5, zb + 1.8, zb - 3.0, zb + 0.2)):
-        rail = cut(bx(xin, x1 - 1.6, dg0 - 1.6, dg1 + 1.6, rz0, rz1), bx(dx0 - 0.2, x1 + 1, dg0, dg1, cz0, cz1))
+        rail = cut(bx(xin, x1 - 1.6, dg0 - 1.6, iw + 0.5, rz0, rz1), bx(dx0 - 0.2, x1 + 1, dg0, dg1, cz0, cz1))
         cup = uni(cup, rail)
     # rod tube (closed through the module; the rod goes in from outside and may stay sticking out)
     rr = p['rod'] * math.sqrt(2) / 2 + p['rod_clear']
@@ -211,9 +210,10 @@ def build(tbm, bx, cyl, cone, uni, cut):
     parts.append(('RJ12 pins', bx(p['rj_x0'] + 1.0, p['rj_x0'] + 10.0, p['rj_y'] - 5, p['rj_y'] + 5, p['rj_z'] - 3.0, p['rj_z'])))
     dx1, dx0 = p['drv_x1'], p['drv_x1'] - p['drv_l']
     parts.append(('DRV8833', bx(dx0, dx1, p['drv_y'], p['drv_y'] + p['drv_t'], za, zb)))
-    parts.append(('DRV8833 chip', bx((dx0 + dx1) / 2 - 2.5, (dx0 + dx1) / 2 + 2.5, p['drv_y'] + p['drv_t'],
-                                     p['drv_y'] + p['drv_t'] + 1.0, za + 7, za + 11)))
-    parts.append(('C 10uF', bx(dx0 + 4, dx0 + 7, p['drv_y'] + p['drv_t'], p['drv_y'] + p['drv_t'] + 2.0, za + 2.5, za + 5.5)))
+    parts.append(('DRV8833 chip', bx((dx0 + dx1) / 2 - 2.5, (dx0 + dx1) / 2 + 2.5, p['drv_y'] - 1.0, p['drv_y'],
+                                     za + 7, za + 11)))
+    parts.append(('C 10uF', bx(dx0 + 4, dx0 + 7, p['drv_y'] - 2.0, p['drv_y'], za + 2.5, za + 5.5)))
+    parts.append(('DRV8833 joints', bx(dx0, dx1, p['drv_y'] + p['drv_t'], p['drv_y'] + p['drv_t'] + 1.5, za + 2.5, zb - 2.5)))
     out['Inside'] = parts
     out['Screws'] = [('M3x25', uni(cone((9.3, y, z), 2.95, (9.3 - 1.45, y, z), 1.5), cyl((9.3 - 1.4, y, z), (9.3 - 25, y, z), 1.45)))
                      for y, z in p['bolts_board'] + p['bolts_rim']]
@@ -228,7 +228,7 @@ def summary():
     return {
         'module': 'X %.2f..%.2f (%.1f mm beyond the lid face), same section as the tilter case, open toward the tilter' % (
             p['end_x'], p['lid_x'], p['lid_x'] - p['end_x']),
-        'fasteners': '4 x M3 x 25 flat head from the main half back face (2 through the AS5600 board) into 4 inserts in the module',
+        'fasteners': '3 x M3 x 25 flat head from the main half back face (2 through the AS5600 board) into 4 inserts in the module',
         'jack': 'end wall at X %.2f, flush; centre Y %.1f, Z %.1f' % (p['end_x'], p['rj_y'], p['rj_z'] + 1.6 + p['rj_jh'] / 2 - 0.5),
         'rod tube': 'Ø%.1f bore through the module at (Y 0, Z %.0f)' % (2 * (p['rod'] * math.sqrt(2) / 2 + p['rod_clear']), p['rod_z']),
     }

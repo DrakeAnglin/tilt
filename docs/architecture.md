@@ -97,7 +97,7 @@ is spare. A reversed cord would put VBAT on IN2 and EN on ANGLE's neighbour, so 
 
 - On the tilter: the **sensor module** ([TiltPod.py](../hardware/mechanical/fusion/TiltPod/TiltPod.py)) carries the
   AS5600 board, the DRV8833 and the RJ12 jack. It is wired on the bench with two loose motor leads, soldered to the
-  N20 at final assembly, slid onto the lid face over the motor and held by 4 × M3 × 25 from the main half's back face.
+  N20 at final assembly, slid onto the lid face over the motor and held by 3 × M3 × 25 from the main half's back face.
   The tilt rod runs through a tube in the module and can stick out.
 - **Colour:** visible parts are white: white cords, white PLA cases. The solar panel's cells are black (a white
   cell can't absorb light), so it sits in a white printed frame with the cells facing the glass; from inside the

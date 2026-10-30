@@ -91,8 +91,8 @@ Each tilter carries a sensor module ([TiltPod.py](mechanical/fusion/TiltPod/Tilt
 the tilter's DRV8833 and the RJ12 jack. One set of bolts holds the tilter halves and the module together. Per tilter:
 | Part | Qty | From |
 |---|---|---|
-| **M3 × 25 flat head** (main half back face → both halves → module inserts) | 4 | **to buy** (32 + spares): replaces the M3 × 18 and the M3 × 16/20 |
-| M3 heat-set inserts (in the module) | 4 | 32 for 8 tilters; ruthex listing unavailable, replacement to pick |
+| **M3 × 25 flat head** (main half back face → both halves → module inserts) | 3 | **to buy** (24 + spares): replaces the M3 × 18 and the M3 × 16/20 |
+| M3 heat-set inserts (in the module) | 3 | 24 for 8 tilters; ruthex listing unavailable, replacement to pick |
 | DRV8833 | 1 | 10-pack (8 used) |
 | RJ12 breakout | 1 | 20 bought |
 | 10 µF ceramic | 1 | ceramic kit |

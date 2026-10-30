@@ -91,10 +91,9 @@ P = dict(
     case_screw_len=16.0,      # (only for auto-picked countersunk bolts; none now)
     # the sensor module (TiltPod) holds the AS5600 board and closes the lid side. ALL case bolts now go in from the
     # main half's back face (countersunk M3 x 25 flat head), through both halves (and the board) into heat-set inserts
-    # in the module: every head is on an open outside face. Bolts: the board's diagonal pair + these two. (-23, 27)
-    # was the lid's countersunk bolt; (22, 5.5) is the only other spot clear of every pocket, the board, the motor and
-    # the pegs (grid search, insert wall 1.3)
-    pod_bolts=((-23.0, 27.0), (22.0, 5.5)),
+    # in the module: every head is on an open outside face. Bolts: the board's diagonal pair + this one (was the lid's
+    # countersunk bolt): 3 in all. (A fourth at (22, 5.5) was dropped: its boss took the space the DRV8833 now uses.)
+    pod_bolts=((-23.0, 27.0),),
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
     ss_z=18, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=14.45, ss_shaft_d=4.0,   # 18T: the board bolts pass it
     ss_bore=3.5,              # the gear turns on a Ø4 pin moulded into the main half (gear prints flat, no stub)
