@@ -7,18 +7,18 @@ cell charged from USB-C or a small solar panel facing the window.** One controll
 then a custom PCB once that works. Everything is modular: every device plugs in, nothing is hard-wired between units.
 
 ```
- 6 V solar panel ──[6.2 V zener clamp]──┐              (facing the glass)
- USB-C 5 V ─────────────────────────────┤
-                                        ▼
-            ┌──────────────┐   VBAT 3.0–4.2 V   ┌──────────────────────────────────────────────┐
- 10 k NTC ─►│ Li-ion charger│──────────────────►│ ESP32-C6 SuperMini (5V pin; on-board 3.3 V LDO)│
- (on cell)  │ (MCP73871,    │   ▲  18650 cell    │  Matter over Thread, sleepy end device        │
-            │  power-path)  │───┘  (protected)   └──┬───────────┬───────────┬────────────┬───────┘
-            └──────────────┘                       │ PWM ×6     │ ADC ×3     │ GPIO ×3    │ ADC
-                   │ VBAT                           ▼            ▲ (RC)      ▼            ▼
-                   └──► 2 × DRV8833 (VM = VBAT, nSLEEP) ─► M1 M2 M3        sensor 3V3   VBAT/2 divider
-                                                        │                  (one per blind)
-                       RJ12 6P6C per blind ─────────────┘  (M+, M−, GND, angle OUT, 3V3, GND)
+ 6 V solar panel (optional) ──[6.2 V zener]──D2──┐
+ USB-C 5 V (charge only) ────────────────────D1──┤
+                                                 ▼
+            ┌──────────────┐  VBAT 3.0–4.2 V  ┌────────────────────────────────────────┐
+ 10 k NTC ─►│ MCP73871      │─────────D3──────►│ ESP32-C6 SuperMini                     │
+ (on cell)  │ power-path    │  ▲ 18650 cell    │ Matter over Thread, sleepy end device  │
+            │ charger       │──┘ (protected)   │ ADC: 3 × angle, battery; GPIO: STAT     │
+            └──────────────┘                  └───┬─────────┬─────────┬────────────────┘
+                   │ LOAD (VBAT)                   │ IN1/IN2  │ EN      │ ANGLE (1 k + 100 n)
+                   ▼                               ▼          ▼         ▲
+          RJ12 port ×3 ═══ white straight-wired cord ═══ tilter: DRV8833 ─ N20,  AS5600
+          (VBAT, IN1, GND, ANGLE, EN, IN2)                  (EN wakes the driver and powers the sensor)
 ```
 
 ## Why these choices
@@ -35,13 +35,13 @@ then a custom PCB once that works. Everything is modular: every device plugs in,
 - **One GPIO per sensor, only the moving blind's sensor on.** The analog OUT is ratiometric to the sensor's
   supply, so a sagging supply reads as angle error. One sensor (~6.5 mA) per GPIO keeps the sag to a few tens of
   mV and constant. If bench tests still show drift, add a P-FET switch.
-- **ADC filtering.** RC filter (1 kΩ + 100 nF) at each ADC input: the flat phone cord runs the 20 kHz motor PWM
-  next to the angle wire. Sample the angle with the motor coasting for a few ms if noise remains. Set the sensor so
-  the tilt range sits mid-scale (no 0/360° wrap, away from the ADC's nonlinear top end).
-- **Motors straight from the battery (to confirm on the bench).** The DRV8833 runs from 2.7–10.8 V, so VM = VBAT
-  (3.0–4.2 V): the N20 gets ~62 % of its 6 V stall torque with no current cap and runs ~185 RPM. The 5 V boost
-  in the cart is limited to 0.3 A, which caps torque when it matters (stiff slats, end of travel). Bench test both
-  ways; if battery drive has enough torque the boost is dropped. The DRV8833s sleep (≈ 2 µA) between moves.
+- **ADC filtering.** RC filter (1 kΩ + 100 nF) at each ADC input. With the drivers in the tilters the cord carries
+  only logic-level PWM, not motor current, but the filter stays. Set the sensor so the tilt range sits mid-scale (no
+  0/360° wrap, away from the ADC's nonlinear top end).
+- **Motors straight from the battery.** The DRV8833 runs from 2.7–10.8 V, so VM = VBAT (3.0–4.2 V): the N20 gets
+  ~62 % of its 6 V stall torque with no current cap and runs ~185 RPM, plenty for the low tilt torque. (A 5 V boost
+  was considered and dropped; add one only if bench tests show too little torque.) The DRV8833s sleep (≈ 2 µA)
+  between moves.
 - **Charger with power-path (MCP73871).** Takes 5 V from a USB-C breakout or a 5–6 V solar panel, charges the
   cell, and powers the load at the same time.
 - **Battery temperature.** A headrail behind blinds in sun can pass 50–60 °C, and Li-ion must not charge above
@@ -64,21 +64,19 @@ gives maybe 80–250 mAh on a sunny day (less behind low-E glass), so in a windo
 the bench: USB meter for charge and motor current, a multimeter's µA/mA range for sleep current.
 
 ## Pin plan
-See [dev-board.md](dev-board.md#pin-plan-header-pins-only-physical-order-to-confirm-against-the-board): header pins
-only (the SuperMini's GPIO 21–23 are bottom pads), motors on 18/19, 20/14, 16/17, sensors on ADC 0/1/2 with power
-from 4/5/6, battery on 3, driver sleep on 15. The case's USB-C breakout carries D+/D− to GPIO 13/12, and three
-1N5819 diodes OR the USB and solar inputs into the charger and protect the ESP's 5V pin.
+See [controller-v4.md](controller-v4.md#dev-board): port 1/2/3 IN1-IN2 on GPIO 18/19, 20/14, 16/17; EN on 4/5/6;
+angle on ADC 0/1/2; battery voltage on 3; charger STAT on 7. Three 1N5819 diodes: USB-C and solar into the charger's
+single input, and charger LOAD to the ESP's 5V pin.
 
 ## Connectors (everything modular)
 | Link | Connector |
 |---|---|
-| Tilter ↔ controller | **RJ12 6P6C** jack on the tilter's plug cover and 3 on the controller; white straight-wired phone cords |
+| Tilter ↔ controller | **RJ12 6P6C** jack flush in the tilter's sensor module and 3 on the controller; white straight-wired phone cords |
 | Solar panel ↔ controller | 2-pin ZH 1.5 mm (comes on the panel's lead); matching socket on the controller |
 | Battery ↔ controller | JST-XH 2-pin (comes on the cell) |
 | Charging | USB-C on the controller end |
 
-**Motor driver at each tilter** (decided 2026-10-28): every tilter carries its own DRV8833 in the plug pod on its
-sensor side, so the phone cord carries battery power and logic instead of the 20 kHz motor PWM. The flat, untwisted
+**Motor driver at each tilter** (decided 2026-10-28): every tilter carries its own DRV8833 in its sensor module, so the phone cord carries battery power and logic instead of the 20 kHz motor PWM. The flat, untwisted
 cord no longer couples motor noise into the angle wire, the controller loses both drivers, and a tilter is a
 complete unit (motor + driver + sensor + plug). 8 drivers from the 10-pack.
 
@@ -92,7 +90,7 @@ complete unit (motor + driver + sensor + plug). 8 drivers from the 10-pack.
 | 5 | EN (3.3 V from an ESP GPIO) | AS5600 VCC **and** DRV8833 ULT (sleep): one line wakes both |
 | 6 | IN2 (PWM) | DRV8833 IN2 |
 
-Motor wires: DRV8833 OUT1 / OUT2 → N20 tabs, inside the pod. Each tilter uses one channel of its DRV8833; the other
+Motor wires: DRV8833 OUT1 / OUT2 → N20 tabs, inside the sensor module. Each tilter uses one channel of its DRV8833; the other
 is spare. A reversed cord would put VBAT on IN2 and EN on ANGLE's neighbour, so the continuity check matters.
 
 - On the tilter: the **sensor module** ([TiltPod.py](../hardware/mechanical/fusion/TiltPod/TiltPod.py)) carries the
@@ -104,9 +102,6 @@ is spare. A reversed cord would put VBAT on IN2 and EN on ANGLE's neighbour, so 
   room only the white back shows.
 
 ## Still open
-- Free length inside the headrail for the controller (case is ~50 × 30 mm in section; length set by the 18650 holder
-  plus boards, ~100–110 mm).
-- Which rail face looks at the glass (where the solar panel and its lead go).
-- Cable lengths to the other two blinds.
-- Bench: N20 torque at VBAT vs. 5 V boost; panel open-circuit voltage behind glass. (The sensor kits' Ø4 × 2
-  magnets are confirmed fine by the owner.)
+- Which rail face looks at the glass (where the solar panel and its lead go), if solar is kept.
+- Cable lengths from each controller to its blinds (8 cords bought: 4 × 10 ft, 4 × 6.6 ft).
+- Bench: N20 torque from the battery; panel open-circuit voltage behind glass; sleep current.

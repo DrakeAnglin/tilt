@@ -1,5 +1,8 @@
 # Motor analysis: will the N20 work?
 
+> **Historical.** Written before the design settled, about an encoder N20 driving the rod directly. The build uses a
+> 6 V 300 RPM N20 (no encoder) through a printed worm, with an AS5600 for position: see the [README](../README.md).
+
 **Candidate:** MECCANIXITY N20, 6 V, 40 RPM, metal gearbox, Hall encoder (Amazon B0F8NGRYGS, 2-pack).
 
 **Short answer:** it's a good *fit* and a sensible first buy (cheap, tiny, encoder included, can't burn out the

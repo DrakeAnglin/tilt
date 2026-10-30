@@ -1,5 +1,8 @@
 # Factory tilter: measurements & motorization layout
 
+> **Measurements of the factory tilter** (still valid). The motorization layouts further down were early studies;
+> the current design is [stl/v0.4](stl/v0.4/README.md).
+
 Photos: [face with ruler](../../docs/reference/tilter-face-ruler.jpg), [top with ruler](../../docs/reference/tilter-top-ruler.jpg),
 [gears](../../docs/reference/tilter-worm-gear.jpg), [side](../../docs/reference/tilter-side.jpg).
 
@@ -101,7 +104,7 @@ Changes from v0.2 (2026-10-25):
 - Adapter collar gives 0.95 mm of wall around the spline socket, then a 45° taper to a 6 mm shaft.
 - Verification is automated (tools/fusion_verify.py): interference incl. the rail, clearances, gear phase + full-rev sweep.
 
-See [stl/README.md](stl/README.md) for the measured clearances and [ASSEMBLY.md](ASSEMBLY.md) for the build.
+(v0.3: see [stl/v0.3/README.md](stl/v0.3/README.md) and [stl/v0.3/ASSEMBLY.md](stl/v0.3/ASSEMBLY.md). Current design: [stl/v0.4/README.md](stl/v0.4/README.md).)
 
 ## Chosen concept (v0.2): crossed helical at the factory 56° angle
 The headrail has a **corner notch** (12 tall × 10.5 into the floor × 12 wide along the rod) where the factory tilter's

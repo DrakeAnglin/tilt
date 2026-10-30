@@ -1,16 +1,18 @@
 # Controller dev board and case
 
+> **Archived (superseded).** Kept for history; the current design is in the [README](../../README.md).
+
 **Current: ControllerV2** (hole-accurate). V1 below is kept for history; its layout could not be wired (breakouts
 and the charger under the perfboard, 18 loose port wires).
 
 ## ControllerV2
-Generator: [ControllerV2.py](../hardware/mechanical/fusion/ControllerV2/ControllerV2.py). Run it with plain Python
-for the checks and the hole map ([ctrl-v2-holemap.svg](renders/ctrl-v2-holemap.svg)); run
+Generator: [ControllerV2.py](../../hardware/mechanical/fusion/ControllerV2/ControllerV2.py). Run it with plain Python
+for the checks and the hole map ([ctrl-v2-holemap.svg](../renders/ctrl-v2-holemap.svg)); run
 `tools/fusion_controller_v2.py` through the bridge for the Fusion model, the exact B-rep interference check and the
 renders.
 
-![board](renders/ctrl-v2-board-iso.png)
-![lid off](renders/ctrl-v2-open.png)
+![board](../renders/ctrl-v2-board-iso.png)
+![lid off](../renders/ctrl-v2-open.png)
 
 **Part sizes are from the listing photos and drawings** (ESP32-C6 26 × 18 drawing; DRV8833 18.5 × 16; USB-C 22.1 ×
 13.05; RJ12 board 19.4 × 19.9 and jack 13.5 × 14.7 scaled from the quarter photo with the 2.54 pin row as the
@@ -54,7 +56,7 @@ when it's low). The charger's STAT pad can also report "charging" / "charged".
 
 One controller = one ESP32-C6 SuperMini driving up to 3 tilters. This is the soldered dev-board stage: bought
 modules on a perfboard strip, in a printed case that sits on the headrail floor under the tilt rod. The Fusion model
-is built by [ControllerV1.py](../hardware/mechanical/fusion/ControllerV1/ControllerV1.py):
+is built by [ControllerV1.py](../../hardware/mechanical/fusion/ControllerV1/ControllerV1.py):
 
 ```bash
 python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller_v1.py --timeout 600
@@ -63,8 +65,8 @@ python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller_v1.py 
 It opens a new document, mocks every part at its listed / measured size, runs an interference check between all
 parts (including the tilt rod's sweep) and saves renders to `docs/renders/ctrl-v1-*.png`.
 
-![in the rail](renders/ctrl-v1-in-rail.png)
-![lid off](renders/ctrl-v1-open.png)
+![in the rail](../renders/ctrl-v1-in-rail.png)
+![lid off](../renders/ctrl-v1-open.png)
 
 ## Case
 - **Outer 118.2 × 46.0 × 23.0 mm.** 46 mm wide drops in between the rail lips (46.5 mm opening) and sits on the rail
@@ -120,7 +122,7 @@ diode" warning on its 5V pin is handled by D3).
   electrolytic across LOAD+/GND; 10 µF at the ESP 5V pin.
 
 **Each tilter port (RJ12 n = 1, 2, 3)**: drivers are now at the tilters (see
-[architecture](architecture.md#connectors-everything-modular)).
+[architecture](../architecture.md#connectors-everything-modular)).
 | RJ12 pin | Net at the controller |
 |---|---|
 | 1 | VBAT (charger LOAD) |

@@ -1,6 +1,8 @@
 # Motorized tilter: build & test guide (v0.3)
 
-![closed housing](../../docs/renders/v03-closed-iso.png)
+> **Archived (superseded).** Kept for history; the current design is in the [README](../../../../README.md).
+
+![closed housing](../../../../docs/renders/v03-closed-iso.png)
 
 One unit per blind replaces the factory tilter. It keeps the factory **worm** and **worm wheel**, adds a small N20 gear
 motor, keeps the wand working by hand, and has an **AS5600 magnetic sensor** built in. A small gear on the back of the
@@ -20,7 +22,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 
 ## Parts
 
-### Printed (files in [stl/](stl/), settings there)
+### Printed (files in [stl/](./), settings there)
 `case_right`, `case_left`, `adapter`, `motor_pinion`, `sensor_gear`
 
 ### Hardware

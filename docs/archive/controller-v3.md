@@ -1,10 +1,12 @@
 # Controller (ControllerV3)
 
-Generator: [ControllerV3.py](../hardware/mechanical/fusion/ControllerV3/ControllerV3.py) (plain Python: hole map +
+> **Archived (superseded).** Kept for history; the current design is in the [README](../../README.md).
+
+Generator: [ControllerV3.py](../../hardware/mechanical/fusion/ControllerV3/ControllerV3.py) (plain Python: hole map +
 wiring table) and `tools/fusion_controller_v3.py` (Fusion model, exact interference check, STLs, renders).
 
-![open](renders/ctrl-v3-open.png)
-![in the rail](renders/ctrl-v3-in-rail.png)
+![open](../renders/ctrl-v3-open.png)
+![in the rail](../renders/ctrl-v3-in-rail.png)
 
 ## Box
 - **100.7 × 55.4 × 33.3 mm**, tray + lid, white, rounded long edges (tilter width). Slides into the rail from its end
@@ -23,7 +25,7 @@ wiring table) and `tools/fusion_controller_v3.py` (Fusion model, exact interfere
 | USB-C breakout | hung under the dev board's end on its header, socket in end wall B |
 
 ## Dev board
-Hole map: [ctrl-v3-holemap.svg](renders/ctrl-v3-holemap.svg). Wiring: [ctrl-v3-wiring.md](renders/ctrl-v3-wiring.md).
+Hole map: [ctrl-v3-holemap.svg](../renders/ctrl-v3-holemap.svg). Wiring: [ctrl-v3-wiring.md](../renders/ctrl-v3-wiring.md).
 
 | ESP32-C6 GPIO | Use |
 |---|---|

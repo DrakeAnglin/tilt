@@ -1,6 +1,6 @@
 # Controller (ControllerV4)
 
-Supersedes [ControllerV3](controller-v3.md).
+One per 3 blinds (3 boxes). Earlier layouts are in [archive/](archive/). Parts per box: [BOM](../hardware/BOM.md#per-unit-what-each-build-uses).
 
 Generator: [ControllerV4.py](../hardware/mechanical/fusion/ControllerV4/ControllerV4.py) (plain Python: hole map +
 wiring table) and `tools/fusion_controller_v4.py` (Fusion model, exact interference check, STLs, renders).
@@ -46,7 +46,8 @@ it, later updates over the air.
 ## Assembly
 1. RJ12 boards (trimmed, 6 leads each): tilt the board back-up, jack nose into its window, lower it so the front edge
    sits at the step and the back edge drops behind the lip.
-2. Dev board (bench-tested) onto its posts with the USB-C breakout's socket in its window; solar lead through its hole.
+2. Dev board (bench-tested) onto its posts; solar lead (if used) through its hole in end wall B.
 3. 18650 into its saddles, XH plug onto the battery pins.
-4. USB-C breakout (2 leads to the dev board's USB pads): lay it on its two posts and slide it forward until the socket is flush in its window. The lid's pins locate it through its mounting holes.
+4. USB-C breakout (VBUS and GND leads to the dev board's USB pads): lay it on its two posts and slide it forward until
+   the socket is flush in its window. The lid's pins locate it through its mounting holes.
 5. Lid, 4 × M3 × 8.

@@ -1,5 +1,8 @@
 # Bonus: motorized raise/lower
 
+> **Not started; written for the earlier ESP32-S3 + encoder plan.** The motor/encoder notes below are out of date;
+> the ideas for driving the lift module still apply.
+
 Cordless blinds are a good starting point: a **spring motor** in the headrail counterbalances the blind's weight,
 so it stays wherever you leave it. That means a motor only has to overcome friction and the spring's brake,
 **not lift the whole blind**. Much less torque than a corded lift.
