@@ -27,6 +27,8 @@ ORIENT = {
     'sensor_module': (X_DOWN, 'end wall on the bed, open face up; no supports'),
     'controller_tray': (ID, 'floor on the bed; no supports'),
     'controller_lid': (FLIP, 'top face on the bed; the groove floor bridges 9 mm, no supports'),
+    'controller_v4_tray': (ID, 'floor on the bed; no supports'),
+    'controller_v4_lid': (FLIP, 'top face on the bed; the groove floor bridges 12 mm, no supports'),
 }
 
 
