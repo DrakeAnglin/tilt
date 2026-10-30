@@ -111,3 +111,15 @@ No longer needed: the M3 × 18 pack (no bolts go into the main half from the lid
 | Bulk electrolytic | 1 | comes with the charger |
 | RJ12 breakouts trimmed to 15 mm | 3 | 20 bought (8 tilters + 9 ports = 17) |
 No DRV8833 in the controller any more (they are in the tilters).
+
+## Cart audit (2026-10-29): 35 items, $366.86, not checked out
+Removed (no longer used by the design): EGSCST JST-PH kit, electrolytic capacitor kit (the charger ships with its own),
+M3 × 18 pack, silver 3.3 ft RJ12 cords (not white), QEBIDUM 5 V boost (motors run from the battery; re-add only if
+bench tests show too little torque). White RJ12 cords set to 2 packs each (8 cords).
+
+Added:
+| Item | Qty | Link | Price | Arrives |
+|---|---|---|---|---|
+| M3 × 25 flat head, 50 pcs (tilter bolts, 3 per tilter = 24) | 1 | [B0DKY4B3VG](https://www.amazon.com/dp/B0DKY4B3VG) | $6.61 | Oct 31 |
+| Moicstiy M3 × 5.7 × 4.6 heat-set inserts, 100 pcs (ruthex size, Ø4.0 hole; 24 tilter + 12 controller) | 1 | [B0DQL4ZSCP](https://www.amazon.com/dp/B0DQL4ZSCP) | $5.99 | Oct 31 |
+| Ginsco heat-shrink kit, 580 pcs (solar extension leads) | 1 | [B01MFA3OFA](https://www.amazon.com/dp/B01MFA3OFA) | $7.99 | Oct 30 |
