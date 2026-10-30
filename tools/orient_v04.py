@@ -25,6 +25,8 @@ ORIENT = {
     'motor_pinion': (ID, 'on a gear face (45° helical teeth print as 45° overhangs)'),
     'sensor_gear': (ID, 'gear face down, magnet pocket up'),
     'sensor_module': (X_DOWN, 'end wall on the bed, open face up; no supports'),
+    'controller_tray': (ID, 'floor on the bed; no supports'),
+    'controller_lid': (FLIP, 'top face on the bed, rod tunnel up; no supports'),
 }
 
 
