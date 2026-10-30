@@ -115,6 +115,20 @@ for i in range(len(own)):
         if v > 0.01:
             hits.append('%s / %s: %.2f mm3' % (ni, nj, v))
 
+# USB-C board fitting: it slides in flat along its posts, socket first into the window, front edge into the wall pocket
+tray_b = groups['Tray'][0][1]
+usb = [b for nm, b in groups['Parts'] if nm in ('USB-C board', 'USB-C socket')]
+slide = {}
+for d in (0, 0.5, 1, 1.5, 2, 3, 5):
+    t = adsk.core.Matrix3D.create()
+    t.translation = adsk.core.Vector3D.create(-d / 10, 0, 0)
+    vs = []
+    for b in usb:
+        cpy = tbm.copy(b)
+        tbm.transform(cpy, t)
+        vs.append(round(vol(cpy, tray_b), 2))
+    slide[d] = vs
+
 old = []
 for i in range(app.documents.count):
     d = app.documents.item(i)
@@ -284,5 +298,5 @@ vis(); res.append(shot('ctrl-v4-end-a.png', (-200, 0, 20), (0, 0, 18)))
 vis(hide=('Lid', 'Screws', 'Tray', 'Rail')); res.append(shot('ctrl-v4-boards-top.png', (L / 2, 0, 300)))
 vis(); res.append(shot('ctrl-v4-in-rail.png', (-140, -90, 90)))
 vis(hide=('Rail',))
-result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, 2 * C['half_w'], C['top']), 'interference': hits or 'none',
+result = {'usb slide-in (mm back from home: [board, socket] overlap with the tray)': slide, 'box': 'L %.1f x W %.1f x H %.1f' % (L, 2 * C['half_w'], C['top']), 'interference': hits or 'none',
           'fillets': fil, 'exported': files, 'renders': res}

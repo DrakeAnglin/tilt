@@ -24,7 +24,7 @@ wiring table) and `tools/fusion_controller_v4.py` (Fusion model, exact interfere
 | Ports, X 4.5-25.8 | three RJ12 breakouts trimmed to 15 mm wide, on ledges with a front step and a 1 mm rear lip |
 | Pillars, X ~31 | room for the 18 port leads to cross to the dev board |
 | Electronics, X 40-110 | 18650 along the room side (two saddles + end stops), dev board (26 x 12 holes) beside it on 6 posts |
-| USB-C, X 110-124 | the breakout on two pegs through its own mounting holes, its front edge in a pocket in end wall B so the socket is flush with the outside; solar lead hole beside it |
+| USB-C, X 110-124 | the breakout lies on two flat posts, its front edge in a pocket in end wall B so the socket sits flush in a rounded (stadium) window; two tapered pins under the lid drop through its mounting holes into the posts, so the lid locks it; solar lead hole beside it |
 
 ## Dev board
 Hole map: [ctrl-v4-holemap.svg](renders/ctrl-v4-holemap.svg). Wiring: [ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md).
@@ -48,5 +48,5 @@ it, later updates over the air.
    sits at the step and the back edge drops behind the lip.
 2. Dev board (bench-tested) onto its posts with the USB-C breakout's socket in its window; solar lead through its hole.
 3. 18650 into its saddles, XH plug onto the battery pins.
-4. USB-C breakout: front edge into the wall pocket, mounting holes onto the two pegs (2 leads to the dev board's USB pads).
+4. USB-C breakout (2 leads to the dev board's USB pads): lay it on its two posts and slide it forward until the socket is flush in its window. The lid's pins locate it through its mounting holes.
 5. Lid, 4 × M3 × 8.

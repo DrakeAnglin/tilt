@@ -273,12 +273,17 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     hx = ux1 - c['usb_hole_x']
     bz0, bz1 = c['usb_z'], c['usb_z'] + 1.6
     for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
-        tray = uni(tray, cyl((hx, hy, fz - 0.1), (hx, hy, bz0), 2.8),
-                   cyl((hx, hy, bz0 - 0.1), (hx, hy, bz1 + 0.8), c['usb_hole'] / 2 - 0.12))
-    tray = cut(tray, bx(C['in_b'] - 0.01, ux1 + 0.15, uy0 - 0.2, uy1 + 0.2, bz0 - 0.2, bz1 + 0.2))      # board-edge pocket
+        tray = uni(tray, cyl((hx, hy, fz - 0.1), (hx, hy, bz0), 2.8))          # flat-topped post: the board slides over it
+    for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
+        tray = cut(tray, cyl((hx, hy, bz0 + 0.01), (hx, hy, bz0 - 1.2), 1.5))   # socket for the lid's locating pin
+    tray = cut(tray, bx(C['in_b'] - 0.01, ux1 + 0.2, uy0 - 0.2, uy1 + 0.2, bz0 - 0.2, bz1 + 0.2))      # board-edge pocket
     sz0 = bz1
-    tray = cut(tray, bx(ux1 - 1, L + 1, c['usb_y'] - c['usb_sw'] / 2 - 0.15, c['usb_y'] + c['usb_sw'] / 2 + 0.15,
-                        sz0 - 0.15, sz0 + c['usb_sh'] + 0.15))                                          # socket window
+    wr = c['usb_sh'] / 2 + 0.2                                       # stadium window: the socket has round ends
+    wzc = sz0 + c['usb_sh'] / 2
+    hwx = c['usb_sw'] / 2 - c['usb_sh'] / 2
+    tray = cut(tray, bx(ux1 - 1, L + 1, c['usb_y'] - hwx, c['usb_y'] + hwx, wzc - wr, wzc + wr),
+               cyl((ux1 - 1, c['usb_y'] - hwx, wzc), (L + 1, c['usb_y'] - hwx, wzc), wr),
+               cyl((ux1 - 1, c['usb_y'] + hwx, wzc), (L + 1, c['usb_y'] + hwx, wzc), wr))
     tray = cut(tray, cyl((C['in_b'] - 1, -12.0, 9.0), (L + 1, -12.0, 9.0), 1.75))
     out['Tray'] = [('Tray', tray)]
 
@@ -301,11 +306,18 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
         lid = uni(lid, bx(fx, fx + 4, C['bat_y'] - 2, C['bat_y'] + 2, btop + 0.1, zl + 0.01))
     for xx in (PB[0] + 0.3, PB[1] - 2.3):
         lid = uni(lid, bx(xx, xx + 2.0, PB[3] - 2.0, PB[3] - 0.3, C['pb_top'] + 0.1, zl + 0.01))
-    for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):   # press the board down beside each peg
-        fx0 = hx - 5.0
-        ztop = C['g_under'] + 0.01 if abs(hy) < C['gw_out'] + 2.5 else zl + 0.01
-        lid = uni(lid, bx(fx0, fx0 + 2.0, hy - 1.0, hy + 1.0, bz1 + 0.1, ztop))
-    lid = cut(lid, tbm.copy(tray))
+    # USB-C board: two pins under the lid drop through its mounting holes into the posts' sockets (tapered tips), and a
+    # collar round each presses the board onto its post. The board slides in flat; the lid locks it.
+    for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
+        ztop = C['g_under'] + 0.01 if abs(hy) < C['gw_out'] + 2.0 else zl + 0.01
+        lid = uni(lid, cyl((hx, hy, bz1 + 0.1), (hx, hy, ztop), 1.95),                         # collar (end wall 2.1 away)
+                  cyl((hx, hy, bz0 - 0.6), (hx, hy, bz1 + 0.2), 1.3),                        # pin, Ø2.6 in the Ø3.0 hole
+                  cone((hx, hy, bz0 - 0.59), 1.3, (hx, hy, bz0 - 1.0), 0.9))                 # tapered tip
+    # the register lip simply stops at each pillar: a square-ended gap across that side of the lip (no slivers)
+    for px, py in PILLARS:
+        sy = 1 if py > 0 else -1
+        gx = c['pillar_r'] + 0.4
+        lid = cut(lid, bx(px - gx, px + gx, sy * (abs(py) - c['pillar_r'] - 0.4), sy * (iw + 1), zl - 3, zl + 0.01))
     for px, py in PILLARS:
         lid = cut(lid, cyl((px, py, zl - 2), (px, py, c['top'] + 1), 1.7),
                   cone((px, py, c['top'] + 0.01), 3.2, (px, py, c['top'] - 1.5), 1.7))
@@ -331,8 +343,11 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
         ub = cut(ub, cyl((hx, hy, bz0 - 1), (hx, hy, bz1 + 1), c['usb_hole'] / 2))
     parts.append(('USB-C board', ub))
-    parts.append(('USB-C socket', bx(ux1 + c['usb_stick'] - c['usb_sl'], ux1 + c['usb_stick'], c['usb_y'] - c['usb_sw'] / 2,
-                                     c['usb_y'] + c['usb_sw'] / 2, bz1, bz1 + c['usb_sh'])))
+    sx0, sx1 = ux1 + c['usb_stick'] - c['usb_sl'], ux1 + c['usb_stick']
+    sr, szc, shx = c['usb_sh'] / 2, bz1 + c['usb_sh'] / 2, c['usb_sw'] / 2 - c['usb_sh'] / 2
+    parts.append(('USB-C socket', uni(bx(sx0, sx1, c['usb_y'] - shx, c['usb_y'] + shx, bz1, bz1 + c['usb_sh']),
+                                      cyl((sx0, c['usb_y'] - shx, szc), (sx1, c['usb_y'] - shx, szc), sr),
+                                      cyl((sx0, c['usb_y'] + shx, szc), (sx1, c['usb_y'] + shx, szc), sr))))
     out['Parts'] = parts
     return out
 
