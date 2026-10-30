@@ -132,11 +132,13 @@ def build(tbm, bx, cyl, cone, uni, cut):
     cup = uni(cup, column(rC[0], rC[1], ir, x1))          # bolt C: top room-side corner
     cup = uni(cup, column(rD[0], rD[1], ir, x1))          # bolt D: bottom back corner
     cup = uni(cup, column(pF[0], pF[1], 3.0, seat, ribs=False))   # pin F: cylinder + the locating pin on top
-    for y, z in p['pin_holes']:                           # locating pins through the board's spare holes
-        cup = uni(cup, cyl((seat - 0.01, y, z), (x1 - 0.2, y, z), p['pin_d'] / 2))
     # the board pocket in the side wall: the board is wider than the cup's inside on the back side
     b0, b1, c0, c1 = p['board']
-    cup = cut(cup, bx(seat - 0.3, x1 + 1, b0 - 0.3, b1 + 0.3, c0 - 0.3, c1 + 0.3))
+    # room for the board's edge where it is wider than the cup's inside: from the seat plane out only, so every seat
+    # face (bolt bosses A and B, pin column F, rod tube end) stays at exactly X = seat
+    cup = cut(cup, bx(seat, x1 + 1, b0 - 0.3, b1 + 0.3, c0 - 0.3, c1 + 0.3))
+    for y, z in p['pin_holes']:                           # locating pin through the board's spare hole (after the cut)
+        cup = uni(cup, cyl((seat - 0.01, y, z), (x1 - 0.2, y, z), p['pin_d'] / 2))
     # N20 cradle under the can's end, shaped to the can
     cx0, cx1 = xin, p['can'][1] + 4.0                  # from the end wall to 4 mm under the can's end
     ay, az = p['n20_axis']
