@@ -24,8 +24,8 @@ import math
 
 P = dict(
     lid_x=-8.33, half_w=27.7, floor_z=0.2, step_z=33.3, plateau_hw=21.7, plateau_z=38.9, edge_r=1.0,
-    wall=1.8, floor=1.8, ceil=1.8, end_x=-43.5, end_t=2.0,
-    rod_z=24.0, rod=4.0, rod_clear=0.65, tube_wall=1.2, tube_x1=-10.3,     # tube stops behind the board
+    wall=1.8, floor=1.8, ceil=1.8, end_x=-37.5, end_t=2.0,    # end wall just behind the N20's tabs
+    rod_z=24.0, rod=4.0, rod_clear=0.65, tube_wall=1.2, tube_x1=-9.93,     # tube ends level with the pin column, under the board's back
     # 4 bolts from the main half; inserts (Ø4.0 x 6.7, M3 x 5.7 ruthex) in the module
     bolts_board=((6.45, 11.58), (22.45, 27.58)), bolts_rim=((-23.0, 27.0), (22.0, 5.5)),
     ins_d=4.0, ins_hole=8.0, ins_wall=1.5,
@@ -138,11 +138,11 @@ def build(tbm, bx, cyl, cone, uni, cut):
     b0, b1, c0, c1 = p['board']
     cup = cut(cup, bx(seat - 0.3, x1 + 1, b0 - 0.3, b1 + 0.3, c0 - 0.3, c1 + 0.3))
     # N20 cradle under the can's end, shaped to the can
-    cx0, cx1 = p['can'][1] + 1.0, p['can'][1] + 5.0
+    cx0, cx1 = xin, p['can'][1] + 4.0                  # from the end wall to 4 mm under the can's end
     ay, az = p['n20_axis']
     cy0, cy1 = ay - p['n20_w'] / 2 - 1.6, ay + p['n20_w'] / 2 + 1.6
-    cr = uni(bx(cx0, cx1, cy0, cy1, fz - 0.5, az + 2.0), gusset(cx0, cy0, cy1, fz - 0.5, az + 2.0, 'floor'))
-    cup = uni(cup, cut(cr, n20_section(bx, cyl, cut, uni, cx0 - 12, cx1 + 1, 0.15)))
+    cr = bx(cx0, cx1, cy0, cy1, fz - 0.5, az + 2.0)
+    cup = uni(cup, cut(cr, n20_section(bx, cyl, cut, uni, cx0 - 1, cx1 + 1, 0.15)))
     # RJ12 breakout: room side, above the motor. That is the one channel from the open face to the end wall that every
     # boss, rib and the rod tube stay out of, so the board (with its leads soldered) slides straight in on two grooved
     # rails until the jack sits flush in the end wall. A spring latch in the room-side rail snaps behind the board's back
@@ -153,7 +153,7 @@ def build(tbm, bx, cyl, cone, uni, cut):
     rj_back = p['rj_x1']
     # room-side rail: a block from the side wall to 1.2 mm under the board's edge, from the end wall to the latch
     blk = bx(xin, rj_back + 1.6, -iw - 0.5, ry0 + 1.2, p['rj_z'] - 2.5, gz1 + 1.8)
-    blk = cut(blk, bx(xin - 1, x1 + 1, ry0 - 0.2, ry0 + 1.3, gz0, gz1))                # groove (open to the face)
+    blk = cut(blk, bx(p['rj_x0'], x1 + 1, ry0 - 0.2, ry0 + 1.3, gz0, gz1))            # groove: ends at the board's front edge (stop)
     blk = cut(blk, bx(rj_back - 12.0, rj_back + 2.0, ry0 - 3.2, ry0 - 0.2, gz0 - 0.6, gz1 + 0.6))   # latch relief
     blk = cut(blk, bx(rj_back - 0.6, rj_back + 2.0, ry0 - 3.2, ry0 + 1.3, gz0 - 0.6, gz1 + 0.6))     # rail cut back at the hook
     cup = uni(cup, blk)
@@ -165,11 +165,9 @@ def build(tbm, bx, cyl, cone, uni, cut):
                bx(rj_back + 1.3, rj_back + 1.6, ry0 - 1.0, ry0 - 0.5, hz0, hz1))
     cup = uni(cup, arm, hook)
     # inner rail: hangs from the rod tube, along the board's other edge
-    bar = bx(xin, rj_back + 1.6, ry1 - 1.2, ry1 + 1.6, p['rj_z'] - 2.5, p['rod_z'] - 4.0)
-    bar = cut(bar, bx(xin - 1, x1 + 1, ry1 - 1.3, ry1 + 0.2, gz0, gz1))
+    bar = bx(xin, rj_back + 1.6, ry1 - 1.2, ry1 + 1.6, p['rj_z'] - 2.0, p['rod_z'] - 4.0)
+    bar = cut(bar, bx(p['rj_x0'], x1 + 1, ry1 - 1.3, ry1 + 0.2, gz0, gz1))
     cup = uni(cup, bar)
-    # front stop for the board's front edge, under the jack's overhang
-    cup = uni(cup, bx(xin, p['rj_x0'], ry0 + 2.0, ry1 - 2.0, p['rj_z'] - 2.5, p['rj_z'] + 1.5))
     jy0, jy1 = p['rj_y'] - p['rj_jw'] / 2 - 0.15, p['rj_y'] + p['rj_jw'] / 2 + 0.15
     cup = cut(cup, bx(x0 - 1, p['in_x0'] + 0.01, jy0, jy1, jz0 - 0.15, jz0 + p['rj_jh'] + 0.15))   # jack window, flush
     # DRV8833: stands on a grooved floor rail, top edge in a rail standing up from the end wall; slides in from the open

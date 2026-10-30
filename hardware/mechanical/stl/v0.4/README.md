@@ -120,6 +120,6 @@ Assembly
    - AS5600 board into its seat at the open face, chip facing out, pressed onto its pin (**file ~1 mm off the board
      edge nearest the rod**, header edge away from the rod). It also closes the DRV8833's rails.
    - Wire it all; leave two leads from OUT1/OUT2 for the motor.
-3. Solder the two leads to the N20's tabs, slide the module onto the lid face (the can drops into the cradle), and fit
+3. Solder the two leads to the N20's tabs, route the motor leads up from the tabs, across under the RJ12 inner rail and over bolt A's column to the DRV8833, slide the module onto the lid face (the can drops into the cradle on the end wall), and fit
    4 × M3 × 25 flat head from the main half's back face.
 4. Tilt rod in through the module's tube at any time.
