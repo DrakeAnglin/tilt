@@ -60,7 +60,7 @@ groups['Rail'] = [('Rail floor', bx(-20, L + 20, -rh - rt, rh + rt, -rt, 0)),
                   ('Rail wall back', bx(-20, L + 20, rh, rh + rt, -rt, C['rail_h'])),
                   ('Rail lip room', bx(-20, L + 20, -rh, -rh + C['lip_in'], C['rail_h'] - C['lip_h'], C['rail_h'])),
                   ('Rail lip back', bx(-20, L + 20, rh - C['lip_in'], rh, C['rail_h'] - C['lip_h'], C['rail_h'])),
-                  ('Tilt rod', bx(-20, L + 20, -2, 2, C['rod_z'] - 2, C['rod_z'] + 2))]
+                  ('Tilt rod sweep', cyl((-20, 0, C['rod_z']), (L + 20, 0, C['rod_z']), C['rod'] * math.sqrt(2) / 2))]
 groups['Screws'] = [('M3x8', uni(cone((x, y, C['top']), 2.95, (x, y, C['top'] - 1.45), 1.5),
                                  cyl((x, y, C['top'] - 1.4), (x, y, C['top'] - 8), 1.45))) for x, y in M.LID_SCREWS]
 
@@ -243,6 +243,7 @@ vis(hide=('Rail',)); res.append(shot('ctrl-v3-exploded.png', (L / 2 - 170, -190,
 move('Lid', 0); move('Screws', 0)
 vis(hide=('Rail',)); res.append(shot('ctrl-v3-closed.png', (-120, -160, 120)))
 res.append(shot('ctrl-v3-end-b.png', (L + 150, 60, 60)))
+vis(); res.append(shot('ctrl-v3-end-a.png', (-200, 0, 20), (0, 0, 18)))
 vis(hide=('Lid', 'Screws', 'Tray', 'Rail')); res.append(shot('ctrl-v3-boards-top.png', (L / 2, 0, 300)))
 vis(); res.append(shot('ctrl-v3-in-rail.png', (-140, -90, 90)))
 vis(hide=('Rail',))

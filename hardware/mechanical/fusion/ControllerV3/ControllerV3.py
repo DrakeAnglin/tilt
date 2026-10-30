@@ -2,8 +2,8 @@
 
 One box per headrail-controller: ESP32-C6 SuperMini, MCP73871 charger, 18650, three RJ12 ports (all on end A), USB-C
 charge-only port and the solar lead (end B). The box has the tilter's width and rounded long edges with a flat top just
-under the rail lips, and slides into the rail from its end like the tilter. The tilt rod passes through a tunnel that
-hangs from the lid (printed lid-down, so the tunnel needs no support).
+under the rail lips, and slides into the rail from its end like the tilter. It sits under the tilt rod: the rod lies in
+a groove along the lid's middle (0.97 mm under the rod's sweep), nothing to thread.
 
   python3 hardware/mechanical/fusion/ControllerV3/ControllerV3.py   # hole map SVG + wiring table, no Fusion needed
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller_v3.py --timeout 1200
@@ -29,7 +29,9 @@ import os
 C = dict(
     half_w=27.7, floor_z=0.2, top=33.3, wall=1.8, floor=1.8, lid=1.8, end_t=2.0, edge_r=1.0,
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0,
-    rod_z=24.0, rod=4.0, rod_clear=0.65, tube_wall=1.2,
+    rod_z=24.0, rod=4.0,
+    # the box sits UNDER the tilt rod: a groove along the lid's middle takes it (rod sweeps down to Z 21.17)
+    groove_hw=4.5, groove_floor=20.2, groove_wall=1.2,
     # RJ12 breakouts, trimmed to 15 wide (jack 13.5 W x 14.7 L x 13 H, overhangs the board's front edge by 4.5)
     rj_w=15.0, rj_d=19.9, rj_t=1.6, rj_jw=13.5, rj_jl=14.7, rj_jh=13.0, rj_over=4.5, rj_z=2.6, rj_y=(-17.0, 0.0, 17.0),
     rj_mouth_w=9.9, rj_mouth_h=8.6,
@@ -49,8 +51,9 @@ C['pb_top'] = c['pb_z'] + c['pb_t']
 C['mod_z'] = C['pb_top'] + c['plastic']
 C['bat_y'] = -C['iw'] + 0.2 + c['bat_d'] / 2
 C['bat_zc'] = C['fz'] + 0.3 + c['bat_d'] / 2
-C['rr'] = c['rod'] * math.sqrt(2) / 2 + c['rod_clear']          # rod bore radius
-C['tube_r'] = C['rr'] + c['tube_wall']
+C['sweep_z'] = c['rod_z'] - c['rod'] * math.sqrt(2) / 2           # lowest point of the rod's corners
+C['ch_hw'] = c['groove_hw'] + c['groove_wall']                     # the groove channel's outer half width
+C['ch_z0'] = c['groove_floor'] - 1.2                               # its underside
 
 PITCH = 2.54
 PX0, PY0 = 28.5, -4.0
@@ -282,11 +285,9 @@ def build(tbm, bx, cyl, cone, uni, cut, obox):
     ucz, ucy = (sk[5] + sk[6]) / 2, (sk[3] + sk[4]) / 2
     tray = cut(tray, bx(C['in_b'] - 0.01, L + 1, ucy - 6.4, ucy + 6.4, ucz - 3.5, ucz + 3.5))
     tray = cut(tray, cyl((C['in_b'] - 1, -3.5, 12.0), (L + 1, -3.5, 12.0), 1.75))
-    # rod: slots in both end walls from the rim down to the tunnel's bottom (the lid's tunnel fills them)
-    tr = C['tube_r']
+    # groove: a notch in both end walls where the lid's channel passes
     for xa, xb in ((-1, C['in_a'] + 0.01), (C['in_b'] - 0.01, L + 1)):
-        tray = cut(tray, uni(bx(xa, xb, -tr - 0.1, tr + 0.1, c['rod_z'], zl + 1),
-                             cyl((xa, 0, c['rod_z']), (xb, 0, c['rod_z']), tr + 0.1)))
+        tray = cut(tray, bx(xa, xb, -C['ch_hw'] - 0.1, C['ch_hw'] + 0.1, C['ch_z0'] - 0.1, zl + 1))
     # lid screw bosses on the end walls, 45° conical undersides, inserts from the top
     ir = c['ins_d'] / 2 + c['ins_wall']
     for sx, sy in LID_SCREWS:
@@ -304,25 +305,21 @@ def build(tbm, bx, cyl, cone, uni, cut, obox):
                        bx(C['in_a'] + 1.35, C['in_b'] - 1.35, -iw + 1.35, iw - 1.35, zl - 2, zl + 1)))
     for sx, sy in LID_SCREWS:                                    # clear the bosses' tops
         lid = cut(lid, cyl((sx, sy, zl - 1.3), (sx, sy, zl + 0.01), ir + 0.3))
-    # rod tunnel: tube + 45° teardrop toward the lid + web, the full length (fills the end-wall slots)
-    k = math.sqrt(0.5)
-    tear = obox((L / 2, 0, c['rod_z']), (1, 0, 0), (0, k, k), L, 2 * tr, 2 * tr)        # square tangent to the tube
-    tbm.booleanOperation(tear, bx(-1, L + 1, -tr * 2, tr * 2, c['rod_z'] + tr * k, zl + 1), INTER)   # cap above the tangents
-    lid = uni(lid, cyl((0, 0, c['rod_z']), (L, 0, c['rod_z']), tr), tear, bx(0, L, -1.0, 1.0, c['rod_z'], zl + 0.01))
-    for xa, xb in ((0, C['in_a']), (C['in_b'], L)):             # fill the end-wall slots flush
-        lid = uni(lid, bx(xa, xb, -tr, tr, c['rod_z'], zl + 0.01))
-    lid = cut(lid, cyl((-1, 0, c['rod_z']), (L + 1, 0, c['rod_z']), C['rr']))
+    # groove channel for the rod: floor + two walls, the full length (it fills the end-wall notches)
+    lid = cut(lid, bx(-1, L + 1, -C['ch_hw'], C['ch_hw'], C['ch_z0'], c['top'] + 1))
+    lid = uni(lid, cut(bx(0, L, -C['ch_hw'], C['ch_hw'], C['ch_z0'], c['top']),
+                       bx(-1, L + 1, -c['groove_hw'], c['groove_hw'], c['groove_floor'], c['top'] + 1)))
     # hold-downs: on each jack's top, on the cell
     jtop = jz0 + c['rj_jh']
     for y in c['rj_y']:
-        lid = uni(lid, bx(C['in_a'] + 7, C['in_a'] + 11, y - 2.0, y + 2.0, jtop + 0.1, zl + 0.01))
+        ztop = C['ch_z0'] + 0.01 if abs(y) < C['ch_hw'] + 2 else zl + 0.01      # the middle one hangs from the groove
+        lid = uni(lid, bx(C['in_a'] + 7, C['in_a'] + 11, y - 2.0, y + 2.0, jtop + 0.1, ztop))
     btop = C['bat_zc'] + c['bat_d'] / 2
     for fx in (c['bat_x0'] + 20, c['bat_x0'] + c['bat_l'] - 24):
         lid = uni(lid, bx(fx, fx + 4, C['bat_y'] - 2, C['bat_y'] + 2, btop + 0.1, zl + 0.01))
     for sx, sy in LID_SCREWS:                                    # countersunk M3 holes
         lid = cut(lid, cyl((sx, sy, zl - 2), (sx, sy, c['top'] + 1), 1.7),
                   cone((sx, sy, c['top'] + 0.01), 3.2, (sx, sy, c['top'] - 1.5), 1.7))
-    lid = cut(lid, cyl((-1, 0, c['rod_z']), (L + 1, 0, c['rod_z']), C['rr']))
     lid = cut(lid, tbm.copy(tray))                               # register clears every boss and web
     out['Lid'] = [('Lid', lid)]
 
