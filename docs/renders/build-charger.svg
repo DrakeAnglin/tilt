@@ -35,17 +35,17 @@
 <line x1="421" y1="113" x2="300" y2="110" stroke="#b03030" stroke-width="2"/>
 <circle cx="421" cy="113" r="4" fill="#b03030"/>
 <text x="294" y="114" font-size="14" fill="#b03030" text-anchor="end" font-weight="bold">PWR pair: 22 AWG, 2 wires</text>
-<text x="294" y="131" font-size="12" fill="#333" text-anchor="end" font-weight="normal">PWR → c19,  GND → a20</text>
+<text x="294" y="131" font-size="12" fill="#333" text-anchor="end" font-weight="normal">PWR → e19,  GND → a21</text>
 <text x="294" y="148" font-size="12" fill="#333" text-anchor="end" font-weight="normal">(USB-C and solar come in here,</text>
 <text x="294" y="165" font-size="12" fill="#333" text-anchor="end" font-weight="normal">through D1 / D2 on the perfboard)</text>
 <line x1="418" y1="507" x2="300" y2="560" stroke="#b03030" stroke-width="2"/>
 <circle cx="418" cy="507" r="4" fill="#b03030"/>
 <text x="294" y="564" font-size="14" fill="#b03030" text-anchor="end" font-weight="bold">BATT pair: 22 AWG, 2 wires</text>
-<text x="294" y="581" font-size="12" fill="#333" text-anchor="end" font-weight="normal">BATT → c24,  GND → a21</text>
+<text x="294" y="581" font-size="12" fill="#333" text-anchor="end" font-weight="normal">BATT → d19,  GND → a22</text>
 <line x1="655" y1="507" x2="790" y2="560" stroke="#b03030" stroke-width="2"/>
 <circle cx="655" cy="507" r="4" fill="#b03030"/>
 <text x="796" y="564" font-size="14" fill="#b03030" text-anchor="start" font-weight="bold">LOAD pair: 22 AWG, 2 wires</text>
-<text x="796" y="581" font-size="12" fill="#333" text-anchor="start" font-weight="normal">LOAD → j20,  GND → a22</text>
+<text x="796" y="581" font-size="12" fill="#333" text-anchor="start" font-weight="normal">LOAD → j20,  GND → a23</text>
 <line x1="670" y1="133" x2="790" y2="100" stroke="#0a7a3a" stroke-width="2"/>
 <circle cx="670" cy="133" r="4" fill="#0a7a3a"/>
 <text x="796" y="104" font-size="14" fill="#0a7a3a" text-anchor="start" font-weight="bold">Bulk capacitor goes here</text>

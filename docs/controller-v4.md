@@ -30,8 +30,8 @@ wiring table) and `tools/fusion_controller_v4.py` (Fusion model, exact interfere
 **Step-by-step build guide with pictures and polarity notes: [dev-board-build.md](dev-board-build.md).**
 Built on the kit's **30 × 70 mm perfboard: columns a–j, rows 1–24** (row 1 toward the ports, column a toward the battery).
 Layout: [DevBoardR.py](../hardware/mechanical/fusion/ControllerV4/DevBoardR.py): the ESP sits **across** the board (pins in
-rows 3 and 9, USB-C over the column-a edge, nothing overhangs), resistors and diodes lie flat; 4 insulated wires, the rest
-straight bridges. Checked by [`tools/devboard_check.py`](../tools/devboard_check.py): parts ≥ 0.3 mm apart, every net
+rows 3 and 9, USB-C over the column-a edge, nothing overhangs), resistors and diodes lie flat across 4 holes; the ESP and the
+USB-C breakout plug into female header sockets (replaceable); 4 insulated wires, the rest straight bridges. Checked by [`tools/devboard_check.py`](../tools/devboard_check.py): parts ≥ 0.3 mm apart, every net
 connected, none shorted, one thing per hole. The older straight layout (ESP along the board, 12 wires) is still in
 ControllerV4.py (`--straight`). (The box still has to be updated to this board: later.)
 
