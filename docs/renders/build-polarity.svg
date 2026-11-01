@@ -12,7 +12,7 @@
 <text x="347" y="120" font-size="16" font-weight="bold" text-anchor="middle">−</text>
 <line x1="354" y1="160" x2="354" y2="200" stroke="#999" stroke-width="3"/>
 <line x1="388" y1="160" x2="388" y2="215" stroke="#999" stroke-width="3"/>
-<text x="370" y="60" font-size="14" text-anchor="middle" font-weight="bold">bulk electrolytic</text>
+<text x="370" y="60" font-size="14" text-anchor="middle" font-weight="bold">charger bulk cap</text>
 <text x="300" y="235" font-size="13">stripe / short leg = −</text>
 <text x="410" y="215" font-size="13">long leg = +</text>
 <rect x="560" y="90" width="40" height="30" rx="5" fill="#7fb2e5"/>

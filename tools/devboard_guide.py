@@ -1,36 +1,50 @@
-"""Pictures for the dev-board build guide (docs/dev-board-build.md), drawn from ControllerV4's layout and wiring list
-so they always match it.
+"""Build guide for the controller dev board: writes docs/dev-board-build.md and one checkpoint picture per step
+(docs/renders/build-step-NN.svg/.png), all drawn from ControllerV4's layout and wiring list so they always match it.
 
-  python3 tools/devboard_guide.py      # writes docs/renders/build-*.svg
+Order: every part and lead first (holes still open), then the insulated wires, then the bare bridges, then the two
+rails, so solder never fills a hole that something still has to go through. In each picture the current step is in
+colour and earlier steps are greyed out.
+
+  python3 tools/devboard_guide.py          # writes the svgs + the markdown
+  python3 tools/devboard_guide.py --png    # also renders the pngs with headless Chrome
 """
 import importlib.util
 import math
 import os
+import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location('cv4', os.path.join(HERE, '../hardware/mechanical/fusion/ControllerV4/ControllerV4.py'))
 M = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M)
-H, COLS = M.H, M.COLS
+H, HN, COLS = M.H, M.HN, M.COLS
 OUT = os.path.join(HERE, '../docs/renders')
+DOC = os.path.join(HERE, '../docs/dev-board-build.md')
+CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
 S = 30.0                     # px per hole pitch
 MX, MY = 70, 90              # margins
 W = int(MX * 2 + S * (M.NI - 1) + 230)
-HGT = int(MY + S * (M.NM - 1) + 140)
+HGT = int(MY + S * (M.NM - 1) + 120)
 
 NET_COL = {'GND': '#222222', 'VBAT': '#d62728', '5V': '#ff7f0e', '3V3': '#9467bd', 'sig': '#1f77b4'}
+PARTS = {p.name: p for p in M.layout()}
+
+
+def pins(name):
+    return [HN(i, m) for i, m, _ in PARTS[name].pins]
 
 
 def pos(hole, bottom=False):
     i, m = H(hole)
-    x = MX + S * i
-    y = MY + S * (m if bottom else (M.NM - 1 - m))          # top view: column a at the bottom; bottom view: a at the top
-    return x, y
+    return MX + S * i, MY + S * (m if bottom else (M.NM - 1 - m))   # top view: column a at the bottom; bottom view: a on top
 
 
+# ------------------------------------------------------------------ drawing primitives
 def board(title, sub, bottom=False):
     o = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" font-family="Helvetica,Arial">' % (W, HGT),
+         '<defs><filter id="mute"><feColorMatrix type="saturate" values="0"/></filter></defs>',
          '<rect width="100%" height="100%" fill="#ffffff"/>',
          '<text x="%d" y="30" font-size="20" font-weight="bold">%s</text>' % (MX - 40, title),
          '<text x="%d" y="54" font-size="13" fill="#444">%s</text>' % (MX - 40, sub),
@@ -38,21 +52,20 @@ def board(title, sub, bottom=False):
              MX - S * 0.7, MY - S * 0.7, S * (M.NI - 1) + S * 1.4, S * (M.NM - 1) + S * 1.4,
              '#f3efe2' if bottom else '#e9f4e1')]
     for i in range(M.NI):
-        x = MX + S * i
-        o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#666" text-anchor="middle">%d</text>' % (x, MY - S * 0.9, i + 1))
+        o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#666" text-anchor="middle">%d</text>' % (MX + S * i, MY - S * 0.9, i + 1))
     for m in range(M.NM):
         y = MY + S * (m if bottom else (M.NM - 1 - m))
         o.append('<text x="%.0f" y="%.0f" font-size="13" font-weight="bold" fill="#666" text-anchor="middle">%s</text>' % (
             MX - S * 1.15, y + 4, COLS[m]))
     for i in range(M.NI):
         for m in range(M.NM):
-            x, y = pos('%s%d' % (COLS[m], i + 1), bottom)
+            x, y = pos(HN(i, m), bottom)
             o.append('<circle cx="%.0f" cy="%.0f" r="4" fill="#fff" stroke="#999"/>' % (x, y))
     return o
 
 
 def finish(o, name, notes=()):
-    y = MY + S * (M.NM - 1) + S * 1.6
+    y = MY + S * (M.NM - 1) + S * 1.5
     for n in notes:
         o.append('<text x="%d" y="%.0f" font-size="13" fill="#222">%s</text>' % (MX - 40, y, n))
         y += 20
@@ -60,15 +73,32 @@ def finish(o, name, notes=()):
     open(os.path.join(OUT, name), 'w').write('\n'.join(o))
 
 
+def muted(o, items):
+    o.append('<g filter="url(#mute)" opacity="0.3">')
+    o.extend(items)
+    o.append('</g>')
+
+
 def dot(o, hole, color, bottom=False, r=6):
     x, y = pos(hole, bottom)
     o.append('<circle cx="%.0f" cy="%.0f" r="%d" fill="%s"/>' % (x, y, r, color))
+
+
+def ring(o, hole, color, bottom=False):
+    x, y = pos(hole, bottom)
+    o.append('<circle cx="%.0f" cy="%.0f" r="9" fill="none" stroke="%s" stroke-width="2.5"/>' % (x, y, color))
 
 
 def label(o, hole, text, dx=0, dy=-12, color='#000', size=11, bottom=False, anchor='middle'):
     x, y = pos(hole, bottom)
     o.append('<text x="%.0f" y="%.0f" font-size="%d" fill="%s" text-anchor="%s" font-weight="bold">%s</text>' % (
         x + dx, y + dy, size, color, anchor, text))
+
+
+def edge_dy(hole, bottom):
+    """Label offset that keeps a label inside the board: below holes on the top edge of the picture, above the rest."""
+    top_edge = hole[0] == ('a' if bottom else 'j')
+    return 19 if top_edge else -11
 
 
 def resistor(o, a, b, text):
@@ -94,135 +124,309 @@ def ceramic(o, a, b, text):
         xm + (0 if y0 == y1 else 16), ym + (-9 if y0 == y1 else 3), text))
 
 
-def diode(o, body, lead, text, band_on_body):
-    """Standing diode: body over 'body', lead in 'lead'. The band (cathode) is drawn on the cathode side."""
-    (x0, y0), (x1, y1) = pos(body), pos(lead)
-    o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="#888" stroke-width="2"/>' % (x0, y0, x1, y1))
-    o.append('<circle cx="%.0f" cy="%.0f" r="10" fill="#333"/>' % (x0, y0))
-    bx, by = (x0, y0) if band_on_body else (x1, y1)
-    o.append('<circle cx="%.0f" cy="%.0f" r="10" fill="none" stroke="#ddd" stroke-width="3"/>' % (bx, by) if band_on_body else
-             '<rect x="%.0f" y="%.0f" width="8" height="16" fill="#ddd" stroke="#333"/>' % (bx - 4, by - 8))
-    o.append('<text x="%.0f" y="%.0f" font-size="10" text-anchor="middle" font-weight="bold" fill="#000">%s</text>' % (
-        (x0 + x1) / 2, min(y0, y1) - 14, text))
+# ------------------------------------------------------------------ what each step adds
+RES = [('R stat 10k', '10k'), ('R div top 1M', '1M'), ('R div bot 1M', '1M'),
+       ('R ADC1 1k', '1k'), ('R ADC2 1k', '1k'), ('R ADC3 1k', '1k')]
+CAPS = [('C 10u', '10µ'), ('C div 100n', '100n'), ('C ADC1 100n', '100n'), ('C ADC2 100n', '100n'), ('C ADC3 100n', '100n')]
+DIODES = [('D3 1N5819', 'D3'), ('D1 1N5819 USB', 'D1'), ('D2 1N5819 solar', 'D2'), ('Z 6.2V', 'Z')]
 
 
-def guide_top():
-    """Step pictures, top view."""
-    o = board('Step 1: orientation and the ESP32-C6',
-              'Top (component) side. Row 1 toward the phone jacks, column a toward the battery. ESP chip side UP, USB-C hanging past row 1.')
+def draw_esp(o):
     x0, y0 = pos('b1')
     x1, y1 = pos('h10')
     o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="5" fill="#1b1b1b" opacity="0.85"/>' % (
-        x0 - 22, y1 - 14, (x1 - x0) * 0 + S * 9 + 44, (y0 - y1) + 28))
+        x0 - 22, y1 - 14, S * 9 + 44, (y0 - y1) + 28))
     o.append('<rect x="%.0f" y="%.0f" width="48" height="74" rx="4" fill="#bbb" stroke="#666"/>' % (x0 - 70, (y0 + y1) / 2 - 37))
     o.append('<text x="%.0f" y="%.0f" font-size="11" text-anchor="middle" font-weight="bold">USB-C</text>' % (x0 - 46, (y0 + y1) / 2 + 4))
-    lab_b = ['TX', 'RX', '0', '1', '2', '3', '4', '5', '6', '7']
-    lab_h = ['5V', 'GND', '3V3', '20', '19', '18', '15', '14', '9', '8']
-    for k in range(10):
-        dot(o, 'b%d' % (k + 1), '#e0b040')
-        dot(o, 'h%d' % (k + 1), '#e0b040')
-        label(o, 'b%d' % (k + 1), lab_b[k], dy=22, color='#fff', size=10)
-        label(o, 'h%d' % (k + 1), lab_h[k], dy=-12, color='#fff', size=10)
-    xc, yc = (x0 + x1) / 2, (y0 + y1) / 2
-    o.append('<text x="%.0f" y="%.0f" font-size="16" fill="#fff" text-anchor="middle" font-weight="bold">ESP32-C6 (chip up)</text>' % (xc, yc + 5))
+    for i, m, lab in PARTS['ESP32-C6'].pins:
+        h = HN(i, m)
+        dot(o, h, '#e0b040')
+        label(o, h, lab.replace('TX16', 'TX').replace('RX17', 'RX'), dy=22 if h[0] == 'b' else -12, color='#fff', size=10)
+    o.append('<text x="%.0f" y="%.0f" font-size="16" fill="#fff" text-anchor="middle" font-weight="bold">ESP32-C6 (chip up)</text>' % (
+        (x0 + x1) / 2, (y0 + y1) / 2 + 5))
+
+
+def draw_res(o):
+    for n, txt in RES:
+        a, b = pins(n)
+        resistor(o, a, b, txt)
+
+
+def draw_diodes(o):
+    for n, txt in DIODES:
+        p = dict((lab, HN(i, m)) for i, m, lab in PARTS[n].pins)
+        body, lead = pins(n)
+        (x0, y0), (x1, y1) = pos(body), pos(lead)
+        o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="#888" stroke-width="2"/>' % (x0, y0, x1, y1))
+        o.append('<circle cx="%.0f" cy="%.0f" r="10" fill="#333"/>' % (x0, y0))
+        x, y = pos(p['K'])
+        if p['K'] == body:
+            o.append('<circle cx="%.0f" cy="%.0f" r="10" fill="none" stroke="#ddd" stroke-width="3"/>' % (x, y))
+        else:
+            o.append('<rect x="%.0f" y="%.0f" width="8" height="16" fill="#ddd" stroke="#333"/>' % (x - 4, y - 8))
+        label(o, p['K'], '%s band' % txt, dy=-14, size=10)
+
+
+def draw_caps(o):
+    for n, txt in CAPS:
+        a, b = pins(n)
+        ceramic(o, a, b, txt)
+
+
+def draw_batt(o):
+    for i, m, lab in PARTS['Battery pins'].pins:
+        h = HN(i, m)
+        c = '#d62728' if lab == 'B+' else '#222'
+        dot(o, h, c)
+        label(o, h, {'B+': 'B+ (red)', 'B-': 'B− (black)'}[lab], dx=22, dy=4 if lab == 'B+' else 16, color=c, anchor='start')
+
+
+def charger_pads():
+    short = {'PWR + (input)': 'PWR+', 'PWR - / GND': 'PWR−', 'BATT +': 'BAT+', 'BATT -': 'BAT−', 'LOAD + (output)': 'LOAD+',
+             'LOAD -': 'LD−', 'STAT': 'STAT'}
+    return [(h, short[pad]) for pad, h, _ in M.CHARGER if pad in short]
+
+
+def draw_charger(o):
     cx0, cy0 = pos('c15')
     cx1, cy1 = pos('h22')
     o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="4" fill="#3b3b3b" opacity="0.8"/>' % (
         cx0 - 14, cy1 - 14, cx1 - cx0 + 28, cy0 - cy1 + 28))
     o.append('<text x="%.0f" y="%.0f" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">charger (foam tape)</text>' % (
         (cx0 + cx1) / 2, (cy0 + cy1) / 2 + 5))
-    o.append('<text x="%d" y="%.0f" font-size="14" fill="#c00" font-weight="bold">&#8592; toward the phone jacks</text>' % (MX - 40, HGT - 70))
-    o.append('<text x="%d" y="%.0f" font-size="14" fill="#c00" font-weight="bold" text-anchor="end">toward the USB-C end &#8594;</text>' % (W - 30, HGT - 70))
-    finish(o, 'build-1-esp.svg', ['Column a (bottom edge here) faces the battery. 5V / GND / 3V3 land in column h, TX / RX in column b.'])
-
-    o = board('Step 2: parts on top (direction matters for the dark ones)',
-              'Top side. Tan = resistor, blue = ceramic capacitor (any way round). Black = diode: the band goes where shown. Electrolytic: stripe = minus.')
-    for name, a, b, txt in (('R stat', 'j3', 'j4', '10k'), ('R div top', 'j7', 'j8', '1M'), ('R div bot', 'j9', 'i9', '1M'),
-                            ('R ADC1', 'b12', 'c12', '1k'), ('R ADC2', 'd12', 'd13', '1k'), ('R ADC3', 'f12', 'g12', '1k')):
-        resistor(o, a, b, txt)
-    for a, b, txt in (('j1', 'i2', '10µ'), ('j10', 'j12', '100n'), ('a14', 'c14', '100n'), ('d14', 'f14', '100n'), ('g14', 'i14', '100n')):
-        ceramic(o, a, b, txt)
-    diode(o, 'j5', 'j6', 'D3 band→j5', True)
-    diode(o, 'e23', 'd23', '', False)
-    diode(o, 'h23', 'g23', '', False)
-    diode(o, 'f24', 'f23', '', False)
-    for h, t in (('e23', 'D1: band at d23'), ('h23', 'D2: band at g23'), ('f23', 'Zener: band at f23')):
-        x, y = pos(h)
-        o.append('<text x="%.0f" y="%.0f" font-size="11" font-weight="bold" text-anchor="end">%s</text>' % (x - 46, y + 4, t))
-    for h, t, c in (('a24', 'B− (black)', '#222'), ('b24', 'B+ (red)', '#d62728'), ('d24', 'USB −', '#222'), ('e24', 'USB +', '#d62728'),
-                    ('h24', 'Solar +', '#d62728'), ('i24', 'Solar −', '#222')):
-        dot(o, h, c)
-        label(o, h, t, dx=22, dy=4, color=c, size=11, anchor='start')
-    finish(o, 'build-2-parts.svg', ['Blue ceramic capacitors: legs 3 holes apart (5 mm), the middle hole stays EMPTY. The 10µ goes corner to corner (j1-i2), legs pulled in slightly, body leaning away from the ESP.',
-                                     'Diodes stand up: body over the first hole, lead bent back into the second. The silver/white band is the cathode (K).',
-                                     'Battery pins: 2 bare header pins at a24 (−) and b24 (+). The plug is NOT keyed on bare pins: red wire to b24.'])
+    for h, lab in charger_pads():
+        ring(o, h, '#0a7a3a')
+        label(o, h, lab, dy=22 if h[0] == 'a' else -13, color='#0a7a3a', size=9)
 
 
-def guide_bottom():
-    o = board('Step 3: wiring underneath (board flipped over)',
-              'Bottom view: flip the board over its long edge, row 1 still on the left. Column a is now at the TOP. Bridges = short bare wire between neighbours.',
-              bottom=True)
-    for f, t, note in M.WIRES:
-        n = note.lower()
-        if n.startswith('gnd rail'):
-            col = NET_COL['GND']
-        elif n.startswith('vbat rail'):
-            col = NET_COL['VBAT']
-        elif 'gnd' in n or 'zener anode' in n or ' - ->' in n:
-            col = NET_COL['GND']
-        elif 'vbat' in n or 'c bulk +' in n:
-            col = NET_COL['VBAT']
-        elif '5v' in n:
-            col = NET_COL['5V']
-        elif '3v3' in n:
-            col = NET_COL['3V3']
-        else:
-            col = NET_COL['sig']
+def draw_leads(o):
+    for n in ('Port leads', 'USB leads', 'Solar leads'):
+        for i, m, lab in PARTS[n].pins:
+            h = HN(i, m)
+            sig = lab.split()[-1]
+            if sig == 'VBAT' or lab in ('V+', 'S+'):
+                c = NET_COL['VBAT']
+            elif sig == 'GND' or lab in ('V-', 'S-'):
+                c = NET_COL['GND']
+            else:
+                c = NET_COL['sig']
+            dot(o, h, c, r=5)
+            txt = {'V+': 'USB+', 'V-': 'USB−', 'S+': 'Sol+', 'S-': 'Sol−'}.get(lab, lab.replace(' VBAT', '+').replace(' GND', '−'))
+            label(o, h, txt, dy=edge_dy(h, False), color=c, size=8)
+
+
+def net_colour(note):
+    n = note.lower()
+    if n.startswith('gnd rail') or 'gnd' in n or 'zener anode' in n or ' - ->' in n:
+        return NET_COL['GND']
+    if n.startswith('vbat rail') or 'vbat' in n:
+        return NET_COL['VBAT']
+    if '5v' in n:
+        return NET_COL['5V']
+    if '3v3' in n:
+        return NET_COL['3V3']
+    return NET_COL['sig']
+
+
+def kind(w):
+    if w[2].startswith(('GND rail', 'VBAT rail')):
+        return 'rail'
+    return 'bridge' if w[2].startswith('bridge') else 'wire'
+
+
+def wires_of(k):
+    return [w for w in M.WIRES if kind(w) == k]
+
+
+def draw_under(o, which):
+    for f, t, note in wires_of(which):
+        col = net_colour(note)
         (x0, y0), (x1, y1) = pos(f, True), pos(t, True)
-        wdt = 5 if 'rail' in n and n.endswith(('rows 12-24', 'rows 13-24')) else 3
-        if n.startswith('bridge') or 'rail' in n.split(':')[0]:
-            o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="%d" stroke-linecap="round"/>' % (
-                x0, y0, x1, y1, col, wdt))
-        else:                                                    # insulated wire: drawn as a curve
+        if which == 'wire':
             mx, my = (x0 + x1) / 2, (y0 + y1) / 2 - 14
             o.append('<path d="M%.0f %.0f Q%.0f %.0f %.0f %.0f" fill="none" stroke="%s" stroke-width="2.5" stroke-dasharray="7,3"/>' % (
                 x0, y0, mx, my, x1, y1, col))
-    # leads and charger wires soldered in from the top: rings, so the underside shows where each net arrives
-    leads = next(p for p in M.layout() if p.name == 'Port leads').pins
-    marks = [(M.HN(i, m), lab.replace(' VBAT', '+').replace(' GND', '−')) for i, m, lab in leads if lab.endswith(('VBAT', 'GND'))]
-    short = {'PWR + (input)': 'PWR+', 'PWR - / GND': 'PWR−', 'BATT +': 'BAT+', 'BATT -': 'BAT−', 'LOAD + (output)': 'LOAD+', 'LOAD -': 'LD−'}
-    marks += [(h, short[pad]) for pad, h, _ in M.CHARGER if pad in short]
-    for h, lab in marks:
-        x, y = pos(h, True)
-        c = NET_COL['VBAT'] if h[0] == 'j' else (NET_COL['GND'] if h[0] == 'a' else '#0a7a3a')
-        o.append('<circle cx="%.0f" cy="%.0f" r="9" fill="none" stroke="%s" stroke-width="2.5"/>' % (x, y, c))
-        o.append('<text x="%.0f" y="%.0f" font-size="9" font-weight="bold" fill="%s" text-anchor="middle">%s</text>' % (
-            x, y + (22 if h[0] == 'j' else -13), c, lab))
-    lx = MX - 40
-    ly = HGT - 64
-    for k, (t, c) in enumerate((('GND', NET_COL['GND']), ('VBAT (battery +)', NET_COL['VBAT']), ('5V', NET_COL['5V']),
+            for x, y in ((x0, y0), (x1, y1)):
+                o.append('<circle cx="%.0f" cy="%.0f" r="3.5" fill="%s"/>' % (x, y, col))
+        else:
+            o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="%d" stroke-linecap="round"/>' % (
+                x0, y0, x1, y1, col, 6 if which == 'rail' else 4))
+
+
+def draw_pins_under(o):
+    """Every lead and pin from the top side, seen from underneath as solder joints."""
+    for p in PARTS.values():
+        for i, m, _ in p.pins:
+            dot(o, HN(i, m), '#8a8a8a', True, r=5)
+    for h, _ in charger_pads():
+        dot(o, h, '#8a8a8a', True, r=5)
+
+
+# ------------------------------------------------------------------ steps
+STEPS = []
+
+
+def step(key, title, view, draw, sub, notes, body, table):
+    STEPS.append(dict(key=key, title=title, view=view, draw=draw, sub=sub, notes=notes, body=body, table=table))
+
+
+def rows_parts(names, note):
+    return [(n, ', '.join(pins(n)), note(n)) for n in names]
+
+
+def res_note(n):
+    a, b = pins(n)
+    return 'body over %s, lead bent %s into %s' % (a, 'sideways' if a[0] != b[0] else 'back', b)
+
+
+def diode_note(n):
+    p = dict((lab, HN(i, m)) for i, m, lab in PARTS[n].pins)
+    return '**band (K) at %s**, other end (A) at %s' % (p['K'], p['A'])
+
+
+def cap_note(n):
+    a, b = pins(n)
+    (i0, m0), (i1, m1) = H(a), H(b)
+    if i0 != i1 and m0 != m1:
+        return 'corner to corner: pull the legs in slightly, lean the body away from the ESP'
+    return 'middle hole %s stays empty' % HN((i0 + i1) // 2, (m0 + m1) // 2)
+
+
+def what(rows):
+    return [(f, t, n.split(': ', 1)[1]) for f, t, n in rows]
+
+
+step('esp', 'ESP32-C6 and its headers', 'top', [draw_esp],
+     'Top side. Row 1 toward the phone jacks, column a toward the battery. Chip side UP, USB-C hanging past row 1.',
+     ['5V / GND / 3V3 land in column h (h1, h2, h3), TX / RX in column b (b1, b2).'],
+     """1. Mark the board with a marker: **row 1 = the end toward the phone jacks**, **column a = the edge toward the battery**.
+2. Push two 10-pin header strips into the ESP's **inner** holes (long side down), set the ESP on the perfboard **chip side
+   up**, USB-C hanging past row 1: the pins go into **b1–b10** and **h1–h10**.
+3. Check before soldering: **5V in h1, GND in h2, 3V3 in h3, TX in b1**. Solder one pin at each corner, check it sits
+   flat, then the rest. Keep each joint on its own pad.""",
+     [('ESP32-C6', 'b1–b10, h1–h10', 'chip up, USB-C past row 1')])
+step('res', 'Resistors (6)', 'top', [draw_res],
+     'Top side. All six stand up: body over the first hole, the other lead bent back into the second. Either way round.',
+     ['Colour bands (4-band): 1k = brown black red, 10k = brown black orange, 1M = brown black green. Not sure? Measure it.'],
+     """Resistors have no direction. Bend the top lead back down, push both leads through, splay them slightly underneath so
+the part stays put, solder, and **trim to ~1 mm**. Keep the trimmed legs: they make good bridges in step 9.""",
+     rows_parts([n for n, _ in RES], res_note))
+step('diodes', 'Diodes (3 × 1N5819, 1 × 6.2 V zener)', 'top', [draw_diodes],
+     'Top side. Direction matters: the silver/white band is the cathode (K). Each label sits on the hole the band goes to.',
+     ['A ring on the body = band at the bottom of the standing body. A white tab on the lead = band at the top (that lead is K).'],
+     """These **only work one way round**; the band end is the cathode (K). D3 stands with its body over j5, band end down.
+For D1, D2 and the zener the body stands over the anode hole and the **bent-back lead is the cathode**, so the band is at
+the top. Check each one against the table before soldering.""",
+     rows_parts([n for n, _ in DIODES], diode_note))
+step('caps', 'Ceramic capacitors (4 × 100 nF, 1 × 10 µF)', 'top', [draw_caps],
+     'Top side. Either way round. Legs are 3 holes apart: the middle hole stays empty. The 10µ goes corner to corner.',
+     ['100 nF is marked 104, 10 µF is marked 106.'],
+     """No direction. Push them straight down so the body sits low; don't bend the legs at the body. The 10 µF goes corner
+to corner (j1 to i2): pull its legs in slightly and lean the body **away from the ESP**.""",
+     rows_parts([n for n, _ in CAPS], cap_note))
+step('batt', 'Battery pins (2 header pins)', 'top', [draw_batt],
+     'Top side. Two header pins for the cell\'s JST-XH plug. The plug is NOT keyed on bare pins.',
+     ['Mark b24 with a red "+" now: the red wire of the battery plug always goes on b24.'],
+     """Snap 2 pins off a header strip and solder them in **a24 (−)** and **b24 (+)**, long side up. Mark **b24 "+"** in red.""",
+     [('Battery pins', 'a24 (−), b24 (+)', 'red wire of the plug on b24')])
+step('charger', 'Charger: prepare, mount, wire its pads (7 wires)', 'top', [draw_charger],
+     'Top side. Charger on foam tape over c15–h22; short insulated wires from its pads into the ringed holes.',
+     ['Where a hole already has a pin (b24, a10), push the wire in beside it or solder it to that pin underneath.'],
+     """1. On the bench first: remove the charger's fixed THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC
+   gets taped to the cell later). If the charger came with a loose bulk capacitor, solder it across its LOAD pads
+   (**long leg / + to LOAD +**, stripe / − to LOAD −). Tin the pads.
+2. Stick it on with foam tape over **c15–h22**.
+3. Cut 7 short pieces of 30 AWG wire, strip ~3 mm, solder one end to each pad and push the other end through its hole
+   from the top. Solder them underneath.
+
+(Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)""",
+     [(pad, h, net) for pad, h, net in M.CHARGER])
+step('leads', 'Leads from the RJ12, USB-C and solar boards (22)', 'top', [draw_leads],
+     'Top side. Each lead goes in from the top. Pin 1 is the square pad on each RJ12 board.',
+     ['Let the RJ12 boards hang off the end and tape them down while you work underneath.'],
+     """Solder the 18 leads from the three RJ12 boards (pin 1 = square pad), then the USB-C breakout's VBUS → e24 and
+GND → d24, and the solar lead's + → h24 and − → i24. Trim underneath to ~1 mm.""",
+     None)
+step('wires', 'Insulated wires underneath (%d)' % len(wires_of('wire')), 'bottom', [draw_under, 'wire'],
+     'Bottom view: flip the board over its long edge, row 1 still on the left, column a now at the TOP. Grey = done already.',
+     ['Dashed = 30 AWG insulated wire, dots = its two ends. Colours: black GND, red battery +, orange 5V, blue signal.'],
+     """Wires go in **before** the bridges and rails, while their holes are still open. For each wire: cut it a little long,
+strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Where a hole already has a
+lead, solder the wire end to that lead. Beep each wire out with the meter as you go.""",
+     what(wires_of('wire')))
+step('bridges', 'Bare bridges underneath (%d)' % len(wires_of('bridge')), 'bottom', [draw_under, 'bridge'],
+     'Bottom view. Each bridge joins neighbouring holes in a straight line (h1-j1, h2-j2, h3-j3 skip an empty hole).',
+     ['Use trimmed resistor legs or bare tinned wire laid flat across the pads, soldered at both ends.'],
+     """A bridge is a short piece of **bare** wire laid across neighbouring pads (a trimmed resistor leg is ideal), soldered at
+both ends; don't rely on a solder blob alone. Work one area at a time and check each with the meter: the two ends beep,
+and neither beeps to the pad next to it.""",
+     what(wires_of('bridge')))
+step('rails', 'Rails (2)', 'bottom', [draw_under, 'rail'],
+     'Bottom view. Two long bare wires: GND down column a (rows 12-24), battery + down column j (rows 13-24).',
+     ['Solder each rail at every hole it passes, including the ones that already have wires or leads.'],
+     """Last: lay a straight bare tinned wire along column **a** from row 12 to row 24 (GND) and along column **j** from row 13
+to row 24 (battery +), soldering it at every hole. Then do the checks in step 11.""",
+     what(wires_of('rail')))
+
+
+def render_step(k):
+    st = STEPS[k]
+    bottom = st['view'] == 'bottom'
+    o = board('Step %d: %s' % (k + 1, st['title']), st['sub'], bottom)
+    prev = []
+    if bottom:
+        draw_pins_under(prev)
+        for s2 in STEPS[:k]:
+            if s2['view'] == 'bottom':
+                draw_under(prev, s2['draw'][1])
+    else:
+        for s2 in STEPS[:k]:
+            for f in s2['draw']:
+                f(prev)
+    muted(o, prev)
+    if bottom:
+        draw_under(o, st['draw'][1])
+    else:
+        for f in st['draw']:
+            f(o)
+    name = 'build-step-%02d.svg' % (k + 1)
+    finish(o, name, st['notes'])
+    return name
+
+
+def render_done():
+    o = board('Finished: top side', 'Top view, every part and lead in place.')
+    for s2 in STEPS:
+        if s2['view'] == 'top':
+            for f in s2['draw']:
+                f(o)
+    finish(o, 'build-done-top.svg')
+    o = board('Finished: underside', 'Bottom view, everything in place. Grey dots = joints of the parts and leads from the top.', True)
+    draw_pins_under(o)
+    for k in ('wire', 'bridge', 'rail'):
+        draw_under(o, k)
+    lx, ly = MX - 40, HGT - 60
+    for k, (t, c) in enumerate((('GND', NET_COL['GND']), ('battery +', NET_COL['VBAT']), ('5V', NET_COL['5V']),
                                 ('3V3', NET_COL['3V3']), ('signal', NET_COL['sig']))):
         o.append('<rect x="%d" y="%.0f" width="18" height="6" fill="%s"/><text x="%d" y="%.0f" font-size="12">%s</text>' % (
             lx + k * 150, ly, c, lx + k * 150 + 24, ly + 7, t))
-    finish(o, 'build-3-underside.svg', ['', 'Solid = bare bridge or rail. Dashed = insulated 30 AWG wire. Rings = port leads / charger wires soldered in from the top (battery + reaches the red rail via LOAD+ at j20).'])
+    finish(o, 'build-done-under.svg')
+    return ['build-done-top.svg', 'build-done-under.svg']
 
 
 def polarity():
     o = ['<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
          '<text x="20" y="30" font-size="20" font-weight="bold">Which way round?</text>']
-    # diode
     o += ['<line x1="40" y1="110" x2="200" y2="110" stroke="#999" stroke-width="3"/>',
           '<rect x="90" y="96" width="60" height="28" rx="6" fill="#222"/>', '<rect x="136" y="96" width="9" height="28" fill="#ddd"/>',
           '<text x="120" y="80" font-size="14" text-anchor="middle" font-weight="bold">1N5819 / zener</text>',
           '<text x="60" y="150" font-size="13">anode (A)</text>', '<text x="150" y="150" font-size="13" font-weight="bold">band = cathode (K)</text>']
-    # electrolytic
     o += ['<rect x="340" y="70" width="60" height="90" rx="10" fill="#1d3557"/>', '<rect x="340" y="70" width="14" height="90" fill="#ddd"/>',
           '<text x="347" y="120" font-size="16" font-weight="bold" text-anchor="middle">−</text>',
           '<line x1="354" y1="160" x2="354" y2="200" stroke="#999" stroke-width="3"/>', '<line x1="388" y1="160" x2="388" y2="215" stroke="#999" stroke-width="3"/>',
-          '<text x="370" y="60" font-size="14" text-anchor="middle" font-weight="bold">bulk electrolytic</text>',
+          '<text x="370" y="60" font-size="14" text-anchor="middle" font-weight="bold">charger bulk cap</text>',
           '<text x="300" y="235" font-size="13">stripe / short leg = −</text>', '<text x="410" y="215" font-size="13">long leg = +</text>']
-    # ceramic & resistor
     o += ['<rect x="560" y="90" width="40" height="30" rx="5" fill="#7fb2e5"/>', '<text x="580" y="80" font-size="14" text-anchor="middle" font-weight="bold">ceramic</text>',
           '<text x="580" y="145" font-size="13" text-anchor="middle">any way round</text>',
           '<text x="580" y="165" font-size="13" text-anchor="middle">legs 3 holes apart</text>',
@@ -230,10 +434,115 @@ def polarity():
           '<text x="735" y="145" font-size="13" text-anchor="middle">any way round</text>']
     o.append('</svg>')
     open(os.path.join(OUT, 'build-polarity.svg'), 'w').write('\n'.join(o))
+    return 'build-polarity.svg'
+
+
+# ------------------------------------------------------------------ parts list + markdown
+def bom():
+    count = {}
+    for _, v in RES + CAPS:
+        count[v] = count.get(v, 0) + 1
+    return [
+        ('ESP32-C6 SuperMini', 1, '1', 'ESP32-C6 SuperMini 5-pack'),
+        ('Header pins', len(PARTS['ESP32-C6'].pins) + len(PARTS['Battery pins'].pins), '1 (2 × 10), 5 (2)', 'perfboard kit headers'),
+        ('Resistor 1 kΩ', count['1k'], '2', 'resistor kit'),
+        ('Resistor 10 kΩ', count['10k'], '2', 'resistor kit'),
+        ('Resistor 1 MΩ', count['1M'], '2', 'resistor kit'),
+        ('Diode 1N5819', 3, '3', '1N5819 150-pack'),
+        ('Zener 6.2 V', 1, '3', 'zener kit'),
+        ('Ceramic capacitor 100 nF (104)', count['100n'], '4', 'ceramic capacitor kit'),
+        ('Ceramic capacitor 10 µF (106)', count['10µ'], '4', 'ceramic capacitor kit'),
+        ('MCP73871 charger board (+ its bulk capacitor)', 1, '6', 'Comimark MCP73871'),
+        ('NTC thermistor 10 kΩ', 1, '6', 'NTC 10-pack'),
+        ('Foam tape', '1 piece', '6', ''),
+        ('RJ12 breakout board', 3, '7 (%d leads)' % len(PARTS['Port leads'].pins), 'RJ11/RJ12 breakout 4-pack'),
+        ('USB-C breakout (Cermant)', 1, '7 (2 leads)', 'USB-C breakout 10-pack'),
+        ('Solar lead (optional)', 1, '7 (2 leads)', 'solar panel + extension'),
+        ('30 AWG insulated wire', '%d pieces' % (len(wires_of('wire')) + len(charger_pads())),
+         '6 (%d), 8 (%d)' % (len(charger_pads()), len(wires_of('wire'))), '30 AWG silicone wire'),
+        ('Bare wire or trimmed resistor legs', '%d bridges + %d rails' % (len(wires_of('bridge')), len(wires_of('rail'))), '9, 10',
+         'tinned wire / leg offcuts'),
+        ('Perfboard 3 × 7 cm (a–j × 1–24)', 1, 'all', 'perfboard kit'),
+        ('18650 cell with JST-XH plug', 1, '11', '18650 cell'),
+    ]
+
+
+def write_md():
+    o = ['# Building the controller dev board, step by step', '',
+         'For the kit\'s **3 × 7 cm perfboard (columns a–j, rows 1–24)**. Everything here (pictures, tables, counts) is generated',
+         'from the layout in [ControllerV4.py](../hardware/mechanical/fusion/ControllerV4/ControllerV4.py) by',
+         '[`tools/devboard_guide.py`](../tools/devboard_guide.py); [`tools/devboard_check.py`](../tools/devboard_check.py)',
+         'checks that the wiring makes every connection with no shorts. Full wiring list:',
+         '[ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md).', '',
+         '**Order:** all parts and leads first (steps 1–7, holes still open), then the insulated wires (8), then the bare',
+         'bridges (9), then the rails (10). That way solder never fills a hole that something still has to go through. Each',
+         'step does one kind of part, and in its picture that step is in colour while everything already done is grey.', '',
+         '## Parts for one board', '', '| Part | Count | Step | From (BOM) |', '|---|---|---|---|']
+    o += ['| %s | %s | %s | %s |' % r for r in bom()]
+    o += ['', 'For all 3 controllers, triple every count. Links and prices: [BOM](../hardware/BOM.md).', '',
+          '## Which parts have a direction?', '', '![which way round](renders/build-polarity.png)', '',
+          '| Part | Direction matters? | How to tell |', '|---|---|---|',
+          '| Resistors | **No** | either way round |',
+          '| Ceramic capacitors | **No** | either way round; legs 3 holes apart, the middle hole stays empty |',
+          '| **1N5819 diodes, 6.2 V zener** | **YES** | the silver/white **band is the cathode (K)** |',
+          '| **ESP32-C6** | **YES** | chip side up, USB-C past row 1, 5V/GND/3V3 in column h |',
+          '| **Battery plug** on the 2 header pins | **YES, and it can go on backwards** | red wire on **b24 (+)**, black on **a24 (−)** |',
+          '| **Charger bulk capacitor** (on the charger board) | **YES** | stripe = −, long leg = + |',
+          '| USB-C and solar leads, charger pads | **YES** | follow the tables |', '',
+          'A reversed diode just won\'t conduct; a reversed electrolytic or battery can damage parts. Check those twice.', '',
+          '## Tools and tips',
+          '- Soldering iron (~330 °C), thin solder, flush cutters, tweezers, multimeter (beep / continuity mode), marker.',
+          '- Place parts on the **top**, solder **underneath**, trim leads to ~1 mm.',
+          '- Use just enough solder for a small cone on the pad. Too much spreads to the next pad or fills holes.',
+          '- If a hole fills by accident, heat it and clear it with a desoldering pump or wick before going on.', '']
+    hdr = {'esp': ('Part', 'Holes', 'Note'), 'res': ('Resistor', 'Holes', 'How'), 'diodes': ('Diode', 'Holes', 'Direction'),
+           'caps': ('Capacitor', 'Holes', 'Note'), 'batt': ('Part', 'Holes', 'Note'), 'charger': ('Charger pad', 'Board hole', 'Net'),
+           'wires': ('From', 'To', 'What'), 'bridges': ('From', 'To', 'What'), 'rails': ('From', 'To', 'What')}
+    for k, st in enumerate(STEPS):
+        o += ['## Step %d: %s' % (k + 1, st['title']), '', '![step %d](renders/build-step-%02d.png)' % (k + 1, k + 1), '', st['body'], '']
+        if st['key'] == 'leads':
+            leads = {lab: HN(i, m) for i, m, lab in PARTS['Port leads'].pins}
+            o += ['| RJ12 pin | Port 1 | Port 2 | Port 3 |', '|---|---|---|---|']
+            for pin, sig in ((1, 'VBAT'), (2, 'IN1'), (3, 'GND'), (4, 'ANG'), (5, 'EN'), (6, 'IN2')):
+                o.append('| %d %s | %s | %s | %s |' % (pin, {'VBAT': 'battery +', 'ANG': 'angle'}.get(sig, sig),
+                                                     leads['P1 ' + sig], leads['P2 ' + sig], leads['P3 ' + sig]))
+            o += ['', '| Lead | Hole |', '|---|---|', '| USB-C VBUS (+) | e24 |', '| USB-C GND (−) | d24 |',
+                  '| Solar + | h24 |', '| Solar − | i24 |', '']
+        else:
+            o += ['| %s |' % ' | '.join(hdr[st['key']]), '|---|---|---|'] + ['| %s | %s | %s |' % r for r in st['table']] + ['']
+    o += ['## Step 11: checks and first power-up', '',
+          '![finished top](renders/build-done-top.png)', '', '![finished underside](renders/build-done-under.png)', '',
+          'The battery + rail (column j) gets most of its connections from the top: the three port leads (j15–j17) and the',
+          'charger\'s LOAD + wire (j20); underneath, only the wire from D3 (j6 → j13) joins it. The cell never connects to the',
+          'rail directly: battery + (b24) goes to the charger\'s BATT + pad and the charger feeds the rail from LOAD +.', '',
+          '1. Meter, beep mode, no power: GND (a12) to battery + (j13): **no beep**. GND to 5V (h1): no beep. GND to 3V3 (h3):',
+          '   no beep. GND to the battery + pin (b24): no beep.',
+          '2. Plug USB into the **ESP\'s own** USB-C only (battery unplugged). Its LED should light; upload the test sketch.',
+          '3. Unplug USB, then push the cell\'s plug onto a24/b24 (**red on b24**). Measure j13 to a12: about the cell voltage',
+          '   (3.0–4.2 V).',
+          '4. Never plug USB into the ESP and the battery at the same time unless D3 is fitted.', '']
+    open(DOC, 'w').write('\n'.join(o))
+
+
+def main():
+    names = [render_step(k) for k in range(len(STEPS))] + render_done() + [polarity()]
+    for old in ('build-1-esp', 'build-2-parts', 'build-3-underside'):
+        for ext in ('.svg', '.png'):
+            p = os.path.join(OUT, old + ext)
+            if os.path.exists(p):
+                os.remove(p)
+    write_md()
+    if '--png' in sys.argv:
+        for n in names:
+            svg = os.path.abspath(os.path.join(OUT, n))
+            head = open(svg).read(400)
+            w = head.split('width="')[1].split('"')[0]
+            h = head.split('height="')[1].split('"')[0]
+            subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=2',
+                            '--window-size=%s,%s' % (w, h), '--screenshot=' + svg[:-4] + '.png', 'file://' + svg],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    print('wrote', ', '.join(names), 'and docs/dev-board-build.md')
 
 
 if __name__ == '__main__':
-    guide_top()
-    guide_bottom()
-    polarity()
-    print('wrote docs/renders/build-1-esp.svg, build-2-parts.svg, build-3-underside.svg, build-polarity.svg')
+    main()
