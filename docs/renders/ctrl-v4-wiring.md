@@ -1,5 +1,7 @@
 # ControllerV4 dev board: placement and wiring
 
+Step-by-step guide with pictures and which parts have a direction: [dev-board-build.md](../dev-board-build.md).
+
 ## Parts: where each one goes
 
 | Part | Holes | Note |

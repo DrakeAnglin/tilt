@@ -27,6 +27,7 @@ wiring table) and `tools/fusion_controller_v4.py` (Fusion model, exact interfere
 | USB-C, X 110-124 | the breakout (Cermant 21.6 × 12.8; holes and socket stick-out scaled from its photo, confirm before printing) lies on two flat posts, its front edge in a pocket in end wall B so the socket sits flush in a rounded (stadium) window; two tapered pins under the lid drop through its mounting holes into the posts, so the lid locks it; solar lead hole beside it |
 
 ## Dev board
+**Step-by-step build guide with pictures and polarity notes: [dev-board-build.md](dev-board-build.md).**
 Built on the kit's **3 × 7 cm perfboard: columns a–j, rows 1–24** (row 1 toward the ports, column a toward the battery).
 **Where every part and wire goes: [ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md)**; picture: [ctrl-v4-holemap.svg](renders/ctrl-v4-holemap.svg).
 Checked by [`tools/devboard_check.py`](../tools/devboard_check.py): parts ≥ 0.3 mm apart, all 25 nets connected, none shorted.

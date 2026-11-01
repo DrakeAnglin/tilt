@@ -219,7 +219,8 @@ CHARGER = [  # charger pad -> board
 
 
 def wiring_md():
-    o = ['## Parts: where each one goes', '', '| Part | Holes | Note |', '|---|---|---|']
+    o = ['Step-by-step guide with pictures and which parts have a direction: [dev-board-build.md](../dev-board-build.md).', '',
+         '## Parts: where each one goes', '', '| Part | Holes | Note |', '|---|---|---|']
     for p in layout():
         if p.pins and p.name not in ('ESP32-C6', 'Port leads'):
             o.append('| %s | %s | %s |' % (p.name, ', '.join('%s%s' % (HN(i, m), (' (' + lab + ')') if lab else '')
