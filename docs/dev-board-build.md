@@ -135,6 +135,8 @@ Snap 2 pins off a header strip and solder them in **a24 (−)** and **b24 (+)**,
 The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
 so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
 
+![charger board](renders/build-charger.png)
+
 1. On the bench first: remove the small **103** (10 kΩ) resistor beside the **THERM** label and solder the 10 kΩ NTC's
    two leads to its pads (the NTC gets taped to the cell later).
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):

@@ -339,6 +339,8 @@ step('charger', 'Charger: prepare it, wire it in from off the board (3 wire pair
      """The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
 so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
 
+![charger board](renders/build-charger.png)
+
 1. On the bench first: remove the small **103** (10 kΩ) resistor beside the **THERM** label and solder the 10 kΩ NTC's
    two leads to its pads (the NTC gets taped to the cell later).
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
@@ -423,6 +425,73 @@ def render_done():
             lx + k * 150, ly, c, lx + k * 150 + 24, ly + 7, t))
     finish(o, 'build-done-under.svg')
     return ['build-done-top.svg', 'build-done-under.svg']
+
+
+def charger_picture():
+    """The Comimark MCP73871 board as in the owner's photo (front, PWR at top left), with what goes where.
+    Positions are scaled from the photo (about +/-0.5 mm): measure before relying on them for a footprint."""
+    k, ox, oy = 14.0, 330, 90                       # px per mm, board origin (top-left corner) in the picture
+    bw, bh = 30.5, 31.5
+
+    def P(x, y):
+        return ox + k * x, oy + k * y
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" font-family="Helvetica,Arial">',
+         '<rect width="100%" height="100%" fill="#fff"/>',
+         '<text x="20" y="32" font-size="20" font-weight="bold">Charger board (MCP73871, 30.5 × 31.5 mm): what goes where</text>',
+         '<text x="20" y="56" font-size="13" fill="#444">Front side, as in the photo. Drawn from the photo, so positions are approximate.</text>']
+    x0, y0 = P(0, 0)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="10" fill="#1a1a1a"/>' % (x0, y0, bw * k, bh * k))
+    chip = P(13.0, 13.0)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#333" stroke="#666"/>' % (chip[0], chip[1], 4.5 * k, 4.5 * k))
+    o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#aaa" text-anchor="middle">MCP73871</text>' % (chip[0] + 2.25 * k, chip[1] + 2.5 * k))
+    for i in range(3):                               # status LEDs (STAT1, STAT2, PG): the only place status shows
+        lx, ly = P(5.5, 9.0 + 1.6 * i)
+        o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#c33"/>' % (lx, ly, 3.5 * k, 0.9 * k))
+    lx, ly = P(9.4, 9.2)
+    o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#bbb">status LEDs</text>' % (lx, ly + 18))
+    for i in range(5):                               # small edge pads
+        ex, ey = P(1.6, 7.6 + 2.54 * i)
+        o.append('<circle cx="%.0f" cy="%.0f" r="9" fill="#c9a400"/><circle cx="%.0f" cy="%.0f" r="4" fill="#1a1a1a"/>' % (ex, ey, ex, ey))
+    # bulk capacitor footprint (top right) and THERM resistor
+    cx, cy = P(22.4, 3.1)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="none" stroke="#fff" stroke-width="2"/>' % (cx, cy, 3.8 * k, 5.0 * k))
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#fff"/>' % (cx + 2.6 * k, cy, 1.2 * k, 5.0 * k))
+    o.append('<text x="%.0f" y="%.0f" font-size="18" fill="#fff" font-weight="bold">+</text>' % (cx + 0.5 * k, cy + 3.0 * k))
+    hx, hy = P(27.1, 5.8)
+    o.append('<circle cx="%.0f" cy="%.0f" r="9" fill="#c9a400"/><circle cx="%.0f" cy="%.0f" r="4" fill="#1a1a1a"/>' % (hx, hy, hx, hy))
+    tx, ty = P(23.2, 19.3)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#555" stroke="#0a7a3a" stroke-width="3"/>' % (tx - 0.8 * k, ty - 0.5 * k, 1.6 * k, 1.0 * k))
+    o.append('<text x="%.0f" y="%.0f" font-size="12" fill="#ddd" transform="rotate(90 %.0f %.0f)">THERM</text>' % (tx + 1.6 * k, ty - 3.5 * k, tx + 1.6 * k, ty - 3.5 * k))
+    holes = [('GND', 4.2, 3.5, 'a20 (GND)', '#222'), ('PWR', 8.8, 3.5, 'g23 (PWR node)', '#d62728'),
+             ('GND', 3.8, 27.9, 'a21 (GND)', '#222'), ('BATT', 8.8, 27.9, 'b24 (battery +)', '#d62728'),
+             ('LOAD', 20.8, 27.9, 'j20 (battery + rail)', '#d62728'), ('GND', 25.6, 27.9, 'a22 (GND)', '#222')]
+    for name, x, y, dest, c in holes:
+        px, py = P(x, y)
+        o.append('<circle cx="%.0f" cy="%.0f" r="24" fill="#c9a400"/><circle cx="%.0f" cy="%.0f" r="12" fill="#fff"/>' % (px, py, px, py))
+        o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#fff" font-weight="bold" text-anchor="middle">%s</text>' % (
+            px, py + (-30 if y < 15 else 42), name))
+    # callouts
+    def call(px, py, tx_, ty_, lines, c='#0a7a3a', anchor='start'):
+        o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="2"/>' % (px, py, tx_, ty_, c))
+        o.append('<circle cx="%.0f" cy="%.0f" r="4" fill="%s"/>' % (px, py, c))
+        for i, t in enumerate(lines):
+            o.append('<text x="%.0f" y="%.0f" font-size="%d" fill="%s" text-anchor="%s" font-weight="%s">%s</text>' % (
+                tx_ + (6 if anchor == 'start' else -6), ty_ + 4 + 17 * i, 14 if i == 0 else 12, c if i == 0 else '#333',
+                anchor, 'bold' if i == 0 else 'normal', t))
+    a = P(6.5, 3.5)
+    call(a[0], a[1] - 26, 300, 110, ['PWR pair: 22 AWG, 2 wires', 'PWR → g23,  GND → a20', '(USB-C and solar come in here,', 'through D1 / D2 on the perfboard)'], '#b03030', 'end')
+    a = P(6.3, 27.9)
+    call(a[0], a[1] + 26, 300, 560, ['BATT pair: 22 AWG, 2 wires', 'BATT → b24,  GND → a21'], '#b03030', 'end')
+    a = P(23.2, 27.9)
+    call(a[0], a[1] + 26, 790, 560, ['LOAD pair: 22 AWG, 2 wires', 'LOAD → j20,  GND → a22'], '#b03030')
+    call(cx + 1.9 * k, cy, 790, 100, ['Bulk capacitor goes here', 'long leg (+) in the hole on the + side,', 'stripe side to the other hole;',
+                                      'bend the legs 90° first to lay it down'])
+    call(tx + 0.8 * k, ty, 790, 280, ['Remove this 103 (10 kΩ) resistor', 'solder the 10 kΩ NTC\'s 2 leads to its pads', '(check: before removing, it reads 10 kΩ)'])
+    ex, ey = P(1.6, 12.7)
+    call(ex - 10, ey, 300, 330, ['Small edge pads: leave empty', '(CE, TE, PROG2, SEL on the back)', 'There is no STAT pad.'], '#666', 'end')
+    o.append('</svg>')
+    open(os.path.join(OUT, 'build-charger.svg'), 'w').write('\n'.join(o))
+    return 'build-charger.svg'
 
 
 def polarity():
@@ -534,7 +603,7 @@ def write_md():
 
 
 def main():
-    names = [render_step(k) for k in range(len(STEPS))] + render_done() + [polarity()]
+    names = [render_step(k) for k in range(len(STEPS))] + render_done() + [charger_picture(), polarity()]
     for old in ('build-1-esp', 'build-2-parts', 'build-3-underside'):
         for ext in ('.svg', '.png'):
             p = os.path.join(OUT, old + ext)
