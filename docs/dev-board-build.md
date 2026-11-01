@@ -8,8 +8,9 @@ every hole holds exactly one thing (a part leg, a lead or a wire end).
 
 **Totals:** 87 parts and leads on top, 4 insulated wires, 61 bare bridges, 3 rails.
 
-**Order:** all parts and leads first (steps 1–7, holes still open; step 7, solar, is optional), then the insulated
-wires (8), then the bare bridges (9), then the rails (10); the ESP and the USB-C board plug in last (11). That way solder never fills a hole that something still has to go through. Each
+**Order:** all parts and leads first (steps 1–9, holes still open), then the insulated wires (10), the bare bridges (11),
+the rails (12), and the ESP and USB-C board plug in last (13). Port 3 and the solar lead are optional. That way solder
+never fills a hole that something still has to go through. Each
 step does one kind of part, and in its picture that step is in colour while everything already done is grey.
 
 ## Parts for one board
@@ -189,31 +190,68 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 | THERM | (NTC) | remove the 103 (10 k) resistor beside the THERM label; NTC across its two pads, taped to the cell |
 | CE, TE, PROG2, SEL (edge pads) | - | leave unconnected (board defaults); the board has no STAT pad, status is on its LEDs |
 
-## Step 6: Leads from the RJ12 boards (18)
+## Step 6: RJ12 port 1 (6 leads)
 
-**You need:** 3 × RJ12 breakout board, 6 × 22 AWG stranded insulated wire, 5–8 cm (battery + and GND), 12 × 30 AWG silicone stranded wire, 5–8 cm (signals).
+**You need:** 1 × RJ12 breakout board, 2 × 22 AWG stranded insulated wire, 5–8 cm (battery +, GND), 4 × 30 AWG silicone stranded wire, 5–8 cm (IN1, IN2, EN, angle).
 
 ![step 6](renders/build-step-06.png)
 
-Each RJ12 board connects with 6 leads, 5–8 cm long. Use **22 AWG stranded insulated wire** (the white two-conductor
+Solder 6 leads, 5–8 cm long, to port 1's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals (IN1, IN2, EN, angle). Solder each lead to its RJ12 pad (pin 1 = square pad), then into the hole in the table
-from the top. Trim underneath to ~1 mm.
+signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.
 
-| RJ12 pin | Wire | Port 1 | Port 2 | Port 3 |
-|---|---|---|---|---|
-| 1 battery + | 22 AWG stranded | j16 | j17 | j18 |
-| 2 IN1 | 30 AWG silicone | f2 | d2 | a10 |
-| 3 GND | 22 AWG stranded | a14 | a15 | a16 |
-| 4 angle | 30 AWG silicone | b15 | e14 | h15 |
-| 5 EN | 30 AWG silicone | d10 | h10 | j10 |
-| 6 IN2 | 30 AWG silicone | e2 | h2 | b10 |
+| RJ12 pin | Wire | Hole |
+|---|---|---|
+| 1 battery + | 22 AWG stranded | j16 |
+| 2 IN1 | 30 AWG silicone | f2 |
+| 3 GND | 22 AWG stranded | a14 |
+| 4 angle | 30 AWG silicone | b15 |
+| 5 EN | 30 AWG silicone | d10 |
+| 6 IN2 | 30 AWG silicone | e2 |
 
-## Step 7: Solar lead (optional)
+## Step 7: RJ12 port 2 (6 leads)
+
+**You need:** 1 × RJ12 breakout board, 2 × 22 AWG stranded insulated wire, 5–8 cm (battery +, GND), 4 × 30 AWG silicone stranded wire, 5–8 cm (IN1, IN2, EN, angle).
+
+![step 7](renders/build-step-07.png)
+
+Solder 6 leads, 5–8 cm long, to port 2's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
+wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
+signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.
+
+| RJ12 pin | Wire | Hole |
+|---|---|---|
+| 1 battery + | 22 AWG stranded | j17 |
+| 2 IN1 | 30 AWG silicone | d2 |
+| 3 GND | 22 AWG stranded | a15 |
+| 4 angle | 30 AWG silicone | e14 |
+| 5 EN | 30 AWG silicone | h10 |
+| 6 IN2 | 30 AWG silicone | h2 |
+
+## Step 8: RJ12 port 3 (6 leads): only if this controller drives 3 blinds
+
+**You need:** 1 × RJ12 breakout board, 2 × 22 AWG stranded insulated wire, 5–8 cm (battery +, GND), 4 × 30 AWG silicone stranded wire, 5–8 cm (IN1, IN2, EN, angle).
+
+![step 8](renders/build-step-08.png)
+
+**Optional:** skip this step on the controller that only drives 2 blinds; the holes stay free for later. Solder 6 leads, 5–8 cm long, to port 3's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
+wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
+signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.
+
+| RJ12 pin | Wire | Hole |
+|---|---|---|
+| 1 battery + | 22 AWG stranded | j18 |
+| 2 IN1 | 30 AWG silicone | a10 |
+| 3 GND | 22 AWG stranded | a16 |
+| 4 angle | 30 AWG silicone | h15 |
+| 5 EN | 30 AWG silicone | j10 |
+| 6 IN2 | 30 AWG silicone | b10 |
+
+## Step 9: Solar lead (optional)
 
 **You need:** 1 × white 22 AWG two-conductor lead to the panel: optional.
 
-![step 7](renders/build-step-07.png)
+![step 9](renders/build-step-09.png)
 
 **Optional.** Only if this controller gets a solar panel. The lead is the **white 22 AWG two-conductor wire** (the
 solar extension, cut to length). Solder its **+ → g23** and **− → a17** (mark the + conductor first)
@@ -224,14 +262,14 @@ solar input, but fit them anyway so a panel can be added later without re-solder
 
 | Lead | Hole | Goes to |
 |---|---|---|
-| Solar + | g23 | to D2's anode (bridge in step 9) |
+| Solar + | g23 | to D2's anode (bridge in step 11) |
 | Solar − | a17 | GND rail |
 
-## Step 8: Insulated wires underneath (4)
+## Step 10: Insulated wires underneath (4)
 
 **You need:** 4 × 30 AWG silicone stranded insulated wire (cut to length).
 
-![step 8](renders/build-step-08.png)
+![step 10](renders/build-step-10.png)
 
 All of these are **30 AWG silicone stranded insulated wire**. They go in **before** the bridges and rails, while their
 holes are still open. For each wire: cut it a little long,
@@ -245,11 +283,11 @@ meter as you go.
 | h19 | f10 | divider node -> GPIO3 |
 | d16 | i10 | input-power sense -> GPIO6 |
 
-## Step 9: Bare bridges underneath (61)
+## Step 11: Bare bridges underneath (61)
 
 **You need:** 61 × short bare wire: the ~32 leg offcuts saved from steps 1-3, the rest cut from 22 AWG solid tinned bus wire.
 
-![step 9](renders/build-step-09.png)
+![step 11](renders/build-step-11.png)
 
 A bridge is a short piece of **bare solid wire**: a trimmed resistor or diode leg, or **22 AWG solid tinned copper
 (bus) wire**, laid across neighbouring pads and soldered at
@@ -320,15 +358,15 @@ and neither beeps to the pad next to it.
 | b19 | c19 | battery + -> charger BATT + hole |
 | c19 | d19 | battery + -> charger BATT + hole |
 
-## Step 10: Rails (3)
+## Step 12: Rails (3)
 
 **You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
 
-![step 10](renders/build-step-10.png)
+![step 12](renders/build-step-12.png)
 
 Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole
 it passes. Where two GND rails
-meet at a corner, solder them together there. Then do the checks in step 11.
+meet at a corner, solder them together there. Then do the checks in step 13.
 
 | From | To | What |
 |---|---|---|
@@ -336,7 +374,7 @@ meet at a corner, solder them together there. Then do the checks in step 11.
 | a13 | a24 | bare wire down column a, rows 13-24 |
 | j11 | j24 | bare wire down column j, rows 11-24 |
 
-## Step 11: checks, then plug in the ESP and the USB-C board
+## Step 13: checks, then plug in the ESP and the USB-C board
 
 **You need:** multimeter, 1 × ESP32-C6 SuperMini (its male pins soldered on), 1 × USB-C breakout (its 6 male pins soldered on), 1 × 18650 cell with JST-XH plug.
 

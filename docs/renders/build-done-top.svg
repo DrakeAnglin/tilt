@@ -423,40 +423,40 @@
 <circle cx="730" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
 <path d="M730 360 Q832 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
 <text x="730" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LD−</text>
-<circle cx="340" cy="360" r="5" fill="#1f77b4"/>
-<text x="340" y="349" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 IN1</text>
-<circle cx="340" cy="330" r="5" fill="#1f77b4"/>
-<text x="340" y="319" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 IN2</text>
 <circle cx="100" cy="210" r="5" fill="#1f77b4"/>
 <text x="100" y="199" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P1 IN1</text>
 <circle cx="100" cy="240" r="5" fill="#1f77b4"/>
 <text x="100" y="229" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P1 IN2</text>
+<circle cx="340" cy="270" r="5" fill="#1f77b4"/>
+<text x="340" y="259" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P1 EN</text>
+<circle cx="490" cy="330" r="5" fill="#1f77b4"/>
+<text x="490" y="319" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P1 ANG</text>
+<circle cx="520" cy="90" r="5" fill="#d62728"/>
+<text x="520" y="109" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">P1+</text>
+<circle cx="460" cy="360" r="5" fill="#222222"/>
+<text x="460" y="349" font-size="8" fill="#222222" text-anchor="middle" font-weight="bold">P1−</text>
 <circle cx="100" cy="270" r="5" fill="#1f77b4"/>
 <text x="100" y="259" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P2 IN1</text>
 <circle cx="100" cy="150" r="5" fill="#1f77b4"/>
 <text x="100" y="139" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P2 IN2</text>
-<circle cx="340" cy="270" r="5" fill="#1f77b4"/>
-<text x="340" y="259" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P1 EN</text>
 <circle cx="340" cy="150" r="5" fill="#1f77b4"/>
 <text x="340" y="139" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P2 EN</text>
-<circle cx="340" cy="90" r="5" fill="#1f77b4"/>
-<text x="340" y="109" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 EN</text>
-<circle cx="490" cy="330" r="5" fill="#1f77b4"/>
-<text x="490" y="319" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P1 ANG</text>
 <circle cx="460" cy="240" r="5" fill="#1f77b4"/>
 <text x="460" y="229" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P2 ANG</text>
-<circle cx="490" cy="150" r="5" fill="#1f77b4"/>
-<text x="490" y="139" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 ANG</text>
-<circle cx="520" cy="90" r="5" fill="#d62728"/>
-<text x="520" y="109" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">P1+</text>
 <circle cx="550" cy="90" r="5" fill="#d62728"/>
 <text x="550" y="109" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">P2+</text>
-<circle cx="580" cy="90" r="5" fill="#d62728"/>
-<text x="580" y="109" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">P3+</text>
-<circle cx="460" cy="360" r="5" fill="#222222"/>
-<text x="460" y="349" font-size="8" fill="#222222" text-anchor="middle" font-weight="bold">P1−</text>
 <circle cx="490" cy="360" r="5" fill="#222222"/>
 <text x="490" y="349" font-size="8" fill="#222222" text-anchor="middle" font-weight="bold">P2−</text>
+<circle cx="340" cy="360" r="5" fill="#1f77b4"/>
+<text x="340" y="349" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 IN1</text>
+<circle cx="340" cy="330" r="5" fill="#1f77b4"/>
+<text x="340" y="319" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 IN2</text>
+<circle cx="340" cy="90" r="5" fill="#1f77b4"/>
+<text x="340" y="109" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 EN</text>
+<circle cx="490" cy="150" r="5" fill="#1f77b4"/>
+<text x="490" y="139" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P3 ANG</text>
+<circle cx="580" cy="90" r="5" fill="#d62728"/>
+<text x="580" y="109" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">P3+</text>
 <circle cx="520" cy="360" r="5" fill="#222222"/>
 <text x="520" y="349" font-size="8" fill="#222222" text-anchor="middle" font-weight="bold">P3−</text>
 <circle cx="730" cy="180" r="5" fill="#d62728"/>
