@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1190" height="520" font-family="Helvetica,Arial">
 <defs><filter id="mute"><feColorMatrix type="saturate" values="0"/></filter></defs>
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text x="30" y="30" font-size="20" font-weight="bold">Step 5: Charger: prepare it, wire it in from off the board (3 wire pairs)</text>
-<text x="30" y="54" font-size="13" fill="#444">Top side. The charger (30.5 × 31.5 mm) sits OFF the board, past row 24; its wires come in to the ringed holes.</text>
+<text x="30" y="30" font-size="20" font-weight="bold">Step 5: Charger: prepare it, put JST plugs on its wires (3 plugs)</text>
+<text x="30" y="54" font-size="13" fill="#444">Top side. The charger (30.5 × 31.5 mm) sits OFF the board, past row 24; its wires plug into the JST headers from step 4.</text>
 <rect x="49" y="69" width="732" height="312" rx="6" fill="#e9f4e1" stroke="#3a7a2a" stroke-width="2"/>
 <text x="70" y="63" font-size="11" fill="#666" text-anchor="middle">1</text>
 <text x="100" y="63" font-size="11" fill="#666" text-anchor="middle">2</text>
@@ -383,6 +383,22 @@
 <rect x="756" y="206" width="8" height="8" fill="#888"/>
 <rect x="756" y="176" width="8" height="8" fill="#888"/>
 <text x="760" y="259" font-size="10" fill="#fff" text-anchor="middle" font-weight="bold" transform="rotate(-90 760 255)">USB-C socket (6)</text>
+<rect x="593" y="308" width="34" height="74" rx="3" fill="#f4f1e8" stroke="#777" stroke-width="1.5"/>
+<circle cx="610" cy="360" r="5" fill="#222222"/>
+<circle cx="610" cy="330" r="5" fill="#d62728"/>
+<rect x="593" y="218" width="34" height="74" rx="3" fill="#f4f1e8" stroke="#777" stroke-width="1.5"/>
+<circle cx="610" cy="270" r="5" fill="#d62728"/>
+<circle cx="610" cy="240" r="5" fill="#d62728"/>
+<text x="642" y="259" font-size="10" text-anchor="middle" font-weight="bold">charger +</text>
+<rect x="618" y="73" width="74" height="34" rx="3" fill="#f4f1e8" stroke="#777" stroke-width="1.5"/>
+<circle cx="640" cy="90" r="5" fill="#d62728"/>
+<circle cx="670" cy="90" r="5" fill="#d62728"/>
+<text x="655" y="122" font-size="10" text-anchor="middle" font-weight="bold">LOAD +</text>
+<rect x="648" y="348" width="104" height="52" rx="3" fill="#f4f1e8" stroke="#777" stroke-width="1.5"/>
+<circle cx="670" cy="360" r="5" fill="#222222"/>
+<circle cx="700" cy="360" r="5" fill="#222222"/>
+<circle cx="730" cy="360" r="5" fill="#222222"/>
+<text x="700" y="390" font-size="10" text-anchor="middle" font-weight="bold">charger GND</text>
 <circle cx="610" cy="360" r="6" fill="#222"/>
 <text x="598" y="378" font-size="11" fill="#222" text-anchor="end" font-weight="bold">B− (black)</text>
 <circle cx="610" cy="330" r="6" fill="#d62728"/>
@@ -409,6 +425,6 @@
 <circle cx="730" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
 <path d="M730 360 Q832 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
 <text x="730" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LD−</text>
-<text x="30" y="447" font-size="13" fill="#222">You need: 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 3 × pairs of white 22 AWG two-conductor wire, 6–8 cm each</text>
-<text x="30" y="467" font-size="13" fill="#222">Each charger wire has its own hole; the bridges in step 8 join them to the right nets.</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 6 × 22 AWG wire, 6–8 cm, 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins</text>
+<text x="30" y="467" font-size="13" fill="#222">Nothing is soldered to the board in this step: the charger plugs in, so it can be swapped.</text>
 </svg>

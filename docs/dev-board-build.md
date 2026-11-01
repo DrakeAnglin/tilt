@@ -6,7 +6,7 @@ board, resistors and diodes lying flat) by [`tools/devboard_guide.py`](../tools/
 [`tools/devboard_check.py`](../tools/devboard_check.py) checks every connection, no shorts, no parts touching, and that
 every hole holds exactly one thing (a part leg, a lead or a wire end).
 
-**Totals:** 80 parts and leads on top, 4 insulated wires, 61 bare bridges, 3 rails.
+**Totals:** 87 parts and leads on top, 4 insulated wires, 61 bare bridges, 3 rails.
 
 **Order:** all parts and leads first (steps 1–6, holes still open), then the insulated wires (7), then the bare
 bridges (8), then the rails (9); the ESP and the USB-C board plug in last (10). That way solder never fills a hole that something still has to go through. Each
@@ -18,7 +18,9 @@ step does one kind of part, and in its picture that step is in colour while ever
 |---|---|---|---|
 | ESP32-C6 SuperMini, with its male pins soldered on | 1 | plugs in at the end | ESP32-C6 SuperMini 5-pack |
 | Female header sockets ("pin stands") | 2 × 10 + 1 × 6 | 4: ESP and USB-C sockets | perfboard kit headers |
-| Male header pins | 2 | 4: battery pins | perfboard kit headers |
+| JST-XH header, 2-pin top entry | 3 | 4: battery, charger +, charger LOAD + | JST-XH kit (to buy) |
+| JST-XH header, 3-pin right angle | 1 | 4: charger GND | JST-XH kit (to buy) |
+| JST-XH housings (2-pin × 2, 3-pin × 1) + 6 crimp pins | 1 | 5: charger plugs | JST-XH kit (to buy) |
 | Resistor 1 kΩ | 3 | 2 | resistor kit |
 | Resistor 1 MΩ | 4 | 2: battery and input-power dividers | resistor kit |
 | Diode 1N5819 | 3 | 3 | 1N5819 150-pack |
@@ -27,7 +29,7 @@ step does one kind of part, and in its picture that step is in colour while ever
 | Ceramic capacitor 10 µF (106) | 1 | 4 | ceramic capacitor kit |
 | MCP73871 charger board, 30.5 × 31.5 mm, off the board (+ its 16 × 26 mm bulk capacitor) | 1 | 6 | Comimark MCP73871 |
 | NTC thermistor 10 kΩ | 1 | 6 | NTC 10-pack |
-| White 22 AWG two-conductor wire | 3 pairs × 6-8 cm | 6 (charger power) | solar extension wire |
+| 22 AWG wire (the white two-conductor, split) | 6 × 6-8 cm | 5 (charger power) | solar extension wire |
 | RJ12 breakout board | 3 | 7 (18 leads) | RJ11/RJ12 breakout 4-pack |
 | USB-C breakout (Cermant), with its 6 male pins | 1 | plugs in at the end | USB-C breakout 10-pack |
 | Solar lead (optional) | 1 | 7 (2 leads) | solar panel + extension |
@@ -48,7 +50,7 @@ For all 3 controllers, triple every count. Links and prices: [BOM](../hardware/B
 | Ceramic capacitors | **No** | either way round; legs 3 holes apart, the middle hole stays empty |
 | **1N5819 diodes, 6.2 V zener** | **YES** | the silver/white **band is the cathode (K)** |
 | **ESP32-C6** | **YES** | chip side up, 5V in a3, TX in a9 |
-| **Battery plug** on the 2 header pins | **YES, and it can go on backwards** | red wire on **b19 (+)**, black on **a19 (−)** |
+| **Battery JST header** | **YES** | keyed, but check before soldering it: the cell's red wire must land on **b19 (+)** |
 | **Charger bulk capacitor** (on the charger board) | **YES** | stripe = −, long leg = + |
 | USB-C and solar leads, charger pads | **YES** | follow the tables |
 
@@ -115,9 +117,9 @@ No direction. Push them straight down so the body sits low; don't bend the legs 
 | C ADC2 100n | e10, e12 | middle hole e11 stays empty |
 | C ADC3 100n | g10, g12 | middle hole g11 stays empty |
 
-## Step 4: Sockets and pins: ESP (2 × 10), USB-C (1 × 6), battery (2)
+## Step 4: Sockets and connectors: ESP (2 × 10), USB-C (1 × 6), JST: battery, charger (3)
 
-**You need:** 2 × 10-way female header socket (pin stand), 1 × 6-way female header socket (cut from a strip), 2 × male header pins (battery).
+**You need:** 2 × 10-way female header socket (pin stand), 1 × 6-way female header socket (cut from a strip), 3 × JST-XH 2-pin top-entry header, 1 × JST-XH 3-pin right-angle header.
 
 ![step 4](renders/build-step-04.png)
 
@@ -128,18 +130,27 @@ All the header parts at once:
    strip, check they sit flat, solder the rest, then lift the ESP back out.
 2. **USB-C socket:** one 6-way socket strip in **b24–g24**, the same way with the breakout: its USB-C socket points **out past
    the row-24 end**, pins VBUS, GND, CC1, D−, D+, CC2 from column b. Solder, then lift it out.
-3. **Battery pins:** snap 2 male pins off a strip and solder them in **a19 (−)** and **b19 (+)**, long side up. Mark **b19 "+"**
-   in red: the cell's plug is not keyed on bare pins.
+3. **JST-XH headers** (2.5 mm pitch, fits the holes; they're keyed, so plugs only go in one way). It's tight around
+   a19–a23 but they fit:
+   - **Battery:** 2-pin top-entry header in **a19 (−) / b19 (+)**. Before soldering, hold the cell's plug against it: its
+     **red wire must land on b19**. Turn the header round if it doesn't.
+   - **Charger +:** 2-pin top-entry header in **d19 (BATT +) / e19 (PWR +)**.
+   - **Charger LOAD +:** 2-pin top-entry header in **j20–j21** (both pins are on the battery + rail).
+   - **Charger GND:** 3-pin **right-angle** header in **a21 / a22 / a23** (PWR −, BATT −, LOAD −), opening outward over the
+     column-a edge.
 
 | Part | Holes | Note |
 |---|---|---|
 | ESP socket | a3–j3, a9–j9 | ESP plugs in chip side up, USB-C over the column-a edge |
 | USB-C socket | b24–g24 | VBUS, GND, CC1, D−, D+, CC2; its socket points past row 24 |
-| Battery pins | a19 (−), b19 (+) | red wire of the plug on b19 |
+| JST battery (2-pin) | a19 (−), b19 (+) | red wire of the cell's plug on b19 |
+| JST charger + (2-pin) | d19 (BATT +), e19 (PWR +) | top entry |
+| JST charger LOAD + (2-pin) | j20, j21 | top entry, both pins battery + |
+| JST charger GND (3-pin) | a21 (PWR −), a22 (BATT −), a23 (LOAD −) | right angle, opening over the column-a edge |
 
-## Step 5: Charger: prepare it, wire it in from off the board (3 wire pairs)
+## Step 5: Charger: prepare it, put JST plugs on its wires (3 plugs)
 
-**You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 3 × pairs of white 22 AWG two-conductor wire, 6–8 cm each.
+**You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 6 × 22 AWG wire, 6–8 cm, 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins.
 
 ![step 5](renders/build-step-05.png)
 
@@ -153,22 +164,27 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
    **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
    from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
-3. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
-   PWR + / PWR −, BATT + / BATT −, LOAD + / LOAD −. Solder each pair to its two pads, then the other ends into the
-   holes in the table from the top. Keep + and − straight: mark the + conductor with a marker before you start.
-4. Solder all 6 underneath. Leave the small edge pads (CE, TE, PROG2, SEL) unconnected. The board has no STAT pad;
-   the ESP watches the input voltage instead (the input-power 1 MΩ pair from step 1).
+3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG** (the white two-conductor wire, split),
+   6–8 cm. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
+   wires before you start.
+4. **Crimp JST-XH pins** on the other ends and push them into the housings, matching the headers from step 4:
+   - **3-pin housing (GND):** PWR − / BATT − / LOAD −, in that order, to match a21 / a22 / a23.
+   - **2-pin housing (charger +):** BATT + on the d19 side, PWR + on the e19 side.
+   - **2-pin housing (LOAD +):** LOAD + in either position (both pins of that header are battery +).
+   Check each one with the meter against the board before plugging in: a swapped + and − here can damage parts.
+5. Leave the small edge pads (CE, TE, PROG2, SEL) unconnected. The board has no STAT pad; the ESP watches the input
+   voltage instead (the input-power 1 MΩ pair from step 1).
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)
 
 | Charger pad | Board hole | Net |
 |---|---|---|
-| PWR + (input) | e19 | PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -) |
-| PWR - / GND | a21 | GND rail |
-| BATT + | d19 | battery pin B+ (bridged from b19), 22 AWG pair with BATT - (the cell reaches the VBAT rail only through the charger) |
-| BATT - | a22 | GND rail |
-| LOAD + (output) | j20 | VBAT rail (22 AWG pair with LOAD -) |
-| LOAD - | a23 | GND rail |
+| PWR + (input) | e19 | PWR node: D1 + D2 cathodes, zener; plugs into the 2-pin JST d19-e19 |
+| PWR - / GND | a21 | GND rail; plugs into the 3-pin angled JST a21-a23 |
+| BATT + | d19 | battery pin B+ (bridged from b19) (the cell reaches the VBAT rail only through the charger); plugs into the 2-pin JST d19-e19 |
+| BATT - | a22 | GND rail; plugs into the 3-pin angled JST a21-a23 |
+| LOAD + (output) | j20 | VBAT rail; plugs into the 2-pin JST j20-j21 |
+| LOAD - | a23 | GND rail; plugs into the 3-pin angled JST a21-a23 |
 | THERM | (NTC) | remove the 103 (10 k) resistor beside the THERM label; NTC across its two pads, taped to the cell |
 | CE, TE, PROG2, SEL (edge pads) | - | leave unconnected (board defaults); the board has no STAT pad, status is on its LEDs |
 

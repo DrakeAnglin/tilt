@@ -78,10 +78,20 @@ def layout():
               flat('R div bot 1M', 'g15', 'g18'), flat('D3 1N5819', 'i15', 'i18', 'D', ('A', 'K')),
               flat('D1 1N5819 USB', 'b23', 'b20', 'D', ('A', 'K')), flat('Z 6.2V', 'd20', 'd23', 'D', ('K', 'A')),
               flat('D2 1N5819 solar', 'f23', 'f20', 'D', ('A', 'K')), flat('R div top 1M', 'h23', 'h20')]
-    # battery: 2 header pins for the cell's JST-XH plug (the plug's 9.8 x 5.8 mm body sits over a-c, rows 18-20: kept clear)
-    parts.append(Part('Battery pins', [H('a19') + ('B-',), H('b19') + ('B+',)],
-                      [('Battery pins', X(18) - 1.27, X(18) + 1.27, Y(0) - 1.27, Y(1) + 1.27, t, t + 2.5),
-                       ('XH plug', X(18) - 2.9, X(18) + 2.9, (Y(0) + Y(1)) / 2 - 4.9, (Y(0) + Y(1)) / 2 + 4.9, t + 2.5, t + 8.5)]))
+    # JST-XH (2.5 mm pitch) headers: the battery and every charger wire unplug. Top-entry 2-pin body 7.5 x 5.75 mm (12 mm
+    # tall with the plug in), right-angle 3-pin body 9.9 mm long, opening out over the column-a edge.
+    def xh_top(name, h0, h1, labels):
+        (i0, m0), (i1, m1) = H(h0), H(h1)
+        xm, ym = (X(i0) + X(i1)) / 2, (Y(m0) + Y(m1)) / 2
+        along_x = i0 != i1
+        hx, hy = (3.75, 2.87) if along_x else (2.87, 3.75)
+        return Part(name, [(i0, m0, labels[0]), (i1, m1, labels[1])], [(name, xm - hx, xm + hx, ym - hy, ym + hy, t, t + 12.0)])
+    parts.append(xh_top('JST battery', 'a19', 'b19', ('B-', 'B+')))
+    parts.append(xh_top('JST charger +', 'd19', 'e19', ('BATT+', 'PWR+')))
+    parts.append(xh_top('JST charger LOAD', 'j20', 'j21', ('LOAD+', 'LOAD+')))
+    parts.append(Part('JST charger GND', [H('a21') + ('PWR-',), H('a22') + ('BATT-',), H('a23') + ('LOAD-',)],
+                      [('JST charger GND', X(21) - 4.95, X(21) + 4.95, Y(0) - 10.0, Y(0) + 1.6, t, t + 6.0)],
+                      note='right-angle 3-pin, opening toward the column-a edge'))
     # USB-C breakout (0.50 x 0.85 in) plugged into a 6-way female socket in row 24, socket overhanging the board end
     usb = ['VBUS', 'GND', 'CC1', 'D-', 'D+', 'CC2']
     x_in, yu, zu = X(23) - 1.5, (Y(1) + Y(6)) / 2, t + SOCKET                # pins 1.5 mm in from its back edge
@@ -142,14 +152,24 @@ WIRES = [
     ('b19', 'c19', 'bridge: battery + -> charger BATT + hole'), ('c19', 'd19', 'bridge: battery + -> charger BATT + hole'),
 ]
 
-CHARGER = [(pad, {'PWR + (input)': 'e19', 'PWR - / GND': 'a21', 'BATT +': 'd19', 'BATT -': 'a22', 'LOAD + (output)': 'j20',
-                  'LOAD -': 'a23'}.get(pad, h), net.replace('bridged from b24', 'bridged from b19'))
+# Pairs the owner dry-fitted and found tight but fine (2026-11-01). The JST housings here are modelled from catalogue sizes,
+# so the checker reports these separately instead of failing on them; anything else that touches still fails.
+TIGHT_OK = {frozenset(p) for p in (('D1 1N5819 USB', 'JST charger GND'), ('JST battery', 'JST charger GND'),
+                                    ('JST charger GND', 'USB-C socket strip'))}
+
+PLUG = {'PWR + (input)': ('e19', '2-pin JST d19-e19'), 'BATT +': ('d19', '2-pin JST d19-e19'),
+        'PWR - / GND': ('a21', '3-pin angled JST a21-a23'), 'BATT -': ('a22', '3-pin angled JST a21-a23'),
+        'LOAD -': ('a23', '3-pin angled JST a21-a23'), 'LOAD + (output)': ('j20', '2-pin JST j20-j21')}
+CHARGER = [(pad, PLUG[pad][0] if pad in PLUG else h,
+            (net.replace('bridged from b24', 'bridged from b19').replace(' (22 AWG pair with PWR -)', '').replace(
+                ', 22 AWG pair with BATT -', '').replace(' (22 AWG pair with LOAD -)', '') + ('; plugs into the ' + PLUG[pad][1]
+                                                                                              if pad in PLUG else '')))
            for pad, h, net in CV4.CHARGER]
 
 EXPECT = {
     'GND': ['b3', 'b2', 'c1', 'a13', 'i13', 'a24', 'c12', 'e12', 'g12', 'f13', 'g15', 'c18', 'd23', 'c24', 'a19', 'a17',
             'a14', 'a15', 'a16', 'a18', 'a21', 'a22', 'a23'],
-    'VBAT': ['j11', 'j24', 'i15', 'h23', 'j16', 'j17', 'j18', 'j20'],
+    'VBAT': ['j11', 'j24', 'i15', 'h23', 'j16', 'j17', 'j18', 'j20', 'j21'],
     '5V': ['a3', 'a1', 'i18', 'i19'],
     'VDIV': ['f9', 'f11', 'h19', 'g18', 'h20', 'f10'],
     'PSENSE': ['i9', 'i10', 'e15', 'c15', 'd16'],

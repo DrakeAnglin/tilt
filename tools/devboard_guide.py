@@ -218,6 +218,7 @@ def draw_sockets(o):
         rot = '' if xb - xa > yb - ya else ' transform="rotate(-90 %.0f %.0f)"' % (cx, cy)
         o.append('<text x="%.0f" y="%.0f" font-size="10" fill="#fff" text-anchor="middle" font-weight="bold"%s>%s socket (%d)</text>' % (
             cx, cy + 4, rot, 'ESP' if name == 'ESP32-C6' else 'USB-C', len(hs)))
+    draw_jst(o)
     draw_batt(o)
 
 
@@ -273,8 +274,37 @@ def draw_caps(o):
         ceramic(o, a, b, txt)
 
 
+BATT = 'JST battery' if 'JST battery' in PARTS else 'Battery pins'
+JSTS = [n for n in PARTS if n.startswith('JST')]
+
+
+def draw_jst(o):
+    """JST-XH headers: white housings, pins as dots, the pin names beside them."""
+    for n in JSTS:
+        hs = [HN(i, m) for i, m, _ in PARTS[n].pins]
+        xs, ys = [pos(h)[0] for h in hs], [pos(h)[1] for h in hs]
+        if 'GND' in n:                                    # right angle: housing reaches out over the column-a edge
+            o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="3" fill="#f4f1e8" stroke="#777" stroke-width="1.5"/>' % (
+                min(xs) - 22, min(ys) - 12, max(xs) - min(xs) + 44, 52))
+        else:
+            o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="3" fill="#f4f1e8" stroke="#777" stroke-width="1.5"/>' % (
+                min(xs) - 22 if max(xs) > min(xs) else min(xs) - 17, min(ys) - 22 if max(ys) > min(ys) else min(ys) - 17,
+                max(xs) - min(xs) + (44 if max(xs) > min(xs) else 34), max(ys) - min(ys) + (44 if max(ys) > min(ys) else 34)))
+        for (i, m, lab), x, y in zip(PARTS[n].pins, xs, ys):
+            c = NET_COL['VBAT'] if '+' in lab else NET_COL['GND']
+            o.append('<circle cx="%.0f" cy="%.0f" r="5" fill="%s"/>' % (x, y, c))
+        name = {'JST battery': 'battery', 'JST charger +': 'charger +', 'JST charger LOAD': 'LOAD +', 'JST charger GND': 'charger GND'}[n]
+        if 'GND' in n:
+            o.append('<text x="%.0f" y="%.0f" font-size="10" text-anchor="middle" font-weight="bold">%s</text>' % (
+                (min(xs) + max(xs)) / 2, max(ys) + 30, name))
+        elif n != 'JST battery':
+            o.append('<text x="%.0f" y="%.0f" font-size="10" text-anchor="middle" font-weight="bold">%s</text>' % (
+                (min(xs) + max(xs)) / 2 + (0 if max(xs) > min(xs) else 32), min(ys) + (32 if max(xs) > min(xs) else (max(ys) - min(ys)) / 2 + 4),
+                name))
+
+
 def draw_batt(o):
-    for i, m, lab in PARTS['Battery pins'].pins:
+    for i, m, lab in PARTS[BATT].pins:
         h = HN(i, m)
         c = '#d62728' if lab == 'B+' else '#222'
         dot(o, h, c)
@@ -416,7 +446,7 @@ def rails_text():
     return ', '.join('%s %s–%s' % ('GND' if 'GND' in k else 'battery +', f, t) for f, t, k in RAILS)
 
 
-LEAD = {lab: HN(i, m) for n in ('USB leads', 'USB-C breakout', 'Solar leads', 'Battery pins') if n in PARTS
+LEAD = {lab: HN(i, m) for n in ('USB leads', 'USB-C breakout', 'Solar leads', 'Battery pins', 'JST battery') if n in PARTS
         for i, m, lab in PARTS[n].pins}
 CH = {pad: h for pad, h, _ in M.CHARGER}
 FLAT = span(*pins('R ADC1 1k')) >= 3
@@ -448,8 +478,8 @@ step('caps', 'Ceramic capacitors (4 × 100 nF, 1 × 10 µF)', 'top', [draw_caps]
      ['100 nF is marked 104, 10 µF is marked 106.'],
      """No direction. Push them straight down so the body sits low; don't bend the legs at the body.""",
      rows_parts([n for n, _ in CAPS], cap_note))
-step('sockets', 'Sockets and pins: ESP (2 × 10), USB-C (1 × 6), battery (2)', 'top', [draw_sockets],
-     'Top side. Female header sockets (the kit\'s pin stands): the ESP and the USB-C board plug in, so they can be swapped or reused.',
+step('sockets', 'Sockets and connectors: ESP (2 × 10), USB-C (1 × 6), JST: battery, charger (3)', 'top', [draw_sockets],
+     'Top side. The ESP and USB-C board plug into sockets, the battery and charger into JST-XH headers: everything unplugs.',
      ['The ESP and the USB-C board are NOT plugged in yet: that happens after the checks at the end.'],
      """All the header parts at once:
 
@@ -458,15 +488,24 @@ step('sockets', 'Sockets and pins: ESP (2 × 10), USB-C (1 × 6), battery (2)', 
    strip, check they sit flat, solder the rest, then lift the ESP back out.
 2. **USB-C socket:** one 6-way socket strip in **%s**, the same way with the breakout: its USB-C socket points **out past
    the row-24 end**, pins VBUS, GND, CC1, D−, D+, CC2 from column b. Solder, then lift it out.
-3. **Battery pins:** snap 2 male pins off a strip and solder them in **%s (−)** and **%s (+)**, long side up. Mark **%s "+"**
-   in red: the cell's plug is not keyed on bare pins.""" % (esp_rows()[0], esp_rows()[1], '%s–%s' % (LEAD.get('VBUS', '-'), LEAD.get('CC2', '-')),
-                                                             LEAD['B-'], LEAD['B+'], LEAD['B+']),
+3. **JST-XH headers** (2.5 mm pitch, fits the holes; they're keyed, so plugs only go in one way). It's tight around
+   a19–a23 but they fit:
+   - **Battery:** 2-pin top-entry header in **%s (−) / %s (+)**. Before soldering, hold the cell's plug against it: its
+     **red wire must land on %s**. Turn the header round if it doesn't.
+   - **Charger +:** 2-pin top-entry header in **d19 (BATT +) / e19 (PWR +)**.
+   - **Charger LOAD +:** 2-pin top-entry header in **j20–j21** (both pins are on the battery + rail).
+   - **Charger GND:** 3-pin **right-angle** header in **a21 / a22 / a23** (PWR −, BATT −, LOAD −), opening outward over the
+     column-a edge.""" % (esp_rows()[0], esp_rows()[1], '%s–%s' % (LEAD.get('VBUS', '-'), LEAD.get('CC2', '-')),
+                          LEAD['B-'], LEAD['B+'], LEAD['B+']),
      [('ESP socket', '%s, %s' % esp_rows(), 'ESP plugs in chip side up, USB-C over the column-a edge'),
       ('USB-C socket', '%s–%s' % (LEAD.get('VBUS', '-'), LEAD.get('CC2', '-')), 'VBUS, GND, CC1, D−, D+, CC2; its socket points past row 24'),
-      ('Battery pins', '%s (−), %s (+)' % (LEAD['B-'], LEAD['B+']), 'red wire of the plug on %s' % LEAD['B+'])])
-step('charger', 'Charger: prepare it, wire it in from off the board (3 wire pairs)', 'top', [draw_charger],
-     'Top side. The charger (30.5 × 31.5 mm) sits OFF the board, past row 24; its wires come in to the ringed holes.',
-     ['Each charger wire has its own hole; the bridges in step 8 join them to the right nets.'],
+      ('JST battery (2-pin)', '%s (−), %s (+)' % (LEAD['B-'], LEAD['B+']), 'red wire of the cell\'s plug on %s' % LEAD['B+']),
+      ('JST charger + (2-pin)', 'd19 (BATT +), e19 (PWR +)', 'top entry'),
+      ('JST charger LOAD + (2-pin)', 'j20, j21', 'top entry, both pins battery +'),
+      ('JST charger GND (3-pin)', 'a21 (PWR −), a22 (BATT −), a23 (LOAD −)', 'right angle, opening over the column-a edge')])
+step('charger', 'Charger: prepare it, put JST plugs on its wires (3 plugs)', 'top', [draw_charger],
+     'Top side. The charger (30.5 × 31.5 mm) sits OFF the board, past row 24; its wires plug into the JST headers from step 4.',
+     ['Nothing is soldered to the board in this step: the charger plugs in, so it can be swapped.'],
      """The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
 so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
 
@@ -477,11 +516,16 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
    **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
    from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
-3. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
-   PWR + / PWR −, BATT + / BATT −, LOAD + / LOAD −. Solder each pair to its two pads, then the other ends into the
-   holes in the table from the top. Keep + and − straight: mark the + conductor with a marker before you start.
-4. Solder all 6 underneath. Leave the small edge pads (CE, TE, PROG2, SEL) unconnected. The board has no STAT pad;
-   the ESP watches the input voltage instead (the input-power 1 MΩ pair from step 1).
+3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG** (the white two-conductor wire, split),
+   6–8 cm. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
+   wires before you start.
+4. **Crimp JST-XH pins** on the other ends and push them into the housings, matching the headers from step 4:
+   - **3-pin housing (GND):** PWR − / BATT − / LOAD −, in that order, to match a21 / a22 / a23.
+   - **2-pin housing (charger +):** BATT + on the d19 side, PWR + on the e19 side.
+   - **2-pin housing (LOAD +):** LOAD + in either position (both pins of that header are battery +).
+   Check each one with the meter against the board before plugging in: a swapped + and − here can damage parts.
+5. Leave the small edge pads (CE, TE, PROG2, SEL) unconnected. The board has no STAT pad; the ESP watches the input
+   voltage instead (the input-power 1 MΩ pair from step 1).
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)""",
      [(pad, h, net) for pad, h, net in M.CHARGER])
@@ -531,9 +575,9 @@ def need():
         'caps': ['%d × %s ceramic capacitor' % (n, {'100n': '100 nF (104)', '10µ': '10 µF (106)'}[v]) for v, n in c.items()],
         'sockets': ['%d × 10-way female header socket (pin stand)' % n_esp] +
                    ['1 × %d-way female header socket (cut from a strip)' % u for u in usb_pins] +
-                   ['%d × male header pins (battery)' % len(PARTS['Battery pins'].pins)],
+                   ['3 × JST-XH 2-pin top-entry header', '1 × JST-XH 3-pin right-angle header'],
         'charger': ['1 × MCP73871 charger board (+ its bulk capacitor)', '1 × 10 kΩ NTC thermistor',
-                    '3 × pairs of white 22 AWG two-conductor wire, 6–8 cm each'],
+                    '6 × 22 AWG wire, 6–8 cm', '1 × JST-XH 3-pin housing', '2 × JST-XH 2-pin housing', '6 × JST-XH crimp pins'],
         'leads': ['3 × RJ12 breakout board (6 leads each)'] + (['1 × solar lead (2 wires)'] if 'Solar leads' in PARTS else []),
         'wires': ['%d × 30 AWG insulated wire (cut to length)' % len(wires_of('wire'))],
         'bridges': ['%d × short bare wire: the ~%d leg offcuts saved from steps 1-3, the rest cut from bare tinned wire' % (
@@ -700,7 +744,9 @@ def bom():
     return [
         ('ESP32-C6 SuperMini, with its male pins soldered on', 1, 'plugs in at the end', 'ESP32-C6 SuperMini 5-pack'),
         ('Female header sockets ("pin stands")', '2 × 10 + 1 × 6', '4: ESP and USB-C sockets', 'perfboard kit headers'),
-        ('Male header pins', len(PARTS['Battery pins'].pins), '4: battery pins', 'perfboard kit headers'),
+        ('JST-XH header, 2-pin top entry', 3, '4: battery, charger +, charger LOAD +', 'JST-XH kit (to buy)'),
+        ('JST-XH header, 3-pin right angle', 1, '4: charger GND', 'JST-XH kit (to buy)'),
+        ('JST-XH housings (2-pin × 2, 3-pin × 1) + 6 crimp pins', 1, '5: charger plugs', 'JST-XH kit (to buy)'),
         ('Resistor 1 kΩ', count['1k'], '2', 'resistor kit'),
         ('Resistor 1 MΩ', count['1M'], '2: battery and input-power dividers', 'resistor kit'),
         ('Diode 1N5819', 3, '3', '1N5819 150-pack'),
@@ -709,7 +755,7 @@ def bom():
         ('Ceramic capacitor 10 µF (106)', count['10µ'], '4', 'ceramic capacitor kit'),
         ('MCP73871 charger board, 30.5 × 31.5 mm, off the board (+ its 16 × 26 mm bulk capacitor)', 1, '6', 'Comimark MCP73871'),
         ('NTC thermistor 10 kΩ', 1, '6', 'NTC 10-pack'),
-        ('White 22 AWG two-conductor wire', '3 pairs × 6-8 cm', '6 (charger power)', 'solar extension wire'),
+        ('22 AWG wire (the white two-conductor, split)', '6 × 6-8 cm', '5 (charger power)', 'solar extension wire'),
         ('RJ12 breakout board', 3, '7 (%d leads)' % len(PARTS['Port leads'].pins), 'RJ11/RJ12 breakout 4-pack'),
         ('USB-C breakout (Cermant), with its 6 male pins', 1, 'plugs in at the end', 'USB-C breakout 10-pack'),
         ('Solar lead (optional)', 1, '7 (2 leads)', 'solar panel + extension'),
@@ -742,7 +788,7 @@ def write_md():
           '| Ceramic capacitors | **No** | either way round; legs 3 holes apart, the middle hole stays empty |',
           '| **1N5819 diodes, 6.2 V zener** | **YES** | the silver/white **band is the cathode (K)** |',
           '| **ESP32-C6** | **YES** | chip side up, 5V in %s, TX in %s |' % (ESP['5V'], ESP['TX16']),
-          '| **Battery plug** on the 2 header pins | **YES, and it can go on backwards** | red wire on **%s (+)**, black on **%s (−)** |' % (LEAD['B+'], LEAD['B-']),
+          '| **Battery JST header** | **YES** | keyed, but check before soldering it: the cell\'s red wire must land on **%s (+)** |' % LEAD['B+'],
           '| **Charger bulk capacitor** (on the charger board) | **YES** | stripe = −, long leg = + |',
           '| USB-C and solar leads, charger pads | **YES** | follow the tables |', '',
           'A reversed diode just won\'t conduct; a reversed electrolytic or battery can damage parts. Check those twice.', '',

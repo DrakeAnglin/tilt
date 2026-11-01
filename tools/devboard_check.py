@@ -114,8 +114,8 @@ def holes_shared(parts):
     for p in parts:
         for i, m, lab in p.pins:
             occ.setdefault(HN(i, m), []).append('%s %s' % (p.name, lab))
-    for pad, h, _ in M.CHARGER:
-        if h[:1] in M.COLS:
+    for pad, h, _ in M.CHARGER:                      # a charger wire in its own hole (not when it plugs into a header there)
+        if h[:1] in M.COLS and h not in occ:
             occ.setdefault(h, []).append('charger ' + pad)
     for f, t, note in M.WIRES:
         if note.startswith('wire'):
@@ -137,14 +137,16 @@ def main():
     parts = M.layout()
     rep = M.check(parts)
     bs = bodies(parts)
-    tight = []
+    tight, dry = [], []
     for i in range(len(bs)):
         for j in range(i + 1, len(bs)):
             if bs[i][0] == bs[j][0]:
                 continue
             g = gap(bs[i], bs[j])
-            if g is not None and g < 0.3:
-                tight.append('%s / %s: %.2f mm' % (bs[i][2], bs[j][2], g))
+            jst = 'JST' in bs[i][0] and 'JST' in bs[j][0]   # JST housings are made to sit side by side
+            if g is not None and g < (0.0 if jst else 0.3):
+                pair = '%s / %s: %.2f mm' % (bs[i][2], bs[j][2], g)
+                (dry if frozenset((bs[i][2], bs[j][2])) in getattr(M, 'TIGHT_OK', ()) else tight).append(pair)
     find = netlist()
     errs = []
     expect = getattr(M, 'EXPECT', EXPECT)
@@ -160,6 +162,8 @@ def main():
         seen[r] = net
     print('\n'.join(rep))
     print('parts closer than 0.3 mm (negative = overlap):', tight or 'none')
+    if dry:
+        print('tight, dry-fitted OK by the owner:', dry)
     print('nets:', errs or 'all %d nets connected, none shorted' % len(expect))
     shared = holes_shared(parts)
     kinds = [w[2].split(':')[0].split(' (')[0] for w in M.WIRES]
