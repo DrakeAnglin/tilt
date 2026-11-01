@@ -52,13 +52,13 @@ isn't stressed.
 
 | Part | Holes | Direction |
 |---|---|---|
-| 10 µF ceramic | j1, j3 (j2 empty) | any |
+| 10 µF ceramic | **j1, i2** (corner to corner: pull the legs in slightly, lean the body away from the ESP) | any |
 | 10 kΩ (R stat) | j4, j5 | any |
 | **D3** 1N5819 | j6, j7 | **band at j6** |
 | 1 MΩ (divider top) | j8, j9 | any |
 | 1 MΩ (divider bottom) | j10, j11 | any |
 | 100 nF (divider) | i11, i13 (i12 empty) | any |
-| 1 kΩ ×3 (angle filters) | b12–b13, d12–d13, f12–f13 | any |
+| 1 kΩ ×3 (angle filters) | b12–c12, d12–d13, f12–f13 | any |
 | 100 nF ×3 (angle filters) | a14–c14, d14–f14, g12–g14 (middle holes empty) | any |
 | **D1** 1N5819 (USB) | e23, d23 | **band at d23** |
 | **D2** 1N5819 (solar) | h23, g23 | **band at g23** |
@@ -74,8 +74,9 @@ nets: black GND, red battery +, orange 5V, purple 3V3, blue signals.
 
 1. **Rails first:** a bare wire along column **a**, rows 12–24 (GND), and along column **j**, rows 12–24 (battery +),
    soldered at every hole.
-2. **Bridges** next to the ESP (a1–b1 … a10–b10; h1–i1–j1, h2–i2–j2–j3, h3–i3; h4–i4, h5–i5, h6–i6, h8–i8) and the
-   short ones in rows 9–14 and 23–24. Bridging under the empty middle hole of a capacitor is fine.
+2. **Bridges** next to the ESP (a1–b1 … a10–b10; h1–i1–j1, h2–i2–j2, h3–i3; h4–i4, h5–i5, h6–i6, h8–i8) and the
+   short ones in rows 9–14 and 23–24. Every bridge is a straight run between neighbouring holes; anything that
+   isn't a neighbour is an insulated wire. Bridging under the empty middle hole of a capacitor is fine.
 3. **Wires** (dashed in the picture): every one is in the "Underside wiring" table of
    [ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md), with what it connects.
 4. After each group, check with the meter's beep mode: the two ends beep, and **GND (a12) must NOT beep to battery +

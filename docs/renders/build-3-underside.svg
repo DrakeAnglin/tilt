@@ -291,7 +291,6 @@
 <line x1="340" y1="90" x2="340" y2="120" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
 <line x1="70" y1="300" x2="70" y2="360" stroke="#ff7f0e" stroke-width="3" stroke-linecap="round"/>
 <line x1="100" y1="300" x2="100" y2="360" stroke="#222222" stroke-width="3" stroke-linecap="round"/>
-<line x1="100" y1="360" x2="130" y2="360" stroke="#222222" stroke-width="3" stroke-linecap="round"/>
 <line x1="130" y1="300" x2="130" y2="330" stroke="#9467bd" stroke-width="3" stroke-linecap="round"/>
 <line x1="160" y1="300" x2="160" y2="330" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
 <line x1="190" y1="300" x2="190" y2="330" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
@@ -301,7 +300,7 @@
 <path d="M190 360 Q265 211 340 90" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
 <path d="M220 360 Q145 346 70 360" fill="none" stroke="#ff7f0e" stroke-width="2.5" stroke-dasharray="7,3"/>
 <path d="M250 360 Q325 346 400 360" fill="none" stroke="#d62728" stroke-width="2.5" stroke-dasharray="7,3"/>
-<path d="M130 360 Q265 211 400 90" fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7,3"/>
+<path d="M100 360 Q250 211 400 90" fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7,3"/>
 <path d="M280 360 Q340 346 400 360" fill="none" stroke="#d62728" stroke-width="2.5" stroke-dasharray="7,3"/>
 <line x1="310" y1="360" x2="340" y2="360" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
 <path d="M310 360 Q340 331 370 330" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
@@ -311,10 +310,11 @@
 <line x1="370" y1="120" x2="400" y2="120" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
 <line x1="370" y1="180" x2="400" y2="180" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
 <line x1="370" y1="240" x2="400" y2="240" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
-<line x1="430" y1="120" x2="460" y2="150" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
+<line x1="400" y1="150" x2="430" y2="150" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
+<line x1="430" y1="150" x2="460" y2="150" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
 <line x1="430" y1="180" x2="460" y2="180" stroke="#1f77b4" stroke-width="3" stroke-linecap="round"/>
 <path d="M430 240 Q415 241 400 270" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
-<path d="M430 120 Q280 91 130 90" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
+<path d="M430 150 Q280 106 130 90" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
 <path d="M430 180 Q295 121 160 90" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
 <path d="M430 240 Q310 151 190 90" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
 <path d="M460 240 Q475 151 490 90" fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7,3"/>

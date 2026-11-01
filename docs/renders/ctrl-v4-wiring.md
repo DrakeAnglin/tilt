@@ -6,13 +6,13 @@ Step-by-step guide with pictures and which parts have a direction: [dev-board-bu
 
 | Part | Holes | Note |
 |---|---|---|
-| C 10u | j1 (5V), j3 (G) |  |
+| C 10u | j1 (5V), i2 (G) |  |
 | R stat 10k | j4, j5 |  |
 | D3 1N5819 | j6 (K), j7 (A) |  |
 | R div top 1M | j8, j9 |  |
 | R div bot 1M | j10, j11 |  |
 | C div 100n | i11, i13 |  |
-| R ADC1 1k | b12, b13 |  |
+| R ADC1 1k | b12, c12 |  |
 | C ADC1 100n | a14, c14 |  |
 | R ADC2 1k | d12, d13 |  |
 | C ADC2 100n | d14, f14 |  |
@@ -25,7 +25,7 @@ Step-by-step guide with pictures and which parts have a direction: [dev-board-bu
 | USB leads | d24 (V-), e24 (V+) |  |
 | Solar leads | h24 (S+), i24 (S-) |  |
 
-All ceramic capacitors (100 n, 10 u) have legs 3 holes apart: the middle hole stays empty under the body.
+Ceramic capacitors have legs 3 holes apart: the middle hole stays empty. The 10 u goes corner to corner (j1-i2) with its legs pulled in slightly.
 The bulk electrolytic that comes with the charger is soldered onto the charger board itself (+ to its LOAD side).
 
 ESP32-C6: chip side up, header pins in its **inner** holes, into **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and
@@ -65,8 +65,7 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 | a9 | b9 | bridge: port 3 EN -> GPIO6 |
 | a10 | b10 | bridge: charger STAT -> GPIO7 |
 | h1 | j1 | bridge (over i1): ESP 5V -> C 10u |
-| h2 | j2 | bridge (over i2): ESP GND |
-| j2 | j3 | bridge: ESP GND -> C 10u |
+| h2 | j2 | bridge (over i2): ESP GND -> C 10u |
 | h3 | i3 | bridge: ESP 3V3 |
 | h4 | i4 | bridge: port 2 IN1 -> GPIO20 |
 | h5 | i5 | bridge: port 1 IN2 -> GPIO19 |
@@ -76,7 +75,7 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 | j5 | a10 | wire: R stat -> STAT / GPIO7 |
 | j6 | j1 | wire: D3 cathode -> ESP 5V |
 | j7 | j12 | wire: D3 anode -> VBAT rail |
-| j3 | a12 | wire: ESP GND -> GND rail |
+| j2 | a12 | wire: ESP GND -> GND rail |
 | j8 | j12 | wire: R div top -> VBAT rail |
 | j9 | j10 | bridge: divider node |
 | j9 | i11 | wire: divider node -> C div |
@@ -86,10 +85,11 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 | b11 | b12 | bridge: port 1 ANGLE -> R ADC1 |
 | d11 | d12 | bridge: port 2 ANGLE -> R ADC2 |
 | f11 | f12 | bridge: port 3 ANGLE -> R ADC3 |
-| b13 | c14 | bridge (over b14): R ADC1 -> C ADC1 |
+| c12 | c13 | bridge: R ADC1 -> filter 1 node |
+| c13 | c14 | bridge: filter 1 node -> C ADC1 |
 | d13 | d14 | bridge: R ADC2 -> C ADC2 |
 | f13 | g12 | wire: R ADC3 -> C ADC3 |
-| b13 | a3 | wire: filter 1 -> GPIO0 |
+| c13 | a3 | wire: filter 1 -> GPIO0 |
 | d13 | a4 | wire: filter 2 -> GPIO1 |
 | f13 | a5 | wire: filter 3 -> GPIO2 |
 | f14 | a15 | wire: C ADC2 -> GND rail |

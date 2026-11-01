@@ -4,6 +4,7 @@ so they always match it.
   python3 tools/devboard_guide.py      # writes docs/renders/build-*.svg
 """
 import importlib.util
+import math
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -80,6 +81,12 @@ def resistor(o, a, b, text):
 def ceramic(o, a, b, text):
     (x0, y0), (x1, y1) = pos(a), pos(b)
     xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+    if x0 != x1 and y0 != y1:                                   # corner to corner: tilted body
+        ln = math.hypot(x1 - x0, y1 - y0) + 16
+        o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="12" rx="3" fill="#7fb2e5" stroke="#2a5a8a" transform="rotate(%.1f %.0f %.0f)"/>' % (
+            xm - ln / 2, ym - 6, ln, math.degrees(math.atan2(y1 - y0, x1 - x0)), xm, ym))
+        o.append('<text x="%.0f" y="%.0f" font-size="9" fill="#0b2e55" font-weight="bold">%s</text>' % (xm + 12, ym + 4, text))
+        return
     w, h = (abs(x1 - x0) + 16, 12) if y0 == y1 else (12, abs(y1 - y0) + 16)
     o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="3" fill="#7fb2e5" stroke="#2a5a8a"/>' % (
         xm - w / 2, ym - h / 2, w, h))
@@ -131,9 +138,9 @@ def guide_top():
     o = board('Step 2: parts on top (direction matters for the dark ones)',
               'Top side. Tan = resistor, blue = ceramic capacitor (any way round). Black = diode: the band goes where shown. Electrolytic: stripe = minus.')
     for name, a, b, txt in (('R stat', 'j4', 'j5', '10k'), ('R div top', 'j8', 'j9', '1M'), ('R div bot', 'j10', 'j11', '1M'),
-                            ('R ADC1', 'b12', 'b13', '1k'), ('R ADC2', 'd12', 'd13', '1k'), ('R ADC3', 'f12', 'f13', '1k')):
+                            ('R ADC1', 'b12', 'c12', '1k'), ('R ADC2', 'd12', 'd13', '1k'), ('R ADC3', 'f12', 'f13', '1k')):
         resistor(o, a, b, txt)
-    for a, b, txt in (('j1', 'j3', '10µ'), ('i11', 'i13', '100n'), ('a14', 'c14', '100n'), ('d14', 'f14', '100n'), ('g12', 'g14', '100n')):
+    for a, b, txt in (('j1', 'i2', '10µ'), ('i11', 'i13', '100n'), ('a14', 'c14', '100n'), ('d14', 'f14', '100n'), ('g12', 'g14', '100n')):
         ceramic(o, a, b, txt)
     diode(o, 'j6', 'j7', 'D3 band→j6', True)
     diode(o, 'e23', 'd23', '', False)
@@ -146,7 +153,7 @@ def guide_top():
                     ('h24', 'Solar +', '#d62728'), ('i24', 'Solar −', '#222')):
         dot(o, h, c)
         label(o, h, t, dx=22, dy=4, color=c, size=11, anchor='start')
-    finish(o, 'build-2-parts.svg', ['Blue ceramic capacitors: legs 3 holes apart (5 mm), the middle hole stays EMPTY. Don\'t bend the legs to fit 2 holes.',
+    finish(o, 'build-2-parts.svg', ['Blue ceramic capacitors: legs 3 holes apart (5 mm), the middle hole stays EMPTY. The 10µ goes corner to corner (j1-i2), legs pulled in slightly, body leaning away from the ESP.',
                                      'Diodes stand up: body over the first hole, lead bent back into the second. The silver/white band is the cathode (K).',
                                      'Battery pins: 2 bare header pins at b24 (−) and c24 (+). The plug is NOT keyed on bare pins: red wire to c24.'])
 

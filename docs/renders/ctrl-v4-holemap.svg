@@ -7,7 +7,7 @@
 <rect x="60.1" y="155.5" width="66.2" height="80.5" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
 <rect x="391.0" y="102.0" width="176.4" height="164.7" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
 <rect x="445.0" y="149.7" width="72.0" height="81.0" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
-<rect x="82.7" y="72.4" width="43.2" height="18.0" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
+<rect x="71.3" y="65.9" width="43.2" height="43.2" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
 <rect x="139.7" y="71.1" width="20.7" height="20.7" rx="4" fill="none" stroke="#b5651d" stroke-width="1.2"/>
 <rect x="183.6" y="69.3" width="24.3" height="24.3" rx="4" fill="none" stroke="#b5651d" stroke-width="1.2"/>
 <rect x="231.1" y="71.1" width="20.7" height="20.7" rx="4" fill="none" stroke="#b5651d" stroke-width="1.2"/>
@@ -42,7 +42,7 @@
 <circle cx="104.3" cy="172.9" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="104.3" cy="150.0" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="104.3" cy="127.2" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
-<circle cx="104.3" cy="104.3" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
+<circle cx="104.3" cy="104.3" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
 <circle cx="104.3" cy="81.4" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="127.2" cy="287.2" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="127.2" cy="264.3" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
@@ -53,7 +53,7 @@
 <circle cx="127.2" cy="150.0" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="127.2" cy="127.2" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
 <circle cx="127.2" cy="104.3" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
-<circle cx="127.2" cy="81.4" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
+<circle cx="127.2" cy="81.4" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="150.0" cy="287.2" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="150.0" cy="264.3" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
 <circle cx="150.0" cy="241.5" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
@@ -136,7 +136,7 @@
 <circle cx="310.0" cy="81.4" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
 <circle cx="332.9" cy="287.2" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="332.9" cy="264.3" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
-<circle cx="332.9" cy="241.5" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
+<circle cx="332.9" cy="241.5" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
 <circle cx="332.9" cy="218.6" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
 <circle cx="332.9" cy="195.7" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="332.9" cy="172.9" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
@@ -145,7 +145,7 @@
 <circle cx="332.9" cy="104.3" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="332.9" cy="81.4" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="355.8" cy="287.2" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
-<circle cx="355.8" cy="264.3" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
+<circle cx="355.8" cy="264.3" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="355.8" cy="241.5" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
 <circle cx="355.8" cy="218.6" r="3.3" fill="#c0392b" stroke="#555" stroke-width="0.7"/>
 <circle cx="355.8" cy="195.7" r="3.3" fill="#fff" stroke="#555" stroke-width="0.7"/>
@@ -287,8 +287,8 @@
 <text x="70.3" y="126.7" font-size="10" font-weight="bold" fill="#1f6fb5">ESP32-C6</text>
 <text x="394.0" y="114.0" font-size="10" font-weight="bold" fill="#1f6fb5">MCP73871</text>
 <text x="85.0" y="77.8" font-size="6">5V</text>
-<text x="130.8" y="77.8" font-size="6">G</text>
-<text x="85.7" y="84.4" font-size="10" font-weight="bold" fill="#1f6fb5">C 10u</text>
+<text x="107.9" y="100.7" font-size="6">G</text>
+<text x="74.3" y="77.9" font-size="10" font-weight="bold" fill="#1f6fb5">C 10u</text>
 <text x="150.0" y="68.1" font-size="8" fill="#b5651d">R stat 10k</text>
 <text x="199.3" y="77.8" font-size="6">K</text>
 <text x="222.2" y="77.8" font-size="6">A</text>
