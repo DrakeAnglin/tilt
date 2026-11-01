@@ -425,6 +425,6 @@
 <circle cx="730" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
 <path d="M730 360 Q832 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
 <text x="730" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LD−</text>
-<text x="30" y="447" font-size="13" fill="#222">You need: 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 6 × 22 AWG wire, 6–8 cm, 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 6 × 22 AWG stranded insulated wire, 6–8 cm, 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins</text>
 <text x="30" y="467" font-size="13" fill="#222">Nothing is soldered to the board in this step: the charger plugs in, so it can be swapped.</text>
 </svg>

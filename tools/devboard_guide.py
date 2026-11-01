@@ -517,12 +517,13 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 ![charger board](renders/build-charger.png)
 
 1. On the bench first: remove the small **103** (10 kΩ) resistor beside the **THERM** label and solder the 10 kΩ NTC's
-   two leads to its pads (the NTC gets taped to the cell later).
+   two leads to its pads (the NTC gets taped to the cell later). If its leads don't reach the cell, extend them with
+   **30 AWG silicone stranded wire** and heat-shrink each joint.
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
    **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
    from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
-3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG** (the white two-conductor wire, split),
-   6–8 cm. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
+3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG stranded insulated wire** (the white
+   two-conductor solar wire, split in two), 6–8 cm each. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
    wires before you start.
 4. **Crimp JST-XH pins** on the other ends and push them into the housings, matching the headers from step 4:
    - **3-pin housing (GND):** PWR − / BATT − / LOAD −, in that order, to match a21 / a22 / a23.
@@ -537,13 +538,16 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 step('leads', 'Leads from the RJ12 boards (%d)' % len(PARTS['Port leads'].pins), 'top', [draw_leads],
      'Top side. Each lead goes in from the top. Pin 1 is the square pad on each RJ12 board.',
      ['Let the RJ12 boards hang off the end and tape them down while you work underneath.'],
-     """Solder the 18 leads from the three RJ12 boards (pin 1 = square pad) into the holes in the table. Trim underneath
-to ~1 mm.""",
+     """Each RJ12 board connects with 6 leads, 5–8 cm long. Use **22 AWG stranded insulated wire** (the white two-conductor
+wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
+signals (IN1, IN2, EN, angle). Solder each lead to its RJ12 pad (pin 1 = square pad), then into the hole in the table
+from the top. Trim underneath to ~1 mm.""",
      None)
 step('solar', 'Solar lead (optional)', 'top', [draw_solar],
      'Top side. Only if you use a solar panel: its lead goes in from the top.',
      ['Skip this step for USB-C charging only. You can add it later: the holes stay free.'],
-     """**Optional.** Only if this controller gets a solar panel: solder the panel lead's **+ (red) → %s** and **− (black) → %s**
+     """**Optional.** Only if this controller gets a solar panel. The lead is the **white 22 AWG two-conductor wire** (the
+solar extension, cut to length). Solder its **+ → %s** and **− → %s** (mark the + conductor first)
 (%s is on the GND rail). Trim underneath.
 
 Without solar, skip it: the board charges over USB-C alone. D2 and the zener from step 2 are only there for the
@@ -551,22 +555,25 @@ solar input, but fit them anyway so a panel can be added later without re-solder
      [('Solar +', LEAD['S+'], 'to D2\'s anode (bridge in step 9)'), ('Solar −', LEAD['S-'], 'GND rail')])
 step('wires', 'Insulated wires underneath (%d)' % len(wires_of('wire')), 'bottom', [draw_under, 'wire'],
      'Bottom view: flip the board over its long edge, row 1 still on the left, column a now at the TOP. Grey = done already.',
-     ['Dashed = 30 AWG insulated wire, dots = its two ends. Colours: black GND, red battery +, orange 5V, blue signal.'],
-     """Wires go in **before** the bridges and rails, while their holes are still open. For each wire: cut it a little long,
+     ['Dashed = 30 AWG silicone stranded insulated wire, dots = its two ends. Colours: black GND, orange 5V, blue signal.'],
+     """All of these are **30 AWG silicone stranded insulated wire**. They go in **before** the bridges and rails, while their
+holes are still open. For each wire: cut it a little long,
 strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Beep each wire out with the
 meter as you go.""",
      what(wires_of('wire')))
 step('bridges', 'Bare bridges underneath (%d)' % len(wires_of('bridge')), 'bottom', [draw_under, 'bridge'],
      'Bottom view. Each bridge joins two neighbouring holes in a straight line.',
-     ['Use trimmed resistor legs or bare tinned wire laid flat across the pads, soldered at both ends.'],
-     """A bridge is a short piece of **bare** wire laid across neighbouring pads (a trimmed resistor leg is ideal), soldered at
+     ['Use trimmed resistor / diode legs or 22 AWG solid tinned bare wire, laid flat across the pads, soldered at both ends.'],
+     """A bridge is a short piece of **bare solid wire**: a trimmed resistor or diode leg, or **22 AWG solid tinned copper
+(bus) wire**, laid across neighbouring pads and soldered at
 both ends; don't rely on a solder blob alone. Work one area at a time and check each with the meter: the two ends beep,
 and neither beeps to the pad next to it.""",
      what(wires_of('bridge')))
 step('rails', 'Rails (%d)' % len(RAILS), 'bottom', [draw_under, 'rail'],
      'Bottom view. Long bare wires: ' + rails_text() + '.',
      ['Solder each rail at every hole it passes, including the ones that already have wires or leads.'],
-     """Last: lay straight bare tinned wire for each rail (%s), soldering it at every hole it passes. Where two GND rails
+     """Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (%s), soldering it at every hole
+it passes. Where two GND rails
 meet at a corner, solder them together there. Then do the checks in step 11.""" % rails_text(),
      what(wires_of('rail')))
 
@@ -590,13 +597,14 @@ def need():
                    ['1 × %d-way female header socket (cut from a strip)' % u for u in usb_pins] +
                    ['3 × JST-XH 2-pin top-entry header', '1 × JST-XH 3-pin right-angle header'],
         'charger': ['1 × MCP73871 charger board (+ its bulk capacitor)', '1 × 10 kΩ NTC thermistor',
-                    '6 × 22 AWG wire, 6–8 cm', '1 × JST-XH 3-pin housing', '2 × JST-XH 2-pin housing', '6 × JST-XH crimp pins'],
-        'leads': ['3 × RJ12 breakout board (6 leads each)'],
-        'solar': ['1 × solar panel lead (2 wires): optional'],
-        'wires': ['%d × 30 AWG insulated wire (cut to length)' % len(wires_of('wire'))],
-        'bridges': ['%d × short bare wire: the ~%d leg offcuts saved from steps 1-3, the rest cut from bare tinned wire' % (
+                    '6 × 22 AWG stranded insulated wire, 6–8 cm', '1 × JST-XH 3-pin housing', '2 × JST-XH 2-pin housing', '6 × JST-XH crimp pins'],
+        'leads': ['3 × RJ12 breakout board', '6 × 22 AWG stranded insulated wire, 5–8 cm (battery + and GND)',
+                  '12 × 30 AWG silicone stranded wire, 5–8 cm (signals)'],
+        'solar': ['1 × white 22 AWG two-conductor lead to the panel: optional'],
+        'wires': ['%d × 30 AWG silicone stranded insulated wire (cut to length)' % len(wires_of('wire'))],
+        'bridges': ['%d × short bare wire: the ~%d leg offcuts saved from steps 1-3, the rest cut from 22 AWG solid tinned bus wire' % (
             len(wires_of('bridge')), 2 * (len(RES) + len(DIODES) + len(CAPS)))],
-        'rails': ['%d × bare tinned wire: %s' % (len(RAILS), '; '.join(rail_mm))],
+        'rails': ['%d × 22 AWG solid tinned bus wire: %s' % (len(RAILS), '; '.join(rail_mm))],
     }
     return out
 
@@ -799,13 +807,15 @@ def bom():
         ('Ceramic capacitor 10 µF (106)', count['10µ'], '4', 'ceramic capacitor kit'),
         ('MCP73871 charger board, 30.5 × 31.5 mm, off the board (+ its 16 × 26 mm bulk capacitor)', 1, '6', 'Comimark MCP73871'),
         ('NTC thermistor 10 kΩ', 1, '6', 'NTC 10-pack'),
-        ('22 AWG wire (the white two-conductor, split)', '6 × 6-8 cm', '5 (charger power)', 'solar extension wire'),
+        ('22 AWG stranded insulated wire (the white two-conductor, split)', '6 × 6-8 cm + 6 × 5-8 cm',
+         '5 (charger power), 6 (RJ12 battery + / GND)', 'white 2-conductor 22 AWG'),
         ('RJ12 breakout board', 3, '7 (%d leads)' % len(PARTS['Port leads'].pins), 'RJ11/RJ12 breakout 4-pack'),
         ('USB-C breakout (Cermant), with its 6 male pins', 1, 'plugs in at the end', 'USB-C breakout 10-pack'),
         ('Solar lead (optional)', 1, '7 (2 leads, optional)', 'solar panel + extension'),
-        ('30 AWG insulated wire', '%d pieces' % len(wires_of('wire')), '8', '30 AWG silicone wire'),
+        ('30 AWG silicone stranded insulated wire', '%d + 12 pieces' % len(wires_of('wire')), '8 (board wires), 6 (RJ12 signals)',
+         '30 AWG silicone wire'),
         ('Bare wire or trimmed resistor legs', '%d bridges + %d rails' % (len(wires_of('bridge')), len(wires_of('rail'))), '9, 10',
-         'tinned wire / leg offcuts'),
+         '22 AWG solid tinned bus wire (to buy, ~0.4 m per board) + leg offcuts'),
         ('Perfboard 3 × 7 cm (a–j × 1–24)', 1, 'all', 'perfboard kit'),
         ('18650 cell with JST-XH plug', 1, '11', '18650 cell'),
     ]
@@ -849,10 +859,11 @@ def write_md():
               '![step %d](renders/build-step-%02d.png)' % (k + 1, k + 1), '', st['body'], '']
         if st['key'] == 'leads':
             leads = {lab: HN(i, m) for i, m, lab in PARTS['Port leads'].pins}
-            o += ['| RJ12 pin | Port 1 | Port 2 | Port 3 |', '|---|---|---|---|']
+            o += ['| RJ12 pin | Wire | Port 1 | Port 2 | Port 3 |', '|---|---|---|---|---|']
             for pin, sig in ((1, 'VBAT'), (2, 'IN1'), (3, 'GND'), (4, 'ANG'), (5, 'EN'), (6, 'IN2')):
-                o.append('| %d %s | %s | %s | %s |' % (pin, {'VBAT': 'battery +', 'ANG': 'angle'}.get(sig, sig),
-                                                     leads['P1 ' + sig], leads['P2 ' + sig], leads['P3 ' + sig]))
+                o.append('| %d %s | %s | %s | %s | %s |' % (pin, {'VBAT': 'battery +', 'ANG': 'angle'}.get(sig, sig),
+                                                          '22 AWG stranded' if sig in ('VBAT', 'GND') else '30 AWG silicone',
+                                                          leads['P1 ' + sig], leads['P2 ' + sig], leads['P3 ' + sig]))
             o += ([''] + ['| Lead | Hole |', '|---|---|', '| USB-C VBUS (+) | %s |' % LEAD['V+'], '| USB-C GND (−) | %s |' % LEAD['V-']]
                   if 'V+' in LEAD else []) + ['']
         else:

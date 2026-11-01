@@ -29,12 +29,12 @@ step does one kind of part, and in its picture that step is in colour while ever
 | Ceramic capacitor 10 µF (106) | 1 | 4 | ceramic capacitor kit |
 | MCP73871 charger board, 30.5 × 31.5 mm, off the board (+ its 16 × 26 mm bulk capacitor) | 1 | 6 | Comimark MCP73871 |
 | NTC thermistor 10 kΩ | 1 | 6 | NTC 10-pack |
-| 22 AWG wire (the white two-conductor, split) | 6 × 6-8 cm | 5 (charger power) | solar extension wire |
+| 22 AWG stranded insulated wire (the white two-conductor, split) | 6 × 6-8 cm + 6 × 5-8 cm | 5 (charger power), 6 (RJ12 battery + / GND) | white 2-conductor 22 AWG |
 | RJ12 breakout board | 3 | 7 (18 leads) | RJ11/RJ12 breakout 4-pack |
 | USB-C breakout (Cermant), with its 6 male pins | 1 | plugs in at the end | USB-C breakout 10-pack |
 | Solar lead (optional) | 1 | 7 (2 leads, optional) | solar panel + extension |
-| 30 AWG insulated wire | 4 pieces | 8 | 30 AWG silicone wire |
-| Bare wire or trimmed resistor legs | 61 bridges + 3 rails | 9, 10 | tinned wire / leg offcuts |
+| 30 AWG silicone stranded insulated wire | 4 + 12 pieces | 8 (board wires), 6 (RJ12 signals) | 30 AWG silicone wire |
+| Bare wire or trimmed resistor legs | 61 bridges + 3 rails | 9, 10 | 22 AWG solid tinned bus wire (to buy, ~0.4 m per board) + leg offcuts |
 | Perfboard 3 × 7 cm (a–j × 1–24) | 1 | all | perfboard kit |
 | 18650 cell with JST-XH plug | 1 | 11 | 18650 cell |
 
@@ -150,7 +150,7 @@ All the header parts at once:
 
 ## Step 5: Charger: prepare it, put JST plugs on its wires (3 plugs)
 
-**You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 6 × 22 AWG wire, 6–8 cm, 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins.
+**You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 6 × 22 AWG stranded insulated wire, 6–8 cm, 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins.
 
 ![step 5](renders/build-step-05.png)
 
@@ -160,12 +160,13 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 ![charger board](renders/build-charger.png)
 
 1. On the bench first: remove the small **103** (10 kΩ) resistor beside the **THERM** label and solder the 10 kΩ NTC's
-   two leads to its pads (the NTC gets taped to the cell later).
+   two leads to its pads (the NTC gets taped to the cell later). If its leads don't reach the cell, extend them with
+   **30 AWG silicone stranded wire** and heat-shrink each joint.
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
    **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
    from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
-3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG** (the white two-conductor wire, split),
-   6–8 cm. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
+3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG stranded insulated wire** (the white
+   two-conductor solar wire, split in two), 6–8 cm each. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
    wires before you start.
 4. **Crimp JST-XH pins** on the other ends and push them into the housings, matching the headers from step 4:
    - **3-pin housing (GND):** PWR − / BATT − / LOAD −, in that order, to match a21 / a22 / a23.
@@ -190,29 +191,32 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 
 ## Step 6: Leads from the RJ12 boards (18)
 
-**You need:** 3 × RJ12 breakout board (6 leads each).
+**You need:** 3 × RJ12 breakout board, 6 × 22 AWG stranded insulated wire, 5–8 cm (battery + and GND), 12 × 30 AWG silicone stranded wire, 5–8 cm (signals).
 
 ![step 6](renders/build-step-06.png)
 
-Solder the 18 leads from the three RJ12 boards (pin 1 = square pad) into the holes in the table. Trim underneath
-to ~1 mm.
+Each RJ12 board connects with 6 leads, 5–8 cm long. Use **22 AWG stranded insulated wire** (the white two-conductor
+wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
+signals (IN1, IN2, EN, angle). Solder each lead to its RJ12 pad (pin 1 = square pad), then into the hole in the table
+from the top. Trim underneath to ~1 mm.
 
-| RJ12 pin | Port 1 | Port 2 | Port 3 |
-|---|---|---|---|
-| 1 battery + | j16 | j17 | j18 |
-| 2 IN1 | f2 | d2 | a10 |
-| 3 GND | a14 | a15 | a16 |
-| 4 angle | b15 | e14 | h15 |
-| 5 EN | d10 | h10 | j10 |
-| 6 IN2 | e2 | h2 | b10 |
+| RJ12 pin | Wire | Port 1 | Port 2 | Port 3 |
+|---|---|---|---|---|
+| 1 battery + | 22 AWG stranded | j16 | j17 | j18 |
+| 2 IN1 | 30 AWG silicone | f2 | d2 | a10 |
+| 3 GND | 22 AWG stranded | a14 | a15 | a16 |
+| 4 angle | 30 AWG silicone | b15 | e14 | h15 |
+| 5 EN | 30 AWG silicone | d10 | h10 | j10 |
+| 6 IN2 | 30 AWG silicone | e2 | h2 | b10 |
 
 ## Step 7: Solar lead (optional)
 
-**You need:** 1 × solar panel lead (2 wires): optional.
+**You need:** 1 × white 22 AWG two-conductor lead to the panel: optional.
 
 ![step 7](renders/build-step-07.png)
 
-**Optional.** Only if this controller gets a solar panel: solder the panel lead's **+ (red) → g23** and **− (black) → a17**
+**Optional.** Only if this controller gets a solar panel. The lead is the **white 22 AWG two-conductor wire** (the
+solar extension, cut to length). Solder its **+ → g23** and **− → a17** (mark the + conductor first)
 (a17 is on the GND rail). Trim underneath.
 
 Without solar, skip it: the board charges over USB-C alone. D2 and the zener from step 2 are only there for the
@@ -225,11 +229,12 @@ solar input, but fit them anyway so a panel can be added later without re-solder
 
 ## Step 8: Insulated wires underneath (4)
 
-**You need:** 4 × 30 AWG insulated wire (cut to length).
+**You need:** 4 × 30 AWG silicone stranded insulated wire (cut to length).
 
 ![step 8](renders/build-step-08.png)
 
-Wires go in **before** the bridges and rails, while their holes are still open. For each wire: cut it a little long,
+All of these are **30 AWG silicone stranded insulated wire**. They go in **before** the bridges and rails, while their
+holes are still open. For each wire: cut it a little long,
 strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Beep each wire out with the
 meter as you go.
 
@@ -242,11 +247,12 @@ meter as you go.
 
 ## Step 9: Bare bridges underneath (61)
 
-**You need:** 61 × short bare wire: the ~32 leg offcuts saved from steps 1-3, the rest cut from bare tinned wire.
+**You need:** 61 × short bare wire: the ~32 leg offcuts saved from steps 1-3, the rest cut from 22 AWG solid tinned bus wire.
 
 ![step 9](renders/build-step-09.png)
 
-A bridge is a short piece of **bare** wire laid across neighbouring pads (a trimmed resistor leg is ideal), soldered at
+A bridge is a short piece of **bare solid wire**: a trimmed resistor or diode leg, or **22 AWG solid tinned copper
+(bus) wire**, laid across neighbouring pads and soldered at
 both ends; don't rely on a solder blob alone. Work one area at a time and check each with the meter: the two ends beep,
 and neither beeps to the pad next to it.
 
@@ -316,11 +322,12 @@ and neither beeps to the pad next to it.
 
 ## Step 10: Rails (3)
 
-**You need:** 3 × bare tinned wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
+**You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
 
 ![step 10](renders/build-step-10.png)
 
-Last: lay straight bare tinned wire for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole it passes. Where two GND rails
+Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole
+it passes. Where two GND rails
 meet at a corner, solder them together there. Then do the checks in step 11.
 
 | From | To | What |

@@ -45,6 +45,7 @@ controllers** (3 + 3 + 2) plus spares. Everything is from Amazon; prices are wha
 | 10 kΩ NTC thermistors, 10 pcs | 1 | 1 per cell (charger THERM: no charging when hot) | [B0F3X2G4D2](https://www.amazon.com/dp/B0F3X2G4D2) | $7.99 | Oct 31 |
 | Double-sided perfboard kit + headers (ALLECIN) | 1 | the 3 controller dev boards | [B0CKZ7GFSK](https://www.amazon.com/dp/B0CKZ7GFSK) | $13.99 | Oct 31 |
 | 30 AWG silicone stranded wire, 6 colours (TUOFENG) | 1 | point-to-point wiring, tilter leads | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) | $16.29 | Oct 31 |
+| **22 AWG solid tinned copper bus wire, bare (not ordered yet)** | 1 roll | dev-board bridges and rails: ~0.4 m per board | search "22 AWG tinned bus wire solid" | | |
 | **JST-XH 2.5 mm connector kit (not ordered yet)**: per controller 3 × 2-pin top-entry headers, 1 × 3-pin right-angle header, 2 × 2-pin + 1 × 3-pin housings, 6 crimp pins (crimper needed) | 1 | battery and charger plug into the dev board ([guide](../docs/dev-board-build.md)) | search "JST XH 2.54 kit right angle" | | |
 | Heat-shrink kit, 580 pcs (Ginsco) | 1 | splices | [B01MFA3OFA](https://www.amazon.com/dp/B01MFA3OFA) | $7.99 | Oct 30 |
 | USB-C power meter (YEREADW) | 1 | bench: charge and motor current | [B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC) | $16.97 | Oct 31 |

@@ -449,6 +449,6 @@
 <line x1="430" y1="90" x2="430" y2="330" stroke="#222222" stroke-width="6" stroke-linecap="round"/>
 <line x1="430" y1="90" x2="760" y2="90" stroke="#222222" stroke-width="6" stroke-linecap="round"/>
 <line x1="370" y1="360" x2="760" y2="360" stroke="#d62728" stroke-width="6" stroke-linecap="round"/>
-<text x="30" y="447" font-size="13" fill="#222">You need: 3 × bare tinned wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm</text>
 <text x="30" y="467" font-size="13" fill="#222">Solder each rail at every hole it passes, including the ones that already have wires or leads.</text>
 </svg>

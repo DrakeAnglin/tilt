@@ -465,6 +465,6 @@
 <text x="730" y="169" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">Sol+</text>
 <circle cx="550" cy="360" r="5" fill="#222222"/>
 <text x="550" y="349" font-size="8" fill="#222222" text-anchor="middle" font-weight="bold">Sol−</text>
-<text x="30" y="447" font-size="13" fill="#222">You need: 1 × solar panel lead (2 wires): optional</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 1 × white 22 AWG two-conductor lead to the panel: optional</text>
 <text x="30" y="467" font-size="13" fill="#222">Skip this step for USB-C charging only. You can add it later: the holes stay free.</text>
 </svg>
