@@ -151,7 +151,7 @@ All the header parts at once:
 
 ## Step 5: Insulated wires underneath (4)
 
-**You need:** 4 × 30 AWG silicone stranded insulated wire (cut to length).
+**You need:** 4 × 30 AWG silicone stranded insulated wire: 1 black, 1 red, 2 white.
 
 ![step 5](renders/build-step-05.png)
 
@@ -162,76 +162,83 @@ meter as you go.
 
 | From | To | What |
 |---|---|---|
-| b2 | a13 | ESP GND -> GND rail (under the ESP) |
-| i19 | a2 | D3 cathode -> ESP 5V (under the ESP) |
-| h19 | f10 | divider node -> GPIO3 |
-| d16 | i10 | input-power sense -> GPIO6 |
+| b2 | a13 | **black**: ESP GND -> GND rail (under the ESP) |
+| i19 | a2 | **red**: D3 cathode -> ESP 5V (under the ESP) |
+| h19 | f10 | **white**: divider node -> GPIO3 |
+| d16 | i10 | **white**: input-power sense -> GPIO6 |
 
 ## Step 6: RJ12 port 1 (6 leads)
 
-**You need:** 1 × RJ12 breakout board, 2 × 22 AWG stranded insulated wire, 5–8 cm (battery +, GND), 4 × 30 AWG silicone stranded wire, 5–8 cm (IN1, IN2, EN, angle).
+**You need:** 1 × RJ12 breakout board, 22 AWG stranded, 5–8 cm: 1 red (battery +), 1 black (GND), 30 AWG silicone, 5–8 cm: 1 each green (IN1), yellow (IN2), blue (EN), white (angle).
 
 ![step 6](renders/build-step-06.png)
 
 Solder 6 leads, 5–8 cm long, to port 1's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.
+signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
+**black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
+underneath, trim to ~1 mm.
 
 | RJ12 pin | Wire | Hole |
 |---|---|---|
-| 1 battery + | 22 AWG stranded | j16 |
-| 2 IN1 | 30 AWG silicone | f2 |
-| 3 GND | 22 AWG stranded | a14 |
-| 4 angle | 30 AWG silicone | b15 |
-| 5 EN | 30 AWG silicone | d10 |
-| 6 IN2 | 30 AWG silicone | e2 |
+| 1 battery + | **red**, 22 AWG stranded | j16 |
+| 2 IN1 | **green**, 30 AWG silicone | f2 |
+| 3 GND | **black**, 22 AWG stranded | a14 |
+| 4 angle | **white**, 30 AWG silicone | b15 |
+| 5 EN | **blue**, 30 AWG silicone | d10 |
+| 6 IN2 | **yellow**, 30 AWG silicone | e2 |
 
 ## Step 7: RJ12 port 2 (6 leads)
 
-**You need:** 1 × RJ12 breakout board, 2 × 22 AWG stranded insulated wire, 5–8 cm (battery +, GND), 4 × 30 AWG silicone stranded wire, 5–8 cm (IN1, IN2, EN, angle).
+**You need:** 1 × RJ12 breakout board, 22 AWG stranded, 5–8 cm: 1 red (battery +), 1 black (GND), 30 AWG silicone, 5–8 cm: 1 each green (IN1), yellow (IN2), blue (EN), white (angle).
 
 ![step 7](renders/build-step-07.png)
 
 Solder 6 leads, 5–8 cm long, to port 2's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.
+signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
+**black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
+underneath, trim to ~1 mm.
 
 | RJ12 pin | Wire | Hole |
 |---|---|---|
-| 1 battery + | 22 AWG stranded | j17 |
-| 2 IN1 | 30 AWG silicone | d2 |
-| 3 GND | 22 AWG stranded | a15 |
-| 4 angle | 30 AWG silicone | e14 |
-| 5 EN | 30 AWG silicone | h10 |
-| 6 IN2 | 30 AWG silicone | h2 |
+| 1 battery + | **red**, 22 AWG stranded | j17 |
+| 2 IN1 | **green**, 30 AWG silicone | d2 |
+| 3 GND | **black**, 22 AWG stranded | a15 |
+| 4 angle | **white**, 30 AWG silicone | e14 |
+| 5 EN | **blue**, 30 AWG silicone | h10 |
+| 6 IN2 | **yellow**, 30 AWG silicone | h2 |
 
 ## Step 8: RJ12 port 3 (6 leads): only if this controller drives 3 blinds
 
-**You need:** 1 × RJ12 breakout board, 2 × 22 AWG stranded insulated wire, 5–8 cm (battery +, GND), 4 × 30 AWG silicone stranded wire, 5–8 cm (IN1, IN2, EN, angle).
+**You need:** 1 × RJ12 breakout board, 22 AWG stranded, 5–8 cm: 1 red (battery +), 1 black (GND), 30 AWG silicone, 5–8 cm: 1 each green (IN1), yellow (IN2), blue (EN), white (angle).
 
 ![step 8](renders/build-step-08.png)
 
 **Optional:** skip this step on the controller that only drives 2 blinds; the holes stay free for later. Solder 6 leads, 5–8 cm long, to port 3's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.
+signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
+**black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
+underneath, trim to ~1 mm.
 
 | RJ12 pin | Wire | Hole |
 |---|---|---|
-| 1 battery + | 22 AWG stranded | j18 |
-| 2 IN1 | 30 AWG silicone | a10 |
-| 3 GND | 22 AWG stranded | a16 |
-| 4 angle | 30 AWG silicone | h15 |
-| 5 EN | 30 AWG silicone | j10 |
-| 6 IN2 | 30 AWG silicone | b10 |
+| 1 battery + | **red**, 22 AWG stranded | j18 |
+| 2 IN1 | **green**, 30 AWG silicone | a10 |
+| 3 GND | **black**, 22 AWG stranded | a16 |
+| 4 angle | **white**, 30 AWG silicone | h15 |
+| 5 EN | **blue**, 30 AWG silicone | j10 |
+| 6 IN2 | **yellow**, 30 AWG silicone | b10 |
 
 ## Step 9: Solar lead (optional)
 
-**You need:** 1 × white 22 AWG two-conductor lead to the panel: optional.
+**You need:** 1 × 22 AWG two-conductor lead to the panel, + red / − black (mark the white wire): optional.
 
 ![step 9](renders/build-step-09.png)
 
 **Optional.** Only if this controller gets a solar panel. The lead is the **white 22 AWG two-conductor wire** (the
-solar extension, cut to length). Solder its **+ → g23** and **− → a17** (mark the + conductor first)
+solar extension, cut to length): band the + conductor **red** and the − **black** with heat-shrink at both ends. Solder its
+**+ (red) → g23** and **− (black) → a17**
 (a17 is on the GND rail). Trim underneath.
 
 Without solar, skip it: the board charges over USB-C alone. D2 and the zener from step 2 are only there for the
@@ -335,7 +342,7 @@ meet at a corner, solder them together there. Then the charger plugs (step 12) a
 
 ## Step 12: Charger: prepare it, put JST plugs on its wires (3 plugs)
 
-**You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 6 × 22 AWG stranded insulated wire, 6–8 cm, 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins.
+**You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 22 AWG stranded, 6–8 cm: 3 red (+), 3 black (−), 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins.
 
 ![step 12](renders/build-step-12.png)
 
@@ -350,8 +357,9 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
    **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
    from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
-3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG stranded insulated wire** (the white
-   two-conductor solar wire, split in two), 6–8 cm each. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
+3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG stranded insulated wire**, 6–8 cm each:
+   **red for the three + wires, black for the three − wires** (or the white two-conductor wire with a red / black
+   heat-shrink band at both ends). Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
    wires before you start.
 4. **Crimp JST-XH pins** on the other ends and push them into the housings, matching the headers from step 4:
    - **3-pin housing (GND):** PWR − / BATT − / LOAD −, in that order, to match a21 / a22 / a23.

@@ -32,6 +32,20 @@ W = int(MX * 2 + S * (M.NI - 1) + 360)
 HGT = int(MY + S * (M.NM - 1) + 160)
 
 NET_COL = {'GND': '#222222', 'VBAT': '#d62728', '5V': '#ff7f0e', '3V3': '#9467bd', 'sig': '#1f77b4'}
+# Insulated wire colours, the same on every connector: power red, GND black, RJ12 signals green / yellow / blue / white.
+WIRE = {'VBAT': 'red', 'GND': 'black', 'IN1': 'green', 'IN2': 'yellow', 'EN': 'blue', 'ANG': 'white'}
+HEX = {'red': '#d62728', 'black': '#222222', 'green': '#2ca02c', 'yellow': '#e8c31a', 'blue': '#1f77b4', 'white': '#ffffff'}
+BARE = '#9aa3a8'                                       # bridges and rails: bare tinned wire
+
+
+def wire_colour(note):
+    """Colour of an insulated board wire from its note: 5V red, GND black, the two sense wires white."""
+    n = note.lower()
+    return 'red' if '5v' in n else 'black' if 'gnd' in n else 'white'
+
+
+def stroke(c):
+    return ' stroke="#555" stroke-width="1"' if c == 'white' else ''
 PARTS = {p.name: p for p in M.layout()}
 
 
@@ -343,22 +357,26 @@ def port_drawer(k):
     def draw(o):
         x_rj = MX + S * (M.NI - 1) + 120
         y0 = MY + S * 1.2
-        o.append('<rect x="%.0f" y="%.0f" width="150" height="%.0f" rx="6" fill="#2b6cb0" opacity="0.9"/>' % (x_rj - 20, y0 - 40, 6 * 34 + 60))
+        o.append('<rect x="%.0f" y="%.0f" width="190" height="%.0f" rx="6" fill="#2b6cb0" opacity="0.9"/>' % (x_rj - 20, y0 - 40, 6 * 34 + 60))
         o.append('<text x="%.0f" y="%.0f" font-size="13" fill="#fff" font-weight="bold">RJ12 board, port %d</text>' % (x_rj - 10, y0 - 18, k))
-        o.append('<rect x="%.0f" y="%.0f" width="56" height="%.0f" rx="4" fill="#ddd" stroke="#666"/>' % (x_rj + 62, y0 + 10, 6 * 34 - 30))
-        o.append('<text x="%.0f" y="%.0f" font-size="11" text-anchor="middle" font-weight="bold">jack</text>' % (x_rj + 90, y0 + 6 * 17))
+        o.append('<rect x="%.0f" y="%.0f" width="40" height="%.0f" rx="4" fill="#ddd" stroke="#666"/>' % (x_rj + 124, y0 + 10, 6 * 34 - 30))
+        o.append('<text x="%.0f" y="%.0f" font-size="10" text-anchor="middle" font-weight="bold">jack</text>' % (x_rj + 144, y0 + 6 * 17))
         for i, m, lab in [pn for pn in PARTS['Port leads'].pins if pn[2].startswith('P%d ' % k)]:
             sig = lab.split()[1]
             n = RJ_PIN[sig]
             px, py = x_rj, y0 + (n - 1) * 34
             hx, hy = pos(HN(i, m))
-            c = NET_COL['VBAT'] if sig == 'VBAT' else NET_COL['GND'] if sig == 'GND' else NET_COL['sig']
-            o.append('<path d="M%.0f %.0f C%.0f %.0f %.0f %.0f %.0f %.0f" fill="none" stroke="%s" stroke-width="%s" stroke-dasharray="6,3" opacity="0.85"/>' % (
-                px, py, px - 80, py, hx + 60, hy, hx, hy, c, '3' if sig in ('VBAT', 'GND') else '2'))
+            cn = WIRE[sig]
+            c = HEX[cn]
+            if cn == 'white':
+                o.append('<path d="M%.0f %.0f C%.0f %.0f %.0f %.0f %.0f %.0f" fill="none" stroke="#555" stroke-width="4.5"/>' % (
+                    px, py, px - 80, py, hx + 60, hy, hx, hy))
+            o.append('<path d="M%.0f %.0f C%.0f %.0f %.0f %.0f %.0f %.0f" fill="none" stroke="%s" stroke-width="3"/>' % (
+                px, py, px - 80, py, hx + 60, hy, hx, hy, c))
             o.append('<rect x="%.0f" y="%.0f" width="14" height="14" fill="#e0b040"%s/>' % (px - 7, py - 7, ' stroke="#000"' if n == 1 else ''))
-            o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#fff" font-weight="bold">%d %s</text>' % (px + 12, py + 4, n, RJ_NAME[sig]))
-            dot(o, HN(i, m), c, r=6)
-            label(o, HN(i, m), 'pin %d' % n, dy=edge_dy(HN(i, m), False), color=c, size=9)
+            o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#fff" font-weight="bold">%d %s (%s)</text>' % (px + 12, py + 4, n, RJ_NAME[sig], cn))
+            o.append('<circle cx="%.0f" cy="%.0f" r="6" fill="%s"%s/>' % (hx, hy, c, stroke(cn)))
+            label(o, HN(i, m), 'pin %d' % n, dy=edge_dy(HN(i, m), False), color=c if cn != 'white' else '#555', size=9)
     return draw
 
 
@@ -371,15 +389,11 @@ def draw_leads(o, which=('Port leads', 'USB leads'), prefix=''):
         for i, m, lab in [pn for pn in PARTS[n].pins if pn[2].startswith(prefix)]:
             h = HN(i, m)
             sig = lab.split()[-1]
-            if sig == 'VBAT' or lab in ('V+', 'S+'):
-                c = NET_COL['VBAT']
-            elif sig == 'GND' or lab in ('V-', 'S-'):
-                c = NET_COL['GND']
-            else:
-                c = NET_COL['sig']
-            dot(o, h, c, r=5)
+            cn = 'red' if lab in ('V+', 'S+') else 'black' if lab in ('V-', 'S-') else WIRE.get(sig, 'blue')
+            c = HEX[cn]
+            o.append('<circle cx="%.0f" cy="%.0f" r="5" fill="%s"%s/>' % (pos(h)[0], pos(h)[1], c, stroke(cn)))
             txt = {'V+': 'USB+', 'V-': 'USB−', 'S+': 'Sol+', 'S-': 'Sol−'}.get(lab, lab.replace(' VBAT', '+').replace(' GND', '−'))
-            label(o, h, txt, dy=edge_dy(h, False), color=c, size=8)
+            label(o, h, txt, dy=edge_dy(h, False), color=c if cn != 'white' else '#555', size=8)
 
 
 def net_colour(note):
@@ -409,15 +423,20 @@ def draw_under(o, which):
     for f, t, note in wires_of(which):
         col = net_colour(note)
         (x0, y0), (x1, y1) = pos(f, True), pos(t, True)
-        if which == 'wire':
+        if which == 'wire':                              # insulated wire, drawn in its real colour
+            cn = wire_colour(note)
             mx, my = (x0 + x1) / 2, (y0 + y1) / 2 - 14
-            o.append('<path d="M%.0f %.0f Q%.0f %.0f %.0f %.0f" fill="none" stroke="%s" stroke-width="2.5" stroke-dasharray="7,3"/>' % (
-                x0, y0, mx, my, x1, y1, col))
+            if cn == 'white':
+                o.append('<path d="M%.0f %.0f Q%.0f %.0f %.0f %.0f" fill="none" stroke="#555" stroke-width="4.5"/>' % (x0, y0, mx, my, x1, y1))
+            o.append('<path d="M%.0f %.0f Q%.0f %.0f %.0f %.0f" fill="none" stroke="%s" stroke-width="3"/>' % (x0, y0, mx, my, x1, y1, HEX[cn]))
             for x, y in ((x0, y0), (x1, y1)):
-                o.append('<circle cx="%.0f" cy="%.0f" r="3.5" fill="%s"/>' % (x, y, col))
-        else:
+                o.append('<circle cx="%.0f" cy="%.0f" r="4" fill="%s"%s/>' % (x, y, HEX[cn], stroke(cn)))
+        else:                                            # bare wire (silver), with a thin stripe showing which net it joins
+            w = 7 if which == 'rail' else 5
             o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="%d" stroke-linecap="round"/>' % (
-                x0, y0, x1, y1, col, 6 if which == 'rail' else 4))
+                x0, y0, x1, y1, BARE, w))
+            o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="1.6" stroke-linecap="round"/>' % (
+                x0, y0, x1, y1, col))
 
 
 def draw_pins_under(o, done=None):
@@ -555,8 +574,9 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
    **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
    from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
-3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG stranded insulated wire** (the white
-   two-conductor solar wire, split in two), 6–8 cm each. Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
+3. **Power wires (they carry the battery and motor current): 6 pieces of 22 AWG stranded insulated wire**, 6–8 cm each:
+   **red for the three + wires, black for the three − wires** (or the white two-conductor wire with a red / black
+   heat-shrink band at both ends). Solder one end of each to the charger's PWR +, PWR −, BATT +, BATT −, LOAD + and LOAD − holes. Mark the +
    wires before you start.
 4. **Crimp JST-XH pins** on the other ends and push them into the housings, matching the headers from step §sockets§:
    - **3-pin housing (GND):** PWR − / BATT − / LOAD −, in that order, to match a21 / a22 / a23.
@@ -574,19 +594,22 @@ for _k in (1, 2, 3):
     step('port%d' % _k, 'RJ12 port %d (6 leads)%s' % (_k, ': only if this controller drives 3 blinds' if _k == 3 else ''), 'top',
          [port_drawer(_k)],
          'Top side. Port %d\'s six leads go in from the top. Pin 1 is the square pad on the RJ12 board.' % _k,
-         ['RJ12 pads 1-6 as printed on the board (1 = square pad). Red = battery +, black = GND (22 AWG); blue = signals (30 AWG).',
+         ['RJ12 pads 1-6 as printed (1 = square pad). Colours, the same on every port: 1 red, 2 green, 3 black, 4 white, 5 blue, 6 yellow.',
           'The RJ12 board is drawn on the right for room: in the box the jacks sit at the row-1 end, so run the leads that way.'],
          ("""%sSolder 6 leads, 5–8 cm long, to port %d's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.""" % (
+signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
+**black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
+underneath, trim to ~1 mm.""" % (
              '**Optional:** skip this step on the controller that only drives 2 blinds; the holes stay free for later. ' if _k == 3 else '', _k)),
-         [('%d %s' % (pin, name), '22 AWG stranded' if sig in ('VBAT', 'GND') else '30 AWG silicone', PORT_LEAD['P%d %s' % (_k, sig)])
-          for pin, sig, name in PORT_PINS])
+         [('%d %s' % (pin, name), '**%s**, %s' % (WIRE[sig], '22 AWG stranded' if sig in ('VBAT', 'GND') else '30 AWG silicone'),
+           PORT_LEAD['P%d %s' % (_k, sig)]) for pin, sig, name in PORT_PINS])
 step('solar', 'Solar lead (optional)', 'top', [draw_solar],
      'Top side. Only if you use a solar panel: its lead goes in from the top.',
      ['Skip this step for USB-C charging only. You can add it later: the holes stay free.'],
      """**Optional.** Only if this controller gets a solar panel. The lead is the **white 22 AWG two-conductor wire** (the
-solar extension, cut to length). Solder its **+ → %s** and **− → %s** (mark the + conductor first)
+solar extension, cut to length): band the + conductor **red** and the − **black** with heat-shrink at both ends. Solder its
+**+ (red) → %s** and **− (black) → %s**
 (%s is on the GND rail). Trim underneath.
 
 Without solar, skip it: the board charges over USB-C alone. D2 and the zener from step §diodes§ are only there for the
@@ -594,15 +617,15 @@ solar input, but fit them anyway so a panel can be added later without re-solder
      [('Solar +', LEAD['S+'], 'to D2\'s anode (bridge in step §bridges§)'), ('Solar −', LEAD['S-'], 'GND rail')])
 step('wires', 'Insulated wires underneath (%d)' % len(wires_of('wire')), 'bottom', [draw_under, 'wire'],
      'Bottom view: flip the board over its long edge, row 1 still on the left, column a now at the TOP. Grey = done already.',
-     ['Dashed = 30 AWG silicone stranded insulated wire, dots = its two ends. Colours: black GND, orange 5V, blue signal.'],
+     ['Drawn in the wire colours: red 5V, black GND, white the two sense wires. Dots = each wire\'s two ends.'],
      """All of these are **30 AWG silicone stranded insulated wire**. They go in **before** the bridges and rails, while their
 holes are still open. For each wire: cut it a little long,
 strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Beep each wire out with the
 meter as you go.""",
-     what(wires_of('wire')))
+     [(f, t, '**%s**: %s' % (wire_colour(n), n.split(': ', 1)[1])) for f, t, n in wires_of('wire')])
 step('bridges', 'Bare bridges underneath (%d)' % len(wires_of('bridge')), 'bottom', [draw_under, 'bridge'],
      'Bottom view. Each bridge joins two neighbouring holes in a straight line.',
-     ['Use trimmed resistor / diode legs or 22 AWG solid tinned bare wire, laid flat across the pads, soldered at both ends.'],
+     ['Silver = bare wire (trimmed legs or 22 AWG solid tinned); the thin stripe shows which net it joins. Solder both ends.'],
      """A bridge is a short piece of **bare solid wire**: a trimmed resistor or diode leg, or **22 AWG solid tinned copper
 (bus) wire**, laid across neighbouring pads and soldered at
 both ends; don't rely on a solder blob alone. Work one area at a time and check each with the meter: the two ends beep,
@@ -636,11 +659,13 @@ def need():
                    ['1 × %d-way female header socket (cut from a strip)' % u for u in usb_pins] +
                    ['3 × JST-XH 2-pin top-entry header', '1 × JST-XH 3-pin right-angle header'],
         'charger': ['1 × MCP73871 charger board (+ its bulk capacitor)', '1 × 10 kΩ NTC thermistor',
-                    '6 × 22 AWG stranded insulated wire, 6–8 cm', '1 × JST-XH 3-pin housing', '2 × JST-XH 2-pin housing', '6 × JST-XH crimp pins'],
-        'port1': ['1 × RJ12 breakout board', '2 × 22 AWG stranded insulated wire, 5–8 cm (battery +, GND)',
-                  '4 × 30 AWG silicone stranded wire, 5–8 cm (IN1, IN2, EN, angle)'],
-        'solar': ['1 × white 22 AWG two-conductor lead to the panel: optional'],
-        'wires': ['%d × 30 AWG silicone stranded insulated wire (cut to length)' % len(wires_of('wire'))],
+                    '22 AWG stranded, 6–8 cm: 3 red (+), 3 black (−)', '1 × JST-XH 3-pin housing', '2 × JST-XH 2-pin housing', '6 × JST-XH crimp pins'],
+        'port1': ['1 × RJ12 breakout board', '22 AWG stranded, 5–8 cm: 1 red (battery +), 1 black (GND)',
+                  '30 AWG silicone, 5–8 cm: 1 each green (IN1), yellow (IN2), blue (EN), white (angle)'],
+        'solar': ['1 × 22 AWG two-conductor lead to the panel, + red / − black (mark the white wire): optional'],
+        'wires': ['%d × 30 AWG silicone stranded insulated wire: %s' % (len(wires_of('wire')), ', '.join(
+            '%d %s' % (n, c) for c, n in sorted({wire_colour(w[2]): sum(1 for q in wires_of('wire') if wire_colour(q[2]) == wire_colour(w[2]))
+                                                 for w in wires_of('wire')}.items())))],
         'bridges': ['%d × short bare wire: the ~%d leg offcuts saved from steps 1-3, the rest cut from 22 AWG solid tinned bus wire' % (
             len(wires_of('bridge')), 2 * (len(RES) + len(DIODES) + len(CAPS)))],
         'rails': ['%d × 22 AWG solid tinned bus wire: %s' % (len(RAILS), '; '.join(rail_mm))],
@@ -720,11 +745,17 @@ def render_done():
     draw_pins_under(o)
     for k in ('wire', 'bridge', 'rail'):
         draw_under(o, k)
-    lx, ly = MX - 40, HGT - 60
-    for k, (t, c) in enumerate((('GND', NET_COL['GND']), ('battery +', NET_COL['VBAT']), ('5V', NET_COL['5V']),
-                                ('3V3', NET_COL['3V3']), ('signal', NET_COL['sig']))):
-        o.append('<rect x="%d" y="%.0f" width="18" height="6" fill="%s"/><text x="%d" y="%.0f" font-size="12">%s</text>' % (
-            lx + k * 150, ly, c, lx + k * 150 + 24, ly + 7, t))
+    lx, ly = MX - 40, HGT - 70
+    o.append('<text x="%d" y="%.0f" font-size="12" font-weight="bold">Insulated wires (their real colour):</text>' % (lx, ly))
+    for k, (t, c) in enumerate((('red: 5V', 'red'), ('black: GND', 'black'), ('white: sense', 'white'))):
+        o.append('<rect x="%d" y="%.0f" width="18" height="6" fill="%s"%s/><text x="%d" y="%.0f" font-size="12">%s</text>' % (
+            lx + 230 + k * 120, ly - 7, HEX[c], stroke(c), lx + 254 + k * 120, ly, t))
+    ly += 24
+    o.append('<text x="%d" y="%.0f" font-size="12" font-weight="bold">Bare bridges and rails (silver), stripe = net:</text>' % (lx, ly))
+    for k, (t, c) in enumerate((('GND', NET_COL['GND']), ('battery +', NET_COL['VBAT']), ('5V', NET_COL['5V']), ('signal', NET_COL['sig']))):
+        o.append('<rect x="%d" y="%.0f" width="18" height="7" fill="%s"/><rect x="%d" y="%.0f" width="18" height="2" fill="%s"/>'
+                 '<text x="%d" y="%.0f" font-size="12">%s</text>' % (lx + 290 + k * 110, ly - 8, BARE, lx + 290 + k * 110, ly - 5.5, c,
+                                                                     lx + 314 + k * 110, ly, t))
     finish(o, PRE + 'done-under.svg')
     return [PRE + 'done-top.svg', PRE + 'done-under.svg']
 

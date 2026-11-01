@@ -353,18 +353,20 @@
 <circle cx="640" cy="360" r="5" fill="#8a8a8a"/>
 <circle cx="730" cy="90" r="5" fill="#8a8a8a"/>
 </g>
-<path d="M100 120 Q265 91 430 90" fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7,3"/>
-<circle cx="100" cy="120" r="3.5" fill="#222222"/>
-<circle cx="430" cy="90" r="3.5" fill="#222222"/>
-<path d="M610 330 Q355 196 100 90" fill="none" stroke="#ff7f0e" stroke-width="2.5" stroke-dasharray="7,3"/>
-<circle cx="610" cy="330" r="3.5" fill="#ff7f0e"/>
-<circle cx="100" cy="90" r="3.5" fill="#ff7f0e"/>
-<path d="M610 300 Q475 256 340 240" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
-<circle cx="610" cy="300" r="3.5" fill="#1f77b4"/>
-<circle cx="340" cy="240" r="3.5" fill="#1f77b4"/>
-<path d="M520 180 Q430 241 340 330" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
-<circle cx="520" cy="180" r="3.5" fill="#1f77b4"/>
-<circle cx="340" cy="330" r="3.5" fill="#1f77b4"/>
-<text x="30" y="447" font-size="13" fill="#222">You need: 4 × 30 AWG silicone stranded insulated wire (cut to length)</text>
-<text x="30" y="467" font-size="13" fill="#222">Dashed = 30 AWG silicone stranded insulated wire, dots = its two ends. Colours: black GND, orange 5V, blue signal.</text>
+<path d="M100 120 Q265 91 430 90" fill="none" stroke="#222222" stroke-width="3"/>
+<circle cx="100" cy="120" r="4" fill="#222222"/>
+<circle cx="430" cy="90" r="4" fill="#222222"/>
+<path d="M610 330 Q355 196 100 90" fill="none" stroke="#d62728" stroke-width="3"/>
+<circle cx="610" cy="330" r="4" fill="#d62728"/>
+<circle cx="100" cy="90" r="4" fill="#d62728"/>
+<path d="M610 300 Q475 256 340 240" fill="none" stroke="#555" stroke-width="4.5"/>
+<path d="M610 300 Q475 256 340 240" fill="none" stroke="#ffffff" stroke-width="3"/>
+<circle cx="610" cy="300" r="4" fill="#ffffff" stroke="#555" stroke-width="1"/>
+<circle cx="340" cy="240" r="4" fill="#ffffff" stroke="#555" stroke-width="1"/>
+<path d="M520 180 Q430 241 340 330" fill="none" stroke="#555" stroke-width="4.5"/>
+<path d="M520 180 Q430 241 340 330" fill="none" stroke="#ffffff" stroke-width="3"/>
+<circle cx="520" cy="180" r="4" fill="#ffffff" stroke="#555" stroke-width="1"/>
+<circle cx="340" cy="330" r="4" fill="#ffffff" stroke="#555" stroke-width="1"/>
+<text x="30" y="447" font-size="13" fill="#222">You need: 4 × 30 AWG silicone stranded insulated wire: 1 black, 1 red, 2 white</text>
+<text x="30" y="467" font-size="13" fill="#222">Drawn in the wire colours: red 5V, black GND, white the two sense wires. Dots = each wire's two ends.</text>
 </svg>
