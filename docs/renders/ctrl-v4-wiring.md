@@ -7,7 +7,6 @@ Step-by-step guide with pictures and which parts have a direction: [dev-board-bu
 | Part | Holes | Note |
 |---|---|---|
 | C 10u | j1 (5V), i2 (G) |  |
-| R stat 10k | j3, j4 |  |
 | D3 1N5819 | j5 (K), j6 (A) |  |
 | R div top 1M | j7, j8 |  |
 | R div bot 1M | j9, i9 |  |
@@ -18,6 +17,8 @@ Step-by-step guide with pictures and which parts have a direction: [dev-board-bu
 | C ADC2 100n | d14, f14 |  |
 | R ADC3 1k | f12, g12 |  |
 | C ADC3 100n | g14, i14 |  |
+| R pwr top 1M | g22, g21 |  |
+| R pwr bot 1M | g20, g19 |  |
 | D1 1N5819 USB | e23 (A), d23 (K) |  |
 | D2 1N5819 solar | h23 (A), g23 (K) |  |
 | Z 6.2V | f24 (A), f23 (K) |  |
@@ -41,7 +42,7 @@ pins + jumper at j5-j6 instead of D3 (zero drop; pull the jumper before plugging
 |---|---|---|---|---|---|
 | P1 IN1 | i6 | P2 IN1 | i4 | P3 IN1 | a1 |
 | P1 IN2 | i5 | P2 IN2 | i8 | P3 IN2 | a2 |
-| P1 EN | a7 | P2 EN | a8 | P3 EN | a9 |
+| P1 EN | a7 | P2 EN | a8 | P3 EN | a10 |
 | P1 ANG | b11 | P2 ANG | d11 | P3 ANG | f11 |
 | P1 VBAT | j15 | P2 VBAT | j16 | P3 VBAT | j17 |
 | P1 GND | a15 | P2 GND | a16 | P3 GND | a17 |
@@ -62,17 +63,19 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 | a6 | b6 | bridge: battery divider -> GPIO3 |
 | a7 | b7 | bridge: port 1 EN -> GPIO4 |
 | a8 | b8 | bridge: port 2 EN -> GPIO5 |
-| a9 | b9 | bridge: port 3 EN -> GPIO6 |
-| a10 | b10 | bridge: charger STAT -> GPIO7 |
+| a9 | b9 | bridge: input-power sense -> GPIO6 |
+| a10 | b10 | bridge: port 3 EN -> GPIO7 |
 | h1 | j1 | bridge (over i1): ESP 5V -> C 10u |
 | h2 | j2 | bridge (over i2): ESP GND -> C 10u |
-| h3 | j3 | bridge (over i3): ESP 3V3 -> R stat |
 | h4 | i4 | bridge: port 2 IN1 -> GPIO20 |
 | h5 | i5 | bridge: port 1 IN2 -> GPIO19 |
 | h6 | i6 | bridge: port 1 IN1 -> GPIO18 |
 | h8 | i8 | bridge: port 2 IN2 -> GPIO14 |
 | j2 | a12 | wire: ESP GND -> GND rail |
-| j4 | a10 | wire: R stat -> STAT / GPIO7 |
+| g23 | g22 | bridge: PWR node -> R pwr top |
+| g21 | g20 | bridge: input-power sense node |
+| g21 | a9 | wire: input-power sense -> GPIO6 |
+| g19 | a19 | wire: R pwr bot -> GND rail |
 | j5 | j1 | wire: D3 cathode -> ESP 5V (straight along column j) |
 | j6 | j7 | bridge: D3 anode -> R div top (VBAT) |
 | j6 | j13 | wire: D3 anode -> VBAT rail (straight along column j) |
@@ -115,5 +118,5 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 | BATT - | a21 | GND rail |
 | LOAD + (output) | j20 | VBAT rail (22 AWG pair with LOAD -) |
 | LOAD - | a22 | GND rail |
-| STAT | a10 | GPIO7 (pulled up by R stat); 30 AWG |
-| THERM | (NTC) | remove the board's THERM resistor; NTC from THERM to GND, taped to the cell |
+| THERM | (NTC) | remove the 103 (10 k) resistor beside the THERM label; NTC across its two pads, taped to the cell |
+| CE, TE, PROG2, SEL (edge pads) | - | leave unconnected (board defaults); the board has no STAT pad, status is on its LEDs |

@@ -300,8 +300,6 @@
 <circle cx="340" cy="300" r="5" fill="#8a8a8a"/>
 <circle cx="70" cy="360" r="5" fill="#8a8a8a"/>
 <circle cx="100" cy="330" r="5" fill="#8a8a8a"/>
-<circle cx="130" cy="360" r="5" fill="#8a8a8a"/>
-<circle cx="160" cy="360" r="5" fill="#8a8a8a"/>
 <circle cx="190" cy="360" r="5" fill="#8a8a8a"/>
 <circle cx="220" cy="360" r="5" fill="#8a8a8a"/>
 <circle cx="250" cy="360" r="5" fill="#8a8a8a"/>
@@ -322,6 +320,10 @@
 <circle cx="400" cy="270" r="5" fill="#8a8a8a"/>
 <circle cx="460" cy="270" r="5" fill="#8a8a8a"/>
 <circle cx="460" cy="330" r="5" fill="#8a8a8a"/>
+<circle cx="700" cy="270" r="5" fill="#8a8a8a"/>
+<circle cx="670" cy="270" r="5" fill="#8a8a8a"/>
+<circle cx="640" cy="270" r="5" fill="#8a8a8a"/>
+<circle cx="610" cy="270" r="5" fill="#8a8a8a"/>
 <circle cx="730" cy="210" r="5" fill="#8a8a8a"/>
 <circle cx="730" cy="180" r="5" fill="#8a8a8a"/>
 <circle cx="730" cy="300" r="5" fill="#8a8a8a"/>
@@ -342,7 +344,7 @@
 <circle cx="280" cy="330" r="5" fill="#8a8a8a"/>
 <circle cx="250" cy="90" r="5" fill="#8a8a8a"/>
 <circle cx="280" cy="90" r="5" fill="#8a8a8a"/>
-<circle cx="310" cy="90" r="5" fill="#8a8a8a"/>
+<circle cx="340" cy="90" r="5" fill="#8a8a8a"/>
 <circle cx="370" cy="120" r="5" fill="#8a8a8a"/>
 <circle cx="370" cy="180" r="5" fill="#8a8a8a"/>
 <circle cx="370" cy="240" r="5" fill="#8a8a8a"/>
@@ -358,13 +360,15 @@
 <circle cx="670" cy="90" r="5" fill="#8a8a8a"/>
 <circle cx="640" cy="360" r="5" fill="#8a8a8a"/>
 <circle cx="700" cy="90" r="5" fill="#8a8a8a"/>
-<circle cx="340" cy="90" r="5" fill="#8a8a8a"/>
 <path d="M100 360 Q250 211 400 90" fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7,3"/>
 <circle cx="100" cy="360" r="3.5" fill="#222222"/>
 <circle cx="400" cy="90" r="3.5" fill="#222222"/>
-<path d="M160 360 Q250 211 340 90" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
-<circle cx="160" cy="360" r="3.5" fill="#1f77b4"/>
-<circle cx="340" cy="90" r="3.5" fill="#1f77b4"/>
+<path d="M670 270 Q490 166 310 90" fill="none" stroke="#1f77b4" stroke-width="2.5" stroke-dasharray="7,3"/>
+<circle cx="670" cy="270" r="3.5" fill="#1f77b4"/>
+<circle cx="310" cy="90" r="3.5" fill="#1f77b4"/>
+<path d="M610 270 Q610 166 610 90" fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7,3"/>
+<circle cx="610" cy="270" r="3.5" fill="#222222"/>
+<circle cx="610" cy="90" r="3.5" fill="#222222"/>
 <path d="M190 360 Q130 346 70 360" fill="none" stroke="#ff7f0e" stroke-width="2.5" stroke-dasharray="7,3"/>
 <circle cx="190" cy="360" r="3.5" fill="#ff7f0e"/>
 <circle cx="70" cy="360" r="3.5" fill="#ff7f0e"/>
@@ -416,11 +420,12 @@
 <line x1="340" y1="90" x2="340" y2="120" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
 <line x1="70" y1="300" x2="70" y2="360" stroke="#ff7f0e" stroke-width="4" stroke-linecap="round"/>
 <line x1="100" y1="300" x2="100" y2="360" stroke="#222222" stroke-width="4" stroke-linecap="round"/>
-<line x1="130" y1="300" x2="130" y2="360" stroke="#9467bd" stroke-width="4" stroke-linecap="round"/>
 <line x1="160" y1="300" x2="160" y2="330" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
 <line x1="190" y1="300" x2="190" y2="330" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
 <line x1="220" y1="300" x2="220" y2="330" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
 <line x1="280" y1="300" x2="280" y2="330" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
+<line x1="730" y1="270" x2="700" y2="270" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
+<line x1="670" y1="270" x2="640" y2="270" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
 <line x1="220" y1="360" x2="250" y2="360" stroke="#d62728" stroke-width="4" stroke-linecap="round"/>
 <line x1="280" y1="360" x2="310" y2="360" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>
 <line x1="310" y1="360" x2="340" y2="360" stroke="#1f77b4" stroke-width="4" stroke-linecap="round"/>

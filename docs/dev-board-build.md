@@ -17,8 +17,7 @@ step does one kind of part, and in its picture that step is in colour while ever
 | ESP32-C6 SuperMini | 1 | 1 | ESP32-C6 SuperMini 5-pack |
 | Header pins | 22 | 1 (2 × 10), 5 (2) | perfboard kit headers |
 | Resistor 1 kΩ | 3 | 2 | resistor kit |
-| Resistor 10 kΩ | 1 | 2 | resistor kit |
-| Resistor 1 MΩ | 2 | 2 | resistor kit |
+| Resistor 1 MΩ | 4 | 2: battery and input-power dividers | resistor kit |
 | Diode 1N5819 | 3 | 3 | 1N5819 150-pack |
 | Zener 6.2 V | 1 | 3 | zener kit |
 | Ceramic capacitor 100 nF (104) | 4 | 4 | ceramic capacitor kit |
@@ -29,8 +28,8 @@ step does one kind of part, and in its picture that step is in colour while ever
 | RJ12 breakout board | 3 | 7 (18 leads) | RJ11/RJ12 breakout 4-pack |
 | USB-C breakout (Cermant) | 1 | 7 (2 leads) | USB-C breakout 10-pack |
 | Solar lead (optional) | 1 | 7 (2 leads) | solar panel + extension |
-| 30 AWG insulated wire | 16 pieces | 6 (1, STAT), 8 (15) | 30 AWG silicone wire |
-| Bare wire or trimmed resistor legs | 35 bridges + 2 rails | 9, 10 | tinned wire / leg offcuts |
+| 30 AWG insulated wire | 16 pieces | 8 | 30 AWG silicone wire |
+| Bare wire or trimmed resistor legs | 36 bridges + 2 rails | 9, 10 | tinned wire / leg offcuts |
 | Perfboard 3 × 7 cm (a–j × 1–24) | 1 | all | perfboard kit |
 | 18650 cell with JST-XH plug | 1 | 11 | 18650 cell |
 
@@ -72,7 +71,7 @@ A reversed diode just won't conduct; a reversed electrolytic or battery can dama
 |---|---|---|
 | ESP32-C6 | b1–b10, h1–h10 | chip up, USB-C past row 1 |
 
-## Step 2: Resistors (6)
+## Step 2: Resistors (7)
 
 ![step 2](renders/build-step-02.png)
 
@@ -81,9 +80,10 @@ the part stays put, solder, and **trim to ~1 mm**. Keep the trimmed legs: they m
 
 | Resistor | Holes | How |
 |---|---|---|
-| R stat 10k | j3, j4 | body over j3, lead bent back into j4 |
 | R div top 1M | j7, j8 | body over j7, lead bent back into j8 |
 | R div bot 1M | j9, i9 | body over j9, lead bent sideways into i9 |
+| R pwr top 1M | g22, g21 | body over g22, lead bent back into g21 |
+| R pwr bot 1M | g20, g19 | body over g20, lead bent back into g19 |
 | R ADC1 1k | b12, c12 | body over b12, lead bent sideways into c12 |
 | R ADC2 1k | d12, d13 | body over d12, lead bent back into d13 |
 | R ADC3 1k | f12, g12 | body over f12, lead bent sideways into g12 |
@@ -128,22 +128,23 @@ Snap 2 pins off a header strip and solder them in **a24 (−)** and **b24 (+)**,
 |---|---|---|
 | Battery pins | a24 (−), b24 (+) | red wire of the plug on b24 |
 
-## Step 6: Charger: prepare it, wire it in from off the board (7 wires)
+## Step 6: Charger: prepare it, wire it in from off the board (3 wire pairs)
 
 ![step 6](renders/build-step-06.png)
 
 The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
 so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
 
-1. On the bench first: remove the charger's fixed THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC
-   gets taped to the cell later). Solder the bulk capacitor across its LOAD pads (**long leg / + to LOAD +**,
-   stripe / − to LOAD −). To make it lie on its side, bend both leads 90° about 2 mm from the body (hold the lead with
-   pliers at the body so the bend doesn't strain it). Tin the pads.
-2. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
+1. On the bench first: remove the small **103** (10 kΩ) resistor beside the **THERM** label and solder the 10 kΩ NTC's
+   two leads to its pads (the NTC gets taped to the cell later).
+2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
+   **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
+   from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
+3. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
    PWR + / PWR −, BATT + / BATT −, LOAD + / LOAD −. Solder each pair to its two pads, then the other ends into the
    holes in the table from the top. Keep + and − straight: mark the + conductor with a marker before you start.
-3. **STAT: one 30 AWG wire** from the STAT pad (STAT1 if there are two) to a10.
-4. Solder all 7 underneath. Nothing else goes in these holes except where noted.
+4. Solder all 6 underneath. Leave the small edge pads (CE, TE, PROG2, SEL) unconnected. The board has no STAT pad;
+   the ESP watches the input voltage instead (the 1 MΩ pair at g19–g22 from step 2).
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)
 
@@ -155,8 +156,8 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 | BATT - | a21 | GND rail |
 | LOAD + (output) | j20 | VBAT rail (22 AWG pair with LOAD -) |
 | LOAD - | a22 | GND rail |
-| STAT | a10 | GPIO7 (pulled up by R stat); 30 AWG |
-| THERM | (NTC) | remove the board's THERM resistor; NTC from THERM to GND, taped to the cell |
+| THERM | (NTC) | remove the 103 (10 k) resistor beside the THERM label; NTC across its two pads, taped to the cell |
+| CE, TE, PROG2, SEL (edge pads) | - | leave unconnected (board defaults); the board has no STAT pad, status is on its LEDs |
 
 ## Step 7: Leads from the RJ12, USB-C and solar boards (22)
 
@@ -171,7 +172,7 @@ GND → d24, and the solar lead's + → h24 and − → i24. Trim underneath to 
 | 2 IN1 | i6 | i4 | a1 |
 | 3 GND | a15 | a16 | a17 |
 | 4 angle | b11 | d11 | f11 |
-| 5 EN | a7 | a8 | a9 |
+| 5 EN | a7 | a8 | a10 |
 | 6 IN2 | i5 | i8 | a2 |
 
 | Lead | Hole |
@@ -181,7 +182,7 @@ GND → d24, and the solar lead's + → h24 and − → i24. Trim underneath to 
 | Solar + | h24 |
 | Solar − | i24 |
 
-## Step 8: Insulated wires underneath (15)
+## Step 8: Insulated wires underneath (16)
 
 ![step 8](renders/build-step-08.png)
 
@@ -192,7 +193,8 @@ lead, solder the wire end to that lead. Beep each wire out with the meter as you
 | From | To | What |
 |---|---|---|
 | j2 | a12 | ESP GND -> GND rail |
-| j4 | a10 | R stat -> STAT / GPIO7 |
+| g21 | a9 | input-power sense -> GPIO6 |
+| g19 | a19 | R pwr bot -> GND rail |
 | j5 | j1 | D3 cathode -> ESP 5V (straight along column j) |
 | j6 | j13 | D3 anode -> VBAT rail (straight along column j) |
 | j10 | a6 | divider node -> GPIO3 |
@@ -207,7 +209,7 @@ lead, solder the wire end to that lead. Beep each wire out with the meter as you
 | f24 | c24 | zener anode -> GND link (straight along row 24) |
 | i24 | c24 | solar - -> GND link (straight along row 24) |
 
-## Step 9: Bare bridges underneath (35)
+## Step 9: Bare bridges underneath (36)
 
 ![step 9](renders/build-step-09.png)
 
@@ -225,15 +227,16 @@ and neither beeps to the pad next to it.
 | a6 | b6 | battery divider -> GPIO3 |
 | a7 | b7 | port 1 EN -> GPIO4 |
 | a8 | b8 | port 2 EN -> GPIO5 |
-| a9 | b9 | port 3 EN -> GPIO6 |
-| a10 | b10 | charger STAT -> GPIO7 |
+| a9 | b9 | input-power sense -> GPIO6 |
+| a10 | b10 | port 3 EN -> GPIO7 |
 | h1 | j1 | ESP 5V -> C 10u |
 | h2 | j2 | ESP GND -> C 10u |
-| h3 | j3 | ESP 3V3 -> R stat |
 | h4 | i4 | port 2 IN1 -> GPIO20 |
 | h5 | i5 | port 1 IN2 -> GPIO19 |
 | h6 | i6 | port 1 IN1 -> GPIO18 |
 | h8 | i8 | port 2 IN2 -> GPIO14 |
+| g23 | g22 | PWR node -> R pwr top |
+| g21 | g20 | input-power sense node |
 | j6 | j7 | D3 anode -> R div top (VBAT) |
 | j8 | j9 | divider node |
 | j9 | j10 | divider node -> C div |

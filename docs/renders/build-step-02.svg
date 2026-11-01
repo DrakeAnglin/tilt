@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1060" height="480" font-family="Helvetica,Arial">
 <defs><filter id="mute"><feColorMatrix type="saturate" values="0"/></filter></defs>
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text x="30" y="30" font-size="20" font-weight="bold">Step 2: Resistors (6)</text>
-<text x="30" y="54" font-size="13" fill="#444">Top side. All six stand up: body over the first hole, the other lead bent back into the second. Either way round.</text>
+<text x="30" y="30" font-size="20" font-weight="bold">Step 2: Resistors (7)</text>
+<text x="30" y="54" font-size="13" fill="#444">Top side. All of them stand up: body over the first hole, the other lead bent back into the second. Either way round.</text>
 <rect x="49" y="69" width="732" height="312" rx="6" fill="#e9f4e1" stroke="#3a7a2a" stroke-width="2"/>
 <text x="70" y="63" font-size="11" fill="#666" text-anchor="middle">1</text>
 <text x="100" y="63" font-size="11" fill="#666" text-anchor="middle">2</text>
@@ -324,15 +324,18 @@
 <text x="340" y="138" font-size="10" fill="#fff" text-anchor="middle" font-weight="bold">8</text>
 <text x="205" y="245" font-size="16" fill="#fff" text-anchor="middle" font-weight="bold">ESP32-C6 (chip up)</text>
 </g>
-<line x1="130" y1="90" x2="160" y2="90" stroke="#888" stroke-width="2"/>
-<circle cx="130" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
-<text x="130" y="93" font-size="9" text-anchor="middle" font-weight="bold">10k</text>
 <line x1="250" y1="90" x2="280" y2="90" stroke="#888" stroke-width="2"/>
 <circle cx="250" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="250" y="93" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
 <line x1="310" y1="90" x2="310" y2="120" stroke="#888" stroke-width="2"/>
 <circle cx="310" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="310" y="93" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
+<line x1="700" y1="180" x2="670" y2="180" stroke="#888" stroke-width="2"/>
+<circle cx="700" cy="180" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
+<text x="700" y="183" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
+<line x1="640" y1="180" x2="610" y2="180" stroke="#888" stroke-width="2"/>
+<circle cx="640" cy="180" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
+<text x="640" y="183" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
 <line x1="400" y1="330" x2="400" y2="300" stroke="#888" stroke-width="2"/>
 <circle cx="400" cy="330" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="400" y="333" font-size="9" text-anchor="middle" font-weight="bold">1k</text>
@@ -342,5 +345,5 @@
 <line x1="400" y1="210" x2="400" y2="180" stroke="#888" stroke-width="2"/>
 <circle cx="400" cy="210" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="400" y="213" font-size="9" text-anchor="middle" font-weight="bold">1k</text>
-<text x="30" y="405" font-size="13" fill="#222">Colour bands (4-band): 1k = brown black red, 10k = brown black orange, 1M = brown black green. Not sure? Measure it.</text>
+<text x="30" y="405" font-size="13" fill="#222">Colour bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.</text>
 </svg>

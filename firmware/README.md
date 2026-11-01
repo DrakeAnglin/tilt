@@ -13,8 +13,8 @@ ESP32-C6 (SuperMini), Arduino-ESP32 3.x or ESP-IDF with esp-matter. **Not starte
 ## Planned modules
 `motor` (PWM, EN, motion profile, stall detection), `angle` (ADC averaging, calibration to the slat range),
 `calibration` (end limits, which end is "closed"), `storage` (NVS), `matter` (one Window Covering endpoint with tilt per
-port; Power Source cluster for battery level), `power` (Thread sleepy end device, battery voltage on GPIO 3, charger
-STAT on GPIO 7), `ota`.
+port; Power Source cluster for battery level), `power` (Thread sleepy end device, battery voltage on GPIO 3,
+input-power voltage on GPIO 6 (1 M / 1 M; charging = input present and the cell below 4.2 V)), `ota`.
 
 ## First milestone
 [bench_test](bench_test/bench_test.ino) (wiring in [docs/bench-test.md](../docs/bench-test.md)): drive one tilter from the battery, read the angle, find out why the motor stalls under load, measure sleep current.

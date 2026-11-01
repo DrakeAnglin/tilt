@@ -125,7 +125,7 @@ def ceramic(o, a, b, text):
 
 
 # ------------------------------------------------------------------ what each step adds
-RES = [('R stat 10k', '10k'), ('R div top 1M', '1M'), ('R div bot 1M', '1M'),
+RES = [('R div top 1M', '1M'), ('R div bot 1M', '1M'), ('R pwr top 1M', '1M'), ('R pwr bot 1M', '1M'),
        ('R ADC1 1k', '1k'), ('R ADC2 1k', '1k'), ('R ADC3 1k', '1k')]
 CAPS = [('C 10u', '10µ'), ('C div 100n', '100n'), ('C ADC1 100n', '100n'), ('C ADC2 100n', '100n'), ('C ADC3 100n', '100n')]
 DIODES = [('D3 1N5819', 'D3'), ('D1 1N5819 USB', 'D1'), ('D2 1N5819 solar', 'D2'), ('Z 6.2V', 'Z')]
@@ -183,7 +183,7 @@ def draw_batt(o):
 
 def charger_pads():
     short = {'PWR + (input)': 'PWR+', 'PWR - / GND': 'PWR−', 'BATT +': 'BAT+', 'BATT -': 'BAT−', 'LOAD + (output)': 'LOAD+',
-             'LOAD -': 'LD−', 'STAT': 'STAT'}
+             'LOAD -': 'LD−'}
     return [(h, short[pad]) for pad, h, _ in M.CHARGER if pad in short]
 
 
@@ -309,9 +309,9 @@ step('esp', 'ESP32-C6 and its headers', 'top', [draw_esp],
 3. Check before soldering: **5V in h1, GND in h2, 3V3 in h3, TX in b1**. Solder one pin at each corner, check it sits
    flat, then the rest. Keep each joint on its own pad.""",
      [('ESP32-C6', 'b1–b10, h1–h10', 'chip up, USB-C past row 1')])
-step('res', 'Resistors (6)', 'top', [draw_res],
-     'Top side. All six stand up: body over the first hole, the other lead bent back into the second. Either way round.',
-     ['Colour bands (4-band): 1k = brown black red, 10k = brown black orange, 1M = brown black green. Not sure? Measure it.'],
+step('res', 'Resistors (%d)' % len(RES), 'top', [draw_res],
+     'Top side. All of them stand up: body over the first hole, the other lead bent back into the second. Either way round.',
+     ['Colour bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.'],
      """Resistors have no direction. Bend the top lead back down, push both leads through, splay them slightly underneath so
 the part stays put, solder, and **trim to ~1 mm**. Keep the trimmed legs: they make good bridges in step 9.""",
      rows_parts([n for n, _ in RES], res_note))
@@ -333,21 +333,22 @@ step('batt', 'Battery pins (2 header pins)', 'top', [draw_batt],
      ['Mark b24 with a red "+" now: the red wire of the battery plug always goes on b24.'],
      """Snap 2 pins off a header strip and solder them in **a24 (−)** and **b24 (+)**, long side up. Mark **b24 "+"** in red.""",
      [('Battery pins', 'a24 (−), b24 (+)', 'red wire of the plug on b24')])
-step('charger', 'Charger: prepare it, wire it in from off the board (7 wires)', 'top', [draw_charger],
+step('charger', 'Charger: prepare it, wire it in from off the board (3 wire pairs)', 'top', [draw_charger],
      'Top side. The charger (30.5 × 31.5 mm) sits OFF the board, past row 24; its wires come in to the ringed holes.',
-     ['Where a hole already has a pin (b24, a10), push the wire in beside it or solder it to that pin underneath.'],
+     ['b24 already has the battery pin: push the BATT + wire in beside it or solder it to that pin underneath.'],
      """The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
 so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
 
-1. On the bench first: remove the charger's fixed THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC
-   gets taped to the cell later). Solder the bulk capacitor across its LOAD pads (**long leg / + to LOAD +**,
-   stripe / − to LOAD −). To make it lie on its side, bend both leads 90° about 2 mm from the body (hold the lead with
-   pliers at the body so the bend doesn't strain it). Tin the pads.
-2. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
+1. On the bench first: remove the small **103** (10 kΩ) resistor beside the **THERM** label and solder the 10 kΩ NTC's
+   two leads to its pads (the NTC gets taped to the cell later).
+2. The bulk capacitor has its own footprint on the charger, at the top right (the outline with **+** on one side):
+   **long leg into the + hole**, stripe side into the other. To make it lie on its side, bend both leads 90° about 2 mm
+   from the body first (hold the lead with pliers at the body so the bend doesn't strain it).
+3. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
    PWR + / PWR −, BATT + / BATT −, LOAD + / LOAD −. Solder each pair to its two pads, then the other ends into the
    holes in the table from the top. Keep + and − straight: mark the + conductor with a marker before you start.
-3. **STAT: one 30 AWG wire** from the STAT pad (STAT1 if there are two) to a10.
-4. Solder all 7 underneath. Nothing else goes in these holes except where noted.
+4. Solder all 6 underneath. Leave the small edge pads (CE, TE, PROG2, SEL) unconnected. The board has no STAT pad;
+   the ESP watches the input voltage instead (the 1 MΩ pair at g19–g22 from step 2).
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)""",
      [(pad, h, net) for pad, h, net in M.CHARGER])
@@ -456,8 +457,7 @@ def bom():
         ('ESP32-C6 SuperMini', 1, '1', 'ESP32-C6 SuperMini 5-pack'),
         ('Header pins', len(PARTS['ESP32-C6'].pins) + len(PARTS['Battery pins'].pins), '1 (2 × 10), 5 (2)', 'perfboard kit headers'),
         ('Resistor 1 kΩ', count['1k'], '2', 'resistor kit'),
-        ('Resistor 10 kΩ', count['10k'], '2', 'resistor kit'),
-        ('Resistor 1 MΩ', count['1M'], '2', 'resistor kit'),
+        ('Resistor 1 MΩ', count['1M'], '2: battery and input-power dividers', 'resistor kit'),
         ('Diode 1N5819', 3, '3', '1N5819 150-pack'),
         ('Zener 6.2 V', 1, '3', 'zener kit'),
         ('Ceramic capacitor 100 nF (104)', count['100n'], '4', 'ceramic capacitor kit'),
@@ -468,8 +468,7 @@ def bom():
         ('RJ12 breakout board', 3, '7 (%d leads)' % len(PARTS['Port leads'].pins), 'RJ11/RJ12 breakout 4-pack'),
         ('USB-C breakout (Cermant)', 1, '7 (2 leads)', 'USB-C breakout 10-pack'),
         ('Solar lead (optional)', 1, '7 (2 leads)', 'solar panel + extension'),
-        ('30 AWG insulated wire', '%d pieces' % (len(wires_of('wire')) + 1),
-         '6 (1, STAT), 8 (%d)' % len(wires_of('wire')), '30 AWG silicone wire'),
+        ('30 AWG insulated wire', '%d pieces' % len(wires_of('wire')), '8', '30 AWG silicone wire'),
         ('Bare wire or trimmed resistor legs', '%d bridges + %d rails' % (len(wires_of('bridge')), len(wires_of('rail'))), '9, 10',
          'tinned wire / leg offcuts'),
         ('Perfboard 3 × 7 cm (a–j × 1–24)', 1, 'all', 'perfboard kit'),

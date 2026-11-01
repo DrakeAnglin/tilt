@@ -38,10 +38,10 @@ Checked by [`tools/devboard_check.py`](../tools/devboard_check.py): parts ≥ 0.
 | 18 / 19 | Port 1 IN1 / IN2 |
 | 20 / 14 | Port 2 IN1 / IN2 |
 | TX16 / RX17 | Port 3 IN1 / IN2 (log over USB-CDC) |
-| 4 / 5 / 6 | Port 1 / 2 / 3 EN (AS5600 power + DRV8833 sleep) |
+| 4 / 5 / 7 | Port 1 / 2 / 3 EN (AS5600 power + DRV8833 sleep) |
 | 0 / 1 / 2 | Port 1 / 2 / 3 angle (ADC, 1 k + 100 n) |
 | 3 | Battery voltage (1 M / 1 M + 100 n) |
-| 7 | Charger STAT (10 k pull-up) |
+| 6 | Input-power sense: USB / solar voltage (1 M / 1 M, ADC); the charger board has no STAT pad |
 | 8, 9, 15 | spare (strapping pins) |
 
 The ESP's own USB-C faces the charger with no room for a cable inside the box: flash it on the bench before fitting

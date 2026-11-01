@@ -13,7 +13,7 @@ then a custom PCB once that works. Everything is modular: every device plugs in,
             ┌──────────────┐  VBAT 3.0–4.2 V  ┌────────────────────────────────────────┐
  10 k NTC ─►│ MCP73871      │─────────D3──────►│ ESP32-C6 SuperMini                     │
  (on cell)  │ power-path    │  ▲ 18650 cell    │ Matter over Thread, sleepy end device  │
-            │ charger       │──┘ (protected)   │ ADC: 3 × angle, battery; GPIO: STAT     │
+            │ charger       │──┘ (protected)   │ ADC: 3 × angle, battery, input power    │
             └──────────────┘                  └───┬─────────┬─────────┬────────────────┘
                    │ LOAD (VBAT)                   │ IN1/IN2  │ EN      │ ANGLE (1 k + 100 n)
                    ▼                               ▼          ▼         ▲
@@ -64,8 +64,8 @@ gives maybe 80–250 mAh on a sunny day (less behind low-E glass), so in a windo
 the bench: USB meter for charge and motor current, a multimeter's µA/mA range for sleep current.
 
 ## Pin plan
-See [controller-v4.md](controller-v4.md#dev-board): port 1/2/3 IN1-IN2 on GPIO 18/19, 20/14, 16/17; EN on 4/5/6;
-angle on ADC 0/1/2; battery voltage on 3; charger STAT on 7. Three 1N5819 diodes: USB-C and solar into the charger's
+See [controller-v4.md](controller-v4.md#dev-board): port 1/2/3 IN1-IN2 on GPIO 18/19, 20/14, 16/17; EN on 4/5/7;
+angle on ADC 0/1/2; battery voltage on 3; input-power (USB/solar) voltage on 6. Three 1N5819 diodes: USB-C and solar into the charger's
 single input, and charger LOAD to the ESP's 5V pin.
 
 ## Connectors (everything modular)

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1060" height="480" font-family="Helvetica,Arial">
 <defs><filter id="mute"><feColorMatrix type="saturate" values="0"/></filter></defs>
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text x="30" y="30" font-size="20" font-weight="bold">Step 6: Charger: prepare it, wire it in from off the board (7 wires)</text>
+<text x="30" y="30" font-size="20" font-weight="bold">Step 6: Charger: prepare it, wire it in from off the board (3 wire pairs)</text>
 <text x="30" y="54" font-size="13" fill="#444">Top side. The charger (30.5 × 31.5 mm) sits OFF the board, past row 24; its wires come in to the ringed holes.</text>
 <rect x="49" y="69" width="732" height="312" rx="6" fill="#e9f4e1" stroke="#3a7a2a" stroke-width="2"/>
 <text x="70" y="63" font-size="11" fill="#666" text-anchor="middle">1</text>
@@ -323,15 +323,18 @@
 <circle cx="340" cy="150" r="6" fill="#e0b040"/>
 <text x="340" y="138" font-size="10" fill="#fff" text-anchor="middle" font-weight="bold">8</text>
 <text x="205" y="245" font-size="16" fill="#fff" text-anchor="middle" font-weight="bold">ESP32-C6 (chip up)</text>
-<line x1="130" y1="90" x2="160" y2="90" stroke="#888" stroke-width="2"/>
-<circle cx="130" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
-<text x="130" y="93" font-size="9" text-anchor="middle" font-weight="bold">10k</text>
 <line x1="250" y1="90" x2="280" y2="90" stroke="#888" stroke-width="2"/>
 <circle cx="250" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="250" y="93" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
 <line x1="310" y1="90" x2="310" y2="120" stroke="#888" stroke-width="2"/>
 <circle cx="310" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="310" y="93" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
+<line x1="700" y1="180" x2="670" y2="180" stroke="#888" stroke-width="2"/>
+<circle cx="700" cy="180" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
+<text x="700" y="183" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
+<line x1="640" y1="180" x2="610" y2="180" stroke="#888" stroke-width="2"/>
+<circle cx="640" cy="180" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
+<text x="640" y="183" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
 <line x1="400" y1="330" x2="400" y2="300" stroke="#888" stroke-width="2"/>
 <circle cx="400" cy="330" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="400" y="333" font-size="9" text-anchor="middle" font-weight="bold">1k</text>
@@ -393,8 +396,5 @@
 <circle cx="700" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
 <path d="M700 360 Q752 342 804 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
 <text x="700" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LD−</text>
-<circle cx="340" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
-<path d="M340 360 Q572 342 804 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="340" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">STAT</text>
-<text x="30" y="405" font-size="13" fill="#222">Where a hole already has a pin (b24, a10), push the wire in beside it or solder it to that pin underneath.</text>
+<text x="30" y="405" font-size="13" fill="#222">b24 already has the battery pin: push the BATT + wire in beside it or solder it to that pin underneath.</text>
 </svg>
