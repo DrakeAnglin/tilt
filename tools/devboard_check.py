@@ -9,7 +9,9 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location('cv4', os.path.join(HERE, '../hardware/mechanical/fusion/ControllerV4/ControllerV4.py'))
+ROT = '--rot' in sys.argv                     # the rotated-ESP variant (DevBoardR.py)
+spec = importlib.util.spec_from_file_location('cv4', os.path.join(HERE, '../hardware/mechanical/fusion/ControllerV4/',
+                                                                   'DevBoardR.py' if ROT else 'ControllerV4.py'))
 M = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M)
 H, HN = M.H, M.HN
@@ -88,11 +90,12 @@ def netlist():
         parent[find(a)] = find(b)
 
     for f, t, note in M.WIRES:
-        if note.startswith(('GND rail', 'VBAT rail')):                    # a whole column range
-            i0, m = H(f)
-            i1, _ = H(t)
+        if note.startswith(('GND rail', 'VBAT rail')):                    # a whole column (or row) range
+            (i0, m0), (i1, m1) = H(f), H(t)
             for i in range(min(i0, i1), max(i0, i1)):
-                join(HN(i, m), HN(i + 1, m))
+                join(HN(i, m0), HN(i + 1, m0))
+            for m in range(min(m0, m1), max(m0, m1)):
+                join(HN(i0, m), HN(i0, m + 1))
         elif 'over' in note:                                   # bridge across the hole between
             (i0, m0), (i1, m1) = H(f), H(t)
             mid = HN(i0, (m0 + m1) // 2)
@@ -141,11 +144,12 @@ def main():
                 tight.append('%s / %s: %.2f mm' % (bs[i][2], bs[j][2], g))
     find = netlist()
     errs = []
-    for net, holes in EXPECT.items():
+    expect = getattr(M, 'EXPECT', EXPECT)
+    for net, holes in expect.items():
         roots = {find(h) for h in holes}
         if len(roots) > 1:
             errs.append('OPEN  %s: %s' % (net, ', '.join('%s' % h for h in holes)))
-    roots = {net: find(holes[0]) for net, holes in EXPECT.items()}
+    roots = {net: find(holes[0]) for net, holes in expect.items()}
     seen = {}
     for net, r in roots.items():
         if r in seen:
@@ -153,8 +157,12 @@ def main():
         seen[r] = net
     print('\n'.join(rep))
     print('parts closer than 0.3 mm (negative = overlap):', tight or 'none')
-    print('nets:', errs or 'all %d nets connected, none shorted' % len(EXPECT))
+    print('nets:', errs or 'all %d nets connected, none shorted' % len(expect))
     shared = holes_shared(parts)
+    kinds = [w[2].split(':')[0].split(' (')[0] for w in M.WIRES]
+    print('counts: %d insulated wires, %d bridges, %d rails, %d holes used' % (
+        sum(k == 'wire' for k in kinds), sum(k == 'bridge' for k in kinds), sum('rail' in k for k in kinds),
+        len({h for p in parts for h in [HN(i, m) for i, m, _ in p.pins]})))
     print('holes with more than one thing through them:', shared or 'none')
     return 1 if (tight or errs or shared) else 0
 

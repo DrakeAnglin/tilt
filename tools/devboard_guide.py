@@ -15,13 +15,16 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location('cv4', os.path.join(HERE, '../hardware/mechanical/fusion/ControllerV4/ControllerV4.py'))
+ROT = '--rot' in sys.argv                     # the rotated-ESP variant (DevBoardR.py): pictures only, prefixed build-r-
+spec = importlib.util.spec_from_file_location('cv4', os.path.join(HERE, '../hardware/mechanical/fusion/ControllerV4/',
+                                                                   'DevBoardR.py' if ROT else 'ControllerV4.py'))
 M = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M)
 H, HN, COLS = M.H, M.HN, M.COLS
 OUT = os.path.join(HERE, '../docs/renders')
 DOC = os.path.join(HERE, '../docs/dev-board-build.md')
 CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+PRE = 'build-r-' if ROT else 'build-'
 
 S = 30.0                     # px per hole pitch
 MX, MY = 70, 90              # margins
@@ -132,18 +135,31 @@ DIODES = [('D3 1N5819', 'D3'), ('D1 1N5819 USB', 'D1'), ('D2 1N5819 solar', 'D2'
 
 
 def draw_esp(o):
-    x0, y0 = pos('b1')
-    x1, y1 = pos('h10')
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="5" fill="#1b1b1b" opacity="0.85"/>' % (
-        x0 - 22, y1 - 14, S * 9 + 44, (y0 - y1) + 28))
-    o.append('<rect x="%.0f" y="%.0f" width="48" height="74" rx="4" fill="#bbb" stroke="#666"/>' % (x0 - 70, (y0 + y1) / 2 - 37))
-    o.append('<text x="%.0f" y="%.0f" font-size="11" text-anchor="middle" font-weight="bold">USB-C</text>' % (x0 - 46, (y0 + y1) / 2 + 4))
-    for i, m, lab in PARTS['ESP32-C6'].pins:
-        h = HN(i, m)
-        dot(o, h, '#e0b040')
-        label(o, h, lab.replace('TX16', 'TX').replace('RX17', 'RX'), dy=22 if h[0] == 'b' else -12, color='#fff', size=10)
-    o.append('<text x="%.0f" y="%.0f" font-size="16" fill="#fff" text-anchor="middle" font-weight="bold">ESP32-C6 (chip up)</text>' % (
-        (x0 + x1) / 2, (y0 + y1) / 2 + 5))
+    """ESP body from its pin positions, USB-C past the pin-1 end (5V / TX), pin names just inside the body."""
+    pts = {lab: pos(HN(i, m)) for i, m, lab in PARTS['ESP32-C6'].pins}
+    xs, ys = [p[0] for p in pts.values()], [p[1] for p in pts.values()]
+    x0, x1, y0, y1 = min(xs) - 22, max(xs) + 22, min(ys) - 22, max(ys) + 22
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="5" fill="#1b1b1b" opacity="0.85"/>' % (x0, y0, x1 - x0, y1 - y0))
+    (ax, ay), (bx, by) = pts['5V'], pts['TX16']
+    (cx, cy), (dx, dy) = pts['8'], pts['7']
+    ux, uy = (ax + bx - cx - dx) / 2, (ay + by - cy - dy) / 2          # from the far end toward the USB end
+    n = math.hypot(ux, uy)
+    ux, uy = ux / n, uy / n
+    mx, my = (ax + bx) / 2 + ux * 40, (ay + by) / 2 + uy * 40
+    w, h = (48, 74) if abs(ux) > abs(uy) else (74, 48)
+    o.append('<rect x="%.0f" y="%.0f" width="%d" height="%d" rx="4" fill="#bbb" stroke="#666"/>' % (mx - w / 2, my - h / 2, w, h))
+    o.append('<text x="%.0f" y="%.0f" font-size="11" text-anchor="middle" font-weight="bold">USB-C</text>' % (mx, my + 4))
+    xc, yc = (x0 + x1) / 2, (y0 + y1) / 2
+    rows_run_x = abs(pts['5V'][1] - pts['8'][1]) < 1          # each pin row runs left-right: put labels above / below it
+    for lab, (x, y) in pts.items():
+        o.append('<circle cx="%.0f" cy="%.0f" r="6" fill="#e0b040"/>' % (x, y))
+        if rows_run_x:
+            lx, ly = x, y + (19 if yc > y else -11)
+        else:
+            lx, ly = x + (18 if xc > x else -18), y + 3
+        o.append('<text x="%.0f" y="%.0f" font-size="9" fill="#fff" text-anchor="middle" font-weight="bold">%s</text>' % (
+            lx, ly, lab.replace('TX16', 'TX').replace('RX17', 'RX')))
+    o.append('<text x="%.0f" y="%.0f" font-size="15" fill="#fff" text-anchor="middle" font-weight="bold">ESP32-C6 (chip up)</text>' % (xc, yc + 5))
 
 
 def draw_res(o):
@@ -403,7 +419,7 @@ def render_step(k):
     else:
         for f in st['draw']:
             f(o)
-    name = 'build-step-%02d.svg' % (k + 1)
+    name = '%sstep-%02d.svg' % (PRE, k + 1)
     finish(o, name, st['notes'])
     return name
 
@@ -414,7 +430,7 @@ def render_done():
         if s2['view'] == 'top':
             for f in s2['draw']:
                 f(o)
-    finish(o, 'build-done-top.svg')
+    finish(o, PRE + 'done-top.svg')
     o = board('Finished: underside', 'Bottom view, everything in place. Grey dots = joints of the parts and leads from the top.', True)
     draw_pins_under(o)
     for k in ('wire', 'bridge', 'rail'):
@@ -424,8 +440,8 @@ def render_done():
                                 ('3V3', NET_COL['3V3']), ('signal', NET_COL['sig']))):
         o.append('<rect x="%d" y="%.0f" width="18" height="6" fill="%s"/><text x="%d" y="%.0f" font-size="12">%s</text>' % (
             lx + k * 150, ly, c, lx + k * 150 + 24, ly + 7, t))
-    finish(o, 'build-done-under.svg')
-    return ['build-done-top.svg', 'build-done-under.svg']
+    finish(o, PRE + 'done-under.svg')
+    return [PRE + 'done-top.svg', PRE + 'done-under.svg']
 
 
 def charger_picture():
@@ -604,13 +620,17 @@ def write_md():
 
 
 def main():
-    names = [render_step(k) for k in range(len(STEPS))] + render_done() + [charger_picture(), polarity()]
+    if ROT:
+        names = [render_step(k) for k in range(len(STEPS))] + render_done()
+    else:
+        names = [render_step(k) for k in range(len(STEPS))] + render_done() + [charger_picture(), polarity()]
     for old in ('build-1-esp', 'build-2-parts', 'build-3-underside'):
         for ext in ('.svg', '.png'):
             p = os.path.join(OUT, old + ext)
             if os.path.exists(p):
                 os.remove(p)
-    write_md()
+    if not ROT:
+        write_md()
     if '--png' in sys.argv:
         for n in names:
             svg = os.path.abspath(os.path.join(OUT, n))
