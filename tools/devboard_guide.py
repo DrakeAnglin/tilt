@@ -334,9 +334,31 @@ def draw_charger(o):
         label(o, h, lab, dy=22 if h[0] == 'a' else -13, color='#0a7a3a', size=9)
 
 
+RJ_PIN = {'VBAT': 1, 'IN1': 2, 'GND': 3, 'ANG': 4, 'EN': 5, 'IN2': 6}
+RJ_NAME = {'VBAT': 'battery +', 'IN1': 'IN1', 'GND': 'GND', 'ANG': 'angle', 'EN': 'EN', 'IN2': 'IN2'}
+
+
 def port_drawer(k):
+    """One port: its RJ12 board drawn beside the perfboard (pads 1-6 as printed on it), a line from each pad to its hole."""
     def draw(o):
-        draw_leads(o, ('Port leads',), 'P%d ' % k)
+        x_rj = MX + S * (M.NI - 1) + 120
+        y0 = MY + S * 1.2
+        o.append('<rect x="%.0f" y="%.0f" width="150" height="%.0f" rx="6" fill="#2b6cb0" opacity="0.9"/>' % (x_rj - 20, y0 - 40, 6 * 34 + 60))
+        o.append('<text x="%.0f" y="%.0f" font-size="13" fill="#fff" font-weight="bold">RJ12 board, port %d</text>' % (x_rj - 10, y0 - 18, k))
+        o.append('<rect x="%.0f" y="%.0f" width="56" height="%.0f" rx="4" fill="#ddd" stroke="#666"/>' % (x_rj + 62, y0 + 10, 6 * 34 - 30))
+        o.append('<text x="%.0f" y="%.0f" font-size="11" text-anchor="middle" font-weight="bold">jack</text>' % (x_rj + 90, y0 + 6 * 17))
+        for i, m, lab in [pn for pn in PARTS['Port leads'].pins if pn[2].startswith('P%d ' % k)]:
+            sig = lab.split()[1]
+            n = RJ_PIN[sig]
+            px, py = x_rj, y0 + (n - 1) * 34
+            hx, hy = pos(HN(i, m))
+            c = NET_COL['VBAT'] if sig == 'VBAT' else NET_COL['GND'] if sig == 'GND' else NET_COL['sig']
+            o.append('<path d="M%.0f %.0f C%.0f %.0f %.0f %.0f %.0f %.0f" fill="none" stroke="%s" stroke-width="%s" stroke-dasharray="6,3" opacity="0.85"/>' % (
+                px, py, px - 80, py, hx + 60, hy, hx, hy, c, '3' if sig in ('VBAT', 'GND') else '2'))
+            o.append('<rect x="%.0f" y="%.0f" width="14" height="14" fill="#e0b040"%s/>' % (px - 7, py - 7, ' stroke="#000"' if n == 1 else ''))
+            o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#fff" font-weight="bold">%d %s</text>' % (px + 12, py + 4, n, RJ_NAME[sig]))
+            dot(o, HN(i, m), c, r=6)
+            label(o, HN(i, m), 'pin %d' % n, dy=edge_dy(HN(i, m), False), color=c, size=9)
     return draw
 
 
@@ -552,7 +574,8 @@ for _k in (1, 2, 3):
     step('port%d' % _k, 'RJ12 port %d (6 leads)%s' % (_k, ': only if this controller drives 3 blinds' if _k == 3 else ''), 'top',
          [port_drawer(_k)],
          'Top side. Port %d\'s six leads go in from the top. Pin 1 is the square pad on the RJ12 board.' % _k,
-         ['Red = battery +, black = GND (22 AWG); blue = signals (30 AWG). Tape the RJ12 board down off the end while you work.'],
+         ['RJ12 pads 1-6 as printed on the board (1 = square pad). Red = battery +, black = GND (22 AWG); blue = signals (30 AWG).',
+          'The RJ12 board is drawn on the right for room: in the box the jacks sit at the row-1 end, so run the leads that way.'],
          ("""%sSolder 6 leads, 5–8 cm long, to port %d's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
 signals. Then push each lead into its hole from the top (table), solder underneath, trim to ~1 mm.""" % (
