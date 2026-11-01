@@ -31,6 +31,7 @@ Matter over Thread.
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | Electronics, power budget, connectors, RJ12 pinout, why each choice |
 | [docs/controller-v4.md](docs/controller-v4.md) | Controller box, dev-board layout, pin plan, assembly |
+| [docs/bench-test.md](docs/bench-test.md) | Breadboard wiring + test plan for one tilter, with a test sketch |
 | [hardware/mechanical/stl/v0.4/README.md](hardware/mechanical/stl/v0.4/README.md) | Tilter + sensor module: print files, orientation, hardware, assembly, fits |
 | [hardware/BOM.md](hardware/BOM.md) | Everything to buy, with links, quantities and what each part is for |
 | [docs/requirements.md](docs/requirements.md) | Numbered requirements |

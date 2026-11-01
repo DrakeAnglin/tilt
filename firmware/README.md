@@ -17,4 +17,4 @@ port; Power Source cluster for battery level), `power` (Thread sleepy end device
 STAT on GPIO 7), `ota`.
 
 ## First milestone
-One tilter on the bench: move to an angle and stop on stall, from the battery (no boost), and measure the sleep current.
+[bench_test](bench_test/bench_test.ino) (wiring in [docs/bench-test.md](../docs/bench-test.md)): drive one tilter from the battery, read the angle, find out why the motor stalls under load, measure sleep current.
