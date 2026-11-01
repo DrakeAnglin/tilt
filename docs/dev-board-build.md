@@ -9,7 +9,7 @@ every hole holds exactly one thing (a part leg, a lead or a wire end).
 **Totals:** 87 parts and leads on top, 4 insulated wires, 61 bare bridges, 3 rails.
 
 **Order:** parts, sockets and the board's own wires first, then the RJ12 and solar leads (steps 1–9), while every hole
-is still open; then the bare bridges (10–14: every board, then one step per port, then solar) and rails (15), which land on those
+is still open; then the rails (10) and the bare bridges (11–15: every board, then one step per port, then solar), which land on those
 holes' pads; then the charger, which only plugs in (16); the ESP and USB-C board plug in last (17). **Ports 2 and 3 and
 the solar lead are optional:** skip a port's lead step and its bridge step together. Each
 step does one kind of part, and in its picture that step is in colour while everything already done is grey.
@@ -247,14 +247,31 @@ solar input, but fit them anyway so a panel can be added later without re-solder
 
 | Lead | Hole | Goes to |
 |---|---|---|
-| Solar + | g23 | to D2's anode (bridge in step 14) |
+| Solar + | g23 | to D2's anode (bridge in step 15) |
 | Solar − | a17 | GND rail |
 
-## Step 10: Bare bridges: every board (21 pieces of wire)
+## Step 10: Rails (3)
+
+**You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
+
+![step 10](renders/build-step-10.png)
+
+Lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole
+it passes. The rails go in before the bridges, so every bridge that goes to GND or battery + ends on a rail that's already
+there. Where two GND rails
+meet at a corner, solder them together there. Next come the bridges (step 11).
+
+| From | To | What |
+|---|---|---|
+| a13 | i13 | bare wire across row 13, a-i |
+| a13 | a24 | bare wire down column a, rows 13-24 |
+| j11 | j24 | bare wire down column j, rows 11-24 |
+
+## Step 11: Bare bridges: every board (21 pieces of wire)
 
 **You need:** 21 pieces of bare wire: leg offcuts saved from steps 1-3 for the short ones, 22 AWG solid tinned bus wire for runs of 3+ holes.
 
-![step 10](renders/build-step-10.png)
+![step 11](renders/build-step-11.png)
 
 A bridge is **bare solid wire** (a trimmed leg, or **22 AWG solid tinned copper bus wire**) laid flat on the pads and
 soldered at **every hole it crosses**. Each row in the table is **one piece of wire**: "b20 → f20, 5 holes" means one
@@ -292,11 +309,11 @@ bridges to nowhere.
 | c23 → d23 | 2 holes | zener A (d23), meets the next run at c23 |
 | h23 → j23 | 3 holes | R div top 1M (h23), battery + rail (j23), steps over empty i23 |
 
-## Step 11: Bare bridges: port 1 (7 pieces)
+## Step 12: Bare bridges: port 1 (7 pieces)
 
 **You need:** 7 pieces of bare wire (leg offcuts or 22 AWG solid tinned).
 
-![step 11](renders/build-step-11.png)
+![step 12](renders/build-step-12.png)
 
 Port 1's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
 ESP and the GND rail. Same method as the step before: each row is one piece of wire.
@@ -311,11 +328,11 @@ ESP and the GND rail. Same method as the step before: each row is one piece of w
 | c12 → c13 | 2 holes | C ADC1 100n (c12), GND rail (c13) |
 | b14 → b15 | 2 holes | R ADC1 1k (b14), lead P1 ANG (b15) |
 
-## Step 12: Bare bridges: port 2 (7 pieces): optional
+## Step 13: Bare bridges: port 2 (7 pieces): optional
 
 **You need:** 7 pieces of bare wire (leg offcuts or 22 AWG solid tinned).
 
-![step 12](renders/build-step-12.png)
+![step 13](renders/build-step-13.png)
 
 Port 2's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
 ESP and the GND rail. Same method as the step before: each row is one piece of wire.
@@ -333,11 +350,11 @@ ESP and the GND rail. Same method as the step before: each row is one piece of w
 | e12 → e13 | 2 holes | C ADC2 100n (e12), GND rail (e13) |
 | d14 → e14 | 2 holes | R ADC2 1k (d14), lead P2 ANG (e14) |
 
-## Step 13: Bare bridges: port 3 (7 pieces): optional
+## Step 14: Bare bridges: port 3 (7 pieces): optional
 
 **You need:** 7 pieces of bare wire (leg offcuts or 22 AWG solid tinned).
 
-![step 13](renders/build-step-13.png)
+![step 14](renders/build-step-14.png)
 
 Port 3's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
 ESP and the GND rail. Same method as the step before: each row is one piece of wire.
@@ -355,33 +372,17 @@ ESP and the GND rail. Same method as the step before: each row is one piece of w
 | g12 → g13 | 2 holes | C ADC3 100n (g12), GND rail (g13) |
 | h14 → h15 | 2 holes | R ADC3 1k (h14), lead P3 ANG (h15) |
 
-## Step 14: Bare bridge: solar (1 piece): optional
+## Step 15: Bare bridge: solar (1 piece): optional
 
 **You need:** 1 short bare wire.
 
-![step 14](renders/build-step-14.png)
+![step 15](renders/build-step-15.png)
 
 **Optional:** only if you fitted the solar lead. One short bridge joins the lead's + hole to D2's anode.
 
 | One piece of wire | Length | What it joins |
 |---|---|---|
 | f23 → g23 | 2 holes | D2 A (f23), Solar leads S+ (g23) |
-
-## Step 15: Rails (3)
-
-**You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
-
-![step 15](renders/build-step-15.png)
-
-Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole
-it passes. Where two GND rails
-meet at a corner, solder them together there. Then the charger plugs (step 16) and the checks (step 17).
-
-| From | To | What |
-|---|---|---|
-| a13 | i13 | bare wire across row 13, a-i |
-| a13 | a24 | bare wire down column a, rows 13-24 |
-| j11 | j24 | bare wire down column j, rows 11-24 |
 
 ## Step 16: Charger: prepare it, put JST plugs on its wires (3 plugs)
 

@@ -744,9 +744,10 @@ step('bridges4', 'Bare bridge: solar (1 piece): optional', 'bottom', [draw_under
 step('rails', 'Rails (%d)' % len(RAILS), 'bottom', [draw_under, 'rail'],
      'Bottom view. Long bare wires: ' + rails_text() + '.',
      ['Solder each rail at every hole it passes, including the ones that already have wires or leads.'],
-     """Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (%s), soldering it at every hole
-it passes. Where two GND rails
-meet at a corner, solder them together there. Then the charger plugs (step §charger§) and the checks (step §checks§).""" % rails_text(),
+     """Lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (%s), soldering it at every hole
+it passes. The rails go in before the bridges, so every bridge that goes to GND or battery + ends on a rail that's already
+there. Where two GND rails
+meet at a corner, solder them together there. Next come the bridges (step §bridges§).""" % rails_text(),
      what(wires_of('rail')))
 
 
@@ -790,8 +791,8 @@ def need():
 NEED = need()
 
 
-ORDER = ['res', 'diodes', 'caps', 'sockets', 'wires', 'port1', 'port2', 'port3', 'solar', 'bridges', 'bridges1', 'bridges2', 'bridges3',
-         'bridges4', 'rails', 'charger']
+ORDER = ['res', 'diodes', 'caps', 'sockets', 'wires', 'port1', 'port2', 'port3', 'solar', 'rails', 'bridges', 'bridges1', 'bridges2',
+         'bridges3', 'bridges4', 'charger']
 STEPS.sort(key=lambda st: ORDER.index(st['key']) if st['key'] in ORDER else len(ORDER))
 KEYS = [st['key'] for st in STEPS]
 
@@ -1035,8 +1036,8 @@ def write_md():
          '**Totals:** %d parts and leads on top, %d insulated wires, %d bare bridges, %d rails.' % (
              sum(len(p.pins) for p in PARTS.values()), len(wires_of('wire')), len(wires_of('bridge')), len(RAILS)), '',
          '**Order:** parts, sockets and the board\'s own wires first, then the RJ12 and solar leads (steps 1–%d), while every hole' % (KEYS.index('solar') + 1),
-         'is still open; then the bare bridges (%d–%d: every board, then one step per port, then solar) and rails (%d), which land on those' % (
-             KEYS.index('bridges') + 1, KEYS.index('bridges4') + 1, KEYS.index('rails') + 1),
+         'is still open; then the rails (%d) and the bare bridges (%d–%d: every board, then one step per port, then solar), which land on those' % (
+             KEYS.index('rails') + 1, KEYS.index('bridges') + 1, KEYS.index('bridges4') + 1),
          'holes\' pads; then the charger, which only plugs in (%d); the ESP and USB-C board plug in last (%d). **Ports 2 and 3 and' % (
              KEYS.index('charger') + 1, len(KEYS) + 1),
          'the solar lead are optional:** skip a port\'s lead step and its bridge step together. Each',
