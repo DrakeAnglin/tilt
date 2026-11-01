@@ -188,14 +188,18 @@ def charger_pads():
 
 
 def draw_charger(o):
-    cx0, cy0 = pos('c15')
-    cx1, cy1 = pos('h22')
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="4" fill="#3b3b3b" opacity="0.8"/>' % (
-        cx0 - 14, cy1 - 14, cx1 - cx0 + 28, cy0 - cy1 + 28))
-    o.append('<text x="%.0f" y="%.0f" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">charger (foam tape)</text>' % (
-        (cx0 + cx1) / 2, (cy0 + cy1) / 2 + 5))
+    """The charger sits off the board, past the row-24 end; its wires come in to the ringed holes."""
+    x0, _ = pos('a24')
+    _, ya = pos('a1')
+    _, yj = pos('j1')
+    o.append('<rect x="%.0f" y="%.0f" width="120" height="%.0f" rx="6" fill="#3b3b3b" opacity="0.85"/>' % (x0 + 44, yj - 6, ya - yj + 12))
+    o.append('<text x="%.0f" y="%.0f" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">charger</text>' % (x0 + 104, (ya + yj) / 2 - 8))
+    o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#fff" text-anchor="middle">(off the board)</text>' % (x0 + 104, (ya + yj) / 2 + 10))
     for h, lab in charger_pads():
+        x, y = pos(h)
         ring(o, h, '#0a7a3a')
+        o.append('<path d="M%.0f %.0f Q%.0f %.0f %.0f %.0f" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>' % (
+            x, y, (x + x0 + 44) / 2, y - 18, x0 + 44, y))
         label(o, h, lab, dy=22 if h[0] == 'a' else -13, color='#0a7a3a', size=9)
 
 
@@ -329,15 +333,21 @@ step('batt', 'Battery pins (2 header pins)', 'top', [draw_batt],
      ['Mark b24 with a red "+" now: the red wire of the battery plug always goes on b24.'],
      """Snap 2 pins off a header strip and solder them in **a24 (−)** and **b24 (+)**, long side up. Mark **b24 "+"** in red.""",
      [('Battery pins', 'a24 (−), b24 (+)', 'red wire of the plug on b24')])
-step('charger', 'Charger: prepare, mount, wire its pads (7 wires)', 'top', [draw_charger],
-     'Top side. Charger on foam tape over c15–h22; short insulated wires from its pads into the ringed holes.',
+step('charger', 'Charger: prepare it, wire it in from off the board (7 wires)', 'top', [draw_charger],
+     'Top side. The charger (30.5 × 31.5 mm) sits OFF the board, past row 24; its wires come in to the ringed holes.',
      ['Where a hole already has a pin (b24, a10), push the wire in beside it or solder it to that pin underneath.'],
-     """1. On the bench first: remove the charger's fixed THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC
-   gets taped to the cell later). If the charger came with a loose bulk capacitor, solder it across its LOAD pads
-   (**long leg / + to LOAD +**, stripe / − to LOAD −). Tin the pads.
-2. Stick it on with foam tape over **c15–h22**.
-3. Cut 7 short pieces of 30 AWG wire, strip ~3 mm, solder one end to each pad and push the other end through its hole
-   from the top. Solder them underneath.
+     """The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
+so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
+
+1. On the bench first: remove the charger's fixed THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC
+   gets taped to the cell later). Solder the bulk capacitor across its LOAD pads (**long leg / + to LOAD +**,
+   stripe / − to LOAD −). To make it lie on its side, bend both leads 90° about 2 mm from the body (hold the lead with
+   pliers at the body so the bend doesn't strain it). Tin the pads.
+2. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
+   PWR + / PWR −, BATT + / BATT −, LOAD + / LOAD −. Solder each pair to its two pads, then the other ends into the
+   holes in the table from the top. Keep + and − straight: mark the + conductor with a marker before you start.
+3. **STAT: one 30 AWG wire** from the STAT pad (STAT1 if there are two) to a10.
+4. Solder all 7 underneath. Nothing else goes in these holes except where noted.
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)""",
      [(pad, h, net) for pad, h, net in M.CHARGER])
@@ -452,14 +462,14 @@ def bom():
         ('Zener 6.2 V', 1, '3', 'zener kit'),
         ('Ceramic capacitor 100 nF (104)', count['100n'], '4', 'ceramic capacitor kit'),
         ('Ceramic capacitor 10 µF (106)', count['10µ'], '4', 'ceramic capacitor kit'),
-        ('MCP73871 charger board (+ its bulk capacitor)', 1, '6', 'Comimark MCP73871'),
+        ('MCP73871 charger board, 30.5 × 31.5 mm, off the board (+ its 16 × 26 mm bulk capacitor)', 1, '6', 'Comimark MCP73871'),
         ('NTC thermistor 10 kΩ', 1, '6', 'NTC 10-pack'),
-        ('Foam tape', '1 piece', '6', ''),
+        ('White 22 AWG two-conductor wire', '3 pairs × 6-8 cm', '6 (charger power)', 'solar extension wire'),
         ('RJ12 breakout board', 3, '7 (%d leads)' % len(PARTS['Port leads'].pins), 'RJ11/RJ12 breakout 4-pack'),
         ('USB-C breakout (Cermant)', 1, '7 (2 leads)', 'USB-C breakout 10-pack'),
         ('Solar lead (optional)', 1, '7 (2 leads)', 'solar panel + extension'),
-        ('30 AWG insulated wire', '%d pieces' % (len(wires_of('wire')) + len(charger_pads())),
-         '6 (%d), 8 (%d)' % (len(charger_pads()), len(wires_of('wire'))), '30 AWG silicone wire'),
+        ('30 AWG insulated wire', '%d pieces' % (len(wires_of('wire')) + 1),
+         '6 (1, STAT), 8 (%d)' % len(wires_of('wire')), '30 AWG silicone wire'),
         ('Bare wire or trimmed resistor legs', '%d bridges + %d rails' % (len(wires_of('bridge')), len(wires_of('rail'))), '9, 10',
          'tinned wire / leg offcuts'),
         ('Perfboard 3 × 7 cm (a–j × 1–24)', 1, 'all', 'perfboard kit'),

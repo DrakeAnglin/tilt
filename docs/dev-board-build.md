@@ -23,13 +23,13 @@ step does one kind of part, and in its picture that step is in colour while ever
 | Zener 6.2 V | 1 | 3 | zener kit |
 | Ceramic capacitor 100 nF (104) | 4 | 4 | ceramic capacitor kit |
 | Ceramic capacitor 10 µF (106) | 1 | 4 | ceramic capacitor kit |
-| MCP73871 charger board (+ its bulk capacitor) | 1 | 6 | Comimark MCP73871 |
+| MCP73871 charger board, 30.5 × 31.5 mm, off the board (+ its 16 × 26 mm bulk capacitor) | 1 | 6 | Comimark MCP73871 |
 | NTC thermistor 10 kΩ | 1 | 6 | NTC 10-pack |
-| Foam tape | 1 piece | 6 |  |
+| White 22 AWG two-conductor wire | 3 pairs × 6-8 cm | 6 (charger power) | solar extension wire |
 | RJ12 breakout board | 3 | 7 (18 leads) | RJ11/RJ12 breakout 4-pack |
 | USB-C breakout (Cermant) | 1 | 7 (2 leads) | USB-C breakout 10-pack |
 | Solar lead (optional) | 1 | 7 (2 leads) | solar panel + extension |
-| 30 AWG insulated wire | 22 pieces | 6 (7), 8 (15) | 30 AWG silicone wire |
+| 30 AWG insulated wire | 16 pieces | 6 (1, STAT), 8 (15) | 30 AWG silicone wire |
 | Bare wire or trimmed resistor legs | 35 bridges + 2 rails | 9, 10 | tinned wire / leg offcuts |
 | Perfboard 3 × 7 cm (a–j × 1–24) | 1 | all | perfboard kit |
 | 18650 cell with JST-XH plug | 1 | 11 | 18650 cell |
@@ -128,28 +128,34 @@ Snap 2 pins off a header strip and solder them in **a24 (−)** and **b24 (+)**,
 |---|---|---|
 | Battery pins | a24 (−), b24 (+) | red wire of the plug on b24 |
 
-## Step 6: Charger: prepare, mount, wire its pads (7 wires)
+## Step 6: Charger: prepare it, wire it in from off the board (7 wires)
 
 ![step 6](renders/build-step-06.png)
 
+The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
+so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
+
 1. On the bench first: remove the charger's fixed THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC
-   gets taped to the cell later). If the charger came with a loose bulk capacitor, solder it across its LOAD pads
-   (**long leg / + to LOAD +**, stripe / − to LOAD −). Tin the pads.
-2. Stick it on with foam tape over **c15–h22**.
-3. Cut 7 short pieces of 30 AWG wire, strip ~3 mm, solder one end to each pad and push the other end through its hole
-   from the top. Solder them underneath.
+   gets taped to the cell later). Solder the bulk capacitor across its LOAD pads (**long leg / + to LOAD +**,
+   stripe / − to LOAD −). To make it lie on its side, bend both leads 90° about 2 mm from the body (hold the lead with
+   pliers at the body so the bend doesn't strain it). Tin the pads.
+2. **Power wires (they carry the battery and motor current): 3 pairs of the white 22 AWG two-conductor wire.**
+   PWR + / PWR −, BATT + / BATT −, LOAD + / LOAD −. Solder each pair to its two pads, then the other ends into the
+   holes in the table from the top. Keep + and − straight: mark the + conductor with a marker before you start.
+3. **STAT: one 30 AWG wire** from the STAT pad (STAT1 if there are two) to a10.
+4. Solder all 7 underneath. Nothing else goes in these holes except where noted.
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)
 
 | Charger pad | Board hole | Net |
 |---|---|---|
-| PWR + (input) | g23 | PWR node: D1 + D2 cathodes, zener |
+| PWR + (input) | g23 | PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -) |
 | PWR - / GND | a20 | GND rail |
-| BATT + | b24 | battery pin B+ (the cell reaches the VBAT rail only through the charger) |
+| BATT + | b24 | battery pin B+, 22 AWG pair with BATT - (the cell reaches the VBAT rail only through the charger) |
 | BATT - | a21 | GND rail |
-| LOAD + (output) | j20 | VBAT rail |
+| LOAD + (output) | j20 | VBAT rail (22 AWG pair with LOAD -) |
 | LOAD - | a22 | GND rail |
-| STAT | a10 | GPIO7 (pulled up by R stat) |
+| STAT | a10 | GPIO7 (pulled up by R stat); 30 AWG |
 | THERM | (NTC) | remove the board's THERM resistor; NTC from THERM to GND, taped to the cell |
 
 ## Step 7: Leads from the RJ12, USB-C and solar boards (22)

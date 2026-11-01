@@ -30,7 +30,7 @@ The bulk electrolytic that comes with the charger is soldered onto the charger b
 
 ESP32-C6: chip side up, header pins in its **inner** holes, into **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and
 **h1-h10** (5V, GND, 3V3, 20, 19, 18, 15, 14, 9, 8), USB-C overhanging row 1 (confirmed against the board).
-Leave its inner pads (12, 13, 21, 22, 23) and BAT pad unconnected. Charger: foam tape over **c15-h22**.
+Leave its inner pads (12, 13, 21, 22, 23) and BAT pad unconnected. Charger: off the board, wired in (see the charger table).
 
 D3 (j5-j6) drops ~0.3 V, so the ESP browns out near 3.4-3.5 V on the cell (last ~10-15 %). Optional: 2 header
 pins + jumper at j5-j6 instead of D3 (zero drop; pull the jumper before plugging USB into the ESP).
@@ -109,11 +109,11 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 
 | Pad | Board hole | Net |
 |---|---|---|
-| PWR + (input) | g23 | PWR node: D1 + D2 cathodes, zener |
+| PWR + (input) | g23 | PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -) |
 | PWR - / GND | a20 | GND rail |
-| BATT + | b24 | battery pin B+ (the cell reaches the VBAT rail only through the charger) |
+| BATT + | b24 | battery pin B+, 22 AWG pair with BATT - (the cell reaches the VBAT rail only through the charger) |
 | BATT - | a21 | GND rail |
-| LOAD + (output) | j20 | VBAT rail |
+| LOAD + (output) | j20 | VBAT rail (22 AWG pair with LOAD -) |
 | LOAD - | a22 | GND rail |
-| STAT | a10 | GPIO7 (pulled up by R stat) |
+| STAT | a10 | GPIO7 (pulled up by R stat); 30 AWG |
 | THERM | (NTC) | remove the board's THERM resistor; NTC from THERM to GND, taped to the cell |

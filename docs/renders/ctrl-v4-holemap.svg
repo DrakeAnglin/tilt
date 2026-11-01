@@ -5,8 +5,6 @@
 <rect x="70.0" y="70.0" width="548.6" height="228.6" fill="#e9f4e1" stroke="#3a7a2a" stroke-width="2"/>
 <rect x="67.3" y="114.7" width="234.0" height="162.0" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
 <rect x="60.1" y="155.5" width="66.2" height="80.5" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
-<rect x="391.0" y="102.0" width="176.4" height="164.7" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
-<rect x="445.0" y="149.7" width="72.0" height="81.0" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
 <rect x="71.4" y="66.0" width="22.5" height="22.5" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
 <rect x="81.6" y="76.2" width="22.5" height="22.5" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
 <rect x="91.8" y="86.4" width="22.5" height="22.5" fill="none" stroke="#1f6fb5" stroke-width="1.2"/>
@@ -287,7 +285,6 @@
 <text x="267.9" y="123.6" font-size="6">9</text>
 <text x="290.8" y="123.6" font-size="6">8</text>
 <text x="70.3" y="126.7" font-size="10" font-weight="bold" fill="#1f6fb5">ESP32-C6</text>
-<text x="394.0" y="114.0" font-size="10" font-weight="bold" fill="#1f6fb5">MCP73871</text>
 <text x="85.0" y="77.8" font-size="6">5V</text>
 <text x="107.9" y="100.7" font-size="6">G</text>
 <text x="74.4" y="78.0" font-size="10" font-weight="bold" fill="#1f6fb5">C 10u</text>

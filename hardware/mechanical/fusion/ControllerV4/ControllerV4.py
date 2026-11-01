@@ -113,12 +113,9 @@ def layout():
         ('ESP32-C6 USB-C', xc - 13 - 0.8, xc - 13 - 0.8 + 7.35, yc - 4.47, yc + 4.47, z0 + 1.0, z0 + 4.26),
         ('ESP32-C6 headers', X(0) - 1.27, X(9) + 1.27, Y(1) - 1.27, Y(1) + 1.27, t, z0),
         ('ESP32-C6 headers 2', X(0) - 1.27, X(9) + 1.27, Y(7) - 1.27, Y(7) + 1.27, t, z0)]))
-    # charger on 1 mm foam tape over rows 15-22, columns c-h
-    cx0, cy0 = (X(14) + X(21)) / 2 - 9.8 - 0.25, (Y(2) + Y(7)) / 2 - 9.15
-    parts.append(Part('MCP73871', [], [('MCP73871 PCB', cx0, cx0 + 19.6, cy0, cy0 + 18.3, t + 1.0, t + 2.6),
-                                       ('MCP73871 parts', cx0 + 6, cx0 + 14, cy0 + 4, cy0 + 13, t + 2.6, t + 3.5),
-                                       ('MCP73871 tape', cx0 + 0.5, cx0 + 19.1, cy0 + 0.5, cy0 + 17.8, t, t + 1.0)],
-                      note='foam tape; its pads are wired to the board (see the wiring list)'))
+    # charger: its board is 30.5 x 31.5 mm (wider than the 25.4 mm perfboard) with a 16 x 26 mm bulk capacitor, so it
+    # sits OFF the perfboard; its pads come in on short wires (power pairs in 22 AWG). The box needs a bay for it.
+    parts.append(Part('MCP73871', [], [], note='off the board (30.5 x 31.5 mm + 16 x 26 mm capacitor); wired in, see the charger table'))
 
     def upright(name, h_body, h_lead, d=2.3, h=8.0, labels=('', '')):
         """Resistor / diode standing up: body over the first hole, the hairpin lead in the second."""
@@ -213,13 +210,13 @@ WIRES = [
 WIRES = [w for w in WIRES if not w[2].startswith('NO')] + [('i24', 'c24', 'wire: solar - -> GND link (straight along row 24)')]
 
 CHARGER = [  # charger pad -> board
-    ('PWR + (input)', 'g23', 'PWR node: D1 + D2 cathodes, zener'),
+    ('PWR + (input)', 'g23', 'PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -)'),
     ('PWR - / GND', 'a20', 'GND rail'),
-    ('BATT +', 'b24', 'battery pin B+ (the cell reaches the VBAT rail only through the charger)'),
+    ('BATT +', 'b24', 'battery pin B+, 22 AWG pair with BATT - (the cell reaches the VBAT rail only through the charger)'),
     ('BATT -', 'a21', 'GND rail'),
-    ('LOAD + (output)', 'j20', 'VBAT rail'),
+    ('LOAD + (output)', 'j20', 'VBAT rail (22 AWG pair with LOAD -)'),
     ('LOAD -', 'a22', 'GND rail'),
-    ('STAT', 'a10', 'GPIO7 (pulled up by R stat)'),
+    ('STAT', 'a10', 'GPIO7 (pulled up by R stat); 30 AWG'),
     ('THERM', '(NTC)', 'remove the board\'s THERM resistor; NTC from THERM to GND, taped to the cell'),
 ]
 
@@ -235,7 +232,7 @@ def wiring_md():
           'The bulk electrolytic that comes with the charger is soldered onto the charger board itself (+ to its LOAD side).', '',
           'ESP32-C6: chip side up, header pins in its **inner** holes, into **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and',
           '**h1-h10** (5V, GND, 3V3, 20, 19, 18, 15, 14, 9, 8), USB-C overhanging row 1 (confirmed against the board).',
-          'Leave its inner pads (12, 13, 21, 22, 23) and BAT pad unconnected. Charger: foam tape over **c15-h22**.', '',
+          'Leave its inner pads (12, 13, 21, 22, 23) and BAT pad unconnected. Charger: off the board, wired in (see the charger table).', '',
           'D3 (j5-j6) drops ~0.3 V, so the ESP browns out near 3.4-3.5 V on the cell (last ~10-15 %). Optional: 2 header',
           'pins + jumper at j5-j6 instead of D3 (zero drop; pull the jumper before plugging USB into the ESP).', '',
           '## Port leads (from the RJ12 boards)', '', '| Lead | Hole | Lead | Hole | Lead | Hole |', '|---|---|---|---|---|---|']
