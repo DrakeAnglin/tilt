@@ -128,30 +128,29 @@ def layout():
                     cyls=[(name, (X(i0), Y(m0), t + 0.5), (X(i0), Y(m0), t + 0.5 + h), d / 2)])
 
     def disc(name, ha, hb, labels=('', '')):
-        """Ceramic disc / MLCC on 2.54 mm leads, standing, body plane along the line between its holes."""
+        """Monolithic ceramic capacitor from the kit: leads 5.08 mm apart (3 holes: the middle one stays free under it),
+        body ~4.8 wide along its leads, 2 mm thick, 5 mm tall. Don't bend the leads."""
         (i0, m0), (i1, m1) = H(ha), H(hb)
-        x0, x1 = sorted((X(i0), X(i1)))
-        y0, y1 = sorted((Y(m0), Y(m1)))
+        assert abs(i0 - i1) + abs(m0 - m1) == 2, name + ': ceramic caps span 3 holes'
+        xm, ym = (X(i0) + X(i1)) / 2, (Y(m0) + Y(m1)) / 2
         if i0 == i1:
-            box = (name, x0 - 1.0, x1 + 1.0, y0 - 1.0, y1 + 1.0, t, t + 5.0)     # 2 mm thick monolithic body
+            box = (name, xm - 1.0, xm + 1.0, ym - 2.4, ym + 2.4, t, t + 5.0)
         else:
-            box = (name, x0 - 1.0, x1 + 1.0, y0 - 1.0, y1 + 1.0, t, t + 5.0)
+            box = (name, xm - 2.4, xm + 2.4, ym - 1.0, ym + 1.0, t, t + 5.0)
         return Part(name, [(i0, m0, labels[0]), (i1, m1, labels[1])], [box])
 
-    # next to the ESP (column i, j rows 1-10)
-    parts += [disc('C 10u', 'j1', 'j2', ('5V', 'G')),
-              upright('R stat 10k', 'j3', 'j4'),
-              upright('D3 1N5819', 'j5', 'j6', 2.7, 8.0, ('K', 'A')),
-              upright('R div top 1M', 'j7', 'j8'),
-              upright('R div bot 1M', 'j9', 'j10'),
-              disc('C div 100n', 'g12', 'g13')]
-    # angle filters, rows 12-14 (1 k standing, 100 n disc)
-    for k, col, ccol in ((1, 'b', 'a'), (2, 'd', 'c'), (3, 'f', 'e')):
-        parts += [upright('R ADC%d 1k' % k, '%s12' % col, '%s13' % col),
-                  disc('C ADC%d 100n' % k, '%s14' % ccol, '%s14' % col)]
-    # bulk electrolytic (comes with the charger), standing, rows 11-13 at the back edge
-    parts.append(Part('C bulk', [H('i12') + ('-',), H('i13') + ('+',)],
-                      cyls=[('C bulk', ((X(11) + X(12)) / 2, Y(8) + 0.6, t), ((X(11) + X(12)) / 2, Y(8) + 0.6, t + 13.0), 4.0)]))
+    # next to the ESP (column j rows 1-11; the middle hole of a ceramic cap stays empty under it)
+    parts += [disc('C 10u', 'j1', 'j3', ('5V', 'G')),
+              upright('R stat 10k', 'j4', 'j5'),
+              upright('D3 1N5819', 'j6', 'j7', 2.7, 8.0, ('K', 'A')),
+              upright('R div top 1M', 'j8', 'j9'),
+              upright('R div bot 1M', 'j10', 'j11'),
+              disc('C div 100n', 'i11', 'i13')]
+    # angle filters, rows 12-14 (1 k standing, 100 n spanning 3 holes)
+    parts += [upright('R ADC1 1k', 'b12', 'b13'), disc('C ADC1 100n', 'a14', 'c14'),
+              upright('R ADC2 1k', 'd12', 'd13'), disc('C ADC2 100n', 'd14', 'f14'),
+              upright('R ADC3 1k', 'f12', 'f13'), disc('C ADC3 100n', 'g12', 'g14')]
+    # the charger's own bulk electrolytic is soldered on the charger board (not on the perfboard)
     # power row: diodes and zener (row 23), connectors (row 24)
     parts += [upright('D1 1N5819 USB', 'e23', 'd23', 2.7, 8.0, ('A', 'K')),
               upright('D2 1N5819 solar', 'h23', 'g23', 2.7, 8.0, ('A', 'K')),
@@ -173,31 +172,31 @@ def layout():
 WIRES = [
     # rails (bare tinned wire along the column, soldered at every hole)
     ('a12', 'a24', 'GND rail: bare wire down column a, rows 12-24'),
-    ('j11', 'j24', 'VBAT rail: bare wire down column j, rows 11-24'),
+    ('j12', 'j24', 'VBAT rail: bare wire down column j, rows 12-24'),
     # ESP pins to their neighbours
     ('a1', 'b1', 'bridge: port 3 IN1 -> GPIO16'), ('a2', 'b2', 'bridge: port 3 IN2 -> GPIO17'),
     ('a3', 'b3', 'bridge: angle 1 -> GPIO0'), ('a4', 'b4', 'bridge: angle 2 -> GPIO1'), ('a5', 'b5', 'bridge: angle 3 -> GPIO2'),
     ('a6', 'b6', 'bridge: battery divider -> GPIO3'),
     ('a7', 'b7', 'bridge: port 1 EN -> GPIO4'), ('a8', 'b8', 'bridge: port 2 EN -> GPIO5'), ('a9', 'b9', 'bridge: port 3 EN -> GPIO6'),
     ('a10', 'b10', 'bridge: charger STAT -> GPIO7'),
-    ('h1', 'j1', 'bridge (over i1): ESP 5V -> C 10u'), ('h2', 'j2', 'bridge (over i2): ESP GND -> C 10u'),
-    ('h3', 'j3', 'bridge (over i3): ESP 3V3 -> R stat'),
+    ('h1', 'j1', 'bridge (over i1): ESP 5V -> C 10u'), ('h2', 'j2', 'bridge (over i2): ESP GND'),
+    ('j2', 'j3', 'bridge: ESP GND -> C 10u'), ('h3', 'i3', 'bridge: ESP 3V3'),
     ('h4', 'i4', 'bridge: port 2 IN1 -> GPIO20'), ('h5', 'i5', 'bridge: port 1 IN2 -> GPIO19'),
     ('h6', 'i6', 'bridge: port 1 IN1 -> GPIO18'), ('h8', 'i8', 'bridge: port 2 IN2 -> GPIO14'),
     # power to the ESP, STAT, divider
-    ('j5', 'j1', 'wire: D3 cathode -> ESP 5V'), ('j6', 'j11', 'wire: D3 anode -> VBAT rail'),
-    ('j2', 'a12', 'wire: ESP GND -> GND rail'), ('j4', 'a10', 'wire: R stat -> STAT / GPIO7'),
-    ('j7', 'j11', 'wire: R div top -> VBAT rail'), ('j8', 'j9', 'bridge: divider node'),
-    ('j8', 'g12', 'wire: divider node -> C div'), ('g12', 'a6', 'wire: divider node -> GPIO3'),
-    ('j10', 'a12', 'wire: R div bot -> GND rail'), ('g13', 'a13', 'wire: C div -> GND rail'),
+    ('i3', 'j4', 'wire: 3V3 -> R stat'), ('j5', 'a10', 'wire: R stat -> STAT / GPIO7'),
+    ('j6', 'j1', 'wire: D3 cathode -> ESP 5V'), ('j7', 'j12', 'wire: D3 anode -> VBAT rail'),
+    ('j3', 'a12', 'wire: ESP GND -> GND rail'),
+    ('j8', 'j12', 'wire: R div top -> VBAT rail'), ('j9', 'j10', 'bridge: divider node'),
+    ('j9', 'i11', 'wire: divider node -> C div'), ('i11', 'a6', 'wire: divider node -> GPIO3'),
+    ('j11', 'a13', 'wire: R div bot -> GND rail'), ('i13', 'a13', 'wire: C div -> GND rail'),
     # angle filters
     ('b11', 'b12', 'bridge: port 1 ANGLE -> R ADC1'), ('d11', 'd12', 'bridge: port 2 ANGLE -> R ADC2'),
     ('f11', 'f12', 'bridge: port 3 ANGLE -> R ADC3'),
-    ('b13', 'b14', 'bridge: R ADC1 -> C ADC1'), ('d13', 'd14', 'bridge: R ADC2 -> C ADC2'), ('f13', 'f14', 'bridge: R ADC3 -> C ADC3'),
+    ('b13', 'c14', 'bridge (over b14): R ADC1 -> C ADC1'), ('d13', 'd14', 'bridge: R ADC2 -> C ADC2'),
+    ('f13', 'g12', 'wire: R ADC3 -> C ADC3'),
     ('b13', 'a3', 'wire: filter 1 -> GPIO0'), ('d13', 'a4', 'wire: filter 2 -> GPIO1'), ('f13', 'a5', 'wire: filter 3 -> GPIO2'),
-    ('c14', 'a14', 'wire: C ADC2 -> GND rail'), ('e14', 'a14', 'wire: C ADC3 -> GND rail'),
-    # bulk cap
-    ('i13', 'j13', 'bridge: C bulk + -> VBAT rail'), ('i12', 'a12', 'wire: C bulk - -> GND rail'),
+    ('f14', 'a15', 'wire: C ADC2 -> GND rail'), ('g14', 'a16', 'wire: C ADC3 -> GND rail'),
     # power row
     ('e23', 'e24', 'bridge: USB V+ -> D1 anode'), ('h23', 'h24', 'bridge: solar + -> D2 anode'),
     ('d23', 'f23', 'wire: D1 cathode -> PWR node (zener cathode)'), ('f23', 'g23', 'bridge: PWR node -> D2 cathode'),
@@ -225,11 +224,13 @@ def wiring_md():
         if p.pins and p.name not in ('ESP32-C6', 'Port leads'):
             o.append('| %s | %s | %s |' % (p.name, ', '.join('%s%s' % (HN(i, m), (' (' + lab + ')') if lab else '')
                                                          for i, m, lab in p.pins), p.note))
-    o += ['', 'ESP32-C6: chip side up, header pins in its **inner** holes, into **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and',
+    o += ['', 'All ceramic capacitors (100 n, 10 u) have legs 3 holes apart: the middle hole stays empty under the body.',
+          'The bulk electrolytic that comes with the charger is soldered onto the charger board itself (+ to its LOAD side).', '',
+          'ESP32-C6: chip side up, header pins in its **inner** holes, into **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and',
           '**h1-h10** (5V, GND, 3V3, 20, 19, 18, 15, 14, 9, 8), USB-C overhanging row 1 (confirmed against the board).',
           'Leave its inner pads (12, 13, 21, 22, 23) and BAT pad unconnected. Charger: foam tape over **c15-h22**.', '',
-          'D3 (j5-j6) drops ~0.3 V, so the ESP browns out near 3.4-3.5 V on the cell (last ~10-15 %). Optional: 2 header',
-          'pins + jumper at j5-j6 instead of D3 (zero drop; pull the jumper before plugging USB into the ESP).', '',
+          'D3 (j6-j7) drops ~0.3 V, so the ESP browns out near 3.4-3.5 V on the cell (last ~10-15 %). Optional: 2 header',
+          'pins + jumper at j6-j7 instead of D3 (zero drop; pull the jumper before plugging USB into the ESP).', '',
           '## Port leads (from the RJ12 boards)', '', '| Lead | Hole | Lead | Hole | Lead | Hole |', '|---|---|---|---|---|---|']
     leads = {lab: HN(i, m) for i, m, lab in next(p for p in layout() if p.name == 'Port leads').pins}
     for sig in ('IN1', 'IN2', 'EN', 'ANG', 'VBAT', 'GND'):

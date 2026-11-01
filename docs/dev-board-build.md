@@ -12,10 +12,10 @@ checks that the wiring makes every connection with no shorts.
 | Part | Direction matters? | How to tell |
 |---|---|---|
 | Resistors (1k, 10k, 1M) | **No** | either way round |
-| Ceramic capacitors (100n, 10µ, small blue/yellow blocks) | **No** | either way round |
+| Ceramic capacitors (100n, 10µ, small blue/yellow blocks) | **No** | either way round. Their legs are **3 holes apart** (5 mm): use the holes in the table and leave the middle one empty. Don't bend the legs to fit 2 holes |
 | **1N5819 diodes** (D1, D2, D3) | **YES** | the silver/white **band is the cathode (K)**; put the band where the picture shows |
 | **6.2 V zener** (Z) | **YES** | same: band = cathode |
-| **Bulk electrolytic** (the can that comes with the charger) | **YES** | stripe with "−" marks minus; the **long leg is +** |
+| **Bulk electrolytic** (the can that comes with the charger, if there is one) | **YES** | it goes **on the charger board**, not the perfboard. Stripe with "−" marks minus; the **long leg is +** |
 | **ESP32-C6** | **YES** | chip side up, USB-C past row 1, 5V/GND/3V3 in column h |
 | **Battery plug** on the 2 header pins | **YES, and it can go on backwards** | red wire on **c24 (+)**, black on **b24 (−)**; mark c24 with a marker |
 | USB-C and solar leads | **YES** | red/+ to e24 (USB) and h24 (solar), black/− to d24 and i24 |
@@ -46,18 +46,20 @@ can damage parts. Check those three twice before connecting the battery.
 ![step 2](renders/build-2-parts.png)
 
 Resistors and diodes **stand up**: body over the first hole, the other lead bent down into the second hole.
+Ceramic capacitors sit straight down with one leg in each listed hole; the hole between them stays empty.
+If a lead ever has to be bent, hold it with pliers right next to the body and bend below the pliers, so the body
+isn't stressed.
 
 | Part | Holes | Direction |
 |---|---|---|
-| 10 µF ceramic | j1, j2 | any |
-| 10 kΩ (R stat) | j3, j4 | any |
-| **D3** 1N5819 | j5, j6 | **band at j5** |
-| 1 MΩ (divider top) | j7, j8 | any |
-| 1 MΩ (divider bottom) | j9, j10 | any |
-| 100 nF (divider) | g12, g13 | any |
+| 10 µF ceramic | j1, j3 (j2 empty) | any |
+| 10 kΩ (R stat) | j4, j5 | any |
+| **D3** 1N5819 | j6, j7 | **band at j6** |
+| 1 MΩ (divider top) | j8, j9 | any |
+| 1 MΩ (divider bottom) | j10, j11 | any |
+| 100 nF (divider) | i11, i13 (i12 empty) | any |
 | 1 kΩ ×3 (angle filters) | b12–b13, d12–d13, f12–f13 | any |
-| 100 nF ×3 (angle filters) | a14–b14, c14–d14, e14–f14 | any |
-| **Bulk electrolytic** | i12, i13 | **stripe (−) in i12, long leg (+) in i13** |
+| 100 nF ×3 (angle filters) | a14–c14, d14–f14, g12–g14 (middle holes empty) | any |
 | **D1** 1N5819 (USB) | e23, d23 | **band at d23** |
 | **D2** 1N5819 (solar) | h23, g23 | **band at g23** |
 | **Zener** 6.2 V | f24, f23 | **band at f23** |
@@ -70,17 +72,18 @@ Resistors and diodes **stand up**: body over the first hole, the other lead bent
 Flip the board over its **long** edge: row 1 stays on the left, column a is now at the **top**. The colours match the
 nets: black GND, red battery +, orange 5V, purple 3V3, blue signals.
 
-1. **Rails first:** a bare wire along column **a**, rows 12–24 (GND), and along column **j**, rows 11–24 (battery +),
+1. **Rails first:** a bare wire along column **a**, rows 12–24 (GND), and along column **j**, rows 12–24 (battery +),
    soldered at every hole.
-2. **Bridges** next to the ESP (a1–b1 … a10–b10; h1–i1–j1, h2–i2–j2, h3–i3–j3; h4–i4, h5–i5, h6–i6, h8–i8) and the
-   short ones in rows 11–14 and 23–24.
+2. **Bridges** next to the ESP (a1–b1 … a10–b10; h1–i1–j1, h2–i2–j2–j3, h3–i3; h4–i4, h5–i5, h6–i6, h8–i8) and the
+   short ones in rows 9–14 and 23–24. Bridging under the empty middle hole of a capacitor is fine.
 3. **Wires** (dashed in the picture): every one is in the "Underside wiring" table of
    [ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md), with what it connects.
 4. After each group, check with the meter's beep mode: the two ends beep, and **GND (a12) must NOT beep to battery +
-   (j11)** or to 5V (h1).
+   (j12)** or to 5V (h1).
 
 ## Step 4: charger
-1. Before mounting: remove the charger's THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC gets taped
+1. Before mounting: if the charger came with a loose bulk capacitor, solder it onto the charger's own output/LOAD
+   pads (+ to LOAD +), or to the LOAD + and LOAD − wire ends right at the charger. Then remove the charger's THERM resistor and solder the 10 kΩ NTC's two leads there (the NTC gets taped
    to the cell later). Tin its pads.
 2. Stick it on with foam tape over **c15–h22**, pads facing where the wires will reach.
 3. Wire its pads (short insulated wires, from the top):
@@ -112,7 +115,7 @@ Solder the 18 leads from the three RJ12 boards from the top (pin 1 = the square 
 Then the USB-C breakout's VBUS → e24 and GND → d24, and the solar lead's + → h24 and − → i24.
 
 ## Step 6: first power-up (no battery yet)
-1. Meter check: GND (a12) to battery + (j11): no beep. GND to 5V (h1): no beep. GND to 3V3 (h3): no beep.
+1. Meter check: GND (a12) to battery + (j12): no beep. GND to 5V (h1): no beep. GND to 3V3 (h3): no beep.
 2. Plug USB into the **ESP's own** USB-C only (battery unplugged). Its LED should light; upload the test sketch.
-3. Unplug USB, then push the cell's plug onto b24/c24 (**red on c24**). Measure j11 to a12: the cell voltage (3.0–4.2 V).
+3. Unplug USB, then push the cell's plug onto b24/c24 (**red on c24**). Measure j12 to a12: the cell voltage (3.0–4.2 V).
 4. Never plug USB into the ESP and the battery at the same time unless D3 is fitted.
