@@ -17,7 +17,7 @@ checks that the wiring makes every connection with no shorts.
 | **6.2 V zener** (Z) | **YES** | same: band = cathode |
 | **Bulk electrolytic** (the can that comes with the charger, if there is one) | **YES** | it goes **on the charger board**, not the perfboard. Stripe with "−" marks minus; the **long leg is +** |
 | **ESP32-C6** | **YES** | chip side up, USB-C past row 1, 5V/GND/3V3 in column h |
-| **Battery plug** on the 2 header pins | **YES, and it can go on backwards** | red wire on **c24 (+)**, black on **b24 (−)**; mark c24 with a marker |
+| **Battery plug** on the 2 header pins | **YES, and it can go on backwards** | red wire on **b24 (+)**, black on **a24 (−)**; mark b24 with a marker |
 | USB-C and solar leads | **YES** | red/+ to e24 (USB) and h24 (solar), black/− to d24 and i24 |
 | Charger pads | **YES** | follow the pad table at the end |
 
@@ -63,7 +63,7 @@ isn't stressed.
 | **D1** 1N5819 (USB) | e23, d23 | **band at d23** |
 | **D2** 1N5819 (solar) | h23, g23 | **band at g23** |
 | **Zener** 6.2 V | f24, f23 | **band at f23** |
-| 2 header pins (battery) | b24 (−), c24 (+) | mark c24 "+" |
+| 2 header pins (battery) | a24 (−), b24 (+) | mark b24 "+" |
 
 ## Step 3: wiring underneath
 
@@ -79,6 +79,11 @@ nets: black GND, red battery +, orange 5V, purple 3V3, blue signals.
    isn't a neighbour is an insulated wire. Bridging under the empty middle hole of a capacitor is fine.
 3. **Wires** (dashed in the picture): every one is in the "Underside wiring" table of
    [ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md), with what it connects.
+   The red battery + line (column j, rows 13–24) looks almost empty from underneath, and that's correct: its
+   connections are soldered in from the top. They're the three port leads (j15, j16, j17) and the charger's
+   LOAD + wire (j20); the rings in the picture mark them. The only wire to it underneath is from D3 (j6 → j13). The
+   battery itself does **not** connect to the red line directly: battery + (b24) goes to the charger's BATT + pad, and
+   the charger feeds the line from LOAD +.
 4. After each group, check with the meter's beep mode: the two ends beep, and **GND (a12) must NOT beep to battery +
    (j13)** or to 5V (h1).
 
@@ -93,7 +98,7 @@ nets: black GND, red battery +, orange 5V, purple 3V3, blue signals.
 |---|---|
 | PWR + (input) | g23 |
 | PWR − / GND | a20 |
-| BATT + | c24 |
+| BATT + | b24 |
 | BATT − | a21 |
 | LOAD + (output) | j20 |
 | LOAD − | a22 |
@@ -118,5 +123,5 @@ Then the USB-C breakout's VBUS → e24 and GND → d24, and the solar lead's + �
 ## Step 6: first power-up (no battery yet)
 1. Meter check: GND (a12) to battery + (j13): no beep. GND to 5V (h1): no beep. GND to 3V3 (h3): no beep.
 2. Plug USB into the **ESP's own** USB-C only (battery unplugged). Its LED should light; upload the test sketch.
-3. Unplug USB, then push the cell's plug onto b24/c24 (**red on c24**). Measure j13 to a12: the cell voltage (3.0–4.2 V).
+3. Unplug USB, then push the cell's plug onto a24/b24 (**red on b24**). Measure j13 to a12: the cell voltage (3.0–4.2 V).
 4. Never plug USB into the ESP and the battery at the same time unless D3 is fitted.

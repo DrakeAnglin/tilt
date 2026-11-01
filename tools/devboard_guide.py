@@ -149,13 +149,13 @@ def guide_top():
     for h, t in (('e23', 'D1: band at d23'), ('h23', 'D2: band at g23'), ('f23', 'Zener: band at f23')):
         x, y = pos(h)
         o.append('<text x="%.0f" y="%.0f" font-size="11" font-weight="bold" text-anchor="end">%s</text>' % (x - 46, y + 4, t))
-    for h, t, c in (('b24', 'B− (black)', '#222'), ('c24', 'B+ (red)', '#d62728'), ('d24', 'USB −', '#222'), ('e24', 'USB +', '#d62728'),
+    for h, t, c in (('a24', 'B− (black)', '#222'), ('b24', 'B+ (red)', '#d62728'), ('d24', 'USB −', '#222'), ('e24', 'USB +', '#d62728'),
                     ('h24', 'Solar +', '#d62728'), ('i24', 'Solar −', '#222')):
         dot(o, h, c)
         label(o, h, t, dx=22, dy=4, color=c, size=11, anchor='start')
     finish(o, 'build-2-parts.svg', ['Blue ceramic capacitors: legs 3 holes apart (5 mm), the middle hole stays EMPTY. The 10µ goes corner to corner (j1-i2), legs pulled in slightly, body leaning away from the ESP.',
                                      'Diodes stand up: body over the first hole, lead bent back into the second. The silver/white band is the cathode (K).',
-                                     'Battery pins: 2 bare header pins at b24 (−) and c24 (+). The plug is NOT keyed on bare pins: red wire to c24.'])
+                                     'Battery pins: 2 bare header pins at a24 (−) and b24 (+). The plug is NOT keyed on bare pins: red wire to b24.'])
 
 
 def guide_bottom():
@@ -187,13 +187,24 @@ def guide_bottom():
             mx, my = (x0 + x1) / 2, (y0 + y1) / 2 - 14
             o.append('<path d="M%.0f %.0f Q%.0f %.0f %.0f %.0f" fill="none" stroke="%s" stroke-width="2.5" stroke-dasharray="7,3"/>' % (
                 x0, y0, mx, my, x1, y1, col))
+    # leads and charger wires soldered in from the top: rings, so the underside shows where each net arrives
+    leads = next(p for p in M.layout() if p.name == 'Port leads').pins
+    marks = [(M.HN(i, m), lab.replace(' VBAT', '+').replace(' GND', '−')) for i, m, lab in leads if lab.endswith(('VBAT', 'GND'))]
+    short = {'PWR + (input)': 'PWR+', 'PWR - / GND': 'PWR−', 'BATT +': 'BAT+', 'BATT -': 'BAT−', 'LOAD + (output)': 'LOAD+', 'LOAD -': 'LD−'}
+    marks += [(h, short[pad]) for pad, h, _ in M.CHARGER if pad in short]
+    for h, lab in marks:
+        x, y = pos(h, True)
+        c = NET_COL['VBAT'] if h[0] == 'j' else (NET_COL['GND'] if h[0] == 'a' else '#0a7a3a')
+        o.append('<circle cx="%.0f" cy="%.0f" r="9" fill="none" stroke="%s" stroke-width="2.5"/>' % (x, y, c))
+        o.append('<text x="%.0f" y="%.0f" font-size="9" font-weight="bold" fill="%s" text-anchor="middle">%s</text>' % (
+            x, y + (22 if h[0] == 'j' else -13), c, lab))
     lx = MX - 40
     ly = HGT - 64
     for k, (t, c) in enumerate((('GND', NET_COL['GND']), ('VBAT (battery +)', NET_COL['VBAT']), ('5V', NET_COL['5V']),
                                 ('3V3', NET_COL['3V3']), ('signal', NET_COL['sig']))):
         o.append('<rect x="%d" y="%.0f" width="18" height="6" fill="%s"/><text x="%d" y="%.0f" font-size="12">%s</text>' % (
             lx + k * 150, ly, c, lx + k * 150 + 24, ly + 7, t))
-    finish(o, 'build-3-underside.svg', ['', 'Solid = bare bridge or rail. Dashed = insulated 30 AWG wire. Charger pad wires: see the table in the guide.'])
+    finish(o, 'build-3-underside.svg', ['', 'Solid = bare bridge or rail. Dashed = insulated 30 AWG wire. Rings = port leads / charger wires soldered in from the top (battery + reaches the red rail via LOAD+ at j20).'])
 
 
 def polarity():

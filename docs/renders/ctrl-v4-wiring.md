@@ -21,7 +21,7 @@ Step-by-step guide with pictures and which parts have a direction: [dev-board-bu
 | D1 1N5819 USB | e23 (A), d23 (K) |  |
 | D2 1N5819 solar | h23 (A), g23 (K) |  |
 | Z 6.2V | f24 (A), f23 (K) |  |
-| Battery pins | b24 (B-), c24 (B+) |  |
+| Battery pins | a24 (B-), b24 (B+) |  |
 | USB leads | d24 (V-), e24 (V+) |  |
 | Solar leads | h24 (S+), i24 (S-) |  |
 
@@ -98,10 +98,12 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 | h23 | h24 | bridge: solar + -> D2 anode |
 | d23 | f23 | wire: D1 cathode -> PWR node (zener cathode) |
 | f23 | g23 | bridge: PWR node -> D2 cathode |
-| b24 | a24 | bridge: battery - -> GND rail |
-| d24 | a24 | wire: USB V- -> GND rail |
-| f24 | a24 | wire: zener anode -> GND rail |
-| i24 | a24 | wire: solar - -> GND rail (run it under the board) |
+| d24 | c24 | bridge: USB V- -> GND link |
+| c24 | c23 | bridge: GND link |
+| c23 | b23 | bridge: GND link |
+| b23 | a23 | bridge: GND link -> GND rail |
+| f24 | c24 | wire: zener anode -> GND link (straight along row 24) |
+| i24 | c24 | wire: solar - -> GND link (straight along row 24) |
 
 ## Charger pads
 
@@ -109,7 +111,7 @@ RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side
 |---|---|---|
 | PWR + (input) | g23 | PWR node: D1 + D2 cathodes, zener |
 | PWR - / GND | a20 | GND rail |
-| BATT + | c24 | battery pin B+ |
+| BATT + | b24 | battery pin B+ (the cell reaches the VBAT rail only through the charger) |
 | BATT - | a21 | GND rail |
 | LOAD + (output) | j20 | VBAT rail |
 | LOAD - | a22 | GND rail |

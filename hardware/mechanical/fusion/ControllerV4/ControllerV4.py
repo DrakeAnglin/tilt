@@ -160,9 +160,9 @@ def layout():
     parts += [upright('D1 1N5819 USB', 'e23', 'd23', 2.7, 8.0, ('A', 'K')),
               upright('D2 1N5819 solar', 'h23', 'g23', 2.7, 8.0, ('A', 'K')),
               upright('Z 6.2V', 'f24', 'f23', 2.7, 8.0, ('A', 'K'))]
-    parts.append(Part('Battery pins', [H('b24') + ('B-',), H('c24') + ('B+',)],
-                      [('Battery pins', X(23) - 1.27, X(23) + 1.27, Y(1) - 1.27, Y(2) + 1.27, t, t + 2.5),
-                       ('XH plug', X(23) - 2.45, X(23) + 2.45, Y(1) - 2.45, Y(2) + 2.45, t + 2.5, t + 8.5)]))
+    parts.append(Part('Battery pins', [H('a24') + ('B-',), H('b24') + ('B+',)],          # a24 is the end of the GND rail
+                      [('Battery pins', X(23) - 1.27, X(23) + 1.27, Y(0) - 1.27, Y(1) + 1.27, t, t + 2.5),
+                       ('XH plug', X(23) - 2.45, X(23) + 2.45, Y(0) - 2.45, Y(1) + 2.45, t + 2.5, t + 8.5)]))
     parts.append(Part('USB leads', [H('d24') + ('V-',), H('e24') + ('V+',)]))
     parts.append(Part('Solar leads', [H('h24') + ('S+',), H('i24') + ('S-',)]))
     # port leads (18), soldered into these holes from the top
@@ -206,15 +206,16 @@ WIRES = [
     # power row
     ('e23', 'e24', 'bridge: USB V+ -> D1 anode'), ('h23', 'h24', 'bridge: solar + -> D2 anode'),
     ('d23', 'f23', 'wire: D1 cathode -> PWR node (zener cathode)'), ('f23', 'g23', 'bridge: PWR node -> D2 cathode'),
-    ('b24', 'a24', 'bridge: battery - -> GND rail'), ('d24', 'a24', 'wire: USB V- -> GND rail'),
-    ('f24', 'a24', 'wire: zener anode -> GND rail'), ('i24', 'j24', 'NO: do not bridge (j is VBAT); see the charger table'),
+    ('d24', 'c24', 'bridge: USB V- -> GND link'), ('c24', 'c23', 'bridge: GND link'), ('c23', 'b23', 'bridge: GND link'),
+    ('b23', 'a23', 'bridge: GND link -> GND rail'),
+    ('f24', 'c24', 'wire: zener anode -> GND link (straight along row 24)'), ('i24', 'j24', 'NO: do not bridge (j is VBAT); see the charger table'),
 ]
-WIRES = [w for w in WIRES if not w[2].startswith('NO')] + [('i24', 'a24', 'wire: solar - -> GND rail (run it under the board)')]
+WIRES = [w for w in WIRES if not w[2].startswith('NO')] + [('i24', 'c24', 'wire: solar - -> GND link (straight along row 24)')]
 
 CHARGER = [  # charger pad -> board
     ('PWR + (input)', 'g23', 'PWR node: D1 + D2 cathodes, zener'),
     ('PWR - / GND', 'a20', 'GND rail'),
-    ('BATT +', 'c24', 'battery pin B+'),
+    ('BATT +', 'b24', 'battery pin B+ (the cell reaches the VBAT rail only through the charger)'),
     ('BATT -', 'a21', 'GND rail'),
     ('LOAD + (output)', 'j20', 'VBAT rail'),
     ('LOAD -', 'a22', 'GND rail'),
