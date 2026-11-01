@@ -9,8 +9,9 @@ every hole holds exactly one thing (a part leg, a lead or a wire end).
 **Totals:** 87 parts and leads on top, 4 insulated wires, 61 bare bridges, 3 rails.
 
 **Order:** parts, sockets and the board's own wires first, then the RJ12 and solar leads (steps 1–9), while every hole
-is still open; then the bare bridges (10) and rails (11), which land on those holes' pads; then the charger, which only
-plugs in (12); the ESP and USB-C board plug in last (13). Port 3 and the solar lead are optional. Each
+is still open; then the bare bridges (10–13: every board, then one step per port) and rails (14), which land on those
+holes' pads; then the charger, which only plugs in (15); the ESP and USB-C board plug in last (16). **Ports 2 and 3 and
+the solar lead are optional:** skip a port's lead step and its bridge step together. Each
 step does one kind of part, and in its picture that step is in colour while everything already done is grey.
 
 ## Parts for one board
@@ -188,13 +189,13 @@ underneath, trim to ~1 mm.
 | 5 EN | **blue**, 30 AWG silicone | d10 |
 | 6 IN2 | **yellow**, 30 AWG silicone | e2 |
 
-## Step 7: RJ12 port 2 (6 leads)
+## Step 7: RJ12 port 2 (6 leads): optional, for 2 or more blinds
 
 **You need:** 1 × RJ12 breakout board, 22 AWG stranded, 5–8 cm: 1 red (battery +), 1 black (GND), 30 AWG silicone, 5–8 cm: 1 each green (IN1), yellow (IN2), blue (EN), white (angle).
 
 ![step 7](renders/build-step-07.png)
 
-Solder 6 leads, 5–8 cm long, to port 2's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
+**Optional:** skip it on a controller that drives only 1 blind; the holes stay free for later. Solder 6 leads, 5–8 cm long, to port 2's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
 signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
 **black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
@@ -209,13 +210,13 @@ underneath, trim to ~1 mm.
 | 5 EN | **blue**, 30 AWG silicone | h10 |
 | 6 IN2 | **yellow**, 30 AWG silicone | h2 |
 
-## Step 8: RJ12 port 3 (6 leads): only if this controller drives 3 blinds
+## Step 8: RJ12 port 3 (6 leads): optional, for 3 blinds
 
 **You need:** 1 × RJ12 breakout board, 22 AWG stranded, 5–8 cm: 1 red (battery +), 1 black (GND), 30 AWG silicone, 5–8 cm: 1 each green (IN1), yellow (IN2), blue (EN), white (angle).
 
 ![step 8](renders/build-step-08.png)
 
-**Optional:** skip this step on the controller that only drives 2 blinds; the holes stay free for later. Solder 6 leads, 5–8 cm long, to port 3's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
+**Optional:** skip it on the controller that drives only 2 blinds; the holes stay free for later. Solder 6 leads, 5–8 cm long, to port 3's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
 signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
 **black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
@@ -249,16 +250,16 @@ solar input, but fit them anyway so a panel can be added later without re-solder
 | Solar + | g23 | to D2's anode (bridge in step 10) |
 | Solar − | a17 | GND rail |
 
-## Step 10: Bare bridges underneath (61)
+## Step 10: Bare bridges: every board (37)
 
-**You need:** 61 × short bare wire: the ~32 leg offcuts saved from steps 1-3, the rest cut from 22 AWG solid tinned bus wire.
+**You need:** 37 × short bare wire: leg offcuts saved from steps 1-3 (about 32 in all), the rest cut from 22 AWG solid tinned bus wire.
 
 ![step 10](renders/build-step-10.png)
 
 A bridge is a short piece of **bare solid wire**: a trimmed resistor or diode leg, or **22 AWG solid tinned copper
-(bus) wire**, laid across neighbouring pads and soldered at
-both ends; don't rely on a solder blob alone. Work one area at a time and check each with the meter: the two ends beep,
-and neither beeps to the pad next to it.
+(bus) wire**, laid across neighbouring pads and soldered at both ends; don't rely on a solder blob alone. Work one area at
+a time and check each with the meter: the two ends beep, and neither beeps to the pad next to it. The bridges that only
+serve one RJ12 port come in the next three steps, so you can leave out a port you don't use.
 
 | From | To | What |
 |---|---|---|
@@ -267,30 +268,6 @@ and neither beeps to the pad next to it.
 | b3 | b2 | ESP GND |
 | b2 | b1 | ESP GND |
 | b1 | c1 | ESP GND -> C 10u |
-| d3 | d2 | port 2 IN1 -> GPIO20 |
-| e3 | e2 | port 1 IN2 -> GPIO19 |
-| f3 | f2 | port 1 IN1 -> GPIO18 |
-| h3 | h2 | port 2 IN2 -> GPIO14 |
-| a9 | a10 | port 3 IN1 -> GPIO16 |
-| b9 | b10 | port 3 IN2 -> GPIO17 |
-| d9 | d10 | port 1 EN -> GPIO1 |
-| h9 | h10 | port 2 EN -> GPIO5 |
-| j9 | j10 | port 3 EN -> GPIO7 |
-| c9 | c10 | filter 1 -> GPIO0 |
-| c10 | c11 | filter 1 node |
-| c11 | b11 | filter 1 node -> R ADC1 |
-| b14 | b15 | port 1 ANGLE -> R ADC1 |
-| c12 | c13 | C ADC1 GND -> GND rail |
-| e9 | e10 | filter 2 -> GPIO2 |
-| e10 | e11 | filter 2 node |
-| e11 | d11 | filter 2 node -> R ADC2 |
-| d14 | e14 | port 2 ANGLE -> R ADC2 |
-| e12 | e13 | C ADC2 GND -> GND rail |
-| g9 | g10 | filter 3 -> GPIO4 |
-| g10 | g11 | filter 3 node |
-| g11 | h11 | filter 3 node -> R ADC3 |
-| h14 | h15 | port 3 ANGLE -> R ADC3 |
-| g12 | g13 | C ADC3 GND -> GND rail |
 | f9 | f10 | battery divider -> GPIO3 |
 | f10 | f11 | battery divider -> C div |
 | i9 | i10 | input-power sense -> GPIO6 |
@@ -324,15 +301,81 @@ and neither beeps to the pad next to it.
 | b19 | c19 | battery + -> charger BATT + hole |
 | c19 | d19 | battery + -> charger BATT + hole |
 
-## Step 11: Rails (3)
+## Step 11: Bare bridges: port 1 (8)
 
-**You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
+**You need:** 8 × short bare wire (leg offcuts or 22 AWG solid tinned).
 
 ![step 11](renders/build-step-11.png)
 
+Port 1's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
+ESP and the GND rail. Same method as the step before.
+
+| From | To | What |
+|---|---|---|
+| e3 | e2 | port 1 IN2 -> GPIO19 |
+| f3 | f2 | port 1 IN1 -> GPIO18 |
+| d9 | d10 | port 1 EN -> GPIO1 |
+| c9 | c10 | filter 1 -> GPIO0 |
+| c10 | c11 | filter 1 node |
+| c11 | b11 | filter 1 node -> R ADC1 |
+| b14 | b15 | port 1 ANGLE -> R ADC1 |
+| c12 | c13 | C ADC1 GND -> GND rail |
+
+## Step 12: Bare bridges: port 2 (8): optional
+
+**You need:** 8 × short bare wire (leg offcuts or 22 AWG solid tinned).
+
+![step 12](renders/build-step-12.png)
+
+Port 2's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
+ESP and the GND rail. Same method as the step before.
+
+**Optional:** only if this controller drives 2 or more blinds. Skipped, the port's holes stay open for later; its 1 kΩ and
+100 nF can stay on the board unconnected.
+
+| From | To | What |
+|---|---|---|
+| d3 | d2 | port 2 IN1 -> GPIO20 |
+| h3 | h2 | port 2 IN2 -> GPIO14 |
+| h9 | h10 | port 2 EN -> GPIO5 |
+| e9 | e10 | filter 2 -> GPIO2 |
+| e10 | e11 | filter 2 node |
+| e11 | d11 | filter 2 node -> R ADC2 |
+| d14 | e14 | port 2 ANGLE -> R ADC2 |
+| e12 | e13 | C ADC2 GND -> GND rail |
+
+## Step 13: Bare bridges: port 3 (8): optional
+
+**You need:** 8 × short bare wire (leg offcuts or 22 AWG solid tinned).
+
+![step 13](renders/build-step-13.png)
+
+Port 3's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
+ESP and the GND rail. Same method as the step before.
+
+**Optional:** only if this controller drives 3 blinds. Skipped, the port's holes stay open for later; its 1 kΩ and
+100 nF can stay on the board unconnected.
+
+| From | To | What |
+|---|---|---|
+| a9 | a10 | port 3 IN1 -> GPIO16 |
+| b9 | b10 | port 3 IN2 -> GPIO17 |
+| j9 | j10 | port 3 EN -> GPIO7 |
+| g9 | g10 | filter 3 -> GPIO4 |
+| g10 | g11 | filter 3 node |
+| g11 | h11 | filter 3 node -> R ADC3 |
+| h14 | h15 | port 3 ANGLE -> R ADC3 |
+| g12 | g13 | C ADC3 GND -> GND rail |
+
+## Step 14: Rails (3)
+
+**You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
+
+![step 14](renders/build-step-14.png)
+
 Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole
 it passes. Where two GND rails
-meet at a corner, solder them together there. Then the charger plugs (step 12) and the checks (step 13).
+meet at a corner, solder them together there. Then the charger plugs (step 15) and the checks (step 16).
 
 | From | To | What |
 |---|---|---|
@@ -340,11 +383,11 @@ meet at a corner, solder them together there. Then the charger plugs (step 12) a
 | a13 | a24 | bare wire down column a, rows 13-24 |
 | j11 | j24 | bare wire down column j, rows 11-24 |
 
-## Step 12: Charger: prepare it, put JST plugs on its wires (3 plugs)
+## Step 15: Charger: prepare it, put JST plugs on its wires (3 plugs)
 
 **You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 22 AWG stranded, 6–8 cm: 3 red (+), 3 black (−), 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins.
 
-![step 12](renders/build-step-12.png)
+![step 15](renders/build-step-15.png)
 
 The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
 so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
@@ -382,7 +425,7 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 | THERM | (NTC) | remove the 103 (10 k) resistor beside the THERM label; NTC across its two pads, taped to the cell |
 | CE, TE, PROG2, SEL (edge pads) | - | leave unconnected (board defaults); the board has no STAT pad, status is on its LEDs |
 
-## Step 13: checks, then plug in the ESP and the USB-C board
+## Step 16: checks, then plug in the ESP and the USB-C board
 
 **You need:** multimeter, 1 × ESP32-C6 SuperMini (its male pins soldered on), 1 × USB-C breakout (its 6 male pins soldered on), 1 × 18650 cell with JST-XH plug.
 

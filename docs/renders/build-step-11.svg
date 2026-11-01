@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1190" height="520" font-family="Helvetica,Arial">
 <defs><filter id="mute"><feColorMatrix type="saturate" values="0"/></filter></defs>
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text x="30" y="30" font-size="20" font-weight="bold">Step 11: Rails (3)</text>
-<text x="30" y="54" font-size="13" fill="#444">Bottom view. Long bare wires: GND a13–i13, GND a13–a24, battery + j11–j24.</text>
+<text x="30" y="30" font-size="20" font-weight="bold">Step 11: Bare bridges: port 1 (8)</text>
+<text x="30" y="54" font-size="13" fill="#444">Bottom view. Port 1 only: its IN1 / IN2 / EN / angle leads to the ESP, and its angle filter.</text>
 <rect x="49" y="69" width="732" height="312" rx="6" fill="#f3efe2" stroke="#3a7a2a" stroke-width="2"/>
 <text x="70" y="63" font-size="11" fill="#666" text-anchor="middle">1</text>
 <text x="100" y="63" font-size="11" fill="#666" text-anchor="middle">2</text>
@@ -396,54 +396,6 @@
 <line x1="100" y1="120" x2="70" y2="120" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
 <line x1="70" y1="120" x2="70" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
 <line x1="70" y1="120" x2="70" y2="150" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="130" y1="180" x2="100" y2="180" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="130" y1="180" x2="100" y2="180" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="130" y1="210" x2="100" y2="210" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="130" y1="210" x2="100" y2="210" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="130" y1="240" x2="100" y2="240" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="130" y1="240" x2="100" y2="240" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="130" y1="300" x2="100" y2="300" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="130" y1="300" x2="100" y2="300" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="90" x2="340" y2="90" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="90" x2="340" y2="90" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="120" x2="340" y2="120" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="120" x2="340" y2="120" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="180" x2="340" y2="180" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="180" x2="340" y2="180" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="300" x2="340" y2="300" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="300" x2="340" y2="300" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="360" x2="340" y2="360" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="360" x2="340" y2="360" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="150" x2="340" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="150" x2="340" y2="150" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="340" y1="150" x2="370" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="340" y1="150" x2="370" y2="150" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="370" y1="150" x2="370" y2="120" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="370" y1="150" x2="370" y2="120" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="460" y1="120" x2="490" y2="120" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="460" y1="120" x2="490" y2="120" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="400" y1="150" x2="430" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="400" y1="150" x2="430" y2="150" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="210" x2="340" y2="210" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="210" x2="340" y2="210" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="340" y1="210" x2="370" y2="210" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="340" y1="210" x2="370" y2="210" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="370" y1="210" x2="370" y2="180" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="370" y1="210" x2="370" y2="180" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="460" y1="180" x2="460" y2="210" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="460" y1="180" x2="460" y2="210" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="400" y1="210" x2="430" y2="210" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="400" y1="210" x2="430" y2="210" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="310" y1="270" x2="340" y2="270" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="310" y1="270" x2="340" y2="270" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="340" y1="270" x2="370" y2="270" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="340" y1="270" x2="370" y2="270" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="370" y1="270" x2="370" y2="300" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="370" y1="270" x2="370" y2="300" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="460" y1="300" x2="490" y2="300" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="460" y1="300" x2="490" y2="300" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="400" y1="270" x2="430" y2="270" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="400" y1="270" x2="430" y2="270" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
 <line x1="310" y1="240" x2="340" y2="240" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
 <line x1="310" y1="240" x2="340" y2="240" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
 <line x1="340" y1="240" x2="370" y2="240" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
@@ -509,12 +461,22 @@
 <line x1="610" y1="150" x2="610" y2="180" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
 <line x1="610" y1="150" x2="610" y2="180" stroke="#d62728" stroke-width="1.6" stroke-linecap="round"/>
 </g>
-<line x1="430" y1="90" x2="430" y2="330" stroke="#9aa3a8" stroke-width="7" stroke-linecap="round"/>
-<line x1="430" y1="90" x2="430" y2="330" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="430" y1="90" x2="760" y2="90" stroke="#9aa3a8" stroke-width="7" stroke-linecap="round"/>
-<line x1="430" y1="90" x2="760" y2="90" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="370" y1="360" x2="760" y2="360" stroke="#9aa3a8" stroke-width="7" stroke-linecap="round"/>
-<line x1="370" y1="360" x2="760" y2="360" stroke="#d62728" stroke-width="1.6" stroke-linecap="round"/>
-<text x="30" y="447" font-size="13" fill="#222">You need: 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm</text>
-<text x="30" y="467" font-size="13" fill="#222">Solder each rail at every hole it passes, including the ones that already have wires or leads.</text>
+<line x1="130" y1="210" x2="100" y2="210" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="130" y1="210" x2="100" y2="210" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
+<line x1="130" y1="240" x2="100" y2="240" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="130" y1="240" x2="100" y2="240" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
+<line x1="310" y1="180" x2="340" y2="180" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="310" y1="180" x2="340" y2="180" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
+<line x1="310" y1="150" x2="340" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="310" y1="150" x2="340" y2="150" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
+<line x1="340" y1="150" x2="370" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="340" y1="150" x2="370" y2="150" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
+<line x1="370" y1="150" x2="370" y2="120" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="370" y1="150" x2="370" y2="120" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
+<line x1="460" y1="120" x2="490" y2="120" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="460" y1="120" x2="490" y2="120" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
+<line x1="400" y1="150" x2="430" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
+<line x1="400" y1="150" x2="430" y2="150" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
+<text x="30" y="447" font-size="13" fill="#222">You need: 8 × short bare wire (leg offcuts or 22 AWG solid tinned)</text>
+<text x="30" y="467" font-size="13" fill="#222">Port 1 is always used.</text>
 </svg>
