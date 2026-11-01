@@ -334,8 +334,12 @@ def draw_charger(o):
         label(o, h, lab, dy=22 if h[0] == 'a' else -13, color='#0a7a3a', size=9)
 
 
-def draw_leads(o):
-    for n in [q for q in ('Port leads', 'USB leads', 'Solar leads') if q in PARTS]:
+def draw_solar(o):
+    draw_leads(o, ('Solar leads',))
+
+
+def draw_leads(o, which=('Port leads', 'USB leads')):
+    for n in [q for q in which if q in PARTS]:
         for i, m, lab in PARTS[n].pins:
             h = HN(i, m)
             sig = lab.split()[-1]
@@ -418,7 +422,8 @@ def res_note(n):
 
 def diode_note(n):
     p = dict((lab, HN(i, m)) for i, m, lab in PARTS[n].pins)
-    return '%s**band (K) at %s**, other end (A) at %s' % ('flat, ' if span(p['K'], p['A']) >= 3 else '', p['K'], p['A'])
+    solar = ' (for the solar input; fit it anyway)' if ('solar' in n or n.startswith('Z ')) else ''
+    return '%s**band (K) at %s**, other end (A) at %s%s' % ('flat, ' if span(p['K'], p['A']) >= 3 else '', p['K'], p['A'], solar)
 
 
 def cap_note(n):
@@ -529,13 +534,21 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)""",
      [(pad, h, net) for pad, h, net in M.CHARGER])
-step('leads', 'Leads from the RJ12 boards and the solar lead (%d)' % sum(len(PARTS[q].pins) for q in ('Port leads', 'Solar leads')),
-     'top', [draw_leads],
+step('leads', 'Leads from the RJ12 boards (%d)' % len(PARTS['Port leads'].pins), 'top', [draw_leads],
      'Top side. Each lead goes in from the top. Pin 1 is the square pad on each RJ12 board.',
      ['Let the RJ12 boards hang off the end and tape them down while you work underneath.'],
-     """Solder the 18 leads from the three RJ12 boards (pin 1 = square pad), then the solar lead's + → %s and − → %s.
-Trim underneath to ~1 mm.""" % (LEAD['S+'], LEAD['S-']),
+     """Solder the 18 leads from the three RJ12 boards (pin 1 = square pad) into the holes in the table. Trim underneath
+to ~1 mm.""",
      None)
+step('solar', 'Solar lead (optional)', 'top', [draw_solar],
+     'Top side. Only if you use a solar panel: its lead goes in from the top.',
+     ['Skip this step for USB-C charging only. You can add it later: the holes stay free.'],
+     """**Optional.** Only if this controller gets a solar panel: solder the panel lead's **+ (red) → %s** and **− (black) → %s**
+(%s is on the GND rail). Trim underneath.
+
+Without solar, skip it: the board charges over USB-C alone. D2 and the zener from step 2 are only there for the
+solar input, but fit them anyway so a panel can be added later without re-soldering.""" % (LEAD['S+'], LEAD['S-'], LEAD['S-']),
+     [('Solar +', LEAD['S+'], 'to D2\'s anode (bridge in step 9)'), ('Solar −', LEAD['S-'], 'GND rail')])
 step('wires', 'Insulated wires underneath (%d)' % len(wires_of('wire')), 'bottom', [draw_under, 'wire'],
      'Bottom view: flip the board over its long edge, row 1 still on the left, column a now at the TOP. Grey = done already.',
      ['Dashed = 30 AWG insulated wire, dots = its two ends. Colours: black GND, red battery +, orange 5V, blue signal.'],
@@ -554,7 +567,7 @@ step('rails', 'Rails (%d)' % len(RAILS), 'bottom', [draw_under, 'rail'],
      'Bottom view. Long bare wires: ' + rails_text() + '.',
      ['Solder each rail at every hole it passes, including the ones that already have wires or leads.'],
      """Last: lay straight bare tinned wire for each rail (%s), soldering it at every hole it passes. Where two GND rails
-meet at a corner, solder them together there. Then do the checks in step 10.""" % rails_text(),
+meet at a corner, solder them together there. Then do the checks in step 11.""" % rails_text(),
      what(wires_of('rail')))
 
 
@@ -578,7 +591,8 @@ def need():
                    ['3 × JST-XH 2-pin top-entry header', '1 × JST-XH 3-pin right-angle header'],
         'charger': ['1 × MCP73871 charger board (+ its bulk capacitor)', '1 × 10 kΩ NTC thermistor',
                     '6 × 22 AWG wire, 6–8 cm', '1 × JST-XH 3-pin housing', '2 × JST-XH 2-pin housing', '6 × JST-XH crimp pins'],
-        'leads': ['3 × RJ12 breakout board (6 leads each)'] + (['1 × solar lead (2 wires)'] if 'Solar leads' in PARTS else []),
+        'leads': ['3 × RJ12 breakout board (6 leads each)'],
+        'solar': ['1 × solar panel lead (2 wires): optional'],
         'wires': ['%d × 30 AWG insulated wire (cut to length)' % len(wires_of('wire'))],
         'bridges': ['%d × short bare wire: the ~%d leg offcuts saved from steps 1-3, the rest cut from bare tinned wire' % (
             len(wires_of('bridge')), 2 * (len(RES) + len(DIODES) + len(CAPS)))],
@@ -788,7 +802,7 @@ def bom():
         ('22 AWG wire (the white two-conductor, split)', '6 × 6-8 cm', '5 (charger power)', 'solar extension wire'),
         ('RJ12 breakout board', 3, '7 (%d leads)' % len(PARTS['Port leads'].pins), 'RJ11/RJ12 breakout 4-pack'),
         ('USB-C breakout (Cermant), with its 6 male pins', 1, 'plugs in at the end', 'USB-C breakout 10-pack'),
-        ('Solar lead (optional)', 1, '7 (2 leads)', 'solar panel + extension'),
+        ('Solar lead (optional)', 1, '7 (2 leads, optional)', 'solar panel + extension'),
         ('30 AWG insulated wire', '%d pieces' % len(wires_of('wire')), '8', '30 AWG silicone wire'),
         ('Bare wire or trimmed resistor legs', '%d bridges + %d rails' % (len(wires_of('bridge')), len(wires_of('rail'))), '9, 10',
          'tinned wire / leg offcuts'),
@@ -806,8 +820,8 @@ def write_md():
          'every hole holds exactly one thing (a part leg, a lead or a wire end).', '',
          '**Totals:** %d parts and leads on top, %d insulated wires, %d bare bridges, %d rails.' % (
              sum(len(p.pins) for p in PARTS.values()), len(wires_of('wire')), len(wires_of('bridge')), len(RAILS)), '',
-         '**Order:** all parts and leads first (steps 1–6, holes still open), then the insulated wires (7), then the bare',
-         'bridges (8), then the rails (9); the ESP and the USB-C board plug in last (10). That way solder never fills a hole that something still has to go through. Each',
+         '**Order:** all parts and leads first (steps 1–7, holes still open; step 7, solar, is optional), then the insulated',
+         'wires (8), then the bare bridges (9), then the rails (10); the ESP and the USB-C board plug in last (11). That way solder never fills a hole that something still has to go through. Each',
          'step does one kind of part, and in its picture that step is in colour while everything already done is grey.', '',
          '## Parts for one board', '', '| Part | Count | Step | From (BOM) |', '|---|---|---|---|']
     o += ['| %s | %s | %s | %s |' % r for r in bom()]
@@ -829,7 +843,7 @@ def write_md():
           '- If a hole fills by accident, heat it and clear it with a desoldering pump or wick before going on.', '']
     hdr = {'esp': ('Part', 'Holes', 'Note'), 'sockets': ('Part', 'Holes', 'Note'), 'res': ('Resistor', 'Holes', 'How'), 'diodes': ('Diode', 'Holes', 'Direction'),
            'caps': ('Capacitor', 'Holes', 'Note'), 'batt': ('Part', 'Holes', 'Note'), 'charger': ('Charger pad', 'Board hole', 'Net'),
-           'wires': ('From', 'To', 'What'), 'bridges': ('From', 'To', 'What'), 'rails': ('From', 'To', 'What')}
+           'wires': ('From', 'To', 'What'), 'solar': ('Lead', 'Hole', 'Goes to'), 'bridges': ('From', 'To', 'What'), 'rails': ('From', 'To', 'What')}
     for k, st in enumerate(STEPS):
         o += ['## Step %d: %s' % (k + 1, st['title']), '', '**You need:** ' + ', '.join(NEED.get(st['key'], [])) + '.', '',
               '![step %d](renders/build-step-%02d.png)' % (k + 1, k + 1), '', st['body'], '']
@@ -839,9 +853,8 @@ def write_md():
             for pin, sig in ((1, 'VBAT'), (2, 'IN1'), (3, 'GND'), (4, 'ANG'), (5, 'EN'), (6, 'IN2')):
                 o.append('| %d %s | %s | %s | %s |' % (pin, {'VBAT': 'battery +', 'ANG': 'angle'}.get(sig, sig),
                                                      leads['P1 ' + sig], leads['P2 ' + sig], leads['P3 ' + sig]))
-            o += ['', '| Lead | Hole |', '|---|---|'] + (['| USB-C VBUS (+) | %s |' % LEAD['V+'], '| USB-C GND (−) | %s |' % LEAD['V-']]
-                                                       if 'V+' in LEAD else []) + \
-                 ['| Solar + | %s |' % LEAD['S+'], '| Solar − | %s |' % LEAD['S-'], '']
+            o += ([''] + ['| Lead | Hole |', '|---|---|', '| USB-C VBUS (+) | %s |' % LEAD['V+'], '| USB-C GND (−) | %s |' % LEAD['V-']]
+                  if 'V+' in LEAD else []) + ['']
         else:
             o += ['| %s |' % ' | '.join(hdr[st['key']]), '|---|---|---|'] + ['| %s | %s | %s |' % r for r in st['table']] + ['']
     o += ['## Step %d: checks, then plug in the ESP and the USB-C board' % (len(STEPS) + 1), '',

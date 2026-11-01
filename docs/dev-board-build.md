@@ -8,8 +8,8 @@ every hole holds exactly one thing (a part leg, a lead or a wire end).
 
 **Totals:** 87 parts and leads on top, 4 insulated wires, 61 bare bridges, 3 rails.
 
-**Order:** all parts and leads first (steps 1–6, holes still open), then the insulated wires (7), then the bare
-bridges (8), then the rails (9); the ESP and the USB-C board plug in last (10). That way solder never fills a hole that something still has to go through. Each
+**Order:** all parts and leads first (steps 1–7, holes still open; step 7, solar, is optional), then the insulated
+wires (8), then the bare bridges (9), then the rails (10); the ESP and the USB-C board plug in last (11). That way solder never fills a hole that something still has to go through. Each
 step does one kind of part, and in its picture that step is in colour while everything already done is grey.
 
 ## Parts for one board
@@ -32,7 +32,7 @@ step does one kind of part, and in its picture that step is in colour while ever
 | 22 AWG wire (the white two-conductor, split) | 6 × 6-8 cm | 5 (charger power) | solar extension wire |
 | RJ12 breakout board | 3 | 7 (18 leads) | RJ11/RJ12 breakout 4-pack |
 | USB-C breakout (Cermant), with its 6 male pins | 1 | plugs in at the end | USB-C breakout 10-pack |
-| Solar lead (optional) | 1 | 7 (2 leads) | solar panel + extension |
+| Solar lead (optional) | 1 | 7 (2 leads, optional) | solar panel + extension |
 | 30 AWG insulated wire | 4 pieces | 8 | 30 AWG silicone wire |
 | Bare wire or trimmed resistor legs | 61 bridges + 3 rails | 9, 10 | tinned wire / leg offcuts |
 | Perfboard 3 × 7 cm (a–j × 1–24) | 1 | all | perfboard kit |
@@ -98,8 +98,8 @@ and lay each one flat with its **band at the K hole** in the table and the pictu
 |---|---|---|
 | D3 1N5819 | i15, i18 | flat, **band (K) at i18**, other end (A) at i15 |
 | D1 1N5819 USB | b23, b20 | flat, **band (K) at b20**, other end (A) at b23 |
-| D2 1N5819 solar | f23, f20 | flat, **band (K) at f20**, other end (A) at f23 |
-| Z 6.2V | d20, d23 | flat, **band (K) at d20**, other end (A) at d23 |
+| D2 1N5819 solar | f23, f20 | flat, **band (K) at f20**, other end (A) at f23 (for the solar input; fit it anyway) |
+| Z 6.2V | d20, d23 | flat, **band (K) at d20**, other end (A) at d23 (for the solar input; fit it anyway) |
 
 ## Step 3: Ceramic capacitors (4 × 100 nF, 1 × 10 µF)
 
@@ -188,14 +188,14 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 | THERM | (NTC) | remove the 103 (10 k) resistor beside the THERM label; NTC across its two pads, taped to the cell |
 | CE, TE, PROG2, SEL (edge pads) | - | leave unconnected (board defaults); the board has no STAT pad, status is on its LEDs |
 
-## Step 6: Leads from the RJ12 boards and the solar lead (20)
+## Step 6: Leads from the RJ12 boards (18)
 
-**You need:** 3 × RJ12 breakout board (6 leads each), 1 × solar lead (2 wires).
+**You need:** 3 × RJ12 breakout board (6 leads each).
 
 ![step 6](renders/build-step-06.png)
 
-Solder the 18 leads from the three RJ12 boards (pin 1 = square pad), then the solar lead's + → g23 and − → a17.
-Trim underneath to ~1 mm.
+Solder the 18 leads from the three RJ12 boards (pin 1 = square pad) into the holes in the table. Trim underneath
+to ~1 mm.
 
 | RJ12 pin | Port 1 | Port 2 | Port 3 |
 |---|---|---|---|
@@ -206,16 +206,28 @@ Trim underneath to ~1 mm.
 | 5 EN | d10 | h10 | j10 |
 | 6 IN2 | e2 | h2 | b10 |
 
-| Lead | Hole |
-|---|---|
-| Solar + | g23 |
-| Solar − | a17 |
+## Step 7: Solar lead (optional)
 
-## Step 7: Insulated wires underneath (4)
+**You need:** 1 × solar panel lead (2 wires): optional.
+
+![step 7](renders/build-step-07.png)
+
+**Optional.** Only if this controller gets a solar panel: solder the panel lead's **+ (red) → g23** and **− (black) → a17**
+(a17 is on the GND rail). Trim underneath.
+
+Without solar, skip it: the board charges over USB-C alone. D2 and the zener from step 2 are only there for the
+solar input, but fit them anyway so a panel can be added later without re-soldering.
+
+| Lead | Hole | Goes to |
+|---|---|---|
+| Solar + | g23 | to D2's anode (bridge in step 9) |
+| Solar − | a17 | GND rail |
+
+## Step 8: Insulated wires underneath (4)
 
 **You need:** 4 × 30 AWG insulated wire (cut to length).
 
-![step 7](renders/build-step-07.png)
+![step 8](renders/build-step-08.png)
 
 Wires go in **before** the bridges and rails, while their holes are still open. For each wire: cut it a little long,
 strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Beep each wire out with the
@@ -228,11 +240,11 @@ meter as you go.
 | h19 | f10 | divider node -> GPIO3 |
 | d16 | i10 | input-power sense -> GPIO6 |
 
-## Step 8: Bare bridges underneath (61)
+## Step 9: Bare bridges underneath (61)
 
 **You need:** 61 × short bare wire: the ~32 leg offcuts saved from steps 1-3, the rest cut from bare tinned wire.
 
-![step 8](renders/build-step-08.png)
+![step 9](renders/build-step-09.png)
 
 A bridge is a short piece of **bare** wire laid across neighbouring pads (a trimmed resistor leg is ideal), soldered at
 both ends; don't rely on a solder blob alone. Work one area at a time and check each with the meter: the two ends beep,
@@ -302,14 +314,14 @@ and neither beeps to the pad next to it.
 | b19 | c19 | battery + -> charger BATT + hole |
 | c19 | d19 | battery + -> charger BATT + hole |
 
-## Step 9: Rails (3)
+## Step 10: Rails (3)
 
 **You need:** 3 × bare tinned wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
 
-![step 9](renders/build-step-09.png)
+![step 10](renders/build-step-10.png)
 
 Last: lay straight bare tinned wire for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole it passes. Where two GND rails
-meet at a corner, solder them together there. Then do the checks in step 10.
+meet at a corner, solder them together there. Then do the checks in step 11.
 
 | From | To | What |
 |---|---|---|
@@ -317,7 +329,7 @@ meet at a corner, solder them together there. Then do the checks in step 10.
 | a13 | a24 | bare wire down column a, rows 13-24 |
 | j11 | j24 | bare wire down column j, rows 11-24 |
 
-## Step 10: checks, then plug in the ESP and the USB-C board
+## Step 11: checks, then plug in the ESP and the USB-C board
 
 **You need:** multimeter, 1 × ESP32-C6 SuperMini (its male pins soldered on), 1 × USB-C breakout (its 6 male pins soldered on), 1 × 18650 cell with JST-XH plug.
 
