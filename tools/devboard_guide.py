@@ -137,12 +137,12 @@ def guide_top():
 
     o = board('Step 2: parts on top (direction matters for the dark ones)',
               'Top side. Tan = resistor, blue = ceramic capacitor (any way round). Black = diode: the band goes where shown. Electrolytic: stripe = minus.')
-    for name, a, b, txt in (('R stat', 'j4', 'j5', '10k'), ('R div top', 'j8', 'j9', '1M'), ('R div bot', 'j10', 'j11', '1M'),
-                            ('R ADC1', 'b12', 'c12', '1k'), ('R ADC2', 'd12', 'd13', '1k'), ('R ADC3', 'f12', 'f13', '1k')):
+    for name, a, b, txt in (('R stat', 'j3', 'j4', '10k'), ('R div top', 'j7', 'j8', '1M'), ('R div bot', 'j9', 'i9', '1M'),
+                            ('R ADC1', 'b12', 'c12', '1k'), ('R ADC2', 'd12', 'd13', '1k'), ('R ADC3', 'f12', 'g12', '1k')):
         resistor(o, a, b, txt)
-    for a, b, txt in (('j1', 'i2', '10µ'), ('i11', 'i13', '100n'), ('a14', 'c14', '100n'), ('d14', 'f14', '100n'), ('g12', 'g14', '100n')):
+    for a, b, txt in (('j1', 'i2', '10µ'), ('j10', 'j12', '100n'), ('a14', 'c14', '100n'), ('d14', 'f14', '100n'), ('g14', 'i14', '100n')):
         ceramic(o, a, b, txt)
-    diode(o, 'j6', 'j7', 'D3 band→j6', True)
+    diode(o, 'j5', 'j6', 'D3 band→j5', True)
     diode(o, 'e23', 'd23', '', False)
     diode(o, 'h23', 'g23', '', False)
     diode(o, 'f24', 'f23', '', False)
@@ -179,7 +179,7 @@ def guide_bottom():
         else:
             col = NET_COL['sig']
         (x0, y0), (x1, y1) = pos(f, True), pos(t, True)
-        wdt = 5 if 'rail' in n and n.endswith(('rows 12-24', 'rows 11-24')) else 3
+        wdt = 5 if 'rail' in n and n.endswith(('rows 12-24', 'rows 13-24')) else 3
         if n.startswith('bridge') or 'rail' in n.split(':')[0]:
             o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="%d" stroke-linecap="round"/>' % (
                 x0, y0, x1, y1, col, wdt))
