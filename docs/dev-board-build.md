@@ -28,8 +28,8 @@ step does one kind of part, and in its picture that step is in colour while ever
 | RJ12 breakout board | 3 | 7 (18 leads) | RJ11/RJ12 breakout 4-pack |
 | USB-C breakout (Cermant) | 1 | 7 (2 leads) | USB-C breakout 10-pack |
 | Solar lead (optional) | 1 | 7 (2 leads) | solar panel + extension |
-| 30 AWG insulated wire | 16 pieces | 8 | 30 AWG silicone wire |
-| Bare wire or trimmed resistor legs | 36 bridges + 2 rails | 9, 10 | tinned wire / leg offcuts |
+| 30 AWG insulated wire | 12 pieces | 8 | 30 AWG silicone wire |
+| Bare wire or trimmed resistor legs | 54 bridges + 2 rails | 9, 10 | tinned wire / leg offcuts |
 | Perfboard 3 × 7 cm (a–j × 1–24) | 1 | all | perfboard kit |
 | 18650 cell with JST-XH plug | 1 | 11 | 18650 cell |
 
@@ -80,8 +80,8 @@ the part stays put, solder, and **trim to ~1 mm**. Keep the trimmed legs: they m
 
 | Resistor | Holes | How |
 |---|---|---|
-| R div top 1M | j7, j8 | body over j7, lead bent back into j8 |
-| R div bot 1M | j9, i9 | body over j9, lead bent sideways into i9 |
+| R div top 1M | d15, d16 | body over d15, lead bent back into d16 |
+| R div bot 1M | d17, d18 | body over d17, lead bent back into d18 |
 | R pwr top 1M | g22, g21 | body over g22, lead bent back into g21 |
 | R pwr bot 1M | g20, g19 | body over g20, lead bent back into g19 |
 | R ADC1 1k | b12, c12 | body over b12, lead bent sideways into c12 |
@@ -92,16 +92,17 @@ the part stays put, solder, and **trim to ~1 mm**. Keep the trimmed legs: they m
 
 ![step 3](renders/build-step-03.png)
 
-These **only work one way round**; the band end is the cathode (K). D3 stands with its body over j5, band end down.
-For D1, D2 and the zener the body stands over the anode hole and the **bent-back lead is the cathode**, so the band is at
-the top. Check each one against the table before soldering.
+These **only work one way round**; the band end is the cathode (K). Each one stands up with its body over the first
+hole in the table. When the cathode is the **bent-back lead** (D1, D2, D3), the band is at the **top** of the body; when the
+body stands over the cathode (the zener, over d22), the band is at the **bottom**. Check each one against the table
+before soldering.
 
 | Diode | Holes | Direction |
 |---|---|---|
-| D3 1N5819 | j5, j6 | **band (K) at j5**, other end (A) at j6 |
-| D1 1N5819 USB | e23, d23 | **band (K) at d23**, other end (A) at e23 |
+| D3 1N5819 | j4, j3 | **band (K) at j3**, other end (A) at j4 |
+| D1 1N5819 USB | e23, e22 | **band (K) at e22**, other end (A) at e23 |
 | D2 1N5819 solar | h23, g23 | **band (K) at g23**, other end (A) at h23 |
-| Z 6.2V | f24, f23 | **band (K) at f23**, other end (A) at f24 |
+| Z 6.2V | d22, d23 | **band (K) at d22**, other end (A) at d23 |
 
 ## Step 4: Ceramic capacitors (4 × 100 nF, 1 × 10 µF)
 
@@ -113,7 +114,7 @@ to corner (j1 to i2): pull its legs in slightly and lean the body **away from th
 | Capacitor | Holes | Note |
 |---|---|---|
 | C 10u | j1, i2 | corner to corner: pull the legs in slightly, lean the body away from the ESP |
-| C div 100n | j10, j12 | middle hole j11 stays empty |
+| C div 100n | e16, e18 | middle hole e17 stays empty |
 | C ADC1 100n | a14, c14 | middle hole b14 stays empty |
 | C ADC2 100n | d14, f14 | middle hole e14 stays empty |
 | C ADC3 100n | g14, i14 | middle hole h14 stays empty |
@@ -152,9 +153,9 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 
 | Charger pad | Board hole | Net |
 |---|---|---|
-| PWR + (input) | g23 | PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -) |
+| PWR + (input) | g24 | PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -) |
 | PWR - / GND | a20 | GND rail |
-| BATT + | b24 | battery pin B+, 22 AWG pair with BATT - (the cell reaches the VBAT rail only through the charger) |
+| BATT + | c24 | battery pin B+ (bridged from b24), 22 AWG pair with BATT - (the cell reaches the VBAT rail only through the charger) |
 | BATT - | a21 | GND rail |
 | LOAD + (output) | j20 | VBAT rail (22 AWG pair with LOAD -) |
 | LOAD - | a22 | GND rail |
@@ -184,7 +185,7 @@ GND → d24, and the solar lead's + → h24 and − → i24. Trim underneath to 
 | Solar + | h24 |
 | Solar − | i24 |
 
-## Step 8: Insulated wires underneath (16)
+## Step 8: Insulated wires underneath (12)
 
 ![step 8](renders/build-step-08.png)
 
@@ -194,24 +195,20 @@ lead, solder the wire end to that lead. Beep each wire out with the meter as you
 
 | From | To | What |
 |---|---|---|
+| i3 | i1 | D3 cathode -> ESP 5V (straight along column i) |
 | j2 | a12 | ESP GND -> GND rail |
-| g21 | a9 | input-power sense -> GPIO6 |
-| g19 | a19 | R pwr bot -> GND rail |
-| j5 | j1 | D3 cathode -> ESP 5V (straight along column j) |
-| j6 | j13 | D3 anode -> VBAT rail (straight along column j) |
-| j10 | a6 | divider node -> GPIO3 |
-| i9 | a13 | R div bot -> GND rail |
-| j12 | a18 | C div -> GND rail |
+| e15 | j18 | R div top -> VBAT rail |
+| c17 | a6 | divider node -> GPIO3 |
 | c13 | a3 | filter 1 -> GPIO0 |
-| d13 | a4 | filter 2 -> GPIO1 |
+| e13 | a4 | filter 2 -> GPIO1 |
 | g13 | a5 | filter 3 -> GPIO2 |
-| f14 | a15 | C ADC2 -> GND rail |
-| i14 | a16 | C ADC3 -> GND rail |
-| d23 | f23 | D1 cathode -> PWR node (zener cathode) |
-| f24 | c24 | zener anode -> GND link (straight along row 24) |
-| i24 | c24 | solar - -> GND link (straight along row 24) |
+| f15 | a13 | C ADC2 -> GND rail |
+| i15 | b16 | C ADC3 -> GND |
+| f21 | a9 | input-power sense -> GPIO6 |
+| f19 | a19 | R pwr bot -> GND rail |
+| i23 | a18 | solar - -> GND rail |
 
-## Step 9: Bare bridges underneath (36)
+## Step 9: Bare bridges underneath (54)
 
 ![step 9](renders/build-step-09.png)
 
@@ -231,44 +228,62 @@ and neither beeps to the pad next to it.
 | a8 | b8 | port 2 EN -> GPIO5 |
 | a9 | b9 | input-power sense -> GPIO6 |
 | a10 | b10 | port 3 EN -> GPIO7 |
-| h1 | j1 | ESP 5V -> C 10u |
+| h1 | i1 | ESP 5V |
+| i1 | j1 | ESP 5V -> C 10u |
 | h2 | j2 | ESP GND -> C 10u |
 | h4 | i4 | port 2 IN1 -> GPIO20 |
 | h5 | i5 | port 1 IN2 -> GPIO19 |
 | h6 | i6 | port 1 IN1 -> GPIO18 |
 | h8 | i8 | port 2 IN2 -> GPIO14 |
-| g23 | g22 | PWR node -> R pwr top |
-| g21 | g20 | input-power sense node |
-| j6 | j7 | D3 anode -> R div top (VBAT) |
-| j8 | j9 | divider node |
-| j9 | j10 | divider node -> C div |
+| j3 | i3 | D3 cathode (5V) |
+| d15 | e15 | R div top (VBAT) |
+| d16 | d17 | divider node |
+| d16 | e16 | divider node -> C div |
+| d17 | c17 | divider node |
+| d18 | e18 | C div GND |
+| d18 | c18 | divider GND |
+| c18 | b18 | divider GND |
+| b18 | a18 | divider GND -> GND rail |
 | b11 | b12 | port 1 ANGLE -> R ADC1 |
 | d11 | d12 | port 2 ANGLE -> R ADC2 |
 | f11 | f12 | port 3 ANGLE -> R ADC3 |
 | c12 | c13 | R ADC1 -> filter 1 node |
 | c13 | c14 | filter 1 node -> C ADC1 |
 | d13 | d14 | R ADC2 -> C ADC2 |
+| d13 | e13 | filter 2 node |
 | g12 | g13 | R ADC3 -> filter 3 node |
 | g13 | g14 | filter 3 node -> C ADC3 |
-| e23 | e24 | USB V+ -> D1 anode |
-| h23 | h24 | solar + -> D2 anode |
-| f23 | g23 | PWR node -> D2 cathode |
-| d24 | c24 | USB V- -> GND link |
-| c24 | c23 | GND link |
+| f14 | f15 | C ADC2 GND |
+| i14 | i15 | C ADC3 GND |
+| b16 | a16 | C ADC3 GND -> GND rail |
+| g22 | g23 | PWR node -> R pwr top |
+| g21 | g20 | input-power sense node |
+| g21 | f21 | input-power sense node |
+| g19 | f19 | R pwr bot GND |
+| e24 | e23 | USB V+ -> D1 anode |
+| h24 | h23 | solar + -> D2 anode |
+| d22 | e22 | PWR node (zener cathode, D1 cathode) |
+| e22 | f22 | PWR node |
+| f22 | g22 | PWR node -> R pwr top |
+| g23 | g24 | PWR node -> charger PWR + hole |
+| d24 | d23 | USB V- -> zener anode (GND) |
+| d23 | c23 | GND link |
 | c23 | b23 | GND link |
 | b23 | a23 | GND link -> GND rail |
+| b24 | c24 | battery + -> charger BATT + hole |
+| i24 | i23 | solar - (GND) |
 
 ## Step 10: Rails (2)
 
 ![step 10](renders/build-step-10.png)
 
-Last: lay a straight bare tinned wire along column **a** from row 12 to row 24 (GND) and along column **j** from row 13
+Last: lay a straight bare tinned wire along column **a** from row 12 to row 24 (GND) and along column **j** from row 4
 to row 24 (battery +), soldering it at every hole. Then do the checks in step 11.
 
 | From | To | What |
 |---|---|---|
 | a12 | a24 | bare wire down column a, rows 12-24 |
-| j13 | j24 | bare wire down column j, rows 13-24 |
+| j4 | j24 | bare wire down column j, rows 4-24 |
 
 ## Step 11: checks and first power-up
 
@@ -276,12 +291,12 @@ to row 24 (battery +), soldering it at every hole. Then do the checks in step 11
 
 ![finished underside](renders/build-done-under.png)
 
-The battery + rail (column j) gets most of its connections from the top: the three port leads (j15–j17) and the
-charger's LOAD + wire (j20); underneath, only the wire from D3 (j6 → j13) joins it. The cell never connects to the
+The battery + rail (column j, rows 4–24) gets its connections from the top: D3 (j4), the three port leads (j15–j17)
+and the charger's LOAD + wire (j20); underneath, the wire from the divider (e15 → j18) joins it. The cell never connects to the
 rail directly: battery + (b24) goes to the charger's BATT + pad and the charger feeds the rail from LOAD +.
 
 1. Meter, beep mode, no power: GND (a12) to battery + (j13): **no beep**. GND to 5V (h1): no beep. GND to 3V3 (h3):
-   no beep. GND to the battery + pin (b24): no beep.
+   no beep. GND to the battery + pin (b24): no beep. GND to the PWR node (g23): no beep.
 2. Plug USB into the **ESP's own** USB-C only (battery unplugged). Its LED should light; upload the test sketch.
 3. Unplug USB, then push the cell's plug onto a24/b24 (**red on b24**). Measure j13 to a12: about the cell voltage
    (3.0–4.2 V).

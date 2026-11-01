@@ -324,12 +324,12 @@
 <text x="340" y="138" font-size="10" fill="#fff" text-anchor="middle" font-weight="bold">8</text>
 <text x="205" y="245" font-size="16" fill="#fff" text-anchor="middle" font-weight="bold">ESP32-C6 (chip up)</text>
 </g>
-<line x1="250" y1="90" x2="280" y2="90" stroke="#888" stroke-width="2"/>
-<circle cx="250" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
-<text x="250" y="93" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
-<line x1="310" y1="90" x2="310" y2="120" stroke="#888" stroke-width="2"/>
-<circle cx="310" cy="90" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
-<text x="310" y="93" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
+<line x1="490" y1="270" x2="520" y2="270" stroke="#888" stroke-width="2"/>
+<circle cx="490" cy="270" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
+<text x="490" y="273" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
+<line x1="550" y1="270" x2="580" y2="270" stroke="#888" stroke-width="2"/>
+<circle cx="550" cy="270" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
+<text x="550" y="273" font-size="9" text-anchor="middle" font-weight="bold">1M</text>
 <line x1="700" y1="180" x2="670" y2="180" stroke="#888" stroke-width="2"/>
 <circle cx="700" cy="180" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="700" y="183" font-size="9" text-anchor="middle" font-weight="bold">1M</text>

@@ -223,7 +223,7 @@ def net_colour(note):
     n = note.lower()
     if n.startswith('gnd rail') or 'gnd' in n or 'zener anode' in n or ' - ->' in n:
         return NET_COL['GND']
-    if n.startswith('vbat rail') or 'vbat' in n:
+    if n.startswith('vbat rail') or 'vbat' in n or 'battery +' in n:
         return NET_COL['VBAT']
     if '5v' in n:
         return NET_COL['5V']
@@ -318,9 +318,10 @@ the part stays put, solder, and **trim to ~1 mm**. Keep the trimmed legs: they m
 step('diodes', 'Diodes (3 × 1N5819, 1 × 6.2 V zener)', 'top', [draw_diodes],
      'Top side. Direction matters: the silver/white band is the cathode (K). Each label sits on the hole the band goes to.',
      ['A ring on the body = band at the bottom of the standing body. A white tab on the lead = band at the top (that lead is K).'],
-     """These **only work one way round**; the band end is the cathode (K). D3 stands with its body over j5, band end down.
-For D1, D2 and the zener the body stands over the anode hole and the **bent-back lead is the cathode**, so the band is at
-the top. Check each one against the table before soldering.""",
+     """These **only work one way round**; the band end is the cathode (K). Each one stands up with its body over the first
+hole in the table. When the cathode is the **bent-back lead** (D1, D2, D3), the band is at the **top** of the body; when the
+body stands over the cathode (the zener, over d22), the band is at the **bottom**. Check each one against the table
+before soldering.""",
      rows_parts([n for n, _ in DIODES], diode_note))
 step('caps', 'Ceramic capacitors (4 × 100 nF, 1 × 10 µF)', 'top', [draw_caps],
      'Top side. Either way round. Legs are 3 holes apart: the middle hole stays empty. The 10µ goes corner to corner.',
@@ -368,16 +369,16 @@ strip ~2 mm at each end, push the ends into the two holes **from underneath**, s
 lead, solder the wire end to that lead. Beep each wire out with the meter as you go.""",
      what(wires_of('wire')))
 step('bridges', 'Bare bridges underneath (%d)' % len(wires_of('bridge')), 'bottom', [draw_under, 'bridge'],
-     'Bottom view. Each bridge joins neighbouring holes in a straight line (h1-j1, h2-j2, h3-j3 skip an empty hole).',
+     'Bottom view. Each bridge joins neighbouring holes in a straight line (h2-j2 skips over the 10µ leg at i2).',
      ['Use trimmed resistor legs or bare tinned wire laid flat across the pads, soldered at both ends.'],
      """A bridge is a short piece of **bare** wire laid across neighbouring pads (a trimmed resistor leg is ideal), soldered at
 both ends; don't rely on a solder blob alone. Work one area at a time and check each with the meter: the two ends beep,
 and neither beeps to the pad next to it.""",
      what(wires_of('bridge')))
 step('rails', 'Rails (2)', 'bottom', [draw_under, 'rail'],
-     'Bottom view. Two long bare wires: GND down column a (rows 12-24), battery + down column j (rows 13-24).',
+     'Bottom view. Two long bare wires: GND down column a (rows 12-24), battery + down column j (rows 4-24).',
      ['Solder each rail at every hole it passes, including the ones that already have wires or leads.'],
-     """Last: lay a straight bare tinned wire along column **a** from row 12 to row 24 (GND) and along column **j** from row 13
+     """Last: lay a straight bare tinned wire along column **a** from row 12 to row 24 (GND) and along column **j** from row 4
 to row 24 (battery +), soldering it at every hole. Then do the checks in step 11.""",
      what(wires_of('rail')))
 
@@ -590,11 +591,11 @@ def write_md():
             o += ['| %s |' % ' | '.join(hdr[st['key']]), '|---|---|---|'] + ['| %s | %s | %s |' % r for r in st['table']] + ['']
     o += ['## Step 11: checks and first power-up', '',
           '![finished top](renders/build-done-top.png)', '', '![finished underside](renders/build-done-under.png)', '',
-          'The battery + rail (column j) gets most of its connections from the top: the three port leads (j15–j17) and the',
-          'charger\'s LOAD + wire (j20); underneath, only the wire from D3 (j6 → j13) joins it. The cell never connects to the',
+          'The battery + rail (column j, rows 4–24) gets its connections from the top: D3 (j4), the three port leads (j15–j17)',
+          'and the charger\'s LOAD + wire (j20); underneath, the wire from the divider (e15 → j18) joins it. The cell never connects to the',
           'rail directly: battery + (b24) goes to the charger\'s BATT + pad and the charger feeds the rail from LOAD +.', '',
           '1. Meter, beep mode, no power: GND (a12) to battery + (j13): **no beep**. GND to 5V (h1): no beep. GND to 3V3 (h3):',
-          '   no beep. GND to the battery + pin (b24): no beep.',
+          '   no beep. GND to the battery + pin (b24): no beep. GND to the PWR node (g23): no beep.',
           '2. Plug USB into the **ESP\'s own** USB-C only (battery unplugged). Its LED should light; upload the test sketch.',
           '3. Unplug USB, then push the cell\'s plug onto a24/b24 (**red on b24**). Measure j13 to a12: about the cell voltage',
           '   (3.0–4.2 V).',

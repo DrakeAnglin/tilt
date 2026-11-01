@@ -59,18 +59,18 @@ def gap(a, b):
 
 # ------------------------------------------------------------------ nets
 EXPECT = {
-    'GND': ['h2', 'i2', 'j2', 'a12', 'a13', 'a18', 'a19', 'g19', 'a24', 'i9', 'j12', 'a14', 'f14', 'i14', 'a23', 'b23', 'c23', 'c24', 'd24', 'f24', 'i24',
-            'a15', 'a16', 'a17', 'a20', 'a21', 'a22'],
-    'VBAT': ['j13', 'j24', 'j6', 'j7', 'j15', 'j16', 'j17', 'j20'],
-    '5V': ['h1', 'j1', 'j5'],
+    'GND': ['h2', 'i2', 'j2', 'a12', 'a24', 'a13', 'a16', 'a18', 'a19', 'a23', 'd18', 'e18', 'a14', 'f14', 'i14', 'g19',
+            'd23', 'd24', 'i24', 'a15', 'a17', 'a20', 'a21', 'a22'],
+    'VBAT': ['j4', 'j24', 'd15', 'j15', 'j16', 'j17', 'j20'],
+    '5V': ['h1', 'j1', 'j3'],
+    'VDIV': ['b6', 'a6', 'd16', 'd17', 'e16'],
     'PSENSE': ['b9', 'a9', 'g21', 'g20'],
-    'VDIV': ['b6', 'a6', 'j8', 'j9', 'j10'],
     'ADC0': ['b3', 'a3', 'c12', 'c13', 'c14'], 'ADC1': ['b4', 'a4', 'd13', 'd14'], 'ADC2': ['b5', 'a5', 'g12', 'g13', 'g14'],
     'ANG1': ['b11', 'b12'], 'ANG2': ['d11', 'd12'], 'ANG3': ['f11', 'f12'],
     'EN1': ['a7', 'b7'], 'EN2': ['a8', 'b8'], 'EN3': ['a10', 'b10'],
     'P3IN1': ['a1', 'b1'], 'P3IN2': ['a2', 'b2'], 'P1IN1': ['i6', 'h6'], 'P1IN2': ['i5', 'h5'],
     'P2IN1': ['i4', 'h4'], 'P2IN2': ['i8', 'h8'],
-    'PWR': ['d23', 'f23', 'g23', 'g22'], 'USB+': ['e23', 'e24'], 'SOL+': ['h23', 'h24'], 'BATT+': ['b24'],
+    'PWR': ['d22', 'e22', 'g23', 'g22', 'g24'], 'USB+': ['e23', 'e24'], 'SOL+': ['h23', 'h24'], 'BATT+': ['b24', 'c24'],
 }
 
 
@@ -103,6 +103,30 @@ def netlist():
     return find
 
 
+def holes_shared(parts):
+    """Each hole takes ONE thing through it: a part leg, a lead, a charger wire or an insulated wire end. Bridges and
+    rails lie on the pads underneath and don't count. Also no wire end in the empty middle hole under a ceramic cap."""
+    occ = {}
+    for p in parts:
+        for i, m, lab in p.pins:
+            occ.setdefault(HN(i, m), []).append('%s %s' % (p.name, lab))
+    for pad, h, _ in M.CHARGER:
+        if h[:1] in M.COLS:
+            occ.setdefault(h, []).append('charger ' + pad)
+    for f, t, note in M.WIRES:
+        if note.startswith('wire'):
+            for h in (f, t):
+                occ.setdefault(h, []).append('wire %s-%s' % (f, t))
+    for p in parts:
+        if p.name.startswith('C ') and len(p.pins) == 2:
+            (i0, m0, _), (i1, m1, _) = p.pins
+            if (i0 == i1 or m0 == m1) and abs(i0 - i1) + abs(m0 - m1) == 2:
+                mid = HN((i0 + i1) // 2, (m0 + m1) // 2)
+                if mid in occ:
+                    occ[mid].append('(middle hole under %s)' % p.name)
+    return ['%s: %s' % (h, ' + '.join(v)) for h, v in sorted(occ.items()) if len(v) > 1]
+
+
 def main():
     parts = M.layout()
     rep = M.check(parts)
@@ -130,7 +154,9 @@ def main():
     print('\n'.join(rep))
     print('parts closer than 0.3 mm (negative = overlap):', tight or 'none')
     print('nets:', errs or 'all %d nets connected, none shorted' % len(EXPECT))
-    return 1 if (tight or errs) else 0
+    shared = holes_shared(parts)
+    print('holes with more than one thing through them:', shared or 'none')
+    return 1 if (tight or errs or shared) else 0
 
 
 if __name__ == '__main__':
