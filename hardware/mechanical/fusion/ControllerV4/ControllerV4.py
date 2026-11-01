@@ -54,10 +54,22 @@ C['rj_over'] = C['rj_x0']
 C['rj_x1'] = C['rj_x0'] + c['rj_d']
 
 PITCH = 2.54
-NI, NM = 26, 12
+# the owner's perfboard (3 x 7 cm from the kit): 10 columns a-j across, 24 rows 1-24 along the box.
+# Orientation in the box: row 1 toward the ports (end A), column a toward the battery (room side).
+NI, NM = 24, 10
+COLS = 'abcdefghij'
 PX0 = c['bat_x0'] + 1.27
 PY0 = C['bat_y'] + c['bat_d'] / 2 + 2.6
 HOLES = {(i, m) for i in range(NI) for m in range(NM)}
+
+
+def H(name):
+    """'b12' -> (i, m)"""
+    return int(name[1:]) - 1, COLS.index(name[0])
+
+
+def HN(i, m):
+    return '%s%d' % (COLS[m], i + 1)
 
 
 def X(i):
@@ -85,75 +97,143 @@ class Part:
 
 
 def layout():
-    """Dev-board parts on their holes. ESP32-C6 SuperMini pins (listing photo; check the board): +Y row 7 6 5 4 3 2 1 0
-    RX TX, -Y row 8 9 14 15 18 19 20 3V3 GND 5V, USB-C at +X."""
+    """Dev-board parts on named holes (column letter + row number). ESP32-C6 SuperMini pins (listing photo; check the
+    silkscreen): with its USB-C toward row 1, the TX/RX/0-7 side is in column b, the 5V/GND/3V3 side in column h."""
     t = C['pb_top']
     parts = []
-    rows = list(range(1, 11))
-    esp_pins = [(i, 8, lab) for i, lab in zip(rows, ['7', '6', '5', '4', '3', '2', '1', '0', 'RX17', 'TX16'])] + \
-               [(i, 2, lab) for i, lab in zip(rows, ['8', '9', '14', '15', '18', '19', '20', '3V3', 'GND', '5V'])]
-    xc, yc = (X(1) + X(10)) / 2, (Y(2) + Y(8)) / 2
+    left = ['TX16', 'RX17', '0', '1', '2', '3', '4', '5', '6', '7']
+    right = ['5V', 'GND', '3V3', '20', '19', '18', '15', '14', '9', '8']
+    esp_pins = [H('b%d' % (k + 1)) + (lab,) for k, lab in enumerate(left)] + \
+               [H('h%d' % (k + 1)) + (lab,) for k, lab in enumerate(right)]
+    xc, yc = (X(0) + X(9)) / 2, (Y(1) + Y(7)) / 2
     z0 = C['mod_z']
     parts.append(Part('ESP32-C6', esp_pins, [
         ('ESP32-C6 PCB', xc - 13, xc + 13, yc - 9, yc + 9, z0, z0 + 1.0),
-        ('ESP32-C6 USB-C', xc + 13 - 7.35 + 0.8, xc + 13 + 0.8, yc - 4.47, yc + 4.47, z0 + 1.0, z0 + 4.26),
-        ('ESP32-C6 headers', X(1) - 1.27, X(10) + 1.27, Y(2) - 1.27, Y(2) + 1.27, t, z0),
-        ('ESP32-C6 headers 2', X(1) - 1.27, X(10) + 1.27, Y(8) - 1.27, Y(8) + 1.27, t, z0)]))
-    parts.append(Part('MCP73871', [], [('MCP73871 PCB', X(13), X(13) + 19.6, Y(2), Y(2) + 18.3, t + 1.0, t + 2.6),
-                                       ('MCP73871 parts', X(13) + 6, X(13) + 14, Y(2) + 4, Y(2) + 13, t + 2.6, t + 3.5),
-                                       ('MCP73871 tape', X(13) + 0.5, X(13) + 19.1, Y(2) + 0.5, Y(2) + 17.8, t, t + 1.0)],
-                      note='PWR, BATT, LOAD, THERM pads wired to the holes beside it'))
+        ('ESP32-C6 USB-C', xc - 13 - 0.8, xc - 13 - 0.8 + 7.35, yc - 4.47, yc + 4.47, z0 + 1.0, z0 + 4.26),
+        ('ESP32-C6 headers', X(0) - 1.27, X(9) + 1.27, Y(1) - 1.27, Y(1) + 1.27, t, z0),
+        ('ESP32-C6 headers 2', X(0) - 1.27, X(9) + 1.27, Y(7) - 1.27, Y(7) + 1.27, t, z0)]))
+    # charger on 1 mm foam tape over rows 15-22, columns c-h
+    cx0, cy0 = (X(14) + X(21)) / 2 - 9.8 - 0.25, (Y(2) + Y(7)) / 2 - 9.15
+    parts.append(Part('MCP73871', [], [('MCP73871 PCB', cx0, cx0 + 19.6, cy0, cy0 + 18.3, t + 1.0, t + 2.6),
+                                       ('MCP73871 parts', cx0 + 6, cx0 + 14, cy0 + 4, cy0 + 13, t + 2.6, t + 3.5),
+                                       ('MCP73871 tape', cx0 + 0.5, cx0 + 19.1, cy0 + 0.5, cy0 + 17.8, t, t + 1.0)],
+                      note='foam tape; its pads are wired to the board (see the wiring list)'))
 
-    def lying(name, i0, m0, i1, m1, d=2.3, ln=6.3):
-        xa, ya, xb, yb = X(i0), Y(m0), X(i1), Y(m1)
-        ux, uy = (1, 0) if m0 == m1 else (0, 1)
-        xm, ym = (xa + xb) / 2, (ya + yb) / 2
-        return Part(name, [(i0, m0, ''), (i1, m1, '')],
-                    cyls=[(name, (xm - ux * ln / 2, ym - uy * ln / 2, t + d / 2), (xm + ux * ln / 2, ym + uy * ln / 2, t + d / 2), d / 2)])
+    def upright(name, h_body, h_lead, d=2.3, h=8.0, labels=('', '')):
+        """Resistor / diode standing up: body over the first hole, the hairpin lead in the second."""
+        i0, m0 = H(h_body)
+        i1, m1 = H(h_lead)
+        return Part(name, [(i0, m0, labels[0]), (i1, m1, labels[1])],
+                    cyls=[(name, (X(i0), Y(m0), t + 0.5), (X(i0), Y(m0), t + 0.5 + h), d / 2)])
 
-    def disc(name, i0, i1, m):
-        return Part(name, [(i0, m, ''), (i1, m, '')], [(name, X(i0) - 0.8, X(i1) + 0.8, Y(m) - 1.25, Y(m) + 1.25, t, t + 5.0)])
+    def disc(name, ha, hb, labels=('', '')):
+        """Ceramic disc / MLCC on 2.54 mm leads, standing, body plane along the line between its holes."""
+        (i0, m0), (i1, m1) = H(ha), H(hb)
+        x0, x1 = sorted((X(i0), X(i1)))
+        y0, y1 = sorted((Y(m0), Y(m1)))
+        if i0 == i1:
+            box = (name, x0 - 1.0, x1 + 1.0, y0 - 1.0, y1 + 1.0, t, t + 5.0)     # 2 mm thick monolithic body
+        else:
+            box = (name, x0 - 1.0, x1 + 1.0, y0 - 1.0, y1 + 1.0, t, t + 5.0)
+        return Part(name, [(i0, m0, labels[0]), (i1, m1, labels[1])], [box])
 
-    # RC filters on the three angle lines, along the +Y edge next to the ESP's ADC pins
-    for k in range(3):
-        parts += [lying('R ADC%d' % (k + 1), 4 * k + 1, 11, 4 * k + 4, 11), disc('C ADC%d' % (k + 1), 4 * k + 2, 4 * k + 3, 10)]
-    # battery divider, STAT pull-up, 10 u at the ESP's 5V, D3 (charger LOAD -> ESP 5V) along the -Y edge
-    parts += [lying('R div top', 1, 0, 4, 0), lying('R div bot', 5, 0, 8, 0), disc('C div', 9, 10, 0),
-              disc('C 10u', 11, 12, 0), lying('R stat', 14, 0, 17, 0), lying('D3 1N5819', 18, 0, 21, 0, 2.7, 5.2)]
-    parts += [lying('D1 1N5819 USB', 24, 2, 24, 5, 2.7, 5.2), lying('D2 1N5819 solar', 24, 6, 24, 9, 2.7, 5.2),
-              lying('Z 6.2V', 22, 4, 22, 7, 2.7, 5.2)]
-    parts.append(Part('C bulk', [(22, 10, '+'), (23, 10, '-')],                     # 8 x 13 radial, standing
-                      cyls=[('C bulk', ((X(22) + X(23)) / 2, Y(10), t), ((X(22) + X(23)) / 2, Y(10), t + 13.0), 4.0)]))
-    parts.append(Part('Battery pins', [(25, 0, 'B+'), (25, 1, 'B-')],
-                      [('Battery pins', X(25) - 1.27, X(25) + 1.27, Y(0) - 1.27, Y(1) + 1.27, t, t + 2.5),
-                       ('XH plug', X(25) - 2.45, X(25) + 2.45, Y(0) - 2.45, Y(1) + 2.45, t + 2.5, t + 8.5)]))
-    parts.append(Part('USB pads', [(25, 3, 'V+'), (25, 4, 'V-')]))
-    parts.append(Part('Solar pads', [(25, 10, 'S+'), (25, 11, 'S-')]))
+    # next to the ESP (column i, j rows 1-10)
+    parts += [disc('C 10u', 'j1', 'j2', ('5V', 'G')),
+              upright('R stat 10k', 'j3', 'j4'),
+              upright('D3 1N5819', 'j5', 'j6', 2.7, 8.0, ('K', 'A')),
+              upright('R div top 1M', 'j7', 'j8'),
+              upright('R div bot 1M', 'j9', 'j10'),
+              disc('C div 100n', 'g12', 'g13')]
+    # angle filters, rows 12-14 (1 k standing, 100 n disc)
+    for k, col, ccol in ((1, 'b', 'a'), (2, 'd', 'c'), (3, 'f', 'e')):
+        parts += [upright('R ADC%d 1k' % k, '%s12' % col, '%s13' % col),
+                  disc('C ADC%d 100n' % k, '%s14' % ccol, '%s14' % col)]
+    # bulk electrolytic (comes with the charger), standing, rows 11-13 at the back edge
+    parts.append(Part('C bulk', [H('i12') + ('-',), H('i13') + ('+',)],
+                      cyls=[('C bulk', ((X(11) + X(12)) / 2, Y(8) + 0.6, t), ((X(11) + X(12)) / 2, Y(8) + 0.6, t + 13.0), 4.0)]))
+    # power row: diodes and zener (row 23), connectors (row 24)
+    parts += [upright('D1 1N5819 USB', 'e23', 'd23', 2.7, 8.0, ('A', 'K')),
+              upright('D2 1N5819 solar', 'h23', 'g23', 2.7, 8.0, ('A', 'K')),
+              upright('Z 6.2V', 'f24', 'f23', 2.7, 8.0, ('A', 'K'))]
+    parts.append(Part('Battery pins', [H('b24') + ('B-',), H('c24') + ('B+',)],
+                      [('Battery pins', X(23) - 1.27, X(23) + 1.27, Y(1) - 1.27, Y(2) + 1.27, t, t + 2.5),
+                       ('XH plug', X(23) - 2.45, X(23) + 2.45, Y(1) - 2.45, Y(2) + 2.45, t + 2.5, t + 8.5)]))
+    parts.append(Part('USB leads', [H('d24') + ('V-',), H('e24') + ('V+',)]))
+    parts.append(Part('Solar leads', [H('h24') + ('S+',), H('i24') + ('S-',)]))
+    # port leads (18), soldered into these holes from the top
+    parts.append(Part('Port leads', [H(n) + (lab,) for n, lab in (
+        ('a1', 'P3 IN1'), ('a2', 'P3 IN2'), ('i6', 'P1 IN1'), ('i5', 'P1 IN2'), ('i4', 'P2 IN1'), ('i8', 'P2 IN2'),
+        ('a7', 'P1 EN'), ('a8', 'P2 EN'), ('a9', 'P3 EN'), ('b11', 'P1 ANG'), ('d11', 'P2 ANG'), ('f11', 'P3 ANG'),
+        ('j15', 'P1 VBAT'), ('j16', 'P2 VBAT'), ('j17', 'P3 VBAT'), ('a15', 'P1 GND'), ('a16', 'P2 GND'), ('a17', 'P3 GND'))]))
     return parts
 
 
-PORTS = [('Port 1 (room side)', '18', '19', '4', '0'), ('Port 2 (middle)', '20', '14', '5', '1'),
-         ('Port 3 (back side)', 'TX16', 'RX17', '6', '2')]
+# underside wiring: (from, to, note). 'bridge' = adjacent pads joined with a short bare wire / solder bridge
+WIRES = [
+    # rails (bare tinned wire along the column, soldered at every hole)
+    ('a12', 'a24', 'GND rail: bare wire down column a, rows 12-24'),
+    ('j11', 'j24', 'VBAT rail: bare wire down column j, rows 11-24'),
+    # ESP pins to their neighbours
+    ('a1', 'b1', 'bridge: port 3 IN1 -> GPIO16'), ('a2', 'b2', 'bridge: port 3 IN2 -> GPIO17'),
+    ('a3', 'b3', 'bridge: angle 1 -> GPIO0'), ('a4', 'b4', 'bridge: angle 2 -> GPIO1'), ('a5', 'b5', 'bridge: angle 3 -> GPIO2'),
+    ('a6', 'b6', 'bridge: battery divider -> GPIO3'),
+    ('a7', 'b7', 'bridge: port 1 EN -> GPIO4'), ('a8', 'b8', 'bridge: port 2 EN -> GPIO5'), ('a9', 'b9', 'bridge: port 3 EN -> GPIO6'),
+    ('a10', 'b10', 'bridge: charger STAT -> GPIO7'),
+    ('h1', 'j1', 'bridge (over i1): ESP 5V -> C 10u'), ('h2', 'j2', 'bridge (over i2): ESP GND -> C 10u'),
+    ('h3', 'j3', 'bridge (over i3): ESP 3V3 -> R stat'),
+    ('h4', 'i4', 'bridge: port 2 IN1 -> GPIO20'), ('h5', 'i5', 'bridge: port 1 IN2 -> GPIO19'),
+    ('h6', 'i6', 'bridge: port 1 IN1 -> GPIO18'), ('h8', 'i8', 'bridge: port 2 IN2 -> GPIO14'),
+    # power to the ESP, STAT, divider
+    ('j5', 'j1', 'wire: D3 cathode -> ESP 5V'), ('j6', 'j11', 'wire: D3 anode -> VBAT rail'),
+    ('j2', 'a12', 'wire: ESP GND -> GND rail'), ('j4', 'a10', 'wire: R stat -> STAT / GPIO7'),
+    ('j7', 'j11', 'wire: R div top -> VBAT rail'), ('j8', 'j9', 'bridge: divider node'),
+    ('j8', 'g12', 'wire: divider node -> C div'), ('g12', 'a6', 'wire: divider node -> GPIO3'),
+    ('j10', 'a12', 'wire: R div bot -> GND rail'), ('g13', 'a13', 'wire: C div -> GND rail'),
+    # angle filters
+    ('b11', 'b12', 'bridge: port 1 ANGLE -> R ADC1'), ('d11', 'd12', 'bridge: port 2 ANGLE -> R ADC2'),
+    ('f11', 'f12', 'bridge: port 3 ANGLE -> R ADC3'),
+    ('b13', 'b14', 'bridge: R ADC1 -> C ADC1'), ('d13', 'd14', 'bridge: R ADC2 -> C ADC2'), ('f13', 'f14', 'bridge: R ADC3 -> C ADC3'),
+    ('b13', 'a3', 'wire: filter 1 -> GPIO0'), ('d13', 'a4', 'wire: filter 2 -> GPIO1'), ('f13', 'a5', 'wire: filter 3 -> GPIO2'),
+    ('c14', 'a14', 'wire: C ADC2 -> GND rail'), ('e14', 'a14', 'wire: C ADC3 -> GND rail'),
+    # bulk cap
+    ('i13', 'j13', 'bridge: C bulk + -> VBAT rail'), ('i12', 'a12', 'wire: C bulk - -> GND rail'),
+    # power row
+    ('e23', 'e24', 'bridge: USB V+ -> D1 anode'), ('h23', 'h24', 'bridge: solar + -> D2 anode'),
+    ('d23', 'f23', 'wire: D1 cathode -> PWR node (zener cathode)'), ('f23', 'g23', 'bridge: PWR node -> D2 cathode'),
+    ('b24', 'a24', 'bridge: battery - -> GND rail'), ('d24', 'a24', 'wire: USB V- -> GND rail'),
+    ('f24', 'a24', 'wire: zener anode -> GND rail'), ('i24', 'j24', 'NO: do not bridge (j is VBAT); see the charger table'),
+]
+WIRES = [w for w in WIRES if not w[2].startswith('NO')] + [('i24', 'a24', 'wire: solar - -> GND rail (run it under the board)')]
+
+CHARGER = [  # charger pad -> board
+    ('PWR + (input)', 'g23', 'PWR node: D1 + D2 cathodes, zener'),
+    ('PWR - / GND', 'a20', 'GND rail'),
+    ('BATT +', 'c24', 'battery pin B+'),
+    ('BATT -', 'a21', 'GND rail'),
+    ('LOAD + (output)', 'j20', 'VBAT rail'),
+    ('LOAD -', 'a22', 'GND rail'),
+    ('STAT', 'a10', 'GPIO7 (pulled up by R stat)'),
+    ('THERM', '(NTC)', 'remove the board\'s THERM resistor; NTC from THERM to GND, taped to the cell'),
+]
 
 
 def wiring_md():
-    o = ['| From | To | Note |', '|---|---|---|']
-    for name, i1, i2, en, adc in PORTS:
-        o += ['| %s pin 1 VBAT | charger LOAD | motor supply |' % name,
-              '| %s pin 2 IN1 | ESP GPIO %s | PWM |' % (name, i1),
-              '| %s pin 3 GND | GND | |' % name,
-              '| %s pin 4 ANGLE | R ADC 1 k -> ESP GPIO %s; C ADC 100 n to GND | AS5600 OUT |' % (name, adc),
-              '| %s pin 5 EN | ESP GPIO %s | AS5600 power + DRV8833 sleep |' % (name, en),
-              '| %s pin 6 IN2 | ESP GPIO %s | PWM |' % (name, i2)]
-    o += ['| USB-C VBUS / GND (2 leads) | USB pads V+ / V- -> D1 (band to charger) -> charger PWR | charge only |',
-          '| Solar + / - (ZH pigtail through end wall B) | Solar pads S+ / S- -> D2 (band to charger) -> charger PWR | |',
-          '| 6.2 V zener | across charger PWR / GND, band to PWR | solar over-voltage clamp |',
-          '| Battery pins B+ / B- | charger BATT + / - | the cell\'s XH plug pushes on |',
-          '| 10 k NTC taped to the cell | charger THERM (replaces its fixed resistor) | stops charging when hot |',
-          '| Charger LOAD | D3 (band to ESP) -> ESP 5V; C bulk + on LOAD | |',
-          '| Charger LOAD | R div top 1 M -> GPIO 3 -> R div bot 1 M -> GND; C div 100 n on GPIO 3 | battery voltage |',
-          '| Charger STAT | GPIO 7, R stat 10 k to 3V3 | charging / charged |',
-          '| C 10 u | ESP 5V to GND | |']
+    o = ['## Parts: where each one goes', '', '| Part | Holes | Note |', '|---|---|---|']
+    for p in layout():
+        if p.pins and p.name not in ('ESP32-C6', 'Port leads'):
+            o.append('| %s | %s | %s |' % (p.name, ', '.join('%s%s' % (HN(i, m), (' (' + lab + ')') if lab else '')
+                                                         for i, m, lab in p.pins), p.note))
+    o += ['', 'ESP32-C6: header pins in **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and **h1-h10** (5V, GND, 3V3, 20, 19, 18, 15,',
+          '14, 9, 8), USB-C overhanging row 1. Charger: foam tape over **c15-h22**.', '',
+          '## Port leads (from the RJ12 boards)', '', '| Lead | Hole | Lead | Hole | Lead | Hole |', '|---|---|---|---|---|---|']
+    leads = {lab: HN(i, m) for i, m, lab in next(p for p in layout() if p.name == 'Port leads').pins}
+    for sig in ('IN1', 'IN2', 'EN', 'ANG', 'VBAT', 'GND'):
+        o.append('| ' + ' | '.join('P%d %s | %s' % (k, sig, leads['P%d %s' % (k, sig)]) for k in (1, 2, 3)) + ' |')
+    o += ['', 'RJ12 pin -> signal: 1 VBAT, 2 IN1, 3 GND, 4 ANG, 5 EN, 6 IN2. Port 1 = room side, port 3 = back side.', '',
+          '## Underside wiring', '', '| From | To | What |', '|---|---|---|']
+    o += ['| %s | %s | %s |' % w for w in WIRES]
+    o += ['', '## Charger pads', '', '| Pad | Board hole | Net |', '|---|---|---|']
+    o += ['| %s | %s | %s |' % w for w in CHARGER]
     return '\n'.join(o)
 
 
@@ -171,15 +251,15 @@ def check(parts):
 
 def svg_map(parts, path):
     s = 9.0
-    W, H = (PB[1] - PB[0]) * s + 120, (PB[3] - PB[2]) * s + 120
-    px = lambda x: 60 + (x - PB[0]) * s
+    W, H = (PB[1] - PB[0]) * s + 140, (PB[3] - PB[2]) * s + 120
+    px = lambda x: 70 + (x - PB[0]) * s
     py = lambda y: 70 + (PB[3] - y) * s
     used = {(i, m) for p in parts for i, m, _ in p.pins}
     o = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" font-family="Helvetica,Arial">' % (W, H),
          '<rect width="100%" height="100%" fill="#fff"/>',
-         '<text x="60" y="26" font-size="16" font-weight="bold">ControllerV4 dev board, top view (2.54 mm holes)</text>',
-         '<text x="60" y="46" font-size="11">Ports (end A) to the left, USB-C (end B) to the right; back wall (+Y) at the top. '
-         'Red = pin hole. Rows (i) along the top, columns (m) on the left.</text>',
+         '<text x="60" y="26" font-size="16" font-weight="bold">ControllerV4 dev board (perfboard a-j x 1-24), top view</text>',
+         '<text x="60" y="46" font-size="11">Row 1 (left) toward the ports, column a (bottom) toward the battery. '
+         'Red = used hole. Row numbers on top, column letters on the left.</text>',
          '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#e9f4e1" stroke="#3a7a2a" stroke-width="2"/>' % (
              px(PB[0]), py(PB[3]), (PB[1] - PB[0]) * s, (PB[3] - PB[2]) * s)]
     for p in parts:
@@ -201,7 +281,7 @@ def svg_map(parts, path):
     for p in parts:
         for i, m, lab in p.pins:
             if lab:
-                o.append('<text x="%.1f" y="%.1f" font-size="7">%s</text>' % (px(X(i)) + 3.6, py(Y(m)) - 3.6, lab))
+                o.append('<text x="%.1f" y="%.1f" font-size="6">%s</text>' % (px(X(i)) + 3.6, py(Y(m)) - 3.6, lab))
         if p.boxes:
             b = p.boxes[0]
             o.append('<text x="%.1f" y="%.1f" font-size="10" font-weight="bold" fill="#1f6fb5">%s</text>' % (px(b[1]) + 3, py(b[4]) + 12, p.name))
@@ -211,10 +291,10 @@ def svg_map(parts, path):
         elif p.pins:
             i, m, _ = p.pins[0]
             o.append('<text x="%.1f" y="%.1f" font-size="8" fill="#b5651d">%s</text>' % (px(X(i)) - 26, py(Y(m)) + 3, p.name))
-    for i in range(0, NI, 5):
-        o.append('<text x="%.1f" y="62" font-size="10" fill="#666">%d</text>' % (px(X(i)) - 3, i))
+    for i in range(NI):
+        o.append('<text x="%.1f" y="62" font-size="10" fill="#666">%d</text>' % (px(X(i)) - 4, i + 1))
     for m in range(NM):
-        o.append('<text x="24" y="%.1f" font-size="10" fill="#666">%d</text>' % (py(Y(m)) + 3, m))
+        o.append('<text x="30" y="%.1f" font-size="11" font-weight="bold" fill="#666">%s</text>' % (py(Y(m)) + 4, COLS[m]))
     o.append('</svg>')
     open(path, 'w').write('\n'.join(o))
 
@@ -263,8 +343,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     for sx in (c['bat_x0'] - 2.2, c['bat_x0'] + c['bat_l'] + 0.2):
         tray = uni(tray, bx(sx, sx + 2.0, C['bat_y'] - 5, C['bat_y'] + 5, fz - 0.1, bc - 3.0))
     # dev board: 6 posts between holes
-    for i in (0, 12, 24):
-        for m in (0, 10):
+    for i in (1, 13, 22):
+        for m in (0, 8):
             xx, yy = X(i) + 1.27, Y(m) + 1.27
             tray = uni(tray, bx(xx - 0.7, xx + 0.7, yy - 0.7, yy + 0.7, fz - 0.1, c['pb_z']))
     # USB-C breakout: two posts with locating pegs through its mounting holes; its front edge in a pocket in end wall B
@@ -305,8 +385,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     btop = bc + c['bat_d'] / 2
     for fx in (c['bat_x0'] + 22, c['bat_x0'] + c['bat_l'] - 26):
         lid = uni(lid, bx(fx, fx + 4, C['bat_y'] - 2, C['bat_y'] + 2, btop + 0.1, zl + 0.01))
-    for xx in (PB[0] + 0.3, PB[1] - 2.3):
-        lid = uni(lid, bx(xx, xx + 2.0, PB[3] - 2.0, PB[3] - 0.3, C['pb_top'] + 0.1, zl + 0.01))
+    for fi, fm in ((10, 0), (18, 9)):                   # hold the board down on empty holes a11 and j19
+        fx, fy = X(fi), Y(fm)
+        ztop = C['g_under'] + 0.01 if abs(fy) < C['gw_out'] + 1.5 else zl + 0.01
+        lid = uni(lid, bx(fx - 0.8, fx + 0.8, fy - 0.6, fy + 0.6, C['pb_top'] + 0.1, ztop))
     # USB-C board: two pins under the lid drop through its mounting holes into the posts' sockets (tapered tips), and a
     # collar round each presses the board onto its post. The board slides in flat; the lid locks it.
     for hy in (c['usb_y'] - c['usb_hole_y'], c['usb_y'] + c['usb_hole_y']):
@@ -362,4 +444,4 @@ if __name__ == '__main__':
     print('Box %.1f x %.1f x %.1f mm; dev board %.1f x %.1f; pillars at %s' % (
         C['L'], 2 * c['half_w'], c['top'], PB[1] - PB[0], PB[3] - PB[2], ', '.join('(%.1f, %.1f)' % q for q in PILLARS)))
     svg_map(parts, os.path.join(repo, 'docs/renders/ctrl-v4-holemap.svg'))
-    open(os.path.join(repo, 'docs/renders/ctrl-v4-wiring.md'), 'w').write(wiring_md() + '\n')
+    open(os.path.join(repo, 'docs/renders/ctrl-v4-wiring.md'), 'w').write('# ControllerV4 dev board: placement and wiring\n\n' + wiring_md() + '\n')
