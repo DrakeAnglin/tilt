@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" font-family="Helvetica,Arial">
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="860" font-family="Helvetica,Arial">
 <rect width="100%" height="100%" fill="#fff"/>
 <text x="20" y="32" font-size="20" font-weight="bold">Charger board (MCP73871, 30.5 × 31.5 mm): what goes where</text>
 <text x="20" y="56" font-size="13" fill="#444">Front side, as in the photo. Drawn from the photo, so positions are approximate.</text>
@@ -32,20 +32,56 @@
 <text x="621" y="523" font-size="11" fill="#fff" font-weight="bold" text-anchor="middle">LOAD</text>
 <circle cx="688" cy="481" r="24" fill="#c9a400"/><circle cx="688" cy="481" r="12" fill="#fff"/>
 <text x="688" y="523" font-size="11" fill="#fff" font-weight="bold" text-anchor="middle">GND</text>
-<line x1="421" y1="113" x2="300" y2="110" stroke="#b03030" stroke-width="2"/>
-<circle cx="421" cy="113" r="4" fill="#b03030"/>
-<text x="294" y="114" font-size="14" fill="#b03030" text-anchor="end" font-weight="bold">PWR pair: 22 AWG, 2 wires</text>
-<text x="294" y="131" font-size="12" fill="#333" text-anchor="end" font-weight="normal">PWR → e19,  GND → a21</text>
-<text x="294" y="148" font-size="12" fill="#333" text-anchor="end" font-weight="normal">(USB-C and solar come in here,</text>
-<text x="294" y="165" font-size="12" fill="#333" text-anchor="end" font-weight="normal">through D1 / D2 on the perfboard)</text>
-<line x1="418" y1="507" x2="300" y2="560" stroke="#b03030" stroke-width="2"/>
-<circle cx="418" cy="507" r="4" fill="#b03030"/>
-<text x="294" y="564" font-size="14" fill="#b03030" text-anchor="end" font-weight="bold">BATT pair: 22 AWG, 2 wires</text>
-<text x="294" y="581" font-size="12" fill="#333" text-anchor="end" font-weight="normal">BATT → d19,  GND → a22</text>
-<line x1="655" y1="507" x2="790" y2="560" stroke="#b03030" stroke-width="2"/>
-<circle cx="655" cy="507" r="4" fill="#b03030"/>
-<text x="796" y="564" font-size="14" fill="#b03030" text-anchor="start" font-weight="bold">LOAD pair: 22 AWG, 2 wires</text>
-<text x="796" y="581" font-size="12" fill="#333" text-anchor="start" font-weight="normal">LOAD → j20,  GND → a23</text>
+<line x1="389" y1="115" x2="389" y2="89" stroke="#222" stroke-width="3"/>
+<rect x="358" y="66" width="62" height="22" rx="4" fill="#fff" stroke="#222" stroke-width="2"/>
+<text x="389" y="81" font-size="12" font-weight="bold" fill="#222" text-anchor="middle">A a21</text>
+<line x1="453" y1="115" x2="453" y2="89" stroke="#d62728" stroke-width="3"/>
+<rect x="422" y="66" width="62" height="22" rx="4" fill="#fff" stroke="#d62728" stroke-width="2"/>
+<text x="453" y="81" font-size="12" font-weight="bold" fill="#d62728" text-anchor="middle">B e19</text>
+<line x1="383" y1="505" x2="383" y2="531" stroke="#222" stroke-width="3"/>
+<rect x="352" y="532" width="62" height="22" rx="4" fill="#fff" stroke="#222" stroke-width="2"/>
+<text x="383" y="547" font-size="12" font-weight="bold" fill="#222" text-anchor="middle">A a22</text>
+<line x1="453" y1="505" x2="453" y2="531" stroke="#d62728" stroke-width="3"/>
+<rect x="422" y="532" width="62" height="22" rx="4" fill="#fff" stroke="#d62728" stroke-width="2"/>
+<text x="453" y="547" font-size="12" font-weight="bold" fill="#d62728" text-anchor="middle">B d19</text>
+<line x1="621" y1="505" x2="621" y2="531" stroke="#d62728" stroke-width="3"/>
+<rect x="590" y="532" width="62" height="22" rx="4" fill="#fff" stroke="#d62728" stroke-width="2"/>
+<text x="621" y="547" font-size="12" font-weight="bold" fill="#d62728" text-anchor="middle">C j20</text>
+<line x1="688" y1="505" x2="688" y2="531" stroke="#222" stroke-width="3"/>
+<rect x="657" y="532" width="62" height="22" rx="4" fill="#fff" stroke="#222" stroke-width="2"/>
+<text x="688" y="547" font-size="12" font-weight="bold" fill="#222" text-anchor="middle">A a23</text>
+<text x="40" y="621" font-size="15" font-weight="bold">The three JST-XH plugs: crimp each wire into the position shown (each position is named after the board hole it plugs onto)</text>
+<text x="60" y="651" font-size="14" font-weight="bold">Plug A: 3-pin plug</text>
+<text x="60" y="669" font-size="12" fill="#444">into the angled header a21–a23</text>
+<rect x="60" y="681" width="288" height="74" rx="6" fill="#f4f1e8" stroke="#777" stroke-width="2"/>
+<rect x="68" y="689" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>
+<text x="108" y="713" font-size="14" font-weight="bold" fill="#222" text-anchor="middle">PWR −</text>
+<text x="108" y="735" font-size="12" fill="#444" text-anchor="middle">→ a21</text>
+<rect x="164" y="689" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>
+<text x="204" y="713" font-size="14" font-weight="bold" fill="#222" text-anchor="middle">BATT −</text>
+<text x="204" y="735" font-size="12" fill="#444" text-anchor="middle">→ a22</text>
+<rect x="260" y="689" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>
+<text x="300" y="713" font-size="14" font-weight="bold" fill="#222" text-anchor="middle">LOAD −</text>
+<text x="300" y="735" font-size="12" fill="#444" text-anchor="middle">→ a23</text>
+<text x="400" y="651" font-size="14" font-weight="bold">Plug B: 2-pin plug</text>
+<text x="400" y="669" font-size="12" fill="#444">into the header d19–e19</text>
+<rect x="400" y="681" width="192" height="74" rx="6" fill="#f4f1e8" stroke="#777" stroke-width="2"/>
+<rect x="408" y="689" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>
+<text x="448" y="713" font-size="14" font-weight="bold" fill="#d62728" text-anchor="middle">BATT +</text>
+<text x="448" y="735" font-size="12" fill="#444" text-anchor="middle">→ d19</text>
+<rect x="504" y="689" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>
+<text x="544" y="713" font-size="14" font-weight="bold" fill="#d62728" text-anchor="middle">PWR +</text>
+<text x="544" y="735" font-size="12" fill="#444" text-anchor="middle">→ e19</text>
+<text x="740" y="651" font-size="14" font-weight="bold">Plug C: 2-pin plug</text>
+<text x="740" y="669" font-size="12" fill="#444">into the header j20–j21</text>
+<rect x="740" y="681" width="192" height="74" rx="6" fill="#f4f1e8" stroke="#777" stroke-width="2"/>
+<rect x="748" y="689" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>
+<text x="788" y="713" font-size="14" font-weight="bold" fill="#d62728" text-anchor="middle">LOAD +</text>
+<text x="788" y="735" font-size="12" fill="#444" text-anchor="middle">→ j20</text>
+<rect x="844" y="689" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>
+<text x="884" y="713" font-size="14" font-weight="bold" fill="#999" text-anchor="middle">(empty)</text>
+<text x="884" y="735" font-size="12" fill="#444" text-anchor="middle">→ j21</text>
+<text x="40" y="781" font-size="12" fill="#444">Before plugging in, hold each plug against its header and check every wire lands on the hole named in its position. Plug C: LOAD + can go in either position (j20 and j21 are both battery +).</text>
 <line x1="670" y1="133" x2="790" y2="100" stroke="#0a7a3a" stroke-width="2"/>
 <circle cx="670" cy="133" r="4" fill="#0a7a3a"/>
 <text x="796" y="104" font-size="14" fill="#0a7a3a" text-anchor="start" font-weight="bold">Bulk capacitor goes here</text>

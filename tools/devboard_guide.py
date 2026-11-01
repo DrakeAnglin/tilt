@@ -656,7 +656,7 @@ def charger_picture():
 
     def P(x, y):
         return ox + k * x, oy + k * y
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" font-family="Helvetica,Arial">',
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="860" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
          '<text x="20" y="32" font-size="20" font-weight="bold">Charger board (MCP73871, 30.5 × 31.5 mm): what goes where</text>',
          '<text x="20" y="56" font-size="13" fill="#444">Front side, as in the photo. Drawn from the photo, so positions are approximate.</text>']
@@ -697,12 +697,42 @@ def charger_picture():
             o.append('<text x="%.0f" y="%.0f" font-size="%d" fill="%s" text-anchor="%s" font-weight="%s">%s</text>' % (
                 tx_ + (6 if anchor == 'start' else -6), ty_ + 4 + 17 * i, 14 if i == 0 else 12, c if i == 0 else '#333',
                 anchor, 'bold' if i == 0 else 'normal', t))
-    a = P(6.5, 3.5)
-    call(a[0], a[1] - 26, 300, 110, ['PWR pair: 22 AWG, 2 wires', 'PWR → %s,  GND → %s' % (CH['PWR + (input)'], CH['PWR - / GND']), '(USB-C and solar come in here,', 'through D1 / D2 on the perfboard)'], '#b03030', 'end')
-    a = P(6.3, 27.9)
-    call(a[0], a[1] + 26, 300, 560, ['BATT pair: 22 AWG, 2 wires', 'BATT → %s,  GND → %s' % (CH['BATT +'], CH['BATT -'])], '#b03030', 'end')
-    a = P(23.2, 27.9)
-    call(a[0], a[1] + 26, 790, 560, ['LOAD pair: 22 AWG, 2 wires', 'LOAD → %s,  GND → %s' % (CH['LOAD + (output)'], CH['LOAD -'])], '#b03030')
+    # which plug and position each pad's wire goes to (the plugs are drawn below the board)
+    jst = 'JST charger GND' in PARTS
+    plugs = [('A', '3-pin plug', 'into the angled header %s–%s' % (CH['PWR - / GND'], CH['LOAD -']),
+              [('PWR −', CH['PWR - / GND'], '#222'), ('BATT −', CH['BATT -'], '#222'), ('LOAD −', CH['LOAD -'], '#222')]),
+             ('B', '2-pin plug', 'into the header %s–%s' % (CH['BATT +'], CH['PWR + (input)']),
+              [('BATT +', CH['BATT +'], '#d62728'), ('PWR +', CH['PWR + (input)'], '#d62728')]),
+             ('C', '2-pin plug', 'into the header j20–j21', [('LOAD +', CH['LOAD + (output)'], '#d62728'), ('(empty)', 'j21', '#999')])]
+    where = {w: (pl, hole) for pl, _, _, cav in plugs for w, hole, _ in cav}
+    tags = [('PWR −', 4.2, 3.5, -1), ('PWR +', 8.8, 3.5, -1), ('BATT −', 3.8, 27.9, 1), ('BATT +', 8.8, 27.9, 1),
+            ('LOAD +', 20.8, 27.9, 1), ('LOAD −', 25.6, 27.9, 1)]
+    for w, x, y, up in tags:
+        px, py = P(x, y)
+        pl, hole = where[w]
+        c = '#d62728' if '+' in w else '#222'
+        ty_ = py + up * 62
+        o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="3"/>' % (px, py + up * 24, px, ty_ - up * 12, c))
+        o.append('<rect x="%.0f" y="%.0f" width="62" height="22" rx="4" fill="#fff" stroke="%s" stroke-width="2"/>' % (px - 31, ty_ - 11, c))
+        o.append('<text x="%.0f" y="%.0f" font-size="12" font-weight="bold" fill="%s" text-anchor="middle">%s %s</text>' % (
+            px, ty_ + 4, c, pl, hole))
+    by = oy + bh * k + 120
+    o.append('<text x="40" y="%.0f" font-size="15" font-weight="bold">%s</text>' % (
+        by - 30, 'The three JST-XH plugs: crimp each wire into the position shown (each position is named after the board hole it plugs onto)'))
+    for n, (pl, kind_, into, cav) in enumerate(plugs):
+        hx0 = 60 + n * 340
+        w_ = 96 * len(cav)
+        o.append('<text x="%.0f" y="%.0f" font-size="14" font-weight="bold">Plug %s: %s</text>' % (hx0, by, pl, kind_))
+        o.append('<text x="%.0f" y="%.0f" font-size="12" fill="#444">%s</text>' % (hx0, by + 18, into))
+        o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="74" rx="6" fill="#f4f1e8" stroke="#777" stroke-width="2"/>' % (hx0, by + 30, w_))
+        for q, (w, hole, c) in enumerate(cav):
+            cx_ = hx0 + 48 + 96 * q
+            o.append('<rect x="%.0f" y="%.0f" width="80" height="58" rx="4" fill="#fff" stroke="#bbb"/>' % (cx_ - 40, by + 38))
+            o.append('<text x="%.0f" y="%.0f" font-size="14" font-weight="bold" fill="%s" text-anchor="middle">%s</text>' % (cx_, by + 62, c, w))
+            o.append('<text x="%.0f" y="%.0f" font-size="12" fill="#444" text-anchor="middle">→ %s</text>' % (cx_, by + 84, hole))
+    o.append('<text x="40" y="%.0f" font-size="12" fill="#444">%s</text>' % (
+        by + 130, 'Before plugging in, hold each plug against its header and check every wire lands on the hole named in its position. '
+                  'Plug C: LOAD + can go in either position (j20 and j21 are both battery +).'))
     call(cx + 1.9 * k, cy, 790, 100, ['Bulk capacitor goes here', 'long leg (+) in the hole on the + side,', 'stripe side to the other hole;',
                                       'bend the legs 90° first to lay it down'])
     call(tx + 0.8 * k, ty, 790, 280, ['Remove this 103 (10 kΩ) resistor', 'solder the 10 kΩ NTC\'s 2 leads to its pads', '(check: before removing, it reads 10 kΩ)'])
