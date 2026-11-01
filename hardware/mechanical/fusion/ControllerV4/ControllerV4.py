@@ -97,8 +97,9 @@ class Part:
 
 
 def layout():
-    """Dev-board parts on named holes (column letter + row number). ESP32-C6 SuperMini pins (listing photo; check the
-    silkscreen): with its USB-C toward row 1, the TX/RX/0-7 side is in column b, the 5V/GND/3V3 side in column h."""
+    """Dev-board parts on named holes (column letter + row number). ESP32-C6 SuperMini pins confirmed by the owner
+    (2026-11-01, board photo): chip side up, USB-C toward row 1, TX/RX/0-7 in column b and 5V/GND/3V3 in column h,
+    using the board's INNER header holes (rows 15.24 apart, b-h)."""
     t = C['pb_top']
     parts = []
     left = ['TX16', 'RX17', '0', '1', '2', '3', '4', '5', '6', '7']
@@ -223,8 +224,11 @@ def wiring_md():
         if p.pins and p.name not in ('ESP32-C6', 'Port leads'):
             o.append('| %s | %s | %s |' % (p.name, ', '.join('%s%s' % (HN(i, m), (' (' + lab + ')') if lab else '')
                                                          for i, m, lab in p.pins), p.note))
-    o += ['', 'ESP32-C6: header pins in **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and **h1-h10** (5V, GND, 3V3, 20, 19, 18, 15,',
-          '14, 9, 8), USB-C overhanging row 1. Charger: foam tape over **c15-h22**.', '',
+    o += ['', 'ESP32-C6: chip side up, header pins in its **inner** holes, into **b1-b10** (TX16, RX17, 0, 1, 2, 3, 4, 5, 6, 7) and',
+          '**h1-h10** (5V, GND, 3V3, 20, 19, 18, 15, 14, 9, 8), USB-C overhanging row 1 (confirmed against the board).',
+          'Leave its inner pads (12, 13, 21, 22, 23) and BAT pad unconnected. Charger: foam tape over **c15-h22**.', '',
+          'D3 (j5-j6) drops ~0.3 V, so the ESP browns out near 3.4-3.5 V on the cell (last ~10-15 %). Optional: 2 header',
+          'pins + jumper at j5-j6 instead of D3 (zero drop; pull the jumper before plugging USB into the ESP).', '',
           '## Port leads (from the RJ12 boards)', '', '| Lead | Hole | Lead | Hole | Lead | Hole |', '|---|---|---|---|---|---|']
     leads = {lab: HN(i, m) for i, m, lab in next(p for p in layout() if p.name == 'Port leads').pins}
     for sig in ('IN1', 'IN2', 'EN', 'ANG', 'VBAT', 'GND'):
