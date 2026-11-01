@@ -398,10 +398,15 @@ def draw_under(o, which):
                 x0, y0, x1, y1, col, 6 if which == 'rail' else 4))
 
 
-def draw_pins_under(o):
-    """Every lead and pin from the top side, seen from underneath as solder joints."""
+def draw_pins_under(o, done=None):
+    """Lead and pin joints from the top side, seen from underneath. 'done' = keys of the steps already done (None: all)."""
     for p in PARTS.values():
-        for i, m, _ in p.pins:
+        for i, m, lab in p.pins:
+            if done is not None:
+                if p.name == 'Port leads' and 'port' + lab[1] not in done:
+                    continue
+                if p.name == 'Solar leads' and 'solar' not in done:
+                    continue
             dot(o, HN(i, m), '#8a8a8a', True, r=5)
     for h, _ in charger_pads():
         dot(o, h, '#8a8a8a', True, r=5)
@@ -585,7 +590,7 @@ step('rails', 'Rails (%d)' % len(RAILS), 'bottom', [draw_under, 'rail'],
      ['Solder each rail at every hole it passes, including the ones that already have wires or leads.'],
      """Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (%s), soldering it at every hole
 it passes. Where two GND rails
-meet at a corner, solder them together there. Then do the checks in step §checks§.""" % rails_text(),
+meet at a corner, solder them together there. Then the charger plugs (step §charger§) and the checks (step §checks§).""" % rails_text(),
      what(wires_of('rail')))
 
 
@@ -624,6 +629,8 @@ def need():
 NEED = need()
 
 
+ORDER = ['res', 'diodes', 'caps', 'sockets', 'wires', 'port1', 'port2', 'port3', 'solar', 'bridges', 'rails', 'charger']
+STEPS.sort(key=lambda st: ORDER.index(st['key']) if st['key'] in ORDER else len(ORDER))
 KEYS = [st['key'] for st in STEPS]
 
 
@@ -646,14 +653,15 @@ def render_step(k):
     o = board('Step %d: %s' % (k + 1, st['title']), st['sub'], bottom)
     prev = []
     if bottom:
-        draw_pins_under(prev)
+        draw_pins_under(prev, {s2['key'] for s2 in STEPS[:k]})
         for s2 in STEPS[:k]:
             if s2['view'] == 'bottom':
                 draw_under(prev, s2['draw'][1])
     else:
         for s2 in STEPS[:k]:
-            for f in s2['draw']:
-                f(prev)
+            if s2['view'] == 'top':
+                for f in s2['draw']:
+                    f(prev)
     if k == 0 and not bottom:                          # first picture: where things will go, and which end is which
         for name, hs in socket_rows():
             (x0, y0), (x1, y1) = pos(hs[0]), pos(hs[-1])
@@ -858,11 +866,11 @@ def write_md():
          'every hole holds exactly one thing (a part leg, a lead or a wire end).', '',
          '**Totals:** %d parts and leads on top, %d insulated wires, %d bare bridges, %d rails.' % (
              sum(len(p.pins) for p in PARTS.values()), len(wires_of('wire')), len(wires_of('bridge')), len(RAILS)), '',
-         '**Order:** all parts and leads first (steps 1–%d, holes still open), then the insulated wires (%d), the bare bridges (%d),' % (
-             KEYS.index('wires'), KEYS.index('wires') + 1, KEYS.index('bridges') + 1),
-         'the rails (%d), and the ESP and USB-C board plug in last (%d). Port 3 and the solar lead are optional. That way solder' % (
-             KEYS.index('rails') + 1, len(KEYS) + 1),
-         'never fills a hole that something still has to go through. Each',
+         '**Order:** parts, sockets and the board\'s own wires first, then the RJ12 and solar leads (steps 1–%d), while every hole' % (KEYS.index('solar') + 1),
+         'is still open; then the bare bridges (%d) and rails (%d), which land on those holes\' pads; then the charger, which only' % (
+             KEYS.index('bridges') + 1, KEYS.index('rails') + 1),
+         'plugs in (%d); the ESP and USB-C board plug in last (%d). Port 3 and the solar lead are optional. Each' % (
+             KEYS.index('charger') + 1, len(KEYS) + 1),
          'step does one kind of part, and in its picture that step is in colour while everything already done is grey.', '',
          '## Parts for one board', '', '| Part | Count | Step | From (BOM) |', '|---|---|---|---|']
     o += ['| %s | %s | %s | %s |' % r for r in bom()]

@@ -402,27 +402,6 @@
 <text x="598" y="378" font-size="11" fill="#222" text-anchor="end" font-weight="bold">B− (black)</text>
 <circle cx="610" cy="330" r="6" fill="#d62728"/>
 <text x="598" y="320" font-size="11" fill="#d62728" text-anchor="end" font-weight="bold">B+ (red)</text>
-<rect x="934" y="84" width="120" height="282" rx="6" fill="#3b3b3b" opacity="0.85"/>
-<text x="994" y="217" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">charger</text>
-<text x="994" y="235" font-size="11" fill="#fff" text-anchor="middle">(off the board)</text>
-<circle cx="610" cy="240" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
-<path d="M610 240 Q772 222 934 240" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="610" y="227" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">PWR+</text>
-<circle cx="670" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
-<path d="M670 360 Q802 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="670" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">PWR−</text>
-<circle cx="610" cy="270" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
-<path d="M610 270 Q772 252 934 270" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="610" y="257" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">BAT+</text>
-<circle cx="700" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
-<path d="M700 360 Q817 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="700" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">BAT−</text>
-<circle cx="640" cy="90" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
-<path d="M640 90 Q787 72 934 90" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="640" y="77" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LOAD+</text>
-<circle cx="730" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
-<path d="M730 360 Q832 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="730" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LD−</text>
 <circle cx="100" cy="210" r="5" fill="#1f77b4"/>
 <text x="100" y="199" font-size="8" fill="#1f77b4" text-anchor="middle" font-weight="bold">P1 IN1</text>
 <circle cx="100" cy="240" r="5" fill="#1f77b4"/>
@@ -463,6 +442,27 @@
 <text x="730" y="169" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">Sol+</text>
 <circle cx="550" cy="360" r="5" fill="#222222"/>
 <text x="550" y="349" font-size="8" fill="#222222" text-anchor="middle" font-weight="bold">Sol−</text>
+<rect x="934" y="84" width="120" height="282" rx="6" fill="#3b3b3b" opacity="0.85"/>
+<text x="994" y="217" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">charger</text>
+<text x="994" y="235" font-size="11" fill="#fff" text-anchor="middle">(off the board)</text>
+<circle cx="610" cy="240" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
+<path d="M610 240 Q772 222 934 240" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="610" y="227" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">PWR+</text>
+<circle cx="670" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
+<path d="M670 360 Q802 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="670" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">PWR−</text>
+<circle cx="610" cy="270" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
+<path d="M610 270 Q772 252 934 270" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="610" y="257" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">BAT+</text>
+<circle cx="700" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
+<path d="M700 360 Q817 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="700" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">BAT−</text>
+<circle cx="640" cy="90" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
+<path d="M640 90 Q787 72 934 90" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="640" y="77" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LOAD+</text>
+<circle cx="730" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
+<path d="M730 360 Q832 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="730" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LD−</text>
 <rect x="108" y="68" width="224" height="314" rx="5" fill="#1b1b1b" opacity="0.85"/>
 <rect x="183" y="376" width="74" height="48" rx="4" fill="#bbb" stroke="#666"/>
 <text x="220" y="404" font-size="11" text-anchor="middle" font-weight="bold">USB-C</text>
