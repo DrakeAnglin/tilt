@@ -278,7 +278,13 @@
 <circle cx="760" cy="150" r="4" fill="#fff" stroke="#999"/>
 <circle cx="760" cy="120" r="4" fill="#fff" stroke="#999"/>
 <circle cx="760" cy="90" r="4" fill="#fff" stroke="#999"/>
+<text x="30" y="405" font-size="13" fill="#c00" font-weight="bold">&#8592; row 1: toward the phone jacks</text>
+<text x="760" y="405" font-size="13" fill="#c00" font-weight="bold" text-anchor="end">row 24: toward the USB-C end &#8594;</text>
+<text x="280" y="405" font-size="11" fill="#555">dashed = where the sockets go later (step 4)</text>
 <g filter="url(#mute)" opacity="0.3">
+<rect x="118" y="78" width="24" height="294" rx="3" fill="none" stroke="#555" stroke-dasharray="5,4"/>
+<rect x="298" y="78" width="24" height="294" rx="3" fill="none" stroke="#555" stroke-dasharray="5,4"/>
+<rect x="748" y="168" width="24" height="174" rx="3" fill="none" stroke="#555" stroke-dasharray="5,4"/>
 </g>
 <line x1="730" y1="150" x2="640" y2="150" stroke="#888" stroke-width="2"/>
 <rect x="648" y="141" width="74" height="18" rx="7" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
@@ -322,5 +328,6 @@
 <rect x="390" y="141" width="4" height="18" fill="#111"/>
 <rect x="397" y="141" width="4" height="18" fill="#d62728"/>
 <text x="423" y="138" font-size="9" text-anchor="middle" font-weight="bold">1k</text>
-<text x="30" y="447" font-size="13" fill="#222">Colour bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 4 × 1 MΩ resistor, 3 × 1 kΩ resistor</text>
+<text x="30" y="467" font-size="13" fill="#222">Colour bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.</text>
 </svg>

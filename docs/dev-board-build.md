@@ -62,6 +62,8 @@ A reversed diode just won't conduct; a reversed electrolytic or battery can dama
 
 ## Step 1: Resistors (7)
 
+**You need:** 4 × 1 MΩ resistor, 3 × 1 kΩ resistor.
+
 ![step 1](renders/build-step-01.png)
 
 First mark the board: **row 1 = the end toward the phone jacks**, **column a = the edge with the row numbers printed on
@@ -83,6 +85,8 @@ the trimmed legs: they make good bridges later. The holes under each body stay e
 
 ## Step 2: Diodes (3 × 1N5819, 1 × 6.2 V zener)
 
+**You need:** 3 × 1N5819 diode, 1 × 6.2 V zener.
+
 ![step 2](renders/build-step-02.png)
 
 These **only work one way round**; the band end is the cathode (K). Bend the legs like the resistors (4 holes)
@@ -97,6 +101,8 @@ and lay each one flat with its **band at the K hole** in the table and the pictu
 
 ## Step 3: Ceramic capacitors (4 × 100 nF, 1 × 10 µF)
 
+**You need:** 1 × 10 µF (106) ceramic capacitor, 4 × 100 nF (104) ceramic capacitor.
+
 ![step 3](renders/build-step-03.png)
 
 No direction. Push them straight down so the body sits low; don't bend the legs at the body.
@@ -110,6 +116,8 @@ No direction. Push them straight down so the body sits low; don't bend the legs 
 | C ADC3 100n | g10, g12 | middle hole g11 stays empty |
 
 ## Step 4: Sockets and pins: ESP (2 × 10), USB-C (1 × 6), battery (2)
+
+**You need:** 2 × 10-way female header socket (pin stand), 1 × 6-way female header socket (cut from a strip), 2 × male header pins (battery).
 
 ![step 4](renders/build-step-04.png)
 
@@ -130,6 +138,8 @@ All the header parts at once:
 | Battery pins | a19 (−), b19 (+) | red wire of the plug on b19 |
 
 ## Step 5: Charger: prepare it, wire it in from off the board (3 wire pairs)
+
+**You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 3 × pairs of white 22 AWG two-conductor wire, 6–8 cm each.
 
 ![step 5](renders/build-step-05.png)
 
@@ -164,6 +174,8 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 
 ## Step 6: Leads from the RJ12 boards and the solar lead (20)
 
+**You need:** 3 × RJ12 breakout board (6 leads each), 1 × solar lead (2 wires).
+
 ![step 6](renders/build-step-06.png)
 
 Solder the 18 leads from the three RJ12 boards (pin 1 = square pad), then the solar lead's + → g23 and − → a17.
@@ -185,6 +197,8 @@ Trim underneath to ~1 mm.
 
 ## Step 7: Insulated wires underneath (4)
 
+**You need:** 4 × 30 AWG insulated wire (cut to length).
+
 ![step 7](renders/build-step-07.png)
 
 Wires go in **before** the bridges and rails, while their holes are still open. For each wire: cut it a little long,
@@ -199,6 +213,8 @@ meter as you go.
 | d16 | i10 | input-power sense -> GPIO6 |
 
 ## Step 8: Bare bridges underneath (61)
+
+**You need:** 61 × short bare wire: the ~32 leg offcuts saved from steps 1-3, the rest cut from bare tinned wire.
 
 ![step 8](renders/build-step-08.png)
 
@@ -272,6 +288,8 @@ and neither beeps to the pad next to it.
 
 ## Step 9: Rails (3)
 
+**You need:** 3 × bare tinned wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
+
 ![step 9](renders/build-step-09.png)
 
 Last: lay straight bare tinned wire for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole it passes. Where two GND rails
@@ -284,6 +302,8 @@ meet at a corner, solder them together there. Then do the checks in step 10.
 | j11 | j24 | bare wire down column j, rows 11-24 |
 
 ## Step 10: checks, then plug in the ESP and the USB-C board
+
+**You need:** multimeter, 1 × ESP32-C6 SuperMini (its male pins soldered on), 1 × USB-C breakout (its 6 male pins soldered on), 1 × 18650 cell with JST-XH plug.
 
 ![finished top](renders/build-done-top.png)
 

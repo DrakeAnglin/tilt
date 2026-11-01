@@ -514,6 +514,38 @@ meet at a corner, solder them together there. Then do the checks in step 10.""" 
      what(wires_of('rail')))
 
 
+def need():
+    """What each step uses, with counts (drawn from the layout)."""
+    cnt = lambda pairs: {v: sum(1 for _, x in pairs if x == v) for _, v in pairs}
+    r, c = cnt(RES), cnt(CAPS)
+    rail_mm = []
+    for f, t, k in RAILS:
+        (i0, m0), (i1, m1) = H(f), H(t)
+        rail_mm.append('%s %s–%s ~%d mm' % ('GND' if 'GND' in k else 'battery +', f, t, (abs(i0 - i1) + abs(m0 - m1)) * 2.54 + 10))
+    socks = socket_rows()
+    n_esp = sum(1 for n, _ in socks if n == 'ESP32-C6')
+    usb_pins = [len(hs) for n, hs in socks if n == 'USB-C breakout']
+    out = {
+        'res': ['%s × %s resistor' % (n, v.replace('1k', '1 kΩ').replace('1M', '1 MΩ')) for v, n in r.items()],
+        'diodes': ['3 × 1N5819 diode', '1 × 6.2 V zener'],
+        'caps': ['%d × %s ceramic capacitor' % (n, {'100n': '100 nF (104)', '10µ': '10 µF (106)'}[v]) for v, n in c.items()],
+        'sockets': ['%d × 10-way female header socket (pin stand)' % n_esp] +
+                   ['1 × %d-way female header socket (cut from a strip)' % u for u in usb_pins] +
+                   ['%d × male header pins (battery)' % len(PARTS['Battery pins'].pins)],
+        'charger': ['1 × MCP73871 charger board (+ its bulk capacitor)', '1 × 10 kΩ NTC thermistor',
+                    '3 × pairs of white 22 AWG two-conductor wire, 6–8 cm each'],
+        'leads': ['3 × RJ12 breakout board (6 leads each)'] + (['1 × solar lead (2 wires)'] if 'Solar leads' in PARTS else []),
+        'wires': ['%d × 30 AWG insulated wire (cut to length)' % len(wires_of('wire'))],
+        'bridges': ['%d × short bare wire: the ~%d leg offcuts saved from steps 1-3, the rest cut from bare tinned wire' % (
+            len(wires_of('bridge')), 2 * (len(RES) + len(DIODES) + len(CAPS)))],
+        'rails': ['%d × bare tinned wire: %s' % (len(RAILS), '; '.join(rail_mm))],
+    }
+    return out
+
+
+NEED = need()
+
+
 def render_step(k):
     st = STEPS[k]
     bottom = st['view'] == 'bottom'
@@ -528,6 +560,17 @@ def render_step(k):
         for s2 in STEPS[:k]:
             for f in s2['draw']:
                 f(prev)
+    if k == 0 and not bottom:                          # first picture: where things will go, and which end is which
+        for name, hs in socket_rows():
+            (x0, y0), (x1, y1) = pos(hs[0]), pos(hs[-1])
+            prev.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="3" fill="none" stroke="#555" stroke-dasharray="5,4"/>' % (
+                min(x0, x1) - 12, min(y0, y1) - 12, abs(x1 - x0) + 24, abs(y1 - y0) + 24))
+        o.append('<text x="%d" y="%.0f" font-size="13" fill="#c00" font-weight="bold">&#8592; row 1: toward the phone jacks</text>' % (
+            MX - 40, MY + S * (M.NM - 1) + S * 1.5))
+        o.append('<text x="%.0f" y="%.0f" font-size="13" fill="#c00" font-weight="bold" text-anchor="end">row 24: toward the USB-C end &#8594;</text>' % (
+            MX + S * (M.NI - 1), MY + S * (M.NM - 1) + S * 1.5))
+        o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#555">dashed = where the sockets go later (step 4)</text>' % (
+            MX + S * 7, MY + S * (M.NM - 1) + S * 1.5))
     muted(o, prev)
     if bottom:
         draw_under(o, st['draw'][1])
@@ -535,7 +578,7 @@ def render_step(k):
         for f in st['draw']:
             f(o)
     name = '%sstep-%02d.svg' % (PRE, k + 1)
-    finish(o, name, st['notes'])
+    finish(o, name, ['You need: ' + ', '.join(NEED.get(st['key'], []))] + list(st['notes']))
     return name
 
 
@@ -712,7 +755,8 @@ def write_md():
            'caps': ('Capacitor', 'Holes', 'Note'), 'batt': ('Part', 'Holes', 'Note'), 'charger': ('Charger pad', 'Board hole', 'Net'),
            'wires': ('From', 'To', 'What'), 'bridges': ('From', 'To', 'What'), 'rails': ('From', 'To', 'What')}
     for k, st in enumerate(STEPS):
-        o += ['## Step %d: %s' % (k + 1, st['title']), '', '![step %d](renders/build-step-%02d.png)' % (k + 1, k + 1), '', st['body'], '']
+        o += ['## Step %d: %s' % (k + 1, st['title']), '', '**You need:** ' + ', '.join(NEED.get(st['key'], [])) + '.', '',
+              '![step %d](renders/build-step-%02d.png)' % (k + 1, k + 1), '', st['body'], '']
         if st['key'] == 'leads':
             leads = {lab: HN(i, m) for i, m, lab in PARTS['Port leads'].pins}
             o += ['| RJ12 pin | Port 1 | Port 2 | Port 3 |', '|---|---|---|---|']
@@ -725,6 +769,8 @@ def write_md():
         else:
             o += ['| %s |' % ' | '.join(hdr[st['key']]), '|---|---|---|'] + ['| %s | %s | %s |' % r for r in st['table']] + ['']
     o += ['## Step %d: checks, then plug in the ESP and the USB-C board' % (len(STEPS) + 1), '',
+          '**You need:** multimeter, 1 × ESP32-C6 SuperMini (its male pins soldered on)%s, 1 × 18650 cell with JST-XH plug.' % (
+              ', 1 × USB-C breakout (its 6 male pins soldered on)' if 'USB-C breakout' in PARTS else ''), '',
           '![finished top](renders/build-done-top.png)', '', '![finished underside](renders/build-done-under.png)', '',
           'The battery + rail (%s) gets most of its connections from the top: the three port leads and the charger\'s LOAD +' % rails_text().split(', ')[-1],
           'wire (%s). The cell never connects to the rail directly: battery + (%s) goes to the charger\'s BATT + pad and the' % (CH['LOAD + (output)'], LEAD['B+']),

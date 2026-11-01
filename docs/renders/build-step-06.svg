@@ -449,5 +449,6 @@
 <text x="730" y="169" font-size="8" fill="#d62728" text-anchor="middle" font-weight="bold">Sol+</text>
 <circle cx="550" cy="360" r="5" fill="#222222"/>
 <text x="550" y="349" font-size="8" fill="#222222" text-anchor="middle" font-weight="bold">Sol−</text>
-<text x="30" y="447" font-size="13" fill="#222">Let the RJ12 boards hang off the end and tape them down while you work underneath.</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 3 × RJ12 breakout board (6 leads each), 1 × solar lead (2 wires)</text>
+<text x="30" y="467" font-size="13" fill="#222">Let the RJ12 boards hang off the end and tape them down while you work underneath.</text>
 </svg>

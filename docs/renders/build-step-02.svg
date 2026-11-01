@@ -342,5 +342,6 @@
 <rect x="657" y="261" width="7" height="18" fill="#ddd"/>
 <text x="690" y="273" font-size="9" fill="#fff" text-anchor="middle" font-weight="bold">Z</text>
 <text x="640" y="258" font-size="9" fill="#000" text-anchor="middle" font-weight="bold">K</text>
-<text x="30" y="447" font-size="13" fill="#222">Each diode lies flat across 4 holes. Put the band end at the hole marked K.</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 3 × 1N5819 diode, 1 × 6.2 V zener</text>
+<text x="30" y="467" font-size="13" fill="#222">Each diode lies flat across 4 holes. Put the band end at the hole marked K.</text>
 </svg>

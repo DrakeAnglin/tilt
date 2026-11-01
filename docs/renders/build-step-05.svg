@@ -409,5 +409,6 @@
 <circle cx="730" cy="360" r="9" fill="none" stroke="#0a7a3a" stroke-width="2.5"/>
 <path d="M730 360 Q832 342 934 360" fill="none" stroke="#0a7a3a" stroke-width="1.5" stroke-dasharray="4,3"/>
 <text x="730" y="382" font-size="9" fill="#0a7a3a" text-anchor="middle" font-weight="bold">LD−</text>
-<text x="30" y="447" font-size="13" fill="#222">Each charger wire has its own hole; the bridges in step 8 join them to the right nets.</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 3 × pairs of white 22 AWG two-conductor wire, 6–8 cm each</text>
+<text x="30" y="467" font-size="13" fill="#222">Each charger wire has its own hole; the bridges in step 8 join them to the right nets.</text>
 </svg>
