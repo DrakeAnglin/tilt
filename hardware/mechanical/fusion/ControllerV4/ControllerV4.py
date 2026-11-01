@@ -80,7 +80,7 @@ def Y(m):
     return PY0 + PITCH * m
 
 
-PB = (X(0) - 1.27, X(NI - 1) + 1.27, Y(0) - 1.27, Y(NM - 1) + 1.27)
+PB = (X(0) - 5.79, X(NI - 1) + 5.79, Y(0) - 3.57, Y(NM - 1) + 3.57)        # the real board: 70 x 30 mm (owner, 2026-11-01)
 C['usb_x0'] = PB[1] + 6.0                                  # USB-C board's back edge, 6 mm past the dev board
 # the socket's face is flush with end B's outer face, so the board's front edge sits 1.45 inside it, in a pocket in the wall
 C['in_b'] = max(C['usb_x0'] + c['usb_bd'] + c['usb_stick'] - c['end_t'], c['bat_x0'] + c['bat_l'] + 14.0)

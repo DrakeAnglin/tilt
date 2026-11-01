@@ -1,7 +1,8 @@
 """Check the ControllerV4 dev board on its own (no box): part bodies don't collide, and the wiring list makes exactly the
 intended nets (nothing missing, nothing shorted).
 
-  python3 tools/devboard_check.py
+  python3 tools/devboard_check.py              # the rotated layout (DevBoardR.py)
+  python3 tools/devboard_check.py --straight   # the older straight layout (ControllerV4.py)
 """
 import importlib.util
 import math
@@ -9,9 +10,9 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROT = '--rot' in sys.argv                     # the rotated-ESP variant (DevBoardR.py)
+STRAIGHT = '--straight' in sys.argv           # the older layout with the ESP along the board (ControllerV4.py)
 spec = importlib.util.spec_from_file_location('cv4', os.path.join(HERE, '../hardware/mechanical/fusion/ControllerV4/',
-                                                                   'DevBoardR.py' if ROT else 'ControllerV4.py'))
+                                                                   'ControllerV4.py' if STRAIGHT else 'DevBoardR.py'))
 M = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M)
 H, HN = M.H, M.HN
@@ -120,13 +121,15 @@ def holes_shared(parts):
         if note.startswith('wire'):
             for h in (f, t):
                 occ.setdefault(h, []).append('wire %s-%s' % (f, t))
-    for p in parts:
-        if p.name.startswith('C ') and len(p.pins) == 2:
+    for p in parts:                                  # holes hidden under a ceramic cap or a flat resistor / diode
+        if len(p.pins) == 2 and p.name not in ('Battery pins',) and 'leads' not in p.name:
             (i0, m0, _), (i1, m1, _) = p.pins
-            if (i0 == i1 or m0 == m1) and abs(i0 - i1) + abs(m0 - m1) == 2:
-                mid = HN((i0 + i1) // 2, (m0 + m1) // 2)
-                if mid in occ:
-                    occ[mid].append('(middle hole under %s)' % p.name)
+            n = abs(i0 - i1) + abs(m0 - m1)
+            if (i0 == i1 or m0 == m1) and n >= 2:
+                for k in range(1, n):
+                    mid = HN(i0 + (i1 - i0) * k // n, m0 + (m1 - m0) * k // n)
+                    if mid in occ:
+                        occ[mid].append('(hole under %s)' % p.name)
     return ['%s: %s' % (h, ' + '.join(v)) for h, v in sorted(occ.items()) if len(v) > 1]
 
 

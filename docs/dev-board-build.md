@@ -1,10 +1,12 @@
 # Building the controller dev board, step by step
 
 For the kit's **3 × 7 cm perfboard (columns a–j, rows 1–24)**. Everything here (pictures, tables, counts) is generated
-from the layout in [ControllerV4.py](../hardware/mechanical/fusion/ControllerV4/ControllerV4.py) by
-[`tools/devboard_guide.py`](../tools/devboard_guide.py); [`tools/devboard_check.py`](../tools/devboard_check.py)
-checks that the wiring makes every connection with no shorts. Full wiring list:
-[ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md).
+from the layout in [DevBoardR.py](../hardware/mechanical/fusion/ControllerV4/DevBoardR.py) (ESP turned across the
+board, resistors and diodes lying flat) by [`tools/devboard_guide.py`](../tools/devboard_guide.py);
+[`tools/devboard_check.py`](../tools/devboard_check.py) checks every connection, no shorts, no parts touching, and that
+every hole holds exactly one thing (a part leg, a lead or a wire end).
+
+**Totals:** 76 parts and leads on top, 4 insulated wires, 53 bare bridges, 3 rails.
 
 **Order:** all parts and leads first (steps 1–7, holes still open), then the insulated wires (8), then the bare
 bridges (9), then the rails (10). That way solder never fills a hole that something still has to go through. Each
@@ -28,8 +30,8 @@ step does one kind of part, and in its picture that step is in colour while ever
 | RJ12 breakout board | 3 | 7 (18 leads) | RJ11/RJ12 breakout 4-pack |
 | USB-C breakout (Cermant) | 1 | 7 (2 leads) | USB-C breakout 10-pack |
 | Solar lead (optional) | 1 | 7 (2 leads) | solar panel + extension |
-| 30 AWG insulated wire | 12 pieces | 8 | 30 AWG silicone wire |
-| Bare wire or trimmed resistor legs | 54 bridges + 2 rails | 9, 10 | tinned wire / leg offcuts |
+| 30 AWG insulated wire | 4 pieces | 8 | 30 AWG silicone wire |
+| Bare wire or trimmed resistor legs | 53 bridges + 3 rails | 9, 10 | tinned wire / leg offcuts |
 | Perfboard 3 × 7 cm (a–j × 1–24) | 1 | all | perfboard kit |
 | 18650 cell with JST-XH plug | 1 | 11 | 18650 cell |
 
@@ -44,7 +46,7 @@ For all 3 controllers, triple every count. Links and prices: [BOM](../hardware/B
 | Resistors | **No** | either way round |
 | Ceramic capacitors | **No** | either way round; legs 3 holes apart, the middle hole stays empty |
 | **1N5819 diodes, 6.2 V zener** | **YES** | the silver/white **band is the cathode (K)** |
-| **ESP32-C6** | **YES** | chip side up, USB-C past row 1, 5V/GND/3V3 in column h |
+| **ESP32-C6** | **YES** | chip side up, 5V in a3, TX in a9 |
 | **Battery plug** on the 2 header pins | **YES, and it can go on backwards** | red wire on **b24 (+)**, black on **a24 (−)** |
 | **Charger bulk capacitor** (on the charger board) | **YES** | stripe = −, long leg = + |
 | USB-C and solar leads, charger pads | **YES** | follow the tables |
@@ -61,63 +63,62 @@ A reversed diode just won't conduct; a reversed electrolytic or battery can dama
 
 ![step 1](renders/build-step-01.png)
 
-1. Mark the board with a marker: **row 1 = the end toward the phone jacks**, **column a = the edge toward the battery**.
-2. Push two 10-pin header strips into the ESP's **inner** holes (long side down), set the ESP on the perfboard **chip side
-   up**, USB-C hanging past row 1: the pins go into **b1–b10** and **h1–h10**.
-3. Check before soldering: **5V in h1, GND in h2, 3V3 in h3, TX in b1**. Solder one pin at each corner, check it sits
-   flat, then the rest. Keep each joint on its own pad.
+1. Mark the board with a marker: **row 1 = the end toward the phone jacks**, **column a = the edge toward the battery**
+   (the edge with the row numbers printed on it).
+2. Push two 10-pin header strips into the ESP's holes (long side down) and set it on the perfboard **chip side up**, USB-C over the column-a edge (nothing overhangs on the 30 mm board):
+   the pins go into **a3–j3** and **a9–j9**.
+3. Check before soldering: **5V in a3, GND in b3, TX in a9**. Solder one pin at each corner, check it sits flat, then the
+   rest. Keep each joint on its own pad.
 
 | Part | Holes | Note |
 |---|---|---|
-| ESP32-C6 | b1–b10, h1–h10 | chip up, USB-C past row 1 |
+| ESP32-C6 | a3–j3, a9–j9 | chip up |
 
 ## Step 2: Resistors (7)
 
 ![step 2](renders/build-step-02.png)
 
-Resistors have no direction. Bend the top lead back down, push both leads through, splay them slightly underneath so
-the part stays put, solder, and **trim to ~1 mm**. Keep the trimmed legs: they make good bridges in step 9.
+Resistors have no direction. Bend both legs down 90° about 2 mm from the body so they are 4 holes apart (10 mm), push
+them through so the body lies flat on the board, splay the legs slightly underneath, solder, and **trim to ~1 mm**. Keep
+the trimmed legs: they make good bridges in step 9. The holes under each body stay empty.
 
 | Resistor | Holes | How |
 |---|---|---|
-| R div top 1M | d15, d16 | body over d15, lead bent back into d16 |
-| R div bot 1M | d17, d18 | body over d17, lead bent back into d18 |
-| R pwr top 1M | g22, g21 | body over g22, lead bent back into g21 |
-| R pwr bot 1M | g20, g19 | body over g20, lead bent back into g19 |
-| R ADC1 1k | b12, c12 | body over b12, lead bent sideways into c12 |
-| R ADC2 1k | d12, d13 | body over d12, lead bent back into d13 |
-| R ADC3 1k | f12, g12 | body over f12, lead bent sideways into g12 |
+| R div top 1M | h23, h19 | flat, legs in h23 and h19 |
+| R div bot 1M | g14, g18 | flat, legs in g14 and g18 |
+| R pwr top 1M | e14, e18 | flat, legs in e14 and e18 |
+| R pwr bot 1M | c14, c18 | flat, legs in c14 and c18 |
+| R ADC1 1k | b11, b15 | flat, legs in b11 and b15 |
+| R ADC2 1k | d11, d15 | flat, legs in d11 and d15 |
+| R ADC3 1k | h11, h15 | flat, legs in h11 and h15 |
 
 ## Step 3: Diodes (3 × 1N5819, 1 × 6.2 V zener)
 
 ![step 3](renders/build-step-03.png)
 
-These **only work one way round**; the band end is the cathode (K). Each one stands up with its body over the first
-hole in the table. When the cathode is the **bent-back lead** (D1, D2, D3), the band is at the **top** of the body; when the
-body stands over the cathode (the zener, over d22), the band is at the **bottom**. Check each one against the table
-before soldering.
+These **only work one way round**; the band end is the cathode (K). Bend the legs like the resistors (4 holes apart)
+and lay each one flat with its **band at the K hole** in the table and the picture. Check each one before soldering.
 
 | Diode | Holes | Direction |
 |---|---|---|
-| D3 1N5819 | j4, j3 | **band (K) at j3**, other end (A) at j4 |
-| D1 1N5819 USB | e23, e22 | **band (K) at e22**, other end (A) at e23 |
-| D2 1N5819 solar | h23, g23 | **band (K) at g23**, other end (A) at h23 |
-| Z 6.2V | d22, d23 | **band (K) at d22**, other end (A) at d23 |
+| D3 1N5819 | i14, i18 | flat, **band (K) at i18**, other end (A) at i14 |
+| D1 1N5819 USB | d23, d19 | flat, **band (K) at d19**, other end (A) at d23 |
+| D2 1N5819 solar | f23, f19 | flat, **band (K) at f19**, other end (A) at f23 |
+| Z 6.2V | b19, b23 | flat, **band (K) at b19**, other end (A) at b23 |
 
 ## Step 4: Ceramic capacitors (4 × 100 nF, 1 × 10 µF)
 
 ![step 4](renders/build-step-04.png)
 
-No direction. Push them straight down so the body sits low; don't bend the legs at the body. The 10 µF goes corner
-to corner (j1 to i2): pull its legs in slightly and lean the body **away from the ESP**.
+No direction. Push them straight down so the body sits low; don't bend the legs at the body.
 
 | Capacitor | Holes | Note |
 |---|---|---|
-| C 10u | j1, i2 | corner to corner: pull the legs in slightly, lean the body away from the ESP |
-| C div 100n | e16, e18 | middle hole e17 stays empty |
-| C ADC1 100n | a14, c14 | middle hole b14 stays empty |
-| C ADC2 100n | d14, f14 | middle hole e14 stays empty |
-| C ADC3 100n | g14, i14 | middle hole h14 stays empty |
+| C 10u | a1, c1 | middle hole b1 stays empty |
+| C div 100n | f11, f13 | middle hole f12 stays empty |
+| C ADC1 100n | c10, c12 | middle hole c11 stays empty |
+| C ADC2 100n | e10, e12 | middle hole e11 stays empty |
+| C ADC3 100n | g10, g12 | middle hole g11 stays empty |
 
 ## Step 5: Battery pins (2 header pins)
 
@@ -147,13 +148,13 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
    PWR + / PWR −, BATT + / BATT −, LOAD + / LOAD −. Solder each pair to its two pads, then the other ends into the
    holes in the table from the top. Keep + and − straight: mark the + conductor with a marker before you start.
 4. Solder all 6 underneath. Leave the small edge pads (CE, TE, PROG2, SEL) unconnected. The board has no STAT pad;
-   the ESP watches the input voltage instead (the 1 MΩ pair at g19–g22 from step 2).
+   the ESP watches the input voltage instead (the input-power 1 MΩ pair from step 2).
 
 (Pad names assumed from the Adafruit-style board: check them against the real board before wiring.)
 
 | Charger pad | Board hole | Net |
 |---|---|---|
-| PWR + (input) | g24 | PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -) |
+| PWR + (input) | c19 | PWR node: D1 + D2 cathodes, zener (22 AWG pair with PWR -) |
 | PWR - / GND | a20 | GND rail |
 | BATT + | c24 | battery pin B+ (bridged from b24), 22 AWG pair with BATT - (the cell reaches the VBAT rail only through the charger) |
 | BATT - | a21 | GND rail |
@@ -166,49 +167,41 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 
 ![step 7](renders/build-step-07.png)
 
-Solder the 18 leads from the three RJ12 boards (pin 1 = square pad), then the USB-C breakout's VBUS → e24 and
-GND → d24, and the solar lead's + → h24 and − → i24. Trim underneath to ~1 mm.
+Solder the 18 leads from the three RJ12 boards (pin 1 = square pad), then the USB-C breakout's VBUS → d24 and
+GND → a19, and the solar lead's + → f24 and − → a17. Trim underneath to ~1 mm.
 
 | RJ12 pin | Port 1 | Port 2 | Port 3 |
 |---|---|---|---|
 | 1 battery + | j15 | j16 | j17 |
-| 2 IN1 | i6 | i4 | a1 |
-| 3 GND | a15 | a16 | a17 |
-| 4 angle | b11 | d11 | f11 |
-| 5 EN | a7 | a8 | a10 |
-| 6 IN2 | i5 | i8 | a2 |
+| 2 IN1 | f2 | d2 | a10 |
+| 3 GND | a14 | a15 | a16 |
+| 4 angle | b16 | d16 | h16 |
+| 5 EN | d10 | h10 | j10 |
+| 6 IN2 | e2 | h2 | b10 |
 
 | Lead | Hole |
 |---|---|
-| USB-C VBUS (+) | e24 |
-| USB-C GND (−) | d24 |
-| Solar + | h24 |
-| Solar − | i24 |
+| USB-C VBUS (+) | d24 |
+| USB-C GND (−) | a19 |
+| Solar + | f24 |
+| Solar − | a17 |
 
-## Step 8: Insulated wires underneath (12)
+## Step 8: Insulated wires underneath (4)
 
 ![step 8](renders/build-step-08.png)
 
 Wires go in **before** the bridges and rails, while their holes are still open. For each wire: cut it a little long,
-strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Where a hole already has a
-lead, solder the wire end to that lead. Beep each wire out with the meter as you go.
+strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Beep each wire out with the
+meter as you go.
 
 | From | To | What |
 |---|---|---|
-| i3 | i1 | D3 cathode -> ESP 5V (straight along column i) |
-| j2 | a12 | ESP GND -> GND rail |
-| e15 | j18 | R div top -> VBAT rail |
-| c17 | a6 | divider node -> GPIO3 |
-| c13 | a3 | filter 1 -> GPIO0 |
-| e13 | a4 | filter 2 -> GPIO1 |
-| g13 | a5 | filter 3 -> GPIO2 |
-| f15 | a13 | C ADC2 -> GND rail |
-| i15 | b16 | C ADC3 -> GND |
-| f21 | a9 | input-power sense -> GPIO6 |
-| f19 | a19 | R pwr bot -> GND rail |
-| i23 | a18 | solar - -> GND rail |
+| b2 | a13 | ESP GND -> GND rail (under the ESP) |
+| i19 | a2 | D3 cathode -> ESP 5V (under the ESP) |
+| h18 | f10 | divider node -> GPIO3 |
+| f14 | i10 | input-power sense -> GPIO6 |
 
-## Step 9: Bare bridges underneath (54)
+## Step 9: Bare bridges underneath (53)
 
 ![step 9](renders/build-step-09.png)
 
@@ -218,72 +211,72 @@ and neither beeps to the pad next to it.
 
 | From | To | What |
 |---|---|---|
-| a1 | b1 | port 3 IN1 -> GPIO16 |
-| a2 | b2 | port 3 IN2 -> GPIO17 |
-| a3 | b3 | angle 1 -> GPIO0 |
-| a4 | b4 | angle 2 -> GPIO1 |
-| a5 | b5 | angle 3 -> GPIO2 |
-| a6 | b6 | battery divider -> GPIO3 |
-| a7 | b7 | port 1 EN -> GPIO4 |
-| a8 | b8 | port 2 EN -> GPIO5 |
-| a9 | b9 | input-power sense -> GPIO6 |
-| a10 | b10 | port 3 EN -> GPIO7 |
-| h1 | i1 | ESP 5V |
-| i1 | j1 | ESP 5V -> C 10u |
-| h2 | j2 | ESP GND -> C 10u |
-| h4 | i4 | port 2 IN1 -> GPIO20 |
-| h5 | i5 | port 1 IN2 -> GPIO19 |
-| h6 | i6 | port 1 IN1 -> GPIO18 |
-| h8 | i8 | port 2 IN2 -> GPIO14 |
-| j3 | i3 | D3 cathode (5V) |
-| d15 | e15 | R div top (VBAT) |
-| d16 | d17 | divider node |
-| d16 | e16 | divider node -> C div |
-| d17 | c17 | divider node |
-| d18 | e18 | C div GND |
-| d18 | c18 | divider GND |
-| c18 | b18 | divider GND |
-| b18 | a18 | divider GND -> GND rail |
-| b11 | b12 | port 1 ANGLE -> R ADC1 |
-| d11 | d12 | port 2 ANGLE -> R ADC2 |
-| f11 | f12 | port 3 ANGLE -> R ADC3 |
-| c12 | c13 | R ADC1 -> filter 1 node |
-| c13 | c14 | filter 1 node -> C ADC1 |
-| d13 | d14 | R ADC2 -> C ADC2 |
-| d13 | e13 | filter 2 node |
-| g12 | g13 | R ADC3 -> filter 3 node |
-| g13 | g14 | filter 3 node -> C ADC3 |
-| f14 | f15 | C ADC2 GND |
-| i14 | i15 | C ADC3 GND |
-| b16 | a16 | C ADC3 GND -> GND rail |
-| g22 | g23 | PWR node -> R pwr top |
-| g21 | g20 | input-power sense node |
-| g21 | f21 | input-power sense node |
-| g19 | f19 | R pwr bot GND |
-| e24 | e23 | USB V+ -> D1 anode |
-| h24 | h23 | solar + -> D2 anode |
-| d22 | e22 | PWR node (zener cathode, D1 cathode) |
-| e22 | f22 | PWR node |
-| f22 | g22 | PWR node -> R pwr top |
-| g23 | g24 | PWR node -> charger PWR + hole |
-| d24 | d23 | USB V- -> zener anode (GND) |
-| d23 | c23 | GND link |
-| c23 | b23 | GND link |
-| b23 | a23 | GND link -> GND rail |
+| a3 | a2 | ESP 5V |
+| a2 | a1 | ESP 5V -> C 10u |
+| b3 | b2 | ESP GND |
+| b2 | b1 | ESP GND |
+| b1 | c1 | ESP GND -> C 10u |
+| d3 | d2 | port 2 IN1 -> GPIO20 |
+| e3 | e2 | port 1 IN2 -> GPIO19 |
+| f3 | f2 | port 1 IN1 -> GPIO18 |
+| h3 | h2 | port 2 IN2 -> GPIO14 |
+| a9 | a10 | port 3 IN1 -> GPIO16 |
+| b9 | b10 | port 3 IN2 -> GPIO17 |
+| d9 | d10 | port 1 EN -> GPIO1 |
+| h9 | h10 | port 2 EN -> GPIO5 |
+| j9 | j10 | port 3 EN -> GPIO7 |
+| c9 | c10 | filter 1 -> GPIO0 |
+| c10 | c11 | filter 1 node |
+| c11 | b11 | filter 1 node -> R ADC1 |
+| b15 | b16 | port 1 ANGLE -> R ADC1 |
+| c12 | c13 | C ADC1 GND -> GND rail |
+| e9 | e10 | filter 2 -> GPIO2 |
+| e10 | e11 | filter 2 node |
+| e11 | d11 | filter 2 node -> R ADC2 |
+| d15 | d16 | port 2 ANGLE -> R ADC2 |
+| e12 | e13 | C ADC2 GND -> GND rail |
+| g9 | g10 | filter 3 -> GPIO4 |
+| g10 | g11 | filter 3 node |
+| g11 | h11 | filter 3 node -> R ADC3 |
+| h15 | h16 | port 3 ANGLE -> R ADC3 |
+| g12 | g13 | C ADC3 GND -> GND rail |
+| f9 | f10 | battery divider -> GPIO3 |
+| f10 | f11 | battery divider -> C div |
+| i9 | i10 | input-power sense -> GPIO6 |
+| i14 | j14 | VBAT rail -> D3 anode (battery +) |
+| i18 | i19 | D3 cathode (5V) |
+| h23 | i23 | R div top (battery +) |
+| i23 | j23 | VBAT rail -> R div top |
+| h19 | h18 | divider node |
+| h18 | g18 | divider node -> R div bot |
+| g14 | g13 | R div bot -> GND rail |
+| e19 | e18 | PWR node -> R pwr top |
+| e14 | d14 | input-power sense node |
+| d14 | c14 | input-power sense node -> R pwr bot |
+| e14 | f14 | input-power sense node |
+| c18 | b18 | R pwr bot GND |
+| b18 | a18 | R pwr bot -> GND rail |
+| b19 | c19 | PWR node (zener cathode) |
+| c19 | d19 | PWR node (D1 cathode) |
+| d19 | e19 | PWR node |
+| e19 | f19 | PWR node (D2 cathode) |
+| b23 | a23 | zener anode -> GND rail |
+| d24 | d23 | USB V+ -> D1 anode |
+| f24 | f23 | solar + -> D2 anode |
 | b24 | c24 | battery + -> charger BATT + hole |
-| i24 | i23 | solar - (GND) |
 
-## Step 10: Rails (2)
+## Step 10: Rails (3)
 
 ![step 10](renders/build-step-10.png)
 
-Last: lay a straight bare tinned wire along column **a** from row 12 to row 24 (GND) and along column **j** from row 4
-to row 24 (battery +), soldering it at every hole. Then do the checks in step 11.
+Last: lay straight bare tinned wire for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole it passes. Where two GND rails
+meet at a corner, solder them together there. Then do the checks in step 11.
 
 | From | To | What |
 |---|---|---|
-| a12 | a24 | bare wire down column a, rows 12-24 |
-| j4 | j24 | bare wire down column j, rows 4-24 |
+| a13 | i13 | bare wire across row 13, a-i |
+| a13 | a24 | bare wire down column a, rows 13-24 |
+| j11 | j24 | bare wire down column j, rows 11-24 |
 
 ## Step 11: checks and first power-up
 
@@ -291,13 +284,13 @@ to row 24 (battery +), soldering it at every hole. Then do the checks in step 11
 
 ![finished underside](renders/build-done-under.png)
 
-The battery + rail (column j, rows 4–24) gets its connections from the top: D3 (j4), the three port leads (j15–j17)
-and the charger's LOAD + wire (j20); underneath, the wire from the divider (e15 → j18) joins it. The cell never connects to the
-rail directly: battery + (b24) goes to the charger's BATT + pad and the charger feeds the rail from LOAD +.
+The battery + rail (battery + j11–j24) gets most of its connections from the top: the three port leads and the charger's LOAD +
+wire (j20). The cell never connects to the rail directly: battery + (b24) goes to the charger's BATT + pad and the
+charger feeds the rail from LOAD +.
 
-1. Meter, beep mode, no power: GND (a12) to battery + (j13): **no beep**. GND to 5V (h1): no beep. GND to 3V3 (h3):
-   no beep. GND to the battery + pin (b24): no beep. GND to the PWR node (g23): no beep.
+1. Meter, beep mode, no power: GND (a13) to battery + (j11): **no beep**. GND to 5V (a3): no beep. GND to 3V3 (c3):
+   no beep. GND to the battery + pin (b24): no beep. GND to the PWR node (c19): no beep.
 2. Plug USB into the **ESP's own** USB-C only (battery unplugged). Its LED should light; upload the test sketch.
-3. Unplug USB, then push the cell's plug onto a24/b24 (**red on b24**). Measure j13 to a12: about the cell voltage
+3. Unplug USB, then push the cell's plug onto a24/b24 (**red on b24**). Measure j11 to a13: about the cell voltage
    (3.0–4.2 V).
 4. Never plug USB into the ESP and the battery at the same time unless D3 is fitted.

@@ -28,18 +28,20 @@ wiring table) and `tools/fusion_controller_v4.py` (Fusion model, exact interfere
 
 ## Dev board
 **Step-by-step build guide with pictures and polarity notes: [dev-board-build.md](dev-board-build.md).**
-Built on the kit's **3 × 7 cm perfboard: columns a–j, rows 1–24** (row 1 toward the ports, column a toward the battery).
-**Where every part and wire goes: [ctrl-v4-wiring.md](renders/ctrl-v4-wiring.md)**; picture: [ctrl-v4-holemap.svg](renders/ctrl-v4-holemap.svg).
-Checked by [`tools/devboard_check.py`](../tools/devboard_check.py): parts ≥ 0.3 mm apart, all 25 nets connected, none shorted.
-(The box still has to be updated to this board: later.)
+Built on the kit's **30 × 70 mm perfboard: columns a–j, rows 1–24** (row 1 toward the ports, column a toward the battery).
+Layout: [DevBoardR.py](../hardware/mechanical/fusion/ControllerV4/DevBoardR.py): the ESP sits **across** the board (pins in
+rows 3 and 9, USB-C over the column-a edge, nothing overhangs), resistors and diodes lie flat; 4 insulated wires, the rest
+straight bridges. Checked by [`tools/devboard_check.py`](../tools/devboard_check.py): parts ≥ 0.3 mm apart, every net
+connected, none shorted, one thing per hole. The older straight layout (ESP along the board, 12 wires) is still in
+ControllerV4.py (`--straight`). (The box still has to be updated to this board: later.)
 
 | ESP32-C6 GPIO | Use |
 |---|---|
 | 18 / 19 | Port 1 IN1 / IN2 |
 | 20 / 14 | Port 2 IN1 / IN2 |
 | TX16 / RX17 | Port 3 IN1 / IN2 (log over USB-CDC) |
-| 4 / 5 / 7 | Port 1 / 2 / 3 EN (AS5600 power + DRV8833 sleep) |
-| 0 / 1 / 2 | Port 1 / 2 / 3 angle (ADC, 1 k + 100 n) |
+| 1 / 5 / 7 | Port 1 / 2 / 3 EN (AS5600 power + DRV8833 sleep) |
+| 0 / 2 / 4 | Port 1 / 2 / 3 angle (ADC, 1 k + 100 n) |
 | 3 | Battery voltage (1 M / 1 M + 100 n) |
 | 6 | Input-power sense: USB / solar voltage (1 M / 1 M, ADC); the charger board has no STAT pad |
 | 8, 9, 15 | spare (strapping pins) |
