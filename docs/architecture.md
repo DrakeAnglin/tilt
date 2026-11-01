@@ -64,7 +64,7 @@ gives maybe 80–250 mAh on a sunny day (less behind low-E glass), so in a windo
 the bench: USB meter for charge and motor current, a multimeter's µA/mA range for sleep current.
 
 ## Pin plan
-See [controller-v4.md](controller-v4.md#dev-board): port 1/2/3 IN1-IN2 on GPIO 18/19, 20/14, 16/17; EN on 1/5/7;
+See [controller-v4.md](controller-v4.md#dev-board): port 1/2/3 IN1-IN2 on GPIO 16/17, 20/19, 18/14 (controller PCB); EN on 1/5/7;
 angle on ADC 0/2/4; battery voltage on 3; input-power (USB/solar) voltage on 6. Three 1N5819 diodes: USB-C and solar into the charger's
 single input, and charger LOAD to the ESP's 5V pin.
 

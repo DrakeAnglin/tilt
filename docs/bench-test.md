@@ -20,8 +20,8 @@ The SuperMini's two pin rows are 0.6" apart: it straddles the breadboard's centr
 | 18650 **−** (black) | GND rail | grounds must be shared |
 | 10 µF | DRV8833 VCC ↔ GND, at the driver | |
 | DRV8833 **GND** | GND rail | |
-| ESP **GPIO 18** | DRV8833 **IN1** | PWM |
-| ESP **GPIO 19** | DRV8833 **IN2** | PWM |
+| ESP **GPIO 16** (TX) | DRV8833 **IN1** | PWM |
+| ESP **GPIO 17** (RX) | DRV8833 **IN2** | PWM |
 | ESP **GPIO 1** | DRV8833 **ULT** and AS5600 **VCC** | EN: wakes the driver and powers the sensor |
 | DRV8833 **OUT1 / OUT2** | N20 tabs | swap them if "forward" turns the wrong way |
 | AS5600 **GND** | GND rail | |
@@ -29,7 +29,8 @@ The SuperMini's two pin rows are 0.6" apart: it straddles the breadboard's centr
 | AS5600 **OUT** | 1 kΩ → ESP **GPIO 0** | |
 | 100 nF | ESP GPIO 0 ↔ GND | angle filter |
 
-Same nets as RJ12 port 1: VBAT = DRV VCC, IN1 = 18, IN2 = 19, EN = 1, ANGLE = 0, GND.
+Same nets as RJ12 port 1 on the controller PCB: VBAT = DRV VCC, IN1 = 16, IN2 = 17, EN = 1, ANGLE = 0, GND. (The
+sketch logs over the ESP's native USB, so the TX/RX pins are free.)
 
 **Never** power the ESP from the 18650 through its 5V pin while USB is plugged in (no diode on the board's 5V pin).
 

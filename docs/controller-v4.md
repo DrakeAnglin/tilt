@@ -35,11 +35,13 @@ USB-C breakout plug into female header sockets (replaceable); 4 insulated wires,
 connected, none shorted, one thing per hole. The older straight layout (ESP along the board, 12 wires) is still in
 ControllerV4.py (`--straight`). (The box still has to be updated to this board: later.)
 
+Pin plan of the **controller PCB** ([hardware/pcb](../hardware/pcb/README.md)); the dev-board layouts used other motor pins.
+
 | ESP32-C6 GPIO | Use |
 |---|---|
-| 18 / 19 | Port 1 IN1 / IN2 |
-| 20 / 14 | Port 2 IN1 / IN2 |
-| TX16 / RX17 | Port 3 IN1 / IN2 (log over USB-CDC) |
+| TX16 / RX17 | Port 1 IN1 / IN2 (logs go over the native USB) |
+| 20 / 19 | Port 2 IN1 / IN2 |
+| 18 / 14 | Port 3 IN1 / IN2 |
 | 1 / 5 / 7 | Port 1 / 2 / 3 EN (AS5600 power + DRV8833 sleep) |
 | 0 / 2 / 4 | Port 1 / 2 / 3 angle (ADC, 1 k + 100 n) |
 | 3 | Battery voltage (1 M / 1 M + 100 n) |

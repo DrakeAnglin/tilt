@@ -13,3 +13,7 @@ fp-info-cache
 *.~*
 node_modules/
 .vscode/
+
+# KiCad local state
+*.kicad_prl
+hardware/pcb/controller/*.svg

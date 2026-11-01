@@ -3,7 +3,7 @@
 //                           0..9 = duty 0..100 %     a = print angle continuously on/off
 #include <Arduino.h>
 
-const int PIN_IN1 = 18, PIN_IN2 = 19, PIN_EN = 1, PIN_ANGLE = 0;
+const int PIN_IN1 = 16, PIN_IN2 = 17, PIN_EN = 1, PIN_ANGLE = 0;   // port 1 on the controller PCB (16/17 = TX/RX pins; logs go over USB)
 const int PWM_HZ = 20000, PWM_BITS = 8;
 
 int duty = 255;            // 0..255
