@@ -9,8 +9,8 @@ every hole holds exactly one thing (a part leg, a lead or a wire end).
 **Totals:** 87 parts and leads on top, 4 insulated wires, 61 bare bridges, 3 rails.
 
 **Order:** parts, sockets and the board's own wires first, then the RJ12 and solar leads (steps 1–9), while every hole
-is still open; then the bare bridges (10–13: every board, then one step per port) and rails (14), which land on those
-holes' pads; then the charger, which only plugs in (15); the ESP and USB-C board plug in last (16). **Ports 2 and 3 and
+is still open; then the bare bridges (10–14: every board, then one step per port, then solar) and rails (15), which land on those
+holes' pads; then the charger, which only plugs in (16); the ESP and USB-C board plug in last (17). **Ports 2 and 3 and
 the solar lead are optional:** skip a port's lead step and its bridge step together. Each
 step does one kind of part, and in its picture that step is in colour while everything already done is grey.
 
@@ -247,135 +247,135 @@ solar input, but fit them anyway so a panel can be added later without re-solder
 
 | Lead | Hole | Goes to |
 |---|---|---|
-| Solar + | g23 | to D2's anode (bridge in step 10) |
+| Solar + | g23 | to D2's anode (bridge in step 14) |
 | Solar − | a17 | GND rail |
 
-## Step 10: Bare bridges: every board (37)
+## Step 10: Bare bridges: every board (21 pieces of wire)
 
-**You need:** 37 × short bare wire: leg offcuts saved from steps 1-3 (about 32 in all), the rest cut from 22 AWG solid tinned bus wire.
+**You need:** 21 pieces of bare wire: leg offcuts saved from steps 1-3 for the short ones, 22 AWG solid tinned bus wire for runs of 3+ holes.
 
 ![step 10](renders/build-step-10.png)
 
-A bridge is a short piece of **bare solid wire**: a trimmed resistor or diode leg, or **22 AWG solid tinned copper
-(bus) wire**, laid across neighbouring pads and soldered at both ends; don't rely on a solder blob alone. Work one area at
-a time and check each with the meter: the two ends beep, and neither beeps to the pad next to it. The bridges that only
-serve one RJ12 port come in the next three steps, so you can leave out a port you don't use.
+A bridge is **bare solid wire** (a trimmed leg, or **22 AWG solid tinned copper bus wire**) laid flat on the pads and
+soldered at **every hole it crosses**. Each row in the table is **one piece of wire**: "b20 → f20, 5 holes" means one
+straight piece from b20 to f20, soldered at b20, c20, d20, e20 and f20. Where two runs meet at a corner you can bend one
+piece round the corner instead of using two.
 
-| From | To | What |
+Some runs cross **empty holes**. That's on purpose: a bridge can only join holes that are next to each other, so to get
+round a part a connection steps through free holes on the way (on row 20, c20 and e20 are just stepping stones between
+D1, the zener and D2). The meter check: each run's two ends beep, and it doesn't beep to the holes beside it.
+
+The bridges that only serve one RJ12 port, and the solar one, come in the next steps, so a port you don't use leaves no
+bridges to nowhere.
+
+| One piece of wire | Length | What it joins |
 |---|---|---|
-| a3 | a2 | ESP 5V |
-| a2 | a1 | ESP 5V -> C 10u |
-| b3 | b2 | ESP GND |
-| b2 | b1 | ESP GND |
-| b1 | c1 | ESP GND -> C 10u |
-| f9 | f10 | battery divider -> GPIO3 |
-| f10 | f11 | battery divider -> C div |
-| i9 | i10 | input-power sense -> GPIO6 |
-| i15 | j15 | VBAT rail -> D3 anode (battery +) |
-| i18 | i19 | D3 cathode (5V) |
-| h23 | i23 | R div top (battery +) |
-| i23 | j23 | VBAT rail -> R div top |
-| g15 | g14 | R div bot GND |
-| g14 | g13 | R div bot -> GND rail |
-| g18 | h18 | divider node |
-| h18 | h19 | divider node |
-| h19 | h20 | divider node -> R div top |
-| e18 | e19 | PWR node -> R pwr top |
-| e19 | e20 | PWR node |
-| e15 | d15 | input-power sense node |
-| d15 | c15 | input-power sense node -> R pwr bot |
-| d15 | d16 | input-power sense node |
-| c18 | b18 | R pwr bot GND |
-| b18 | a18 | R pwr bot -> GND rail |
-| b20 | c20 | PWR node (D1 cathode) |
-| c20 | d20 | PWR node (zener cathode) |
-| d20 | e20 | PWR node |
-| e20 | f20 | PWR node (D2 cathode) |
-| b24 | b23 | USB VBUS -> D1 anode |
-| f23 | g23 | solar + -> D2 anode |
-| c24 | c23 | USB GND |
-| c23 | d23 | USB GND -> zener anode |
-| c23 | c22 | USB GND |
-| c22 | b22 | USB GND |
-| b22 | a22 | USB GND -> GND rail |
-| b19 | c19 | battery + -> charger BATT + hole |
-| c19 | d19 | battery + -> charger BATT + hole |
+| a1 → a3 | 3 holes | C 10u 5V (a1), wire end (a2), ESP 5V (a3) |
+| b1 → b3 | 3 holes | wire end (b2), ESP GND (b3), meets the next run at b1 |
+| b1 → c1 | 2 holes | C 10u G (c1), meets the next run at b1 |
+| f9 → f11 | 3 holes | ESP 3 (f9), wire end (f10), C div 100n (f11) |
+| i9 → i10 | 2 holes | ESP 6 (i9), wire end (i10) |
+| g13 → g15 | 3 holes | GND rail (g13), R div bot 1M (g15), steps over empty g14 |
+| c15 → e15 | 3 holes | R pwr bot 1M (c15), R pwr top 1M (e15), meets the next run at d15 |
+| d15 → d16 | 2 holes | wire end (d16), meets the next run at d15 |
+| i15 → j15 | 2 holes | D3 A (i15), battery + rail (j15) |
+| a18 → c18 | 3 holes | GND rail (a18), R pwr bot 1M (c18), steps over empty b18 |
+| e18 → e20 | 3 holes | R pwr top 1M (e18), JST PWR+ (e19), meets the next run at e20 |
+| g18 → h18 | 2 holes | R div bot 1M (g18), meets the next run at h18 |
+| h18 → h20 | 3 holes | wire end (h19), R div top 1M (h20), meets the next run at h18 |
+| i18 → i19 | 2 holes | D3 K (i18), wire end (i19) |
+| b19 → d19 | 3 holes | battery B+ (b19), JST BATT+ (d19), steps over empty c19 |
+| b20 → f20 | 5 holes | D1 K (b20), zener K (d20), D2 K (f20), meets the next run at e20, steps over empty c20 |
+| a22 → c22 | 3 holes | JST BATT- / GND rail (a22), meets the next run at c22, steps over empty b22 |
+| c22 → c24 | 3 holes | USB-C breakout GND (c24), meets the next run at c22, c23 |
+| b23 → b24 | 2 holes | D1 A (b23), USB-C breakout VBUS (b24) |
+| c23 → d23 | 2 holes | zener A (d23), meets the next run at c23 |
+| h23 → j23 | 3 holes | R div top 1M (h23), battery + rail (j23), steps over empty i23 |
 
-## Step 11: Bare bridges: port 1 (8)
+## Step 11: Bare bridges: port 1 (7 pieces)
 
-**You need:** 8 × short bare wire (leg offcuts or 22 AWG solid tinned).
+**You need:** 7 pieces of bare wire (leg offcuts or 22 AWG solid tinned).
 
 ![step 11](renders/build-step-11.png)
 
 Port 1's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
-ESP and the GND rail. Same method as the step before.
+ESP and the GND rail. Same method as the step before: each row is one piece of wire.
 
-| From | To | What |
+| One piece of wire | Length | What it joins |
 |---|---|---|
-| e3 | e2 | port 1 IN2 -> GPIO19 |
-| f3 | f2 | port 1 IN1 -> GPIO18 |
-| d9 | d10 | port 1 EN -> GPIO1 |
-| c9 | c10 | filter 1 -> GPIO0 |
-| c10 | c11 | filter 1 node |
-| c11 | b11 | filter 1 node -> R ADC1 |
-| b14 | b15 | port 1 ANGLE -> R ADC1 |
-| c12 | c13 | C ADC1 GND -> GND rail |
+| e2 → e3 | 2 holes | lead P1 IN2 (e2), ESP 19 (e3) |
+| f2 → f3 | 2 holes | lead P1 IN1 (f2), ESP 18 (f3) |
+| c9 → c11 | 3 holes | ESP 0 (c9), C ADC1 100n (c10), meets the next run at c11 |
+| d9 → d10 | 2 holes | ESP 1 (d9), lead P1 EN (d10) |
+| b11 → c11 | 2 holes | R ADC1 1k (b11), meets the next run at c11 |
+| c12 → c13 | 2 holes | C ADC1 100n (c12), GND rail (c13) |
+| b14 → b15 | 2 holes | R ADC1 1k (b14), lead P1 ANG (b15) |
 
-## Step 12: Bare bridges: port 2 (8): optional
+## Step 12: Bare bridges: port 2 (7 pieces): optional
 
-**You need:** 8 × short bare wire (leg offcuts or 22 AWG solid tinned).
+**You need:** 7 pieces of bare wire (leg offcuts or 22 AWG solid tinned).
 
 ![step 12](renders/build-step-12.png)
 
 Port 2's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
-ESP and the GND rail. Same method as the step before.
+ESP and the GND rail. Same method as the step before: each row is one piece of wire.
 
 **Optional:** only if this controller drives 2 or more blinds. Skipped, the port's holes stay open for later; its 1 kΩ and
 100 nF can stay on the board unconnected.
 
-| From | To | What |
+| One piece of wire | Length | What it joins |
 |---|---|---|
-| d3 | d2 | port 2 IN1 -> GPIO20 |
-| h3 | h2 | port 2 IN2 -> GPIO14 |
-| h9 | h10 | port 2 EN -> GPIO5 |
-| e9 | e10 | filter 2 -> GPIO2 |
-| e10 | e11 | filter 2 node |
-| e11 | d11 | filter 2 node -> R ADC2 |
-| d14 | e14 | port 2 ANGLE -> R ADC2 |
-| e12 | e13 | C ADC2 GND -> GND rail |
+| d2 → d3 | 2 holes | lead P2 IN1 (d2), ESP 20 (d3) |
+| h2 → h3 | 2 holes | lead P2 IN2 (h2), ESP 14 (h3) |
+| e9 → e11 | 3 holes | ESP 2 (e9), C ADC2 100n (e10), meets the next run at e11 |
+| h9 → h10 | 2 holes | ESP 5 (h9), lead P2 EN (h10) |
+| d11 → e11 | 2 holes | R ADC2 1k (d11), meets the next run at e11 |
+| e12 → e13 | 2 holes | C ADC2 100n (e12), GND rail (e13) |
+| d14 → e14 | 2 holes | R ADC2 1k (d14), lead P2 ANG (e14) |
 
-## Step 13: Bare bridges: port 3 (8): optional
+## Step 13: Bare bridges: port 3 (7 pieces): optional
 
-**You need:** 8 × short bare wire (leg offcuts or 22 AWG solid tinned).
+**You need:** 7 pieces of bare wire (leg offcuts or 22 AWG solid tinned).
 
 ![step 13](renders/build-step-13.png)
 
 Port 3's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
-ESP and the GND rail. Same method as the step before.
+ESP and the GND rail. Same method as the step before: each row is one piece of wire.
 
 **Optional:** only if this controller drives 3 blinds. Skipped, the port's holes stay open for later; its 1 kΩ and
 100 nF can stay on the board unconnected.
 
-| From | To | What |
+| One piece of wire | Length | What it joins |
 |---|---|---|
-| a9 | a10 | port 3 IN1 -> GPIO16 |
-| b9 | b10 | port 3 IN2 -> GPIO17 |
-| j9 | j10 | port 3 EN -> GPIO7 |
-| g9 | g10 | filter 3 -> GPIO4 |
-| g10 | g11 | filter 3 node |
-| g11 | h11 | filter 3 node -> R ADC3 |
-| h14 | h15 | port 3 ANGLE -> R ADC3 |
-| g12 | g13 | C ADC3 GND -> GND rail |
+| a9 → a10 | 2 holes | ESP TX16 (a9), lead P3 IN1 (a10) |
+| b9 → b10 | 2 holes | ESP RX17 (b9), lead P3 IN2 (b10) |
+| g9 → g11 | 3 holes | ESP 4 (g9), C ADC3 100n (g10), meets the next run at g11 |
+| j9 → j10 | 2 holes | ESP 7 (j9), lead P3 EN (j10) |
+| g11 → h11 | 2 holes | R ADC3 1k (h11), meets the next run at g11 |
+| g12 → g13 | 2 holes | C ADC3 100n (g12), GND rail (g13) |
+| h14 → h15 | 2 holes | R ADC3 1k (h14), lead P3 ANG (h15) |
 
-## Step 14: Rails (3)
+## Step 14: Bare bridge: solar (1 piece): optional
 
-**You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
+**You need:** 1 short bare wire.
 
 ![step 14](renders/build-step-14.png)
 
+**Optional:** only if you fitted the solar lead. One short bridge joins the lead's + hole to D2's anode.
+
+| One piece of wire | Length | What it joins |
+|---|---|---|
+| f23 → g23 | 2 holes | D2 A (f23), Solar leads S+ (g23) |
+
+## Step 15: Rails (3)
+
+**You need:** 3 × 22 AWG solid tinned bus wire: GND a13–i13 ~30 mm; GND a13–a24 ~37 mm; battery + j11–j24 ~43 mm.
+
+![step 15](renders/build-step-15.png)
+
 Last: lay a straight piece of **22 AWG solid tinned copper (bus) wire** for each rail (GND a13–i13, GND a13–a24, battery + j11–j24), soldering it at every hole
 it passes. Where two GND rails
-meet at a corner, solder them together there. Then the charger plugs (step 15) and the checks (step 16).
+meet at a corner, solder them together there. Then the charger plugs (step 16) and the checks (step 17).
 
 | From | To | What |
 |---|---|---|
@@ -383,11 +383,11 @@ meet at a corner, solder them together there. Then the charger plugs (step 15) a
 | a13 | a24 | bare wire down column a, rows 13-24 |
 | j11 | j24 | bare wire down column j, rows 11-24 |
 
-## Step 15: Charger: prepare it, put JST plugs on its wires (3 plugs)
+## Step 16: Charger: prepare it, put JST plugs on its wires (3 plugs)
 
 **You need:** 1 × MCP73871 charger board (+ its bulk capacitor), 1 × 10 kΩ NTC thermistor, 22 AWG stranded, 6–8 cm: 3 red (+), 3 black (−), 1 × JST-XH 3-pin housing, 2 × JST-XH 2-pin housing, 6 × JST-XH crimp pins.
 
-![step 15](renders/build-step-15.png)
+![step 16](renders/build-step-16.png)
 
 The charger board (30.5 × 31.5 mm) is wider than the perfboard, and its bulk capacitor is 16 mm across and 26 mm tall,
 so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm long.
@@ -425,7 +425,7 @@ so it sits **off the board**, beside the row-24 end, on wires about 6–8 cm lon
 | THERM | (NTC) | remove the 103 (10 k) resistor beside the THERM label; NTC across its two pads, taped to the cell |
 | CE, TE, PROG2, SEL (edge pads) | - | leave unconnected (board defaults); the board has no STAT pad, status is on its LEDs |
 
-## Step 16: checks, then plug in the ESP and the USB-C board
+## Step 17: checks, then plug in the ESP and the USB-C board
 
 **You need:** multimeter, 1 × ESP32-C6 SuperMini (its male pins soldered on), 1 × USB-C breakout (its 6 male pins soldered on), 1 × 18650 cell with JST-XH plug.
 

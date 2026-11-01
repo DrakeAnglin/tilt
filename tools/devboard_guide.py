@@ -420,7 +420,9 @@ def wires_of(k):
 
 
 def port_of(note):
-    """0 = needed on every board; 1-3 = only for that RJ12 port (its lead bridges and its angle filter)."""
+    """0 = needed on every board; 1-3 = only for that RJ12 port (its lead bridges and its angle filter); 4 = solar only."""
+    if 'solar +' in note:
+        return 4
     for k in (1, 2, 3):
         if any(tag in note for tag in ('port %d ' % k, 'filter %d' % k, 'ADC%d' % k)):
             return k
@@ -429,6 +431,77 @@ def port_of(note):
 
 def bridges_of(group):
     return [w for w in wires_of('bridge') if port_of(w[2]) == group]
+
+
+def runs_of(group):
+    """Bridges merged into runs: consecutive bridges on one straight line become ONE piece of bare wire soldered at every
+    hole along it (bridges only join neighbours, so a run may step over empty holes to get round a part)."""
+    segs = [(H(f), H(t), n.split(': ', 1)[1]) for f, t, n in bridges_of(group)]
+    lines = {}
+    for a, b, note in segs:
+        key = ('row', a[0]) if a[0] == b[0] else ('col', a[1])
+        lo, hi = (min(a[1], b[1]), max(a[1], b[1])) if key[0] == 'row' else (min(a[0], b[0]), max(a[0], b[0]))
+        lines.setdefault(key, []).append([lo, hi, [note]])
+    runs = []
+    for key, iv in lines.items():
+        iv.sort()
+        merged = [iv[0]]
+        for lo, hi, notes in iv[1:]:
+            if lo <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], hi)
+                merged[-1][2] += notes
+            else:
+                merged.append([lo, hi, notes])
+        for lo, hi, notes in merged:
+            ends = [HN(key[1], lo), HN(key[1], hi)] if key[0] == 'row' else [HN(lo, key[1]), HN(hi, key[1])]
+            holes = hi - lo + 1
+            what_ = notes[0] if len(notes) == 1 else notes[0].split(' -> ')[0] + ' (' + ', '.join(
+                q.split(' -> ')[-1] for q in notes[1:]) + ')'
+            runs.append((ends[0], ends[1], holes, what_))
+    runs.sort(key=lambda r: (H(r[0])[0], H(r[0])[1]))
+    return runs
+
+
+def _at(h):
+    """What sits in hole h, for the bridge tables."""
+    out = []
+    for p in PARTS.values():
+        for i, m, lab in p.pins:
+            if HN(i, m) == h and p.name not in ('MCP73871',):
+                nm = p.name.replace(' 1N5819 USB', '').replace(' 1N5819 solar', '').replace(' 1N5819', '').replace(' 6.2V', '')
+                nm = {'Z': 'zener'}.get(nm, nm)
+                out.append(('%s %s' % (nm, lab)).strip().replace('ESP32-C6', 'ESP').replace('Port leads ', 'lead ')
+                           .replace('JST charger + ', 'JST ').replace('JST charger GND ', 'JST ').replace('JST battery ', 'battery '))
+    for f, t, n in M.WIRES:
+        if n.startswith('wire') and h in (f, t):
+            out.append('wire end')
+    for f, t, k in RAILS:
+        (i0, m0), (i1, m1) = H(f), H(t)
+        i, m = H(h)
+        if min(i0, i1) <= i <= max(i0, i1) and min(m0, m1) <= m <= max(m0, m1):
+            out.append('GND rail' if 'GND' in k else 'battery + rail')
+            break
+    return ' / '.join(dict.fromkeys(out))
+
+
+def run_rows(group):
+    def holes_of(a, b):
+        (i0, m0), (i1, m1) = H(a), H(b)
+        return [HN(i, m) for i in range(min(i0, i1), max(i0, i1) + 1) for m in range(min(m0, m1), max(m0, m1) + 1)]
+    runs = runs_of(group)
+    rows = []
+    for a, b, n, _ in runs:
+        holes = holes_of(a, b)
+        others = {h for a2, b2, _, _ in runs if (a2, b2) != (a, b) for h in holes_of(a2, b2)}
+        parts = ['%s (%s)' % (_at(h), h) for h in holes if _at(h)]
+        corner = [h for h in holes if not _at(h) and h in others]
+        empty = [h for h in holes if not _at(h) and h not in others]
+        if corner:
+            parts.append('meets the next run at %s' % ', '.join(corner))
+        if empty:
+            parts.append('steps over empty %s' % ', '.join(empty))
+        rows.append(('%s → %s' % (a, b), '%d holes' % n, ', '.join(parts)))
+    return rows
 
 
 def draw_under(o, which, group=None):
@@ -628,7 +701,7 @@ solar extension, cut to length): band the + conductor **red** and the − **blac
 
 Without solar, skip it: the board charges over USB-C alone. D2 and the zener from step §diodes§ are only there for the
 solar input, but fit them anyway so a panel can be added later without re-soldering.""" % (LEAD['S+'], LEAD['S-'], LEAD['S-']),
-     [('Solar +', LEAD['S+'], 'to D2\'s anode (bridge in step §bridges§)'), ('Solar −', LEAD['S-'], 'GND rail')])
+     [('Solar +', LEAD['S+'], 'to D2\'s anode (bridge in step §bridges4§)'), ('Solar −', LEAD['S-'], 'GND rail')])
 step('wires', 'Insulated wires underneath (%d)' % len(wires_of('wire')), 'bottom', [draw_under, 'wire'],
      'Bottom view: flip the board over its long edge, row 1 still on the left, column a now at the TOP. Grey = done already.',
      ['Drawn in the wire colours: red 5V, black GND, white the two sense wires. Dots = each wire\'s two ends.'],
@@ -637,25 +710,37 @@ holes are still open. For each wire: cut it a little long,
 strip ~2 mm at each end, push the ends into the two holes **from underneath**, solder, trim. Beep each wire out with the
 meter as you go.""",
      [(f, t, '**%s**: %s' % (wire_colour(n), n.split(': ', 1)[1])) for f, t, n in wires_of('wire')])
-step('bridges', 'Bare bridges: every board (%d)' % len(bridges_of(0)), 'bottom', [draw_under, 'bridge', 0],
-     'Bottom view. The bridges every board needs: power, ESP, battery divider, input sense. Each joins two neighbouring holes.',
-     ['Silver = bare wire (trimmed legs or 22 AWG solid tinned); the thin stripe shows which net it joins. Solder both ends.'],
-     """A bridge is a short piece of **bare solid wire**: a trimmed resistor or diode leg, or **22 AWG solid tinned copper
-(bus) wire**, laid across neighbouring pads and soldered at both ends; don't rely on a solder blob alone. Work one area at
-a time and check each with the meter: the two ends beep, and neither beeps to the pad next to it. The bridges that only
-serve one RJ12 port come in the next three steps, so you can leave out a port you don't use.""",
-     what(bridges_of(0)))
+step('bridges', 'Bare bridges: every board (%d pieces of wire)' % len(runs_of(0)), 'bottom', [draw_under, 'bridge', 0],
+     'Bottom view. The bridges every board needs: power, ESP, battery divider, input sense.',
+     ['Silver = bare wire; one straight silver line = ONE piece, soldered at every hole it crosses. The thin stripe shows the net.'],
+     """A bridge is **bare solid wire** (a trimmed leg, or **22 AWG solid tinned copper bus wire**) laid flat on the pads and
+soldered at **every hole it crosses**. Each row in the table is **one piece of wire**: "b20 → f20, 5 holes" means one
+straight piece from b20 to f20, soldered at b20, c20, d20, e20 and f20. Where two runs meet at a corner you can bend one
+piece round the corner instead of using two.
+
+Some runs cross **empty holes**. That's on purpose: a bridge can only join holes that are next to each other, so to get
+round a part a connection steps through free holes on the way (on row 20, c20 and e20 are just stepping stones between
+D1, the zener and D2). The meter check: each run's two ends beep, and it doesn't beep to the holes beside it.
+
+The bridges that only serve one RJ12 port, and the solar one, come in the next steps, so a port you don't use leaves no
+bridges to nowhere.""",
+     run_rows(0))
 for _k in (1, 2, 3):
-    step('bridges%d' % _k, 'Bare bridges: port %d (%d)%s' % (_k, len(bridges_of(_k)), '' if _k == 1 else ': optional'), 'bottom',
+    step('bridges%d' % _k, 'Bare bridges: port %d (%d pieces)%s' % (_k, len(runs_of(_k)), '' if _k == 1 else ': optional'), 'bottom',
          [draw_under, 'bridge', _k],
          'Bottom view. Port %d only: its IN1 / IN2 / EN / angle leads to the ESP, and its angle filter.' % _k,
          ['Skip this step if port %d isn\'t used (its RJ12 step skipped too).' % _k if _k > 1 else 'Port 1 is always used.'],
          ("""Port %d's bridges: its four signal leads to their ESP pins, and its angle filter (the 1 kΩ and 100 nF) to the
-ESP and the GND rail. Same method as the step before.%s""" % (_k, '' if _k == 1 else """
+ESP and the GND rail. Same method as the step before: each row is one piece of wire.%s""" % (_k, '' if _k == 1 else """
 
 **Optional:** only if this controller drives %s. Skipped, the port's holes stay open for later; its 1 kΩ and
 100 nF can stay on the board unconnected.""" % ('2 or more blinds' if _k == 2 else '3 blinds'))),
-         what(bridges_of(_k)))
+         run_rows(_k))
+step('bridges4', 'Bare bridge: solar (1 piece): optional', 'bottom', [draw_under, 'bridge', 4],
+     'Bottom view. Only with the solar lead: joins it to D2.',
+     ['Skip it without solar (no lead in g23).'],
+     """**Optional:** only if you fitted the solar lead. One short bridge joins the lead's + hole to D2's anode.""",
+     run_rows(4))
 step('rails', 'Rails (%d)' % len(RAILS), 'bottom', [draw_under, 'rail'],
      'Bottom view. Long bare wires: ' + rails_text() + '.',
      ['Solder each rail at every hole it passes, including the ones that already have wires or leads.'],
@@ -691,11 +776,11 @@ def need():
         'wires': ['%d × 30 AWG silicone stranded insulated wire: %s' % (len(wires_of('wire')), ', '.join(
             '%d %s' % (n, c) for c, n in sorted({wire_colour(w[2]): sum(1 for q in wires_of('wire') if wire_colour(q[2]) == wire_colour(w[2]))
                                                  for w in wires_of('wire')}.items())))],
-        'bridges': ['%d × short bare wire: leg offcuts saved from steps 1-3 (about %d in all), the rest cut from 22 AWG solid tinned bus wire' % (
-            len(bridges_of(0)), 2 * (len(RES) + len(DIODES) + len(CAPS)))],
-        'bridges1': ['%d × short bare wire (leg offcuts or 22 AWG solid tinned)' % len(bridges_of(1))],
-        'bridges2': ['%d × short bare wire (leg offcuts or 22 AWG solid tinned)' % len(bridges_of(2))],
-        'bridges3': ['%d × short bare wire (leg offcuts or 22 AWG solid tinned)' % len(bridges_of(3))],
+        'bridges': ['%d pieces of bare wire: leg offcuts saved from steps 1-3 for the short ones, 22 AWG solid tinned bus wire for runs of 3+ holes' % len(runs_of(0))],
+        'bridges1': ['%d pieces of bare wire (leg offcuts or 22 AWG solid tinned)' % len(runs_of(1))],
+        'bridges2': ['%d pieces of bare wire (leg offcuts or 22 AWG solid tinned)' % len(runs_of(2))],
+        'bridges3': ['%d pieces of bare wire (leg offcuts or 22 AWG solid tinned)' % len(runs_of(3))],
+        'bridges4': ['1 short bare wire'],
         'rails': ['%d × 22 AWG solid tinned bus wire: %s' % (len(RAILS), '; '.join(rail_mm))],
     }
     out['port2'] = out['port3'] = out['port1']
@@ -706,7 +791,7 @@ NEED = need()
 
 
 ORDER = ['res', 'diodes', 'caps', 'sockets', 'wires', 'port1', 'port2', 'port3', 'solar', 'bridges', 'bridges1', 'bridges2', 'bridges3',
-         'rails', 'charger']
+         'bridges4', 'rails', 'charger']
 STEPS.sort(key=lambda st: ORDER.index(st['key']) if st['key'] in ORDER else len(ORDER))
 KEYS = [st['key'] for st in STEPS]
 
@@ -950,8 +1035,8 @@ def write_md():
          '**Totals:** %d parts and leads on top, %d insulated wires, %d bare bridges, %d rails.' % (
              sum(len(p.pins) for p in PARTS.values()), len(wires_of('wire')), len(wires_of('bridge')), len(RAILS)), '',
          '**Order:** parts, sockets and the board\'s own wires first, then the RJ12 and solar leads (steps 1–%d), while every hole' % (KEYS.index('solar') + 1),
-         'is still open; then the bare bridges (%d–%d: every board, then one step per port) and rails (%d), which land on those' % (
-             KEYS.index('bridges') + 1, KEYS.index('bridges3') + 1, KEYS.index('rails') + 1),
+         'is still open; then the bare bridges (%d–%d: every board, then one step per port, then solar) and rails (%d), which land on those' % (
+             KEYS.index('bridges') + 1, KEYS.index('bridges4') + 1, KEYS.index('rails') + 1),
          'holes\' pads; then the charger, which only plugs in (%d); the ESP and USB-C board plug in last (%d). **Ports 2 and 3 and' % (
              KEYS.index('charger') + 1, len(KEYS) + 1),
          'the solar lead are optional:** skip a port\'s lead step and its bridge step together. Each',
@@ -978,7 +1063,9 @@ def write_md():
            'caps': ('Capacitor', 'Holes', 'Note'), 'batt': ('Part', 'Holes', 'Note'), 'charger': ('Charger pad', 'Board hole', 'Net'),
            'wires': ('From', 'To', 'What'), 'solar': ('Lead', 'Hole', 'Goes to'), 'port1': ('RJ12 pin', 'Wire', 'Hole'),
            'port2': ('RJ12 pin', 'Wire', 'Hole'), 'port3': ('RJ12 pin', 'Wire', 'Hole'),
-           'bridges1': ('From', 'To', 'What'), 'bridges2': ('From', 'To', 'What'), 'bridges3': ('From', 'To', 'What'), 'bridges': ('From', 'To', 'What'), 'rails': ('From', 'To', 'What')}
+           'bridges': ('One piece of wire', 'Length', 'What it joins'), 'bridges1': ('One piece of wire', 'Length', 'What it joins'),
+           'bridges2': ('One piece of wire', 'Length', 'What it joins'), 'bridges3': ('One piece of wire', 'Length', 'What it joins'),
+           'bridges4': ('One piece of wire', 'Length', 'What it joins'), 'rails': ('From', 'To', 'What')}
     for k, st in enumerate(STEPS):
         o += ['## Step %d: %s' % (k + 1, st['title']), '', '**You need:** ' + ', '.join(NEED.get(st['key'], [])) + '.', '',
               '![step %d](renders/build-step-%02d.png)' % (k + 1, k + 1), '', st['body'], '']

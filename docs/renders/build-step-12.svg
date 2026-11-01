@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1190" height="520" font-family="Helvetica,Arial">
 <defs><filter id="mute"><feColorMatrix type="saturate" values="0"/></filter></defs>
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text x="30" y="30" font-size="20" font-weight="bold">Step 12: Bare bridges: port 2 (8): optional</text>
+<text x="30" y="30" font-size="20" font-weight="bold">Step 12: Bare bridges: port 2 (7 pieces): optional</text>
 <text x="30" y="54" font-size="13" fill="#444">Bottom view. Port 2 only: its IN1 / IN2 / EN / angle leads to the ESP, and its angle filter.</text>
 <rect x="49" y="69" width="732" height="312" rx="6" fill="#f3efe2" stroke="#3a7a2a" stroke-width="2"/>
 <text x="70" y="63" font-size="11" fill="#666" text-anchor="middle">1</text>
@@ -444,8 +444,6 @@
 <line x1="640" y1="210" x2="640" y2="240" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
 <line x1="760" y1="120" x2="730" y2="120" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
 <line x1="760" y1="120" x2="730" y2="120" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
-<line x1="730" y1="240" x2="730" y2="270" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
-<line x1="730" y1="240" x2="730" y2="270" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
 <line x1="760" y1="150" x2="730" y2="150" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
 <line x1="760" y1="150" x2="730" y2="150" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
 <line x1="730" y1="150" x2="730" y2="180" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
@@ -493,6 +491,6 @@
 <line x1="460" y1="180" x2="460" y2="210" stroke="#1f77b4" stroke-width="1.6" stroke-linecap="round"/>
 <line x1="400" y1="210" x2="430" y2="210" stroke="#9aa3a8" stroke-width="5" stroke-linecap="round"/>
 <line x1="400" y1="210" x2="430" y2="210" stroke="#222222" stroke-width="1.6" stroke-linecap="round"/>
-<text x="30" y="447" font-size="13" fill="#222">You need: 8 × short bare wire (leg offcuts or 22 AWG solid tinned)</text>
+<text x="30" y="447" font-size="13" fill="#222">You need: 7 pieces of bare wire (leg offcuts or 22 AWG solid tinned)</text>
 <text x="30" y="467" font-size="13" fill="#222">Skip this step if port 2 isn't used (its RJ12 step skipped too).</text>
 </svg>
