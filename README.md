@@ -32,6 +32,7 @@ Matter over Thread.
 | [docs/architecture.md](docs/architecture.md) | Electronics, power budget, connectors, RJ12 pinout, why each choice |
 | [docs/controller-v4.md](docs/controller-v4.md) | Controller box, dev-board layout, pin plan, assembly |
 | [docs/dev-board-build.md](docs/dev-board-build.md) | **Building the controller dev board**: step by step with pictures, which parts have a direction, every hole and wire |
+| [docs/tilter-wiring.md](docs/tilter-wiring.md) | **Wiring a tilter** (motor side): RJ12 breakout, DRV8833, AS5600, motor, with a diagram and checks |
 | [docs/bench-test.md](docs/bench-test.md) | Breadboard wiring + test plan for one tilter, with a test sketch |
 | [hardware/mechanical/stl/v0.4/README.md](hardware/mechanical/stl/v0.4/README.md) | Tilter + sensor module: print files, orientation, hardware, assembly, fits |
 | [hardware/BOM.md](hardware/BOM.md) | Everything to buy, with links, quantities and what each part is for |

@@ -1,37 +1,42 @@
 # Bench test: one tilter on a breadboard
 
-One port of the controller, wired on a breadboard exactly as the dev board will be (same pins as
-[controller-v4.md](controller-v4.md#dev-board)), so the firmware carries straight over. The tilter is wired directly
-(no RJ12 cord) for the first runs. Sketch: [firmware/bench_test](../firmware/bench_test/bench_test.ino).
+The tilter is wired exactly as it will be on a blind ([tilter-wiring.md](tilter-wiring.md)); the controller side is one
+port on a breadboard with the controller PCB's pins, joined by a **real RJ12 cord**. So the test also proves the cord,
+the tilter's wiring and the firmware's pin plan. Sketch: [firmware/bench_test](../firmware/bench_test/bench_test.ino).
 
 ## Parts
-ESP32-C6 SuperMini, 1 DRV8833 (J2 pad cut), 1 AS5600 board, the tilter with its N20, an 18650 cell (motor supply),
-USB-C cable to the computer (ESP power + serial), 1 kΩ + 100 nF (angle filter), 10 µF (driver supply), a breadboard
-and jumper wires, the USB power meter or a multimeter.
+- The tilter, wired per [tilter-wiring.md](tilter-wiring.md) (motor leads soldered to the N20 for this test)
+- One RJ12 cord (continuity-checked pin 1 to pin 1)
+- ESP32-C6 SuperMini, a spare **RJ12 breakout** (controller side), an 18650 cell with its JST-XH lead
+- 1 kΩ + 100 nF (angle filter), 100 kΩ (EN pull-down), a breadboard and jumper wires
+- USB-C cable to the computer (ESP power + serial), the USB power meter or a multimeter
 
-The SuperMini's two pin rows are 0.6" apart: it straddles the breadboard's centre gap like a wide DIP chip.
+The SuperMini's two pin rows are 0.6" apart: it straddles the breadboard's centre gap like a wide DIP chip. The RJ12
+breakout's 6 pins plug into the breadboard too.
 
-## Wiring
+## Wiring (controller side, on the breadboard)
 | From | To | Note |
 |---|---|---|
 | ESP **USB-C** | computer | powers the ESP, serial monitor at 115200 |
 | ESP **GND** | breadboard GND rail | |
-| 18650 **+** (red, XH lead) | DRV8833 **VCC** | motor supply: the real 3.0–4.2 V |
 | 18650 **−** (black) | GND rail | grounds must be shared |
-| 10 µF | DRV8833 VCC ↔ GND, at the driver | |
-| DRV8833 **GND** | GND rail | |
-| ESP **GPIO 14** | DRV8833 **IN1** | PWM |
-| ESP **GPIO 18** | DRV8833 **IN2** | PWM |
-| ESP **GPIO 7** | DRV8833 **ULT** and AS5600 **VCC** | EN: wakes the driver and powers the sensor |
-| DRV8833 **OUT1 / OUT2** | N20 tabs | swap them if "forward" turns the wrong way |
-| AS5600 **GND** | GND rail | |
-| AS5600 **GPO** | AS5600 **VCC** | analog output mode |
-| AS5600 **OUT** | 1 kΩ → ESP **GPIO 6** | |
+| 18650 **+** (red) | RJ12 breakout **pin 1** | battery + for the tilter's motor driver (the real 3.0–4.2 V) |
+| RJ12 breakout **pin 3** | GND rail | |
+| ESP **GPIO 14** | RJ12 breakout **pin 2** (IN1) | |
+| ESP **GPIO 18** | RJ12 breakout **pin 6** (IN2) | |
+| ESP **GPIO 7** | RJ12 breakout **pin 5** (EN) | wakes the driver and powers the sensor |
+| 100 kΩ | RJ12 pin 5 ↔ GND | keeps EN low while the ESP boots |
+| RJ12 breakout **pin 4** (angle) | 1 kΩ → ESP **GPIO 6** | |
 | 100 nF | ESP GPIO 6 ↔ GND | angle filter |
 
-Same nets as RJ12 port 1 on the controller PCB v2: VBAT = DRV VCC, IN1 = 14, IN2 = 18, EN = 7, ANGLE = 6, GND.
+Then plug the cord into the breadboard's RJ12 breakout and into the tilter's jack. Same pins as port 1 on the
+controller PCB v2: IN1 = 14, IN2 = 18, EN = 7, angle = 6.
 
-**Never** power the ESP from the 18650 through its 5V pin while USB is plugged in (no diode on the board's 5V pin).
+Before the battery goes on: meter beep mode, breadboard RJ12 **pin 1 to pin 3 (GND): no beep**; with the cord
+plugged in, still no beep (checks the tilter side too).
+
+The ESP runs from USB here; the 18650 only feeds the tilter. **Never** also connect the 18650 to the ESP's 5V pin while USB
+is plugged in (no diode on the board's 5V pin).
 
 ## Tests
 1. **Angle:** EN on (`e`), turn the wand by hand: the angle should change smoothly over the whole travel, without
