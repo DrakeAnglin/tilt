@@ -80,7 +80,7 @@ battery + to RJ12 pin 1 reads OL, and that is correct.
 
 | # | Other probe | Correct | Reading |
 |---|---|---|---|
-| 9 | ESP pin **19** | ~0 Ω | |
+| 9 | ESP pin **18** | ~0 Ω | |
 | 10 | RJ12 pin **3** | OL | |
 | 11 | RJ12 pin **4** | OL | |
 | 12 | RJ12 pin **5** | OL | |
