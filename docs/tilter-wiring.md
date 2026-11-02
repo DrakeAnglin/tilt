@@ -21,9 +21,13 @@ controller, so a cord can be checked end to end by colour.
 | Heat-shrink (small) | a few |
 
 ## 1. Prepare the boards (before any wiring)
-**DRV8833: cut the J2 pad.** As it comes, the board ties its sleep pin (ULT) permanently to VCC, so the driver never
-sleeps and EN can't control it. Find the small pad marked **J2** next to the ULT pin, cut the thin trace between its
-two halves with a hobby knife, then check with the meter's beep mode: **ULT must not beep to VCC**.
+**DRV8833: cut the sleep jumper.** As it comes, the board ties its sleep pin (ULT) permanently to VCC, so the driver
+never sleeps and EN can't control it. The jumper is a tiny pair of pads at the top edge marked **J1** between the
+words **"en"** and **"sleep"** (some batches print it **J2**: same jumper).
+1. Meter in beep mode on **ULT** and **VCC**: it beeps (the jumper is closed).
+2. Scrape through the thin copper bridge between J1's two pads with a hobby knife, a few strokes across the gap (if
+   it's a solder blob instead, wick it off).
+3. **ULT to VCC must not beep now.** If it still does, the cut isn't through.
 
 **AS5600: three checks and two links.**
 1. **Link GPO to VCC** with a short bare wire across the two pins on the board (analog output mode, as the controller
@@ -69,7 +73,7 @@ Meter in beep mode, nothing connected:
 - Pin 5 (EN) to pin 3 (GND): no beep. Pin 4 (angle) to pin 3: no beep.
 - Each RJ12 pin to its board pin per the table: beep. Pin 1 to pin 6 and pin 2 to pin 5: **no** beep (catches a
   lead on the wrong pad).
-- DRV8833 ULT to VCC: no beep (J2 really cut).
+- DRV8833 ULT to VCC: no beep (J1 sleep jumper really cut).
 
 ## 4. Final assembly
 At final assembly, solder the white pair's free ends to the N20's two tabs (either way round; swap them later if the
