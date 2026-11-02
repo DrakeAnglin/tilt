@@ -119,7 +119,7 @@ Go down the list in order: one RJ12 pin at a time, red probe on that pin. Write 
 
 **ESP and battery**
 
-| # | Black probe | Correct | Reading |
+| # | Probes (red to black) | Correct | Reading |
 |---|---|---|---|
 | 23 | **ESP 5V** to ESP GND | high, not near 0 | |
 | 24 | **ESP 3V3** to ESP GND | high, not near 0 | |
