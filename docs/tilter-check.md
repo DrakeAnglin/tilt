@@ -128,10 +128,21 @@ battery + to RJ12 pin 1 reads OL, and that is correct.
 ~0 Ω line reading OL = that lead / bridge isn't connected. OL line reading near 0 = a short: don't power up.
 Line 19 (~1 kΩ) wrong = the 1 kΩ filter resistor or its bridges.
 
+### D. Polarity, before ANY battery goes on (do not skip)
+A battery plugged in backwards destroys the charger in a second. Check every plug against its header **unpowered**:
+- [ ] **Battery plug:** hold it against the battery header. The **red** wire lines up with **b19** (+), the **black**
+  with **a19** (−). If red lines up with a19, the header is turned the wrong way: desolder it, rotate it 180°,
+  resolder, check again. Mark b19 with a red "+".
+- [ ] **Battery voltage at the plug:** meter on DC V, red probe on the red wire: **+3.0 to +4.2 V**. A minus sign
+  means the plug itself is wired backwards: stop.
+- [ ] **Charger harness, each wire:** from the charger pad to the dev-board hole it plugs into, meter on Ω, ~0 Ω:
+  BATT+ pad → **d19**, PWR+ pad → **e19**, LOAD+ pad → **j20**, the three GND pads → **a21, a22, a23**.
+- [ ] **Charger harness, no swaps:** BATT+ pad to GND pads: OL. LOAD+ pad to GND pads: OL.
+
 ### E. Power up in stages
 1. **USB only** (no battery, no cord), sketch running. EN off (`x`): RJ12 5 to GND ≈ 0 V. EN on (`e`): ≈ 3.3 V.
    Back to `x`.
-2. **Plug in the charger harness, then the battery** (still no cord): RJ12 pin 1 to GND = battery voltage (it comes
+2. **Only after section D passes:** plug in the charger harness, then the battery (still no cord): RJ12 pin 1 to GND = battery voltage (it comes
    through the charger); nothing warm; the ESP keeps running.
 3. **Unplug the battery, plug in the cord** to both breakouts. Recheck RJ12 1 to 3: no continuous beep (that tests
    the tilter end through the cord).
