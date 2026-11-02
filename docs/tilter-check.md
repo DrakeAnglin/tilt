@@ -1,4 +1,4 @@
-# Tilter wiring check (before first power)
+# Bench wiring check (before first power): tilter and controller
 
 Nothing plugged in: no cord, no battery. Meter in **beep (continuity) mode** unless a line says otherwise. Probe the
 **RJ12 breakout's pads** on one side and the board pins on the other. Wiring: [tilter-wiring.md](tilter-wiring.md).
@@ -51,6 +51,45 @@ Also, no beep from:
 ## 5. The cord
 - [ ] Plug end to plug end: **pin 1 beeps to pin 1** (and not to pin 6), for all six pins.
 - [ ] Cord plugged into the tilter: RJ12 1 to 3 at the far plug still doesn't beep continuously.
+
+## Controller side (the breadboard rig, [bench-test.md](bench-test.md))
+Same rules: no USB, no battery, no cord plugged in; beep mode. Probe the breadboard RJ12 breakout's pins against the
+ESP's pins (the SuperMini's pin names are printed next to each pin).
+
+### A. Look first
+- [ ] ESP straddles the centre gap; no two ESP pins share a breadboard row.
+- [ ] Battery **+ goes only to RJ12 pin 1**. Nothing from the battery goes to the ESP's 5V, 3V3 or BAT pins.
+- [ ] ESP GND, battery −, RJ12 pin 3, the 100 kΩ and the 100 nF all reach the **same** GND rail (breadboards often
+  split the rail in the middle: check the rail is continuous end to end).
+
+### B. Must beep
+| ✓ | From | To |
+|---|---|---|
+| [ ] | ESP **GPIO 14** | RJ12 **2** (IN1) |
+| [ ] | ESP **GPIO 18** | RJ12 **6** (IN2) |
+| [ ] | ESP **GPIO 7** | RJ12 **5** (EN) |
+| [ ] | ESP **GND** | RJ12 **3** |
+| [ ] | battery lead **−** (black) | RJ12 **3** |
+| [ ] | battery lead **+** (red) | RJ12 **1** |
+
+### C. Resistances (Ω range)
+- [ ] RJ12 **4** (angle) to ESP **GPIO 6**: **≈ 1 kΩ** (the filter resistor).
+- [ ] RJ12 **5** (EN) to RJ12 **3** (GND): **≈ 100 kΩ** (the pull-down).
+- [ ] ESP **GPIO 6** to GND: no beep (only the 100 nF there: a chirp at most).
+
+### D. Must NOT beep
+- [ ] Every pair of the six RJ12 pins, as in the tilter table (pin 4 to pin 5 and 5 to 3 read their resistors, not 0).
+- [ ] ESP **5V** to **GND**, **3V3** to **GND**, **5V** to **3V3**.
+- [ ] Battery **+** to any ESP pin.
+- [ ] Neighbouring ESP pins on each side (catches a jumper in the wrong row).
+
+### E. Power up in stages
+1. **USB only** (no battery, no cord), sketch running. EN off (`x`): RJ12 5 to GND ≈ 0 V. EN on (`e`): ≈ 3.3 V.
+   Back to `x`.
+2. **Add the battery** (still no cord): RJ12 1 to GND = battery voltage; nothing warm; the ESP keeps running.
+3. **Unplug the battery, plug in the cord** to both breakouts. Recheck RJ12 1 to 3: no continuous beep (that tests
+   the tilter end through the cord).
+4. Battery back on, then the tilter's first-power checks below.
 
 ## 6. First power (on the bench rig, [bench-test.md](bench-test.md))
 With the ESP sketch running, EN off (`x`):
