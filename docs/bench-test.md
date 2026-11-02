@@ -42,6 +42,22 @@ plugged in, still no beep (checks the tilter side too).
 The ESP runs from USB here; the 18650 only feeds the tilter. **Never** also connect the 18650 to the ESP's 5V pin while USB
 is plugged in (no diode on the board's 5V pin).
 
+## Flash the ESP (once)
+Battery and charger **unplugged**; only the ESP's own USB-C to the computer.
+1. Install the **Arduino IDE** (arduino.cc). In *Settings → Additional boards manager URLs* add
+   `https://espressif.github.io/arduino-esp32/package_esp32_index.json`, then *Boards Manager* → install **esp32 by
+   Espressif** (version 3.x).
+2. Open [firmware/bench_test/bench_test.ino](../firmware/bench_test/bench_test.ino). *Tools*:
+   - Board: **ESP32C6 Dev Module**
+   - **USB CDC On Boot: Enabled** (without this the Serial Monitor stays blank)
+   - Port: the `/dev/cu.usbmodem…` that appears when the ESP is plugged in
+3. **Upload.** If it can't connect: hold **BOOT**, tap **RST**, release BOOT, upload again; tap RST afterwards.
+4. *Tools → Serial Monitor*, **115200** baud, line ending "No line ending". Tap RST: it prints
+   `bench_test: e/x EN, f/r/s motor, 0-9 duty, a angle stream`.
+
+Commands (type one letter, Enter): `e` EN on, `x` EN off (and stop), `f` forward, `r` reverse, `s` stop,
+`1`–`9` speed (10–100 %), `0` speed 0, `a` angle readout on/off. **The motor only runs after `e`.**
+
 ## Tests
 1. **Angle:** EN on (`e`), turn the wand by hand: the angle should change smoothly over the whole travel, without
    jumping or wrapping past 0/360°. Note the readings at both ends.
