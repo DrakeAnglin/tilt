@@ -62,26 +62,38 @@ ESP's pins (the SuperMini's pin names are printed next to each pin).
 - [ ] ESP GND, battery −, RJ12 pin 3, the 100 kΩ and the 100 nF all reach the **same** GND rail (breadboards often
   split the rail in the middle: check the rail is continuous end to end).
 
-### B. Must beep
-| ✓ | From | To |
-|---|---|---|
-| [ ] | ESP **GPIO 19** | RJ12 **2** (IN1) |
-| [ ] | ESP **GPIO 20** | RJ12 **6** (IN2) |
-| [ ] | ESP **GPIO 1** | RJ12 **5** (EN) |
-| [ ] | ESP **GND** | RJ12 **3** |
-| [ ] | battery lead **−** (black) | RJ12 **3** |
-| [ ] | battery lead **+** (red) | RJ12 **1** |
+### B. Ohms check (meter on Ω; no USB, no battery, no cord)
+Write down each reading.
 
-### C. Resistances (Ω range)
-- [ ] RJ12 **4** (angle) to ESP **GPIO 0**: **≈ 1 kΩ** (the filter resistor).
-- [ ] RJ12 **5** (EN) to RJ12 **3** (GND): **≈ 100 kΩ** (the pull-down).
-- [ ] ESP **GPIO 0** to GND: no beep (only the 100 nF there: a chirp at most).
+**Should read about 0 Ω (connected):**
+| # | Red probe | Black probe | Correct | Reading |
+|---|---|---|---|---|
+| 1 | RJ12 pin **2** | ESP pin **19** | ~0 Ω | |
+| 2 | RJ12 pin **6** | ESP pin **20** | ~0 Ω | |
+| 3 | RJ12 pin **5** | ESP pin **1** | ~0 Ω | |
+| 4 | RJ12 pin **3** | ESP **GND** | ~0 Ω | |
+| 5 | RJ12 pin **3** | battery lead **black** | ~0 Ω | |
+| 6 | RJ12 pin **1** | battery lead **red** | ~0 Ω | |
 
-### D. Must NOT beep
-- [ ] Every pair of the six RJ12 pins, as in the tilter table (5 to 3 reads the 100 kΩ pull-down, not 0).
-- [ ] ESP **5V** to **GND**, **3V3** to **GND**, **5V** to **3V3**.
-- [ ] Battery **+** to any ESP pin.
-- [ ] Neighbouring ESP pins on each side (catches a jumper in the wrong row).
+**Should read the resistor:**
+| # | Red probe | Black probe | Correct | Reading |
+|---|---|---|---|---|
+| 7 | RJ12 pin **4** | ESP pin **0** | ~1 kΩ (0.9–1.1 k) | |
+| 8 | RJ12 pin **5** | RJ12 pin **3** | ~100 kΩ | |
+
+**Should read high (megohms or OL):**
+| # | Red probe | Black probe | Correct | Reading |
+|---|---|---|---|---|
+| 9 | RJ12 pin **1** | RJ12 pin **3** | OL (**most important**) | |
+| 10 | RJ12 pin **1** | pins 2, 4, 5, 6 (each) | OL | |
+| 11 | RJ12 pin **2** | RJ12 pin **6** | OL | |
+| 12 | ESP **5V** | ESP **GND** | high, not near 0 | |
+| 13 | ESP **3V3** | ESP **GND** | high, not near 0 | |
+| 14 | battery **red** | ESP **5V** | OL | |
+
+A line in the first table reading OL = that wire isn't connected. A line in the last table near 0 = a short: don't
+power up. Lines 7 / 8 wrong = resistor missing, wrong row or wrong value (1 kΩ brown-black-red, 100 kΩ
+brown-black-yellow).
 
 ### E. Power up in stages
 1. **USB only** (no battery, no cord), sketch running. EN off (`x`): RJ12 5 to GND ≈ 0 V. EN on (`e`): ≈ 3.3 V.
