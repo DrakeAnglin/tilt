@@ -34,16 +34,18 @@ it **J2**: same jumper).
      pulled low and feeds battery voltage into the EN line (which powers the AS5600 and goes to an ESP pin). Remove
      that resistor before wiring (ask first if you're not sure which one it is).
 
-**AS5600: three checks and two links.**
-1. **Link GPO to VCC** with a short bare wire across the two pins on the board (analog output mode, as the controller
-   reads it).
-2. **Link DIR to GND** the same way. DIR sets which way the angle counts; left open it floats and the reading can
-   flip direction at random.
-3. **3.3 V operation:** the controller powers the sensor at 3.3 V. At 3.3 V the chip needs its 5V and 3V3 supply pins
-   joined: on most of these boards the VCC pin already feeds both (meter: VCC beeps to both legs of the small
-   capacitor next to the chip). If yours doesn't, bridge them.
-4. Some versions have a pull-up resistor (often **R4**) on the OUT line. If the angle later reads stuck near the top
-   of the range, remove it.
+**AS5600: two links and two checks.** On this board the header pins are on opposite sides: **VCC, OUT, GND** on the
+left (VCC = square pad), **DIR, SCL, SDA, GPO** on the right (DIR = square pad). So the links are short pieces of
+**30 AWG wire on the back of the board**, pad to pad, not bridges between neighbours (dashed in the picture).
+1. **GPO to VCC** (blue): analog output mode, as the controller reads it.
+2. **DIR to GND** (black): DIR sets which way the angle counts; left open it floats and the reading can flip at random.
+   Solder the links on the back before fitting header pins or leads to those pads, and keep them flat (the board sits
+   in a seat).
+3. **3.3 V check:** the chip needs its 5V and 3V3 supply pins joined when run from 3.3 V. Meter in beep mode: **VCC**
+   to one end of **C1** and to one end of **C2** (the two small parts beside R1, top of the board). If VCC beeps to
+   both, you're set. If it only beeps to one, send a photo before bridging anything.
+4. **R4** (bottom right, next to GPO) is a pull-up on the output on some versions. Leave it for now; if the angle
+   later reads stuck near the top of its range, remove it.
 5. Mechanical: file ~1 mm off the board edge nearest the rod so it fits its seat (see the
    [tilter build](../hardware/mechanical/stl/v0.4/README.md)).
 
