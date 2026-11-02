@@ -52,86 +52,87 @@ Also, no beep from:
 - [ ] Plug end to plug end: **pin 1 beeps to pin 1** (and not to pin 6), for all six pins.
 - [ ] Cord plugged into the tilter: RJ12 1 to 3 at the far plug still doesn't beep continuously.
 
-## Controller side (the breadboard rig, [bench-test.md](bench-test.md))
-Same rules: no USB, no battery, no cord plugged in; beep mode. Probe the breadboard RJ12 breakout's pins against the
-ESP's pins (the SuperMini's pin names are printed next to each pin).
+## Controller side (the dev board)
+No USB, no battery, no charger, no cord plugged in. Meter on Ω. The RJ12 board's six leads go into the dev board;
+probe the **RJ12 breakout's pads** against the holes / ESP pins listed. The battery + connections on their own:
+[devboard-hot.png](renders/devboard-hot.png).
 
-### A. Look first
-- [ ] ESP straddles the centre gap; no two ESP pins share a breadboard row.
-- [ ] Battery **+ goes only to RJ12 pin 1**. Nothing from the battery goes to the ESP's 5V, 3V3 or BAT pins.
-- [ ] ESP GND, battery −, RJ12 pin 3, the 100 kΩ and the 100 nF all reach the **same** GND rail (breadboards often
-  split the rail in the middle: check the rail is continuous end to end).
+**Note:** on the dev board the cell's + reaches RJ12 pin 1 only **through the charger**. With the charger unplugged,
+battery + to RJ12 pin 1 reads OL, and that is correct.
 
-### B. Ohms check (meter on Ω; no USB, no battery, no cord)
-Go down the list in order: one RJ12 pin at a time, red probe on that pin. Write down each reading.
+### B. Ohms check, in RJ12 pin order (red probe on the RJ12 pin)
 
-**RJ12 pin 1** (red probe here)
+**RJ12 pin 1 (battery + lead)**
 
-| # | Black probe | Correct | Reading |
+| # | Other probe | Correct | Reading |
 |---|---|---|---|
-| 1 | battery header pin, **red** (marked) side | ~0 Ω | |
-| 2 | RJ12 pin **2** | OL | |
-| 3 | RJ12 pin **3** | OL (**most important**) | |
-| 4 | RJ12 pin **4** | OL | |
-| 5 | RJ12 pin **5** | OL | |
-| 6 | RJ12 pin **6** | OL | |
+| 1 | hole **j16** (the battery + rail, column j) | ~0 Ω | |
+| 2 | charger LOAD+ header pin (**j20**) | ~0 Ω | |
+| 3 | battery header **+** (b19) | OL (only joined through the charger) | |
+| 4 | RJ12 pin **2** | OL | |
+| 5 | RJ12 pin **3** | OL (**most important**) | |
+| 6 | RJ12 pin **4** | OL | |
+| 7 | RJ12 pin **5** | OL | |
+| 8 | RJ12 pin **6** | OL | |
 
-**RJ12 pin 2** (red probe here)
+**RJ12 pin 2 (IN1 lead)**
 
-| # | Black probe | Correct | Reading |
+| # | Other probe | Correct | Reading |
 |---|---|---|---|
-| 7 | ESP pin **19** | ~0 Ω | |
-| 8 | RJ12 pin **3** | OL | |
-| 9 | RJ12 pin **4** | OL | |
-| 10 | RJ12 pin **5** | OL | |
-| 11 | RJ12 pin **6** | OL | |
+| 9 | ESP pin **19** | ~0 Ω | |
+| 10 | RJ12 pin **3** | OL | |
+| 11 | RJ12 pin **4** | OL | |
+| 12 | RJ12 pin **5** | OL | |
+| 13 | RJ12 pin **6** | OL | |
 
-**RJ12 pin 3** (red probe here)
+**RJ12 pin 3 (GND lead)**
 
-| # | Black probe | Correct | Reading |
+| # | Other probe | Correct | Reading |
 |---|---|---|---|
-| 12 | ESP **GND** | ~0 Ω | |
-| 13 | battery header pin, **black** side | ~0 Ω | |
-| 14 | RJ12 pin **4** | climbs to OL (the 100 nF charging) | |
-| 15 | RJ12 pin **5** | ~100 kΩ (the pull-down) | |
-| 16 | RJ12 pin **6** | OL | |
+| 14 | ESP **GND** | ~0 Ω | |
+| 15 | battery header **−** (a19) | ~0 Ω | |
+| 16 | RJ12 pin **4** | climbs to OL (the 100 nF charging) | |
+| 17 | RJ12 pin **5** | high (no pull-down on the dev board) | |
+| 18 | RJ12 pin **6** | OL | |
 
-**RJ12 pin 4** (red probe here)
+**RJ12 pin 4 (angle lead)**
 
-| # | Black probe | Correct | Reading |
+| # | Other probe | Correct | Reading |
 |---|---|---|---|
-| 17 | ESP pin **0** | ~1 kΩ (0.9–1.1 k) | |
-| 18 | RJ12 pin **5** | OL | |
-| 19 | RJ12 pin **6** | OL | |
-
-**RJ12 pin 5** (red probe here)
-
-| # | Black probe | Correct | Reading |
-|---|---|---|---|
-| 20 | ESP pin **1** | ~0 Ω | |
+| 19 | ESP pin **0** | ~1 kΩ (0.9–1.1 k) | |
+| 20 | RJ12 pin **5** | OL | |
 | 21 | RJ12 pin **6** | OL | |
 
-**RJ12 pin 6** (red probe here)
+**RJ12 pin 5 (EN lead)**
 
-| # | Black probe | Correct | Reading |
+| # | Other probe | Correct | Reading |
 |---|---|---|---|
-| 22 | ESP pin **20** | ~0 Ω | |
+| 22 | ESP pin **1** | ~0 Ω | |
+| 23 | RJ12 pin **6** | OL | |
 
-**ESP and battery**
+**RJ12 pin 6 (IN2 lead)**
 
-| # | Probes (red to black) | Correct | Reading |
+| # | Other probe | Correct | Reading |
 |---|---|---|---|
-| 23 | **ESP 5V** to ESP GND | high, not near 0 | |
-| 24 | **ESP 3V3** to ESP GND | high, not near 0 | |
-| 25 | **battery red** to ESP 5V | OL | |
+| 24 | ESP pin **20** | ~0 Ω | |
 
-~0 Ω reading OL = that wire isn't connected. OL line reading near 0 = a short: don't power up. Resistor lines
-wrong = resistor missing, wrong row or wrong value (1 kΩ brown-black-red, 100 kΩ brown-black-yellow).
+**Battery and ESP**
+
+| # | Other probe | Correct | Reading |
+|---|---|---|---|
+| 25 | battery header **+** (b19) to charger header BATT+ (**d19**) | ~0 Ω | |
+| 26 | battery header **+** (b19) to battery header **−** (a19) | OL | |
+| 27 | **ESP 5V** to ESP GND | high, not near 0 | |
+| 28 | **ESP 3V3** to ESP GND | high, not near 0 | |
+
+~0 Ω line reading OL = that lead / bridge isn't connected. OL line reading near 0 = a short: don't power up.
+Line 19 (~1 kΩ) wrong = the 1 kΩ filter resistor or its bridges.
 
 ### E. Power up in stages
 1. **USB only** (no battery, no cord), sketch running. EN off (`x`): RJ12 5 to GND ≈ 0 V. EN on (`e`): ≈ 3.3 V.
    Back to `x`.
-2. **Add the battery** (still no cord): RJ12 1 to GND = battery voltage; nothing warm; the ESP keeps running.
+2. **Plug in the charger harness, then the battery** (still no cord): RJ12 pin 1 to GND = battery voltage (it comes
+   through the charger); nothing warm; the ESP keeps running.
 3. **Unplug the battery, plug in the cord** to both breakouts. Recheck RJ12 1 to 3: no continuous beep (that tests
    the tilter end through the cord).
 4. Battery back on, then the tilter's first-power checks below.
