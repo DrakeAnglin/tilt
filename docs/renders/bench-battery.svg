@@ -17,7 +17,7 @@
 <circle cx="292" cy="211" r="5" fill="#d62728"/>
 <text x="290" y="150" font-size="12" font-weight="bold">2 male header pins</text>
 <text x="290" y="168" font-size="12" fill="#d62728" font-weight="bold">top = red side (marked)</text>
-<text x="285" y="282" font-size="12" fill="#222" font-weight="bold" text-anchor="end">black side</text>
+<text x="330" y="282" font-size="12" fill="#222" font-weight="bold">bottom = black side</text>
 
 
 <!-- RJ12 breakout on the breadboard -->
