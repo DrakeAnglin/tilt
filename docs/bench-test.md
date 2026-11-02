@@ -15,6 +15,9 @@ The SuperMini's two pin rows are 0.6" apart: it straddles the breadboard's centr
 breakout's 6 pins plug into the breadboard too.
 
 ## Wiring (controller side, on the breadboard)
+
+![battery hookup](renders/bench-battery.png)
+
 | From | To | Note |
 |---|---|---|
 | ESP **USB-C** | computer | powers the ESP, serial monitor at 115200 |
