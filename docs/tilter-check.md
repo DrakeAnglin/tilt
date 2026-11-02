@@ -69,7 +69,7 @@ Go down the list in order: one RJ12 pin at a time, red probe on that pin. Write 
 
 | # | Black probe | Correct | Reading |
 |---|---|---|---|
-| 1 | battery lead **red** | ~0 Ω | |
+| 1 | battery header pin, **red** (marked) side | ~0 Ω | |
 | 2 | RJ12 pin **2** | OL | |
 | 3 | RJ12 pin **3** | OL (**most important**) | |
 | 4 | RJ12 pin **4** | OL | |
@@ -91,7 +91,7 @@ Go down the list in order: one RJ12 pin at a time, red probe on that pin. Write 
 | # | Black probe | Correct | Reading |
 |---|---|---|---|
 | 12 | ESP **GND** | ~0 Ω | |
-| 13 | battery lead **black** | ~0 Ω | |
+| 13 | battery header pin, **black** side | ~0 Ω | |
 | 14 | RJ12 pin **4** | climbs to OL (the 100 nF charging) | |
 | 15 | RJ12 pin **5** | ~100 kΩ (the pull-down) | |
 | 16 | RJ12 pin **6** | OL | |

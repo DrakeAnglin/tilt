@@ -19,8 +19,9 @@ breakout's 6 pins plug into the breadboard too.
 |---|---|---|
 | ESP **USB-C** | computer | powers the ESP, serial monitor at 115200 |
 | ESP **GND** | breadboard GND rail | |
-| 18650 **−** (black) | GND rail | grounds must be shared |
-| 18650 **+** (red) | RJ12 breakout **pin 1** | battery + for the tilter's motor driver (the real 3.0–4.2 V) |
+| 2 male header pins | breadboard, two rows side by side | the cell's JST-XH plug pushes onto them (not keyed: **mark the red side**) |
+| header pin, **red** side | jumper to the row of RJ12 breakout **pin 1** | battery + for the tilter's motor driver (the real 3.0–4.2 V) |
+| header pin, **black** side | jumper to the GND rail | grounds must be shared |
 | RJ12 breakout **pin 3** | GND rail | |
 | ESP **GPIO 19** | RJ12 breakout **pin 2** (IN1) | (the PCB uses GPIO 14 here) |
 | ESP **GPIO 20** | RJ12 breakout **pin 6** (IN2) | |
