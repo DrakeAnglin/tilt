@@ -72,7 +72,7 @@ drv = {}
 for k, name in enumerate(('IN4', 'IN3', 'GND', 'VCC', 'IN2', 'IN1')):
     drv[name] = pad(X0 + 22, Y0 + 40 + k * 42, name, 'l', dim=name in ('IN4', 'IN3'), light=True)
 for k, name in enumerate(('EEP', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'ULT')):
-    drv[name] = pad(X0 + 278, Y0 + 40 + k * 42, name, 'r', dim=name in ('EEP', 'OUT3', 'OUT4'), light=True)
+    drv[name] = pad(X0 + 278, Y0 + 40 + k * 42, name, 'r', dim=name in ('ULT', 'OUT3', 'OUT4'), light=True)
 # 10 uF straight across GND and VCC, just outside the board edge
 gx, gy = drv['GND']
 vx, vy = drv['VCC']
@@ -125,7 +125,7 @@ path([rj[1], (330, rj[1][1]), (330, drv['VCC'][1]), drv['VCC']], 'red', True)
 path([rj[3], (350, rj[3][1]), (350, drv['GND'][1]), drv['GND']], 'black', True)
 path([rj[2], (370, rj[2][1]), (370, drv['IN1'][1]), drv['IN1']], 'green')
 path([rj[6], (390, rj[6][1]), (390, drv['IN2'][1]), drv['IN2']], 'yellow')
-path([rj[5], (420, rj[5][1]), (420, 440), (900, 440), (900, drv['ULT'][1]), drv['ULT']], 'blue')   # under the driver to ULT
+path([rj[5], (420, rj[5][1]), (420, 440), (900, 440), (900, drv['EEP'][1]), drv['EEP']], 'blue')   # around the driver to EEP (= SLEEP)
 path([rj[5], (440, rj[5][1]), (440, asn['VCC'][1]), asn['VCC']], 'blue')
 path([rj[4], (460, rj[4][1]), (460, asn['OUT'][1]), asn['OUT']], 'white')
 path([rj[3], (310, rj[3][1]), (310, asn['GND'][1]), asn['GND']], 'black')
@@ -133,7 +133,7 @@ path([rj[3], (310, rj[3][1]), (310, asn['GND'][1]), asn['GND']], 'black')
 # ---------------------------------------------------------------- legend
 legend = [('red', True, 'RJ12 pin 1 battery + -> DRV VCC'), ('black', True, 'RJ12 pin 3 GND -> DRV GND'),
           ('green', False, 'RJ12 pin 2 IN1 -> DRV IN1'), ('yellow', False, 'RJ12 pin 6 IN2 -> DRV IN2'),
-          ('blue', False, 'RJ12 pin 5 EN -> DRV ULT and AS5600 VCC'), ('white', False, 'RJ12 pin 4 angle -> AS5600 OUT'),
+          ('blue', False, 'RJ12 pin 5 EN -> DRV EEP (sleep) and AS5600 VCC'), ('white', False, 'RJ12 pin 4 angle -> AS5600 OUT'),
           ('black', False, 'RJ12 pin 3 GND -> AS5600 GND'), ('motor', True, 'DRV OUT1 / OUT2 -> N20 tabs')]
 for k, (c, thick, t) in enumerate(legend):
     y, lx = 360 + k * 24, 1010
@@ -141,7 +141,7 @@ for k, (c, thick, t) in enumerate(legend):
         o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#555" stroke-width="%d"/>' % (lx, y, lx + 34, y, 7 if thick else 5))
     o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="%d"/>' % (lx, y, lx + 34, y, COL[c], 5 if thick else 3))
     o.append('<text x="%d" y="%d" font-size="12" fill="#222">%s (%s)</text>' % (lx + 42, y + 4, t, '22 AWG' if thick else '30 AWG'))
-o.append('<text x="24" y="860" font-size="13" fill="#222">Grey pads stay empty: IN3, IN4, EEP, OUT3, OUT4 on the driver; SCL, SDA on the sensor. '
+o.append('<text x="24" y="860" font-size="13" fill="#222">Grey pads stay empty: IN3, IN4, ULT (= FAULT), OUT3, OUT4 on the driver; SCL, SDA on the sensor. '
          'Two wires each on RJ12 pins 3 and 5.</text>')
 o.append('</svg>')
 open(OUT, 'w').write('\n'.join(o))

@@ -20,7 +20,7 @@ Nothing plugged in: no cord, no battery. Meter in **beep (continuity) mode** unl
 | [ ] | RJ12 **3** | AS5600 **GND** | black |
 | [ ] | RJ12 **2** | DRV8833 **IN1** | green |
 | [ ] | RJ12 **6** | DRV8833 **IN2** | yellow |
-| [ ] | RJ12 **5** | DRV8833 **ULT** | blue |
+| [ ] | RJ12 **5** | DRV8833 **EEP** (sleep; NOT ULT) | blue |
 | [ ] | RJ12 **5** | AS5600 **VCC** | blue |
 | [ ] | RJ12 **4** | AS5600 **OUT** | white |
 | [ ] | AS5600 **GPO** | AS5600 **VCC** (so also RJ12 5) | link on the back |
@@ -39,7 +39,8 @@ Each pair once. Any continuous beep here is a wiring fault: find it before going
 | **5** EN | | | | | [ ] |
 
 Also, no beep from:
-- [ ] DRV8833 **ULT** to **VCC** (should read megohms on the Ω range).
+- [ ] DRV8833 **EEP** to **VCC** (should read megohms on the Ω range).
+- [ ] Nothing on DRV8833 **ULT** (that's FAULT, an output).
 - [ ] DRV8833 **OUT1** to **GND**, **OUT2** to **GND**.
 
 ## 4. A few resistance readings (Ω range)

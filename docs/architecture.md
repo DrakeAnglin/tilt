@@ -87,7 +87,7 @@ complete unit (motor + driver + sensor + plug). 8 drivers from the 10-pack.
 | 2 | IN1 (PWM) | DRV8833 IN1 |
 | 3 | GND | DRV8833 GND, AS5600 GND |
 | 4 | ANGLE | AS5600 OUT (GPO tied to VCC) |
-| 5 | EN (3.3 V from an ESP GPIO) | AS5600 VCC **and** DRV8833 ULT (sleep): one line wakes both |
+| 5 | EN (3.3 V from an ESP GPIO) | AS5600 VCC **and** DRV8833 EEP (sleep; the board's ULT is FAULT): one line wakes both |
 | 6 | IN2 (PWM) | DRV8833 IN2 |
 
 Motor wires: DRV8833 OUT1 / OUT2 → N20 tabs, inside the sensor module. Each tilter uses one channel of its DRV8833; the other

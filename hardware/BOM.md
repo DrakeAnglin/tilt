@@ -68,7 +68,7 @@ magnet), 1 DRV8833 + 10 µF, 1 RJ12 breakout, 1 dowel pin, 3 × M3 × 25 + 3 ins
 
 ## Before soldering (check on arrival)
 - **AS5600:** run at 3.3 V; tie GPO to VCC for the analog output (some boards also need R4 removed).
-- **DRV8833:** the sleep jumper (J1, between "en" and "sleep"; J2 on some batches) must be open so EN controls ULT: cut it if bridged; ULT to VCC should read megohms; confirm the pin order on the silkscreen.
+- **DRV8833:** the sleep jumper (J1, between "en" and "sleep"; J2 on some batches) must be open so EN controls EEP (= SLEEP; ULT is FAULT): cut it if bridged; EEP to VCC should read megohms; confirm the pin order on the silkscreen.
 - **ESP32-C6 SuperMini:** confirm the pin order against the board; desolder the RGB LED (GPIO8) and the power LED
   before battery tests; flash it on the bench before it goes in the box (the box's USB-C is charge-only).
 - **Charger (Comimark MCP73871):** solder pads only (PWR, BATT, LOAD, THERM); replace its fixed THERM resistor with the NTC.

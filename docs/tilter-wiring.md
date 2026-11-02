@@ -21,18 +21,15 @@ controller, so a cord can be checked end to end by colour.
 | Heat-shrink (small) | a few |
 
 ## 1. Prepare the boards (before any wiring)
-**DRV8833: check the sleep jumper.** The driver's sleep pin (ULT) must be free for the EN wire to control. The jumper
-is a tiny pair of pads at the top edge marked **J1** between the words **"en"** and **"sleep"** (some batches print
-it **J2**: same jumper).
-1. Look at J1: **open** (two separate pads) on the owner's boards, which is what we want: nothing to cut. If yours is
-   **bridged** (copper or a solder blob joining the pads), scrape the bridge through with a hobby knife or wick the
-   solder off.
-2. Meter on **resistance (Ω)** between **ULT** and **VCC**:
-   - **megohms (MΩ) or open:** good, ULT is free.
-   - **near 0 Ω / beeps:** the jumper is still closed: cut it.
-   - **a few kΩ (e.g. 4.7 kΩ):** the board has a pull-up resistor on ULT. It keeps the driver awake whenever EN isn't
-     pulled low and feeds battery voltage into the EN line (which powers the AS5600 and goes to an ESP pin). Remove
-     that resistor before wiring (ask first if you're not sure which one it is).
+**DRV8833: the sleep pin is EEP, not ULT.** The board's labels are cut-off words: **EEP = (SL)EEP**, the input that
+wakes the driver; **ULT = (FA)ULT**, an error *output* that must stay unconnected. EN goes to **EEP**.
+
+**Check the sleep jumper.** EEP must be free for the EN wire to control. The jumper is a tiny pair of pads at the top
+edge marked **J1** between the words **"en"** and **"sleep"** (some batches print it **J2**).
+1. Look at J1: **open** (two separate pads) on the owner's boards, which is what we want. If yours is **bridged**,
+   scrape the bridge through or wick the solder off.
+2. Meter on **resistance (Ω)** between **EEP** and **VCC**: **megohms or open** is good. Near 0 = the jumper is still
+   closed; a few kΩ = a pull-up resistor on EEP: remove it before wiring.
 
 **AS5600: two links and two checks.** On this board the header pins are on opposite sides: **VCC, OUT, GND** on the
 left (VCC = square pad), **DIR, SCL, SDA, GPO** on the right (DIR = square pad). So the links are short pieces of
@@ -63,7 +60,7 @@ the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch
 | 2 | RJ12 **pin 3** (GND) | DRV8833 **GND** | **black**, 22 AWG |
 | 3 | RJ12 **pin 2** (IN1) | DRV8833 **IN1** | **green**, 30 AWG |
 | 4 | RJ12 **pin 6** (IN2) | DRV8833 **IN2** | **yellow**, 30 AWG |
-| 5 | RJ12 **pin 5** (EN) | DRV8833 **ULT** | **blue**, 30 AWG |
+| 5 | RJ12 **pin 5** (EN) | DRV8833 **EEP** (sleep) | **blue**, 30 AWG |
 | 6 | RJ12 **pin 5** (EN) | AS5600 **VCC** | **blue**, 30 AWG (second wire on the same pad) |
 | 7 | RJ12 **pin 4** (angle) | AS5600 **OUT** | **white**, 30 AWG |
 | 8 | RJ12 **pin 3** (GND) | AS5600 **GND** | **black**, 30 AWG (second wire on the same pad) |
@@ -71,7 +68,7 @@ the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch
 | 10 | DRV8833 **OUT1** and **OUT2** | N20 motor tabs | white 22 AWG pair, ~8 cm. **Leave the motor ends loose** until final assembly |
 
 Why two wires from pins 3 and 5: GND is split so the motor's current returns on its own wire, not through the
-sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Leave **IN3, IN4, OUT3, OUT4, EEP** on
+sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Leave **IN3, IN4, OUT3, OUT4, ULT** on
 the driver and **SCL, SDA** on the sensor empty.
 
 ## 3. Check before plugging in
@@ -81,7 +78,7 @@ Meter in beep mode, nothing connected:
 - Pin 5 (EN) to pin 3 (GND): no beep. Pin 4 (angle) to pin 3: no beep.
 - Each RJ12 pin to its board pin per the table: beep. Pin 1 to pin 6 and pin 2 to pin 5: **no** beep (catches a
   lead on the wrong pad).
-- DRV8833 ULT to VCC: megohms or open (no jumper, no pull-up).
+- DRV8833 EEP to VCC: megohms or open (no jumper, no pull-up). Nothing on ULT.
 
 ## 4. Final assembly
 At final assembly, solder the white pair's free ends to the N20's two tabs (either way round; swap them later if the
