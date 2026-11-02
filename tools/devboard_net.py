@@ -8,14 +8,22 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+WHICH = sys.argv[1] if len(sys.argv) > 1 else 'hot'
 sys.argv = [sys.argv[0]]                         # the imported modules read their own flags
 sys.path.insert(0, HERE)
 import devboard_guide as G                      # noqa: E402  (drawing helpers, layout, wires)
 import devboard_check as C                      # noqa: E402  (net union-find)
 
 M, HN, H = G.M, G.HN, G.H
-NETS = [('VBAT', '#d62728', 'battery + rail (charger LOAD+ output: feeds the ports, D3 -> ESP, battery divider)'),
-        ('BATT+', '#ff7f0e', 'cell + (battery pin -> charger BATT+ input only)')]
+VIEWS = {
+    'hot': ('battery + connections only', [
+        ('VBAT', '#d62728', 'battery + rail (charger LOAD+ output: feeds the ports, D3 -> ESP, battery divider)'),
+        ('BATT+', '#ff7f0e', 'cell + (battery pin -> charger BATT+ input only)')]),
+    'angle1': ('port 1 angle line only', [
+        ('ANG1', '#888888', 'RJ12 pin 4 lead -> 1 kOhm resistor (lead side)'),
+        ('ADC0', '#1f77b4', '1 kOhm resistor (ESP side) -> ESP GPIO0, + the 100 nF filter cap')]),
+}
+TITLE, NETS = VIEWS[WHICH]
 find = C.netlist()
 expect = M.EXPECT
 root = {name: find(expect[name][0]) for name, _, _ in NETS}
@@ -30,8 +38,8 @@ def net_of(h):
 
 
 def run():
-    o = G.board('Dev board: battery + connections only (underside)',
-                'Bottom view (column a at the top). Only the two "hot" nets are drawn; everything else is left out.', True)
+    o = G.board('Dev board: %s (underside)' % TITLE,
+                'Bottom view (column a at the top). Only these nets are drawn; everything else is left out.', True)
     col = {n: c for n, c, _ in NETS}
     # copper: rails, bridges, wires on these nets
     for f, t, note in M.WIRES:
@@ -45,6 +53,20 @@ def run():
         else:
             o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="%d" stroke-linecap="round"/>' % (
                 x0, y0, x1, y1, col[n], 7 if 'rail' in note.split(':')[0] else 5))
+    # a part joining two of the drawn nets (e.g. the 1 k between the lead and the ESP): its body, on the top side
+    for p in M.layout():
+        if len(p.pins) == 2:
+            (i0, m0, _), (i1, m1, _) = p.pins
+            h0, h1 = HN(i0, m0), HN(i1, m1)
+            n0, n1 = net_of(h0), net_of(h1)
+            if n0 and n1 and n0 != n1:
+                (x0, y0), (x1, y1) = G.pos(h0, True), G.pos(h1, True)
+                xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+                o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="#8a6a2a" stroke-width="2" stroke-dasharray="4,3"/>' % (x0, y0, x1, y1))
+                o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="16" rx="7" fill="#e8c88a" stroke="#8a6a2a" opacity="0.9"/>' % (
+                    xm - abs(x1 - x0) * 0.32, ym - 8, abs(x1 - x0) * 0.64))
+                o.append('<text x="%.0f" y="%.0f" font-size="10" font-weight="bold" text-anchor="middle">%s (on top)</text>' % (
+                    xm, ym + 4, p.name.split()[-1]))
     # what plugs / solders onto these nets: numbered dots, key underneath
     seen, key = set(), []
     pins = []
@@ -86,7 +108,7 @@ def run():
     hgt = int(y + 50)
     o[0] = o[0].replace('height="%d"' % G.HGT, 'height="%d"' % hgt)
     o.append('</svg>')
-    out = os.path.join(G.OUT, 'devboard-hot.svg')
+    out = os.path.join(G.OUT, 'devboard-%s.svg' % WHICH)
     open(out, 'w').write('\n'.join(o))
     head = open(out).read(300)
     w, h = head.split('width="')[1].split('"')[0], head.split('height="')[1].split('"')[0]
