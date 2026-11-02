@@ -78,7 +78,7 @@ ESP's pins (the SuperMini's pin names are printed next to each pin).
 - [ ] ESP **GPIO 6** to GND: no beep (only the 100 nF there: a chirp at most).
 
 ### D. Must NOT beep
-- [ ] Every pair of the six RJ12 pins, as in the tilter table (pin 4 to pin 5 and 5 to 3 read their resistors, not 0).
+- [ ] Every pair of the six RJ12 pins, as in the tilter table (5 to 3 reads the 100 kΩ pull-down, not 0).
 - [ ] ESP **5V** to **GND**, **3V3** to **GND**, **5V** to **3V3**.
 - [ ] Battery **+** to any ESP pin.
 - [ ] Neighbouring ESP pins on each side (catches a jumper in the wrong row).
