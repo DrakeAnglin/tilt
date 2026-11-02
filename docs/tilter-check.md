@@ -73,9 +73,9 @@ ESP's pins (the SuperMini's pin names are printed next to each pin).
 | [ ] | battery lead **+** (red) | RJ12 **1** |
 
 ### C. Resistances (Ω range)
-- [ ] RJ12 **4** (angle) to ESP **GPIO 6**: **≈ 1 kΩ** (the filter resistor).
+- [ ] RJ12 **4** (angle) to ESP **GPIO 0**: **≈ 1 kΩ** (the filter resistor).
 - [ ] RJ12 **5** (EN) to RJ12 **3** (GND): **≈ 100 kΩ** (the pull-down).
-- [ ] ESP **GPIO 6** to GND: no beep (only the 100 nF there: a chirp at most).
+- [ ] ESP **GPIO 0** to GND: no beep (only the 100 nF there: a chirp at most).
 
 ### D. Must NOT beep
 - [ ] Every pair of the six RJ12 pins, as in the tilter table (5 to 3 reads the 100 kΩ pull-down, not 0).

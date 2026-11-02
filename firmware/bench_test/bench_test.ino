@@ -3,7 +3,7 @@
 //                           0..9 = duty 0..100 %     a = print angle continuously on/off
 #include <Arduino.h>
 
-const int PIN_IN1 = 19, PIN_IN2 = 20, PIN_EN = 1, PIN_ANGLE = 6;   // bench rig as wired (angle pin still to confirm)
+const int PIN_IN1 = 19, PIN_IN2 = 20, PIN_EN = 1, PIN_ANGLE = 0;   // bench rig (fixed; see docs/bench-test.md)
 const int PWM_HZ = 20000, PWM_BITS = 8;
 
 int duty = 255;            // 0..255
