@@ -3,7 +3,7 @@
 //                           0..9 = duty 0..100 %     a = print angle continuously on/off
 #include <Arduino.h>
 
-const int PIN_IN1 = 14, PIN_IN2 = 18, PIN_EN = 7, PIN_ANGLE = 6;   // port 1 on the controller PCB v2
+const int PIN_IN1 = 19, PIN_IN2 = 18, PIN_EN = 7, PIN_ANGLE = 6;   // bench rig as wired (PCB v2 port 1 uses IN1 = 14)
 const int PWM_HZ = 20000, PWM_BITS = 8;
 
 int duty = 255;            // 0..255

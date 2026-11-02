@@ -65,7 +65,7 @@ ESP's pins (the SuperMini's pin names are printed next to each pin).
 ### B. Must beep
 | ✓ | From | To |
 |---|---|---|
-| [ ] | ESP **GPIO 14** | RJ12 **2** (IN1) |
+| [ ] | ESP **GPIO 19** | RJ12 **2** (IN1) |
 | [ ] | ESP **GPIO 18** | RJ12 **6** (IN2) |
 | [ ] | ESP **GPIO 7** | RJ12 **5** (EN) |
 | [ ] | ESP **GND** | RJ12 **3** |
