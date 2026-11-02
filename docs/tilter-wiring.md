@@ -21,13 +21,18 @@ controller, so a cord can be checked end to end by colour.
 | Heat-shrink (small) | a few |
 
 ## 1. Prepare the boards (before any wiring)
-**DRV8833: cut the sleep jumper.** As it comes, the board ties its sleep pin (ULT) permanently to VCC, so the driver
-never sleeps and EN can't control it. The jumper is a tiny pair of pads at the top edge marked **J1** between the
-words **"en"** and **"sleep"** (some batches print it **J2**: same jumper).
-1. Meter in beep mode on **ULT** and **VCC**: it beeps (the jumper is closed).
-2. Scrape through the thin copper bridge between J1's two pads with a hobby knife, a few strokes across the gap (if
-   it's a solder blob instead, wick it off).
-3. **ULT to VCC must not beep now.** If it still does, the cut isn't through.
+**DRV8833: check the sleep jumper.** The driver's sleep pin (ULT) must be free for the EN wire to control. The jumper
+is a tiny pair of pads at the top edge marked **J1** between the words **"en"** and **"sleep"** (some batches print
+it **J2**: same jumper).
+1. Look at J1: **open** (two separate pads) on the owner's boards, which is what we want: nothing to cut. If yours is
+   **bridged** (copper or a solder blob joining the pads), scrape the bridge through with a hobby knife or wick the
+   solder off.
+2. Meter on **resistance (Ω)** between **ULT** and **VCC**:
+   - **megohms (MΩ) or open:** good, ULT is free.
+   - **near 0 Ω / beeps:** the jumper is still closed: cut it.
+   - **a few kΩ (e.g. 4.7 kΩ):** the board has a pull-up resistor on ULT. It keeps the driver awake whenever EN isn't
+     pulled low and feeds battery voltage into the EN line (which powers the AS5600 and goes to an ESP pin). Remove
+     that resistor before wiring (ask first if you're not sure which one it is).
 
 **AS5600: three checks and two links.**
 1. **Link GPO to VCC** with a short bare wire across the two pins on the board (analog output mode, as the controller
@@ -73,7 +78,7 @@ Meter in beep mode, nothing connected:
 - Pin 5 (EN) to pin 3 (GND): no beep. Pin 4 (angle) to pin 3: no beep.
 - Each RJ12 pin to its board pin per the table: beep. Pin 1 to pin 6 and pin 2 to pin 5: **no** beep (catches a
   lead on the wrong pad).
-- DRV8833 ULT to VCC: no beep (J1 sleep jumper really cut).
+- DRV8833 ULT to VCC: megohms or open (no jumper, no pull-up).
 
 ## 4. Final assembly
 At final assembly, solder the white pair's free ends to the N20's two tabs (either way round; swap them later if the

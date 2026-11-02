@@ -55,7 +55,7 @@ o.append('<rect x="252" y="154" width="12" height="12" fill="none" stroke="#000"
 o.append('<text x="150" y="420" font-size="11" fill="#fff">pin 1 = square pad</text>')
 
 # DRV8833 (middle top)
-board(560, 90, 260, 300, '#7b2d8e', 'DRV8833 motor driver', 'cut the J1 en/sleep jumper first')
+board(560, 90, 260, 300, '#7b2d8e', 'DRV8833 motor driver', 'J1 en/sleep jumper must be open')
 drv = {'VCC': pin(572, 140, 'VCC', 'l'), 'GND': pin(572, 186, 'GND', 'l'), 'IN1': pin(572, 232, 'IN1', 'l'),
        'IN2': pin(572, 278, 'IN2', 'l'), 'ULT': pin(572, 324, 'ULT', 'l'),
        'OUT1': pin(808, 186, 'OUT1'), 'OUT2': pin(808, 232, 'OUT2')}

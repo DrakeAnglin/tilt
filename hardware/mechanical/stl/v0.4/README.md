@@ -55,7 +55,7 @@ headrail can pass PLA's ~55 °C). Print the worm and worm wheel in different pla
    - RJ12 breakout (leads soldered first): room side, above the motor's place; slide it along its two grooved rails
      until the jack is flush in the end wall and the latch clicks behind its back edge (release: push the latch toward
      the side wall with a small screwdriver);
-   - DRV8833 (J1 en/sleep jumper cut, leads soldered): against the back wall, edges in its rails, components facing in; slide to the stop;
+   - DRV8833 (J1 en/sleep jumper open, leads soldered): against the back wall, edges in its rails, components facing in; slide to the stop;
    - AS5600 board into its seat, chip facing out, onto its pin (**file ~1 mm off the board edge nearest the rod**,
      header edge away from the rod). It also closes the DRV8833's rails;
    - wire it all ([RJ12 pinout](../../../../docs/architecture.md#connectors-everything-modular)); leave two leads from
