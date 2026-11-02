@@ -10,7 +10,7 @@ import math
 
 import pcbnew
 
-PITCH = 0.25          # mm
+PITCH = 0.125         # mm
 CLEAR = 0.2           # copper-to-copper clearance, mm
 EDGE = 0.5            # copper-to-board-edge, mm
 VIA_D, VIA_DRILL = 0.7, 0.35
@@ -113,11 +113,25 @@ class Grid:
         return True
 
 
+HOLE_GAP = 0.3       # drill edge to drill edge, mm (PCBWay asks for >= 0.25)
+
+
+def via_hole_ok(grid, x, y):
+    """A via's drill must keep HOLE_GAP from every other drill, whatever its net."""
+    for hx, hy, hr in grid.holes:
+        if (x - hx) ** 2 + (y - hy) ** 2 < (hr + VIA_DRILL / 2 + HOLE_GAP) ** 2:
+            return False
+    return True
+
+
 def paint_board(board, grid, netcode):
     """Paint every pad and hole already on the board."""
+    grid.holes = []
     for fp in board.GetFootprints():
         for pad in fp.Pads():
             x, y = TO(pad.GetPosition().x), TO(pad.GetPosition().y)
+            if pad.GetDrillSize().x > 0:
+                grid.holes.append((x, y, TO(pad.GetDrillSize().x) / 2))
             net = netcode.get(pad.GetNetname(), BLOCK) if pad.GetNetname() else BLOCK
             if pad.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH:           # bare holes: keep everything clear
                 r = TO(pad.GetDrillSize().x) / 2 + CLEAR
@@ -153,15 +167,20 @@ def pad_cells(grid, pad):
 DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 
 
-GRID_MARGIN = 0.3            # painted copper can reach this far past a cell centre: keep that much extra room
+GRID_MARGIN = 0.15           # painted copper can reach this far past a cell centre: keep that much extra room
 
 
 def astar(grid, net, starts, goals, half_w, layers_allowed=(0, 1)):
     """From any start cell (both layers) to any goal cell (layer, ix, iy): the part of the net already connected."""
     r = half_w + CLEAR + GRID_MARGIN
-    rv = VIA_D / 2 + CLEAR + GRID_MARGIN
-    start_set = set(starts)
+    rv = max(VIA_D / 2 + CLEAR + GRID_MARGIN, r)     # a via is also where a (possibly wide) track starts
     nx = grid.nx
+    # a track may only start / end where its full width clears other nets (a wide track ending on a pad's rim could
+    # otherwise reach a neighbour); keep at least the pad centre
+    ok_starts = [c for c in starts if all(grid.free_for(l, c[0], c[1], net, r) for l in layers_allowed)]
+    starts = ok_starts or starts[:1]
+    start_set = set(starts)
+    goals = {g for g in goals if grid.free_for(g[0], g[1], g[2], net, r)} or goals
     if not goals:
         return None
     gpts = [(gx, gy) for _, gx, gy in goals]
@@ -208,7 +227,8 @@ def astar(grid, net, starts, goals, half_w, layers_allowed=(0, 1)):
         if ol in layers_allowed:
             vkey = ('v', ix, iy)
             if vkey not in ok_cache:
-                ok_cache[vkey] = grid.free_for(0, ix, iy, net, rv) and grid.free_for(1, ix, iy, net, rv)
+                ok_cache[vkey] = (grid.free_for(0, ix, iy, net, rv) and grid.free_for(1, ix, iy, net, rv)
+                                  and via_hole_ok(grid, *grid.xy(ix, iy)))
             if ok_cache[vkey]:
                 ns = (ol, ix, iy, -1)
                 ng = g + VIA_COST
@@ -217,6 +237,31 @@ def astar(grid, net, starts, goals, half_w, layers_allowed=(0, 1)):
                     came[ns] = st
                     heapq.heappush(openq, (ng + h(ix, iy), ng, ns))
     return None
+
+
+def split_at(board, netinfo, layer, pt):
+    """If pt lies inside a track of this net on this layer (not at an end), split that track there."""
+    p = pcbnew.VECTOR2I(MM(pt[0]), MM(pt[1]))
+    for t in list(board.GetTracks()):
+        if t.GetClass() != 'PCB_TRACK' or t.GetNetCode() != netinfo.GetNetCode() or t.GetLayer() != layer:
+            continue
+        a, b = t.GetStart(), t.GetEnd()
+        if a == p or b == p:
+            return
+        # point on the segment (collinear and between the ends, to within 1 um)
+        cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
+        seg = ((b.x - a.x) ** 2 + (b.y - a.y) ** 2) ** 0.5
+        if seg and abs(cross) / seg < 1000 and min(a.x, b.x) - 1000 <= p.x <= max(a.x, b.x) + 1000 \
+                and min(a.y, b.y) - 1000 <= p.y <= max(a.y, b.y) + 1000:
+            t2 = pcbnew.PCB_TRACK(board)
+            t2.SetStart(p)
+            t2.SetEnd(b)
+            t2.SetWidth(t.GetWidth())
+            t2.SetLayer(layer)
+            t2.SetNet(netinfo)
+            board.Add(t2)
+            t.SetEnd(p)
+            return
 
 
 def emit(board, grid, net, netinfo, path, half_w):
@@ -241,6 +286,7 @@ def emit(board, grid, net, netinfo, path, half_w):
             v.SetDrill(MM(VIA_DRILL))
             v.SetNet(netinfo)
             board.Add(v)
+            grid.holes.append((run[1][0], run[1][1], VIA_DRILL / 2))
             for layer in (0, 1):
                 grid.paint_disc(layer, run[1][0], run[1][1], VIA_D / 2, net)
             n_vias += 1
@@ -255,6 +301,8 @@ def emit(board, grid, net, netinfo, path, half_w):
             if abs((x1 - x0) * (y2 - y1) - (y1 - y0) * (x2 - x1)) > 1e-9:
                 corners.append(run[k][1])
         corners.append(run[-1][1])
+        for end in (corners[0], corners[-1]):
+            split_at(board, netinfo, layer_id[l], end)
         for a, b in zip(corners, corners[1:]):
             t = pcbnew.PCB_TRACK(board)
             t.SetStart(pcbnew.VECTOR2I(MM(a[0]), MM(a[1])))
@@ -268,8 +316,9 @@ def emit(board, grid, net, netinfo, path, half_w):
     return n_tracks, n_vias
 
 
-def route(board, outline_pts, widths, order, default_w=0.3):
-    """Route every net in 'order' (net names). widths: {net: track width mm}. Returns (ok, failures)."""
+def route(board, outline_pts, widths, order, default_w=0.3, first=None):
+    """Route every net in 'order' (net names). widths: {net: track width mm}. first: {net: ([(ref, pad), ...], width)}
+    pads joined first, in that order, as one tree of that width (e.g. the motor-return GND). Returns (failures, stats, grid)."""
     grid = Grid(outline_pts)
     nets = board.GetNetsByName()
     netcode = {name: k + 1 for k, name in enumerate(order)}
@@ -288,10 +337,29 @@ def route(board, outline_pts, widths, order, default_w=0.3):
         half_w = widths.get(name, default_w) / 2
         # grow a tree: start from the first pad, then add the nearest unconnected pad each time; the goal is always the
         # connected tree (its pads and the path cells), so the net never splits into islands
+        pre, pre_w = (first or {}).get(name, ([], None))
+        key = {(p.GetParentFootprint().GetReference(), p.GetNumber()): p for p in pads}
+        pre_pads = [key[k] for k in pre if k in key]
+        if pre_pads:
+            pads = pre_pads + [p for p in pads if p not in pre_pads]
         tree = {(l, ix, iy) for ix, iy in pad_cells(grid, pads[0]) for l in (0, 1)}
         done = [pads[0]]
         todo = pads[1:]
         while todo:
+            if pre_pads and todo[0] in pre_pads:                # the pre-ordered group, in its own order and width
+                pad = todo.pop(0)
+                cells = pad_cells(grid, pad)
+                path = astar(grid, net, cells, tree, pre_w / 2)
+                if path is None:
+                    failures.append('%s: %s-%s' % (name, pad.GetParentFootprint().GetReference(), pad.GetNumber()))
+                else:
+                    t, v = emit(board, grid, net, nets[name], path, pre_w / 2)
+                    stats[0] += t
+                    stats[1] += v
+                    tree |= set(path)
+                    tree |= {(l, ix, iy) for ix, iy in cells for l in (0, 1)}
+                done.append(pad)
+                continue
             def dist(p):
                 return min((p.GetPosition() - q.GetPosition()).EuclideanNorm() for q in done)
             todo.sort(key=dist)
@@ -307,4 +375,41 @@ def route(board, outline_pts, widths, order, default_w=0.3):
                 tree |= set(path)
                 tree |= {(l, ix, iy) for ix, iy in cells for l in (0, 1)}
             done.append(pad)
-    return failures, stats
+    return failures, stats, grid
+
+
+def stitch(board, grid, name, step):
+    """GND stitching vias on a 'step' mm grid wherever both layers are free, so the two GND pours act as one."""
+    net = grid_net = None
+    nets = board.GetNetsByName()
+    # the GND code is whatever paint_board / route gave it: read it back from a GND pad
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            if pad.GetNetname() == name:
+                ix, iy = grid.cell(TO(pad.GetPosition().x), TO(pad.GetPosition().y))
+                grid_net = grid.own[0][iy * grid.nx + ix]
+                break
+        if grid_net:
+            break
+    rv = VIA_D / 2 + CLEAR + GRID_MARGIN + 0.1
+    n = 0
+    y = grid.y0 + step / 2
+    while y < grid.y0 + grid.ny * PITCH:
+        x = grid.x0 + step / 2
+        while x < grid.x0 + grid.nx * PITCH:
+            ix, iy = grid.cell(x, y)
+            if 0 <= ix < grid.nx and 0 <= iy < grid.ny and grid.free_for(0, ix, iy, -999, rv) and grid.free_for(1, ix, iy, -999, rv) \
+                    and via_hole_ok(grid, x, y):
+                grid.holes.append((x, y, VIA_DRILL / 2))
+                v = pcbnew.PCB_VIA(board)
+                v.SetPosition(pcbnew.VECTOR2I(MM(x), MM(y)))
+                v.SetWidth(MM(VIA_D))
+                v.SetDrill(MM(VIA_DRILL))
+                v.SetNet(nets[name])
+                board.Add(v)
+                for layer in (0, 1):
+                    grid.paint_disc(layer, x, y, VIA_D / 2, grid_net)
+                n += 1
+            x += step
+        y += step
+    return n

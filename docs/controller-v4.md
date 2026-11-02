@@ -39,13 +39,13 @@ Pin plan of the **controller PCB** ([hardware/pcb](../hardware/pcb/README.md)); 
 
 | ESP32-C6 GPIO | Use |
 |---|---|
-| TX16 / RX17 | Port 1 IN1 / IN2 (logs go over the native USB) |
-| 20 / 19 | Port 2 IN1 / IN2 |
-| 18 / 14 | Port 3 IN1 / IN2 |
-| 1 / 5 / 7 | Port 1 / 2 / 3 EN (AS5600 power + DRV8833 sleep) |
-| 0 / 2 / 4 | Port 1 / 2 / 3 angle (ADC, 1 k + 100 n) |
+| 14 / 18 | Port 1 IN1 / IN2 (220 Ω series) |
+| 19 / 20 | Port 2 IN1 / IN2 (220 Ω series) |
+| TX16 / RX17 | Port 3 IN1 / IN2 (220 Ω series; logs go over the native USB) |
+| 7 / 5 / 1 | Port 1 / 2 / 3 EN (AS5600 power + DRV8833 sleep; 10 Ω series, 100 kΩ pull-down) |
+| 6 / 4 / 2 | Port 1 / 2 / 3 angle (ADC, 1 k + 100 n) |
 | 3 | Battery voltage (1 M / 1 M + 100 n) |
-| 6 | Input-power sense: USB / solar voltage (1 M / 1 M, ADC); the charger board has no STAT pad |
+| 0 | Input-power sense: USB / solar voltage (1 M / 1 M + 100 n, ADC); the charger board has no STAT pad |
 | 8, 9, 15 | spare (strapping pins) |
 
 The ESP's own USB-C faces the charger with no room for a cable inside the box: flash it on the bench before fitting

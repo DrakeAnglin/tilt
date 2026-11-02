@@ -9,6 +9,9 @@ ESP32-C6 (SuperMini), Arduino-ESP32 3.x or ESP-IDF with esp-matter. **Not starte
 - **Angle:** AS5600 analog OUT on an ADC pin (1 kΩ + 100 nF filter), read only while EN is high. Absolute, so no
   homing; a wand move while asleep is read correctly at the next wake.
 - **Move:** soft start/stop, stop at the target angle, **stall stop** when the angle stops changing (≤ 250 ms).
+- **Angle while moving reads high:** motor current returns on the same RJ12 GND wire the angle is measured against,
+  shifting it by up to ~0.2 V (~20°) at 0.5 A. Use moving readings only for "still turning", and take the final
+  position with the motor stopped (brake, wait ~20 ms, then sample).
 
 ## Planned modules
 `motor` (PWM, EN, motion profile, stall detection), `angle` (ADC averaging, calibration to the slat range),
