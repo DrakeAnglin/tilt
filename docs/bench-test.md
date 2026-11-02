@@ -27,14 +27,14 @@ breakout's 6 pins plug into the breadboard too.
 | header pin, **black** side | jumper to the GND rail | grounds must be shared |
 | RJ12 breakout **pin 3** | GND rail | |
 | ESP **GPIO 18** | RJ12 breakout **pin 2** (IN1) | |
-| ESP **GPIO 20** | RJ12 breakout **pin 6** (IN2) | |
+| ESP **GPIO 19** | RJ12 breakout **pin 6** (IN2) | |
 | ESP **GPIO 1** | RJ12 breakout **pin 5** (EN) | wakes the driver and powers the sensor |
 | 100 kΩ | RJ12 pin 5 ↔ GND | keeps EN low while the ESP boots |
 | RJ12 breakout **pin 4** (angle) | 1 kΩ → ESP **GPIO 0** | |
 | 100 nF | ESP GPIO 0 ↔ GND | angle filter |
 
 Then plug the cord into the breadboard's RJ12 breakout and into the tilter's jack. Bench pins (as the sketch uses
-them): IN1 = 18, IN2 = 20, EN = 1, angle = 0.
+them): IN1 = 18, IN2 = 19, EN = 1, angle = 0.
 
 Before the battery goes on: meter beep mode, breadboard RJ12 **pin 1 to pin 3 (GND): no beep**; with the cord
 plugged in, still no beep (checks the tilter side too).
