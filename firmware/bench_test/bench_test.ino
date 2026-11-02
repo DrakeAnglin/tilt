@@ -10,7 +10,7 @@
 #include <ArduinoOTA.h>
 #include "secrets.h"
 
-const int PIN_IN1 = 19, PIN_IN2 = 20, PIN_EN = 1, PIN_ANGLE = 0;   // bench rig (fixed; see docs/bench-test.md)
+const int PIN_IN1 = 18, PIN_IN2 = 20, PIN_EN = 1, PIN_ANGLE = 0;   // bench rig as wired (see docs/bench-test.md)
 const int PWM_HZ = 20000, PWM_BITS = 8;
 const char *HOSTNAME = "blinds-bench";
 
