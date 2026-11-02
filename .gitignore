@@ -20,3 +20,4 @@ hardware/pcb/controller/*.svg
 
 # Wi-Fi / update passwords
 firmware/**/secrets.h
+firmware/bin/

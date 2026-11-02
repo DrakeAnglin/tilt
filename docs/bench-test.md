@@ -65,6 +65,8 @@ Battery and charger **unplugged**; only the ESP's own USB-C to the computer.
 - **Commands over Wi-Fi:** in Terminal, `nc blinds-bench.local 23`, then type the same letters and press Enter.
   (Ctrl-C to leave.)
 - The ESP runs from the battery through the charger and D3, so it stays on with USB unplugged.
+- **From Terminal instead of the IDE** (arduino-cli is in `firmware/bin/`, not committed):
+  `cd firmware && bin/arduino-cli compile --upload --fqbn esp32:esp32:esp32c6:CDCOnBoot=cdc -p blinds-bench.local --upload-field password=<your update password> bench_test`
 
 Commands (type one letter, Enter): `e` EN on, `x` EN off (and stop), `f` forward, `r` reverse, `s` stop,
 `1`–`9` speed (10–100 %), `0` speed 0, `a` angle readout on/off. **The motor only runs after `e`.**
