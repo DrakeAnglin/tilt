@@ -42,18 +42,29 @@ plugged in, still no beep (checks the tilter side too).
 The ESP runs from USB here; the 18650 only feeds the tilter. **Never** also connect the 18650 to the ESP's 5V pin while USB
 is plugged in (no diode on the board's 5V pin).
 
-## Flash the ESP (once)
+## Flash the ESP (once by USB, then over Wi-Fi)
 Battery and charger **unplugged**; only the ESP's own USB-C to the computer.
 1. Install the **Arduino IDE** (arduino.cc). In *Settings → Additional boards manager URLs* add
    `https://espressif.github.io/arduino-esp32/package_esp32_index.json`, then *Boards Manager* → install **esp32 by
    Espressif** (version 3.x).
-2. Open [firmware/bench_test/bench_test.ino](../firmware/bench_test/bench_test.ino). *Tools*:
+2. **Your Wi-Fi details:** in `firmware/bench_test/`, copy `secrets.h.example` to **`secrets.h`** and fill in your
+   Wi-Fi name, Wi-Fi password and an update password of your choice. `secrets.h` stays on your computer (it's in
+   `.gitignore`, never committed).
+3. Open [firmware/bench_test/bench_test.ino](../firmware/bench_test/bench_test.ino). *Tools*:
    - Board: **ESP32C6 Dev Module**
    - **USB CDC On Boot: Enabled** (without this the Serial Monitor stays blank)
+   - Partition Scheme: the default (**4MB with spiffs**: it has the two app slots Wi-Fi updates need)
    - Port: the `/dev/cu.usbmodem…` that appears when the ESP is plugged in
-3. **Upload.** If it can't connect: hold **BOOT**, tap **RST**, release BOOT, upload again; tap RST afterwards.
-4. *Tools → Serial Monitor*, **115200** baud, line ending "No line ending". Tap RST: it prints
-   `bench_test: e/x EN, f/r/s motor, 0-9 duty, a angle stream`.
+4. **Upload.** If it can't connect: hold **BOOT**, tap **RST**, release BOOT, upload again; tap RST afterwards.
+5. *Tools → Serial Monitor*, **115200** baud. Tap RST: it prints the command list and `Wi-Fi <address>, telnet
+   blinds-bench.local port 23`. If it says "Wi-Fi not connected", check `secrets.h` (it must be a 2.4 GHz network).
+
+**From now on, no cable:**
+- **Update:** in the IDE, *Tools → Port* shows **blinds-bench at 192.168.x.x** (a network port). Pick it and Upload;
+  it asks for your update password. The motor switches off while it updates.
+- **Commands over Wi-Fi:** in Terminal, `nc blinds-bench.local 23`, then type the same letters and press Enter.
+  (Ctrl-C to leave.)
+- The ESP runs from the battery through the charger and D3, so it stays on with USB unplugged.
 
 Commands (type one letter, Enter): `e` EN on, `x` EN off (and stop), `f` forward, `r` reverse, `s` stop,
 `1`–`9` speed (10–100 %), `0` speed 0, `a` angle readout on/off. **The motor only runs after `e`.**

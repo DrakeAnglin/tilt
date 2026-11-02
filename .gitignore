@@ -17,3 +17,6 @@ node_modules/
 # KiCad local state
 *.kicad_prl
 hardware/pcb/controller/*.svg
+
+# Wi-Fi / update passwords
+firmware/**/secrets.h
