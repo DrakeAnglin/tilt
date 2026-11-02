@@ -66,8 +66,8 @@ ESP's pins (the SuperMini's pin names are printed next to each pin).
 | ✓ | From | To |
 |---|---|---|
 | [ ] | ESP **GPIO 19** | RJ12 **2** (IN1) |
-| [ ] | ESP **GPIO 18** | RJ12 **6** (IN2) |
-| [ ] | ESP **GPIO 7** | RJ12 **5** (EN) |
+| [ ] | ESP **GPIO 20** | RJ12 **6** (IN2) |
+| [ ] | ESP **GPIO 1** | RJ12 **5** (EN) |
 | [ ] | ESP **GND** | RJ12 **3** |
 | [ ] | battery lead **−** (black) | RJ12 **3** |
 | [ ] | battery lead **+** (red) | RJ12 **1** |
