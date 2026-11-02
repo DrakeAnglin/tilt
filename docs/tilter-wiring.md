@@ -75,6 +75,7 @@ sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Le
 the driver and **SCL, SDA** on the sensor empty.
 
 ## 3. Check before plugging in
+Full printable checklist: [tilter-check.md](tilter-check.md). The short version:
 Meter in beep mode, nothing connected:
 - RJ12 **pin 1 to pin 3** (battery + to GND): **no beep**.
 - Pin 5 (EN) to pin 3 (GND): no beep. Pin 4 (angle) to pin 3: no beep.
