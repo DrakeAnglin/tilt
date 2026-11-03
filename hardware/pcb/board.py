@@ -130,8 +130,12 @@ LABELS = [  # (text, x, y, size, angle): connector names and orientation marks o
     ('5V', 1.4, 72.0, 0.8, 90), ('TX', 23.0, 72.0, 0.8, 90),
     ('BAT+', 42.2, 38.6, 0.8, 0),
     ('5V', 13.5, 97.1, 0.8, 0), ('3V3', 17.0, 97.1, 0.8, 0), ('PWR', 20.5, 97.1, 0.8, 0), ('GND', 24.0, 97.1, 0.8, 0),
-    ('BATTERY', 19.75, 101.2, 0.8, 0), ('CHARGER', 9.25, 109.8, 0.8, 0), ('SOLAR', 22.75, 110.4, 0.8, 0),
+    ('BATTERY (red +)', 18.75, 101.2, 0.8, 0), ('CHARGER', 9.25, 109.8, 0.8, 0), ('SOLAR', 22.75, 110.4, 0.8, 0),
     ('USB-C BOARD (socket out)', 10.85, 119.9, 0.8, 0),
+    # pin labels on the three power connectors (a reversed plug is the one mistake that destroys parts)
+    ('-', 17.5, 109.8, 1.0, 0), ('+', 20.0, 109.8, 1.0, 0),                           # J4 battery: pin 1 GND, pin 2 BATT+ (red)
+    ('G', 3.0, 118.4, 0.8, 0), ('B+', 5.5, 118.4, 0.8, 0), ('L+', 10.5, 118.4, 0.8, 0), ('P+', 15.5, 118.4, 0.8, 0),  # J5
+    ('-', 22.0, 117.3, 1.0, 0), ('+', 23.5, 117.3, 1.0, 0),                            # J8 solar: pin 1 GND, pin 2 SOL+
 ]
 
 
