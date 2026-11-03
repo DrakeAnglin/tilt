@@ -33,7 +33,7 @@ python3 hardware/pcb/schematic.py
 | No per-port overcurrent protection | 0.75 A resettable fuse (Bel Fuse 0ZRE0075FF) on each port's battery + |
 | No bulk capacitance near the jacks | 470 µF on battery + |
 | Angle shifts while a motor runs | Firmware note ([firmware/README.md](../../firmware/README.md)): final reading with the motor stopped |
-| Zener heat in sun | 5 W zener (1N5341B, 6.2 V) |
+| Zener heat in sun | 3 W zener (1N5920B, 6.2 V) on a 5 W-size footprint (the 1N5341B's 8.9 mm body is too long for the 10.16 mm pitch, and the small panel never needs 5 W) |
 | Input-power divider unfiltered | 100 nF added |
 | GND pour in islands | ~80 stitching vias; filter-cap GND pads solid to the pour |
 | Motor return through the analog ground | Dedicated 1 mm GND track: jacks → bulk cap → battery / charger GND |
@@ -71,29 +71,30 @@ Order the PCBs (5) and these together, so nothing is missing when the boards arr
 
 | Part | Exact part (or equivalent) | Per board | Buy |
 |---|---|---|---|
-| RJ12 jack | Amphenol **54601-906WPLF** | 3 | **10** |
-| Resettable fuse 0.75 A | Bel Fuse **0ZRE0075FF1E** (radial, 5.1 mm pitch) | 3 | **10** |
+| RJ12 jack | Amphenol **87180-066LF** (the 54601-906WPLF is obsolete; 87180 is Amphenol's replacement, same holes: checked against its drawing) | 3 | **10** |
+| Resettable fuse 0.75 A | Bel Fuse **0ZRE0075FF1A** (radial, 5.1 mm pitch, 11.5 × 4.8 mm) | 3 | **10** |
 | Electrolytic 470 µF | 10 V (or 16 V), 8 mm dia, **3.5 mm pitch**, e.g. Panasonic EEU-FR1A471 | 1 | **4** |
-| Zener 6.2 V 5 W | **1N5341BG** | 1 | **4** |
+| Zener 6.2 V 3 W | **1N5920BRLG** (onsemi, cut tape; 1N5920BG is the same part, boxed) | 1 | **5** |
 | JST-XH header 2-pin | **B2B-XH-A(LF)(SN)** | 1 | **5** |
 | JST-XH header 6-pin | **B6B-XH-A(LF)(SN)** | 1 | **4** |
-| JST-XH housing 6-pin + crimps | **XHP-6** + **SXH-001T-P0.6** (crimper needed) | 1 + 4 | **4 + 25** |
+| JST-XH housing 6-pin + leads | **XHP-6** + pre-crimped leads **ASXHSXH22K152** (6", crimp both ends: cut in half = 2 leads; no crimper needed) | 1 + 2 | **4 + 10** |
 | JST-ZH header 2-pin (solar) | **B2B-ZR(LF)(SN)** | 1 | **4** |
 | MCP73871 charger module | Comimark (same as before) | 1 | **1** (replaces the damaged one) |
-| Resistors 1/4 W | 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | from the kit (220 Ω: 18 needed for 3 boards; top up if the kit runs short) |
+| Resistors 1/4 W | 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | from the kit; 220 Ω ×25 bought (**CFR-25JB-52-220R**), 18 needed for 3 boards |
 | Ceramic 100 nF / 10 µF | | 5 / 1 | from the kit |
-| 1N5819, female header strips, M3 screws | | | already have |
+| Female header sockets 10-way / 6-way | Sullins **PPTC101LFBN-RC** / **PPTC061LFBN-RC** | 2 / 1 | **6 / 3** |
+| 1N5819, M3 screws | | | already have |
 
 ## Parts for one board
 | Part | Qty | Have it? |
 |---|---|---|
 | This PCB | 1 | order |
 | ESP32-C6 SuperMini (male pins on) / USB-C breakout (Cermant, male pins on) | 1 / 1 | yes |
-| Female header socket 10-way / 6-way | 2 / 1 | yes (kit) |
-| **RJ12 PCB jack, Amphenol 54601-906WPLF** (or another with this footprint) | 3 | **buy** |
+| Female header socket 10-way / 6-way (Sullins PPTC101LFBN-RC / PPTC061LFBN-RC) | 2 / 1 | **buy** |
+| **RJ12 PCB jack, Amphenol 87180-066LF** (or another with the 54601 footprint) | 3 | **buy** |
 | **Resettable fuse 0.75 A hold, radial, Bel Fuse 0ZRE0075FF** (5.1 mm pin spacing) | 3 | **buy** |
 | **Electrolytic 470 µF 10 V+, 8 mm dia, 3.5 mm pitch** | 1 | **buy** |
-| **Zener 1N5341B (6.2 V 5 W)** | 1 | **buy** |
+| **Zener 1N5920B (6.2 V 3 W)** | 1 | **buy** |
 | **JST-XH header 2-pin (B2B-XH-A) / 6-pin (B6B-XH-A), vertical**, + 6-pin housing and 4 crimp pins | 1 / 1 | **buy** (XH kit) |
 | **JST-ZH header 2-pin (B2B-ZR), vertical** (matches the solar extension plugs) | 1 | **buy** |
 | Resistors: 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | yes (kit) |
@@ -113,7 +114,7 @@ Order the PCBs (5) and these together, so nothing is missing when the boards arr
 
 ## Soldering order (lowest parts first)
 1. Resistors (19, flat, any way round). The four behind each jack stand in a row: 220, 10, 100k, 220 (see the silkscreen).
-2. Diodes: the band on the side marked **K**. 1N5819 ×3, zener (big one, "6V2 5W Z").
+2. Diodes: the band on the side marked **K**. 1N5819 ×3, zener ("6V2 3W Z").
 3. Ceramic capacitors (6), then the 470 µF (**+** marked; the long leg is +).
 4. Fuses (3, any way round), test pads.
 5. Sockets: 2 × 10-way for the ESP (push onto the ESP's pins, set it in, solder, lift it out), 6-way for the USB-C board.
@@ -134,7 +135,7 @@ Battery voltage GPIO3, input-power voltage GPIO0. RJ12 pinout (both ends): 1 bat
 ## Check before ordering
 - ESP32-C6 SuperMini pin rows 15.24 mm apart, pin 1 (5V / TX) at the USB end.
 - USB-C breakout pins VBUS, GND, CC1, D−, D+, CC2 at 2.54 mm.
-- The RJ12 jack and the PTC you buy match their footprints (RJ12: Amphenol 54601; PTC: 5.1 mm pin spacing).
+- The RJ12 jack and the PTC you buy match their footprints (RJ12: Amphenol 54601 / 87180-x66; PTC: 5.1 mm pin spacing).
 - The box (ControllerV4) still has to be redrawn around this board.
 
 ## Rebuild the files

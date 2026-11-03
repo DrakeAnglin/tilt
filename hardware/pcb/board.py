@@ -122,7 +122,7 @@ def build():
     return board
 
 
-SHORT = {'1M': '1M', '1k': '1k', '100nF': '100n', '10uF': '10u', '1N5819': '1N5819', '1N5341B 6.2V 5W': '6V2 5W Z',
+SHORT = {'1M': '1M', '1k': '1k', '100nF': '100n', '10uF': '10u', '1N5819': '1N5819', '1N5920B 6.2V 3W': '6V2 3W Z',
          '220': '220', '10': '10', '100k': '100k', '470uF 10V': '470u', '0.75A PTC': 'PTC'}
 LABELS = [  # (text, x, y, size, angle): connector names and orientation marks on the top silkscreen
     ('PORT 1', 3.0, 20.4, 0.9, 0), ('PORT 2', 18.5, 20.4, 0.9, 0), ('PORT 3', 34.0, 20.4, 0.9, 0),

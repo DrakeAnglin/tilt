@@ -65,7 +65,7 @@ PARTS = [
     ('C2', '100nF', 'C', {1: 'VDIV', 2: 'GND'}, 'battery divider filter'),
     ('D1', '1N5819', 'D', {1: 'PWR', 2: 'VBUS'}, 'USB input'),
     ('D2', '1N5819', 'D', {1: 'PWR', 2: 'SOL+'}, 'solar input'),
-    ('D4', '1N5341B 6.2V 5W', 'D5W', {1: 'PWR', 2: 'GND'}, 'solar clamp'),
+    ('D4', '1N5920B 6.2V 3W', 'D5W', {1: 'PWR', 2: 'GND'}, 'solar clamp'),
     ('R3', '1M', 'R', {1: 'PWR', 2: 'PSENSE'}, 'input-power divider top'),
     ('R4', '1M', 'R', {1: 'PSENSE', 2: 'GND'}, 'input-power divider bottom'),
     ('C6', '100nF', 'C', {1: 'PSENSE', 2: 'GND'}, 'input-power divider filter'),
