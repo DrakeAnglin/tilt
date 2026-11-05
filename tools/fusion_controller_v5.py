@@ -118,32 +118,12 @@ for k in range(pcb_occ.childOccurrences.count):
     o = pcb_occ.childOccurrences.item(k)
     n = natives.get(o.name)
     if o.name.startswith('Fuse'):
-        y = box_y(o)
-        if -8 < y < 2:
-            n.isLightBulbOn = False                          # F2: folded flat (mock-up in Parts)
-            notes.append('F2 folded flat (%s)' % o.name)
-        elif y > 5:
-            n.isLightBulbOn = False                          # F3: replaced by a leaned copy (below)
-            f3 = o
+        n.isLightBulbOn = False                              # all three fuses are folded (mock-ups in Parts)
+        notes.append('fuse folded (%s)' % o.name)
     elif o.name.startswith('CP_Radial'):
         n.isLightBulbOn = False                              # generic short model: replaced by the 8 x 11.5 mock-up
         notes.append('C9 shown at its real 11.5 mm height')
 
-# F3 leaned 8 deg toward the cell side (rotation about its base line, along X) so its top clears the groove channel
-f3_bodies = []
-for b0 in [o.bRepBodies.item(j) for o in proxies(f3) for j in range(o.bRepBodies.count)]:
-    b = tbm.copy(b0)
-    bb = b.boundingBox
-    r = adsk.core.Matrix3D.create()
-    r.setToRotation(math.radians(-8), adsk.core.Vector3D.create(1, 0, 0),
-                    adsk.core.Point3D.create(0, (bb.minPoint.y + bb.maxPoint.y) / 2, C['zt'] / 10))
-    tbm.transform(b, r)
-    f3_bodies.append(b)
-f3_body = f3_bodies[0]
-for b in f3_bodies[1:]:
-    uni(f3_body, b)
-groups['Parts'].append(('F3 leaned', f3_body))
-notes.append('F3 leaned 8 deg')
 step_bodies = []                                             # (name, temp body in box coordinates)
 for o in proxies(pcb_occ):
     if not o.isLightBulbOn or (o != pcb_occ and not o.isVisible):
@@ -173,7 +153,7 @@ def vol(a, b):
         return 0.0
 
 
-MATES = [('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F3 leaned', 'controller_PCB'), ('F2 folded', 'R_Axial'), ('J3 USB lead plug', 'PinSocket_1x06'),
+MATES = [('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F1 folded', 'controller_PCB'), ('F2 folded', 'controller_PCB'), ('F3 folded', 'controller_PCB'), ('J3 USB lead plug', 'PinSocket_1x06'),
          ('ESP32-C6 spacer', 'PinSocket_1x10'), ('RJ12', 'controller_PCB'), ('RJ12', 'PCB:board'),
          ('Screws', 'controller_PCB'), ('Charger cap leg', 'Charger'), ('USB-C', 'USB-C'), ('ESP32-C6', 'ESP32-C6'),
          ('Charger', 'Charger'), ('J8', 'J8'), ('RJ12 1', 'RJ12 1'), ('RJ12 2', 'RJ12 2'), ('RJ12 3', 'RJ12 3'),
@@ -226,7 +206,7 @@ def gap_up(name_part):
     return res
 
 
-gaps = gap_up('ESP32-C6') + gap_up('RJ12 2 jack') + gap_up('C9') + gap_up('F2') + gap_up('F3') + gap_up('Fuse') + gap_up('0ZRE') + gap_up('J4') + gap_up('18650')
+gaps = gap_up('ESP32-C6') + gap_up('RJ12 2 jack') + gap_up('C9') + gap_up(' folded') + gap_up('Charger capacitor') + gap_up('USB-C board') + gap_up('Charger board') + gap_up('J4') + gap_up('18650')
 
 # ------------------------------------------------------------------ components
 APPEAR = {'Tray': 'Plastic - Matte (White)', 'Lid': 'Plastic - Matte (White)', 'Parts': 'Plastic - Matte (Black)',

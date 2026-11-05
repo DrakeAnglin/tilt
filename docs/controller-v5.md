@@ -10,7 +10,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C 
 
 | | |
 |---|---|
-| Size | **164.6 × 55.4 × 33.3 mm**: same cross-section as V4 (fits the rail, rod in the lid's groove), 39 mm longer |
+| Size | **164.6 × 55.4 × 25.8 mm**: fits the rail with the rod in the lid's groove; 7.5 mm lower than before, with the fuses folded |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 4 × M3 heat-set inserts (the M3 × 5.7 ones you have), **4 × M3 × 10 flat-head** (one screw size for the whole box) |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
@@ -29,16 +29,16 @@ edge in a slot. A short 2-wire lead joins it to J3.
 |---|---|
 | ESP32-C6 header pin tips (on the side under the groove) | **0.8 mm** below the groove (2.3 mm if you clip the tips flush) |
 | Under the PCB | 2.1 mm (the floor is recessed 0.4 under the board). The tallest tails (JST-XH headers) reach 1.8 mm: **trim every other lead to 1.8 mm or less**. The jacks' tails and pegs sit in deeper pockets |
-| Fuse F1 (room side, standing) | 3 mm under the lid |
+| Fuses (folded) | 2–3 mm under the lid / groove |
 | 470 µF capacitor | 2–3 mm under the groove (standing, as soldered) |
 | Battery plug wires (J4) | 1.5 mm under the groove: bend them over as they leave the plug |
-| Cell, jacks, charger, capacitor, USB-C board | held by pads on the lid (0.05–0.3 mm, by design) |
+| Cell, jacks, charger, capacitor, USB-C board | held by pads on the lid (0.05–0.3 mm, by design). **The capacitor lying on the charger is now the tallest part outside the groove**: it sets the lid height |
 
 ## Before it goes in the box
-1. **Fuse F2 (the middle one)** sits under the groove. Upright it is 23.5 mm tall, so after soldering, **fold it flat
-   back over its four resistors**, toward the ESP.
-2. **Fuse F3 (beside the cell)**: lean it slightly toward the cell side (about 8°, a gentle push) so its top clears the groove.
-3. **Fuse F1** stays upright.
+1. **Fold all three fuses** after soldering. Each one is an 11.5 mm disc on about 12 mm of legs (Bel 0ZRE0075FF:
+   23.4 mm seated). Bend both legs over toward the ESP **about 1.6 mm below the body** (not at the body: the coating
+   can crack), so the disc lies flat over its own four resistors, roughly 8–13 mm above the board. The H1 screw post is
+   0.35 mm past the end of F1's disc, and the 470 µF is 1.3 mm past F3's, so fold them straight, not skewed.
 4. **USB-C lead**: two wires, about 45 mm. Solder one end to the USB-C board's **VBUS** and **GND** pins. Solder the
    other end to a 2-pin piece of male header that plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Use red for VBUS and black for GND,
    or the white flat 2-core cable with the VBUS side marked.
@@ -81,6 +81,22 @@ Nothing presses on the capacitor's legs.
    bay. Together they hold the lid on.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
+
+## Height (rev F)
+Folding the fuses brought the box from 33.3 to **25.8 mm** tall. Nothing else changed in length or width: the length is
+the PCB (125 mm) plus the charger bay, and folding parts doesn't change either. What sets each height now:
+
+| | Top |
+|---|---|
+| Charger capacitor (lying on the module) | 23.3 → lid underside 23.8, top 25.8 |
+| USB-C board (on edge) | 22.8 |
+| 18650 | 20.7 |
+| Under the rod's groove (fixed by the blind) | 19.2: ESP pins 18.4, folded F2 17.1, 470 µF 16.7, jacks 15.9 |
+
+The rod's corners sweep about 1 mm above the lid's top face inside the groove. That's fine: the groove is open at the
+top. The lid has no locating lip along end wall B, where the capacitor and USB-C board come within 1 mm of it.
+
+![fuses folded](renders/ctrl-v5-fuses.png)
 
 ## RJ12 ports (rev D)
 ![ports](renders/ctrl-v5-port.png)

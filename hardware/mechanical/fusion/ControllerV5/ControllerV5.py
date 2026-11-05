@@ -33,8 +33,14 @@ import math
 import os
 
 C = dict(
-    half_w=27.7, top=33.3, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=1.6, corner_r=4.0, edge_r=1.5,
+    half_w=27.7, top=25.8, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=1.6, corner_r=4.0, edge_r=1.5,
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0, rod_z=24.0, rod=4.0,
+    # height: with the three fuses folded, the tallest part outside the groove is the charger's capacitor lying on its
+    # module (top 23.3), so the lid's underside is at 23.8 and its top at 25.8 (was 33.3 with the fuses upright)
+    # PTC fuses (Bel 0ZRE0075FF, datasheet: A 11.5 wide, B 23.4 seated, E 4.8 thick, C 5.1 / F 1.9 lead offset): an
+    # 11.5 disc on ~11.9 mm legs (KiCad's model; B - A). Each is folded toward the ESP, legs bent 1.6 below the body,
+    # so the disc lies flat over its own four resistors
+    fuse_leg=11.9, fuse_bend=1.6, fuse_w=11.5, fuse_t=4.8, fuse_body=11.5,
     # rod groove: floor 20.2 (the rod sweeps down to 21.17), 1.0 thick, so its underside is 19.2
     groove_hw=6.0, groove_floor=20.2, groove_t=1.0, groove_wall=1.2,
     # PCB: 1.7 mm above the floor, which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
@@ -219,6 +225,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     lid = rbox(0, L, -hw, hw, zl, c['top'], c['corner_r'])
     reg = cut(rbox(c['end_a'] + 0.2, in_b - 0.2, -iw + 0.2, iw - 0.2, zl - 1.4, zl + 0.01, c['corner_r'] - c['wall'] - 0.2),
               rbox(c['end_a'] + 1.6, in_b - 1.6, -iw + 1.6, iw - 1.6, zl - 2, zl + 1, max(c['corner_r'] - c['wall'] - 1.6, 0.3)))
+    # no lip along end wall B: the capacitor's end and the USB-C board's top edge come up to within 1 mm of the lid there;
+    # the lid locates on the other three sides and its four posts
+    reg = cut(reg, bx(in_b - 2.0, in_b + 1, -iw - 1, iw + 1, zl - 2, zl))
     lid = uni(lid, reg)
     lid = cut(lid, bx(-1, L + 1, -gw, gw, gu, c['top'] + 1))
     lid = uni(lid, cut(bx(0, L, -gw, gw, gu, c['top']),
@@ -278,10 +287,17 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     # 470 uF as bought (8 x 11.5 + 0.5 seal): the PCB export's model is a short generic one
     x9, y9 = K(32.75, 42.0)
     P.append(('C9 470uF', cyl((x9, y9, zt + 0.5), (x9, y9, zt + 12.0), 4.0)))
-    # fuse F2 folded back over its resistors (it sits under the groove; upright it is 23.5 tall)
-    fx0, _ = K(0, 25.3)
-    _, fy = K(21.65, 0)
-    P.append(('F2 folded', bx(fx0, fx0 + 16.0, fy - 5.75 - 0.6, fy + 5.75 - 0.6, zt + 2.8, zt + 2.8 + 4.8)))
+    # the three fuses, folded (see fuse_* above): legs up from their pads, bent over 1.6 below the body, disc flat
+    fxc, _ = K(0, 23.55)                                  # between the staggered pads (y 22.6 / 24.5)
+    hb = zt + c['fuse_leg'] - c['fuse_bend']              # height of the bend
+    for n, jx in enumerate((11.0, 26.5, 42.0)):
+        _, fyc = K(jx - 7.4 + 2.55, 0)
+        legs = uni(bx(fxc - 0.4, fxc + 0.4, fyc - 2.95, fyc - 2.15, zt, hb + 0.4),
+                   bx(fxc - 0.4, fxc + 0.4, fyc + 2.15, fyc + 2.95, zt, hb + 0.4),
+                   bx(fxc - 0.4, fxc + c['fuse_bend'], fyc - 2.95, fyc + 2.95, hb - 0.4, hb + 0.4))
+        disc = bx(fxc + c['fuse_bend'], fxc + c['fuse_bend'] + c['fuse_body'], fyc - c['fuse_w'] / 2, fyc + c['fuse_w'] / 2,
+                  hb - c['fuse_t'] / 2, hb + c['fuse_t'] / 2)
+        P.append(('F%d folded' % (n + 1), uni(legs, disc)))
     # ESP32-C6 SuperMini: header spacers, board, USB-C, buttons, chip, pin tips
     for xk in (4.5, 19.74):
         x0, y0 = K(xk - 1.27, 47.86)
