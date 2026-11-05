@@ -10,7 +10,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C 
 
 | | |
 |---|---|
-| Size | **164.6 × 52.5 × 25.8 mm** (+3 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
+| Size | **164.6 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 4 × M3 heat-set inserts (the M3 × 5.7 ones you have), **4 × M3 × 10 flat-head** (one screw size for the whole box) |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
@@ -87,11 +87,12 @@ The top stays clean (no screw heads) and the screw heads sit flush with the bott
   screw post. The 18650 moves 5.6 mm toward the PCB. It now starts 1.2 mm in from the PCB's edge, above it, and its
   top clears the groove's channel. The charger module moves 3.3 mm toward the room side, which is why the USB-C board's
   header pins get clipped to 3 mm. The bay's screw post and the solar cable's floor route moved with it. The box no
-  longer fills the rail, so **three rounded bumpers** on the back wall touch the rail's wall (0.2 mm clear) and keep the
-  groove on the rod.
-- **Round groove:** a teardrop: an r 6 round top, 45° flanks and a 5 mm flat floor (the rod still clears it by 0.97 mm at
-  the bottom of its sweep). Printed upside down, it bridges 5 mm instead of 12 and needs no supports, and the channel
-  under it rises away from the middle. That leaves the ESP's pins 3 mm of room, up from 0.8.
+  longer fills the rail, so **two rounded bumpers** on the back wall stop 1.0 mm short of the rail's wall. That's an
+  easy squeeze-in fit, and the box can't shift more than 1 mm, less than the groove's 1.9 mm side clearance.
+- **Round groove:** a circle, r 5 mm, centred 1.67 mm above the rod's axis. The 4 mm square rod's corners (they sweep r 2.83)
+  clear it by 0.5 mm at the bottom and about 1.9 mm each side at the axis. Printed upside down, it's a 7 mm arch that
+  flattens to about a 2 mm bridge at its crown, so no supports. The channel under it rises away from the middle, leaving the ESP's pins
+  over 3 mm of room.
 - **Battery cradle:** the lid's flat pads are now two curved cradles at the same X as the tray's two saddles (same
   width, 0.2 mm over the cell), so the cell is held round its whole circumference at two stations.
 

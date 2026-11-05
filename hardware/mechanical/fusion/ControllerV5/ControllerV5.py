@@ -42,12 +42,13 @@ C = dict(
     # so the disc lies flat over its own four resistors
     fuse_leg=11.9, fuse_bend=1.6, fuse_w=11.5, fuse_t=4.8, fuse_body=11.5,
     # width: the room-side wall stays put (the PCB is 0.7 off it); the back wall comes in to 0.4 past the PCB's 47 mm jack
-    # strip (the widest thing in the box) and 0.3 past the H2 screw post, so the box no longer fills the rail: three rounded bumpers on the back wall
-    # touch the rail wall (0.2 clear) and keep the groove on the rod
-    bumper_x=(20.0, 82.0, 144.0), bumper_w=2.4,
-    # rod groove: a teardrop - r 6 round top (centre 26.2), 45 deg flanks, a 5 mm flat at 20.2 (the rod sweeps down to
-    # 21.17). Printed upside down it bridges 5 mm instead of 12 and needs no supports. The channel under it is 1.0 thick
-    groove_r=6.0, groove_floor=20.2, groove_t=1.0,
+    # strip (the widest thing in the box) and 0.3 past the H2 screw post, so the box no longer fills the rail: two rounded
+    # bumpers on the back wall stop 1.0 short of the rail's wall - an easy fit that still keeps the rod off the groove's
+    # sides (1.9 clear each side)
+    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=1.0,
+    # rod groove: a circle, r 5, its centre 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
+    # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 1.0 thick
+    groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=1.0,
     # PCB: 1.7 mm above the floor, which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
     # reach 1.8 below), board 1.52 (as exported)
     pcb_gap=1.7, floor_recess=0.4, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
@@ -105,8 +106,6 @@ def z_under(y, off):
     R, y = c['groove_r'] + off, abs(y)
     if y > R:
         return float('inf')
-    if y <= R / math.sqrt(2):
-        return max(y + C['g_zc'] - R * math.sqrt(2), c['groove_floor'] - off)
     return C['g_zc'] - math.sqrt(R * R - y * y)
 
 
@@ -129,14 +128,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     out = {}
 
     def groove(off, x0, x1):
-        """The groove (off 0), or its outline grown by off: round top r, 45 deg flanks, flat floor, open above."""
-        R, zc, fo = c['groove_r'] + off, C['g_zc'], c['groove_floor'] - off
-        zt_ = zc - R / math.sqrt(2)                       # where the flanks meet the round top
-        h = math.sqrt(0.5)
-        sq = cut(obox(((x0 + x1) / 2, 0, zc), (1, 0, 0), (0, h, h), x1 - x0, 2 * R, 2 * R),
-                 bx(x0 - 1, x1 + 1, -3 * R, 3 * R, zt_, zc + 3 * R))
-        g = uni(cyl((x0, 0, zc), (x1, 0, zc), R), sq, bx(x0, x1, -R, R, zc, zc + 20))
-        return cut(g, bx(x0 - 1, x1 + 1, -3 * R, 3 * R, fo - 3 * R - 5, fo))
+        """The groove (off 0), or its outline grown by off: a circle, open above its centre."""
+        R, zc = c['groove_r'] + off, C['g_zc']
+        return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20))
 
     def ceiling(y, half=0.0):
         """Lid features run up to the lid's underside; under the groove they are trimmed by the final groove cut."""
@@ -146,8 +140,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     F0 = c['floor_z'] + 0.3                              # floor-standing features start inside the floor
     tray = cut(rbox(0, L, olo, ohi, c['floor_z'], zl, c['corner_r']),
                rbox(c['end_a'], in_b, ilo, ihi, fz, zl + 1, c['corner_r'] - c['wall']))
-    # rail bumpers on the back wall: rounded vertical fins out to 0.2 short of the rail's wall
-    ry = c['rail_w'] / 2 - 0.2 - c['bumper_w'] / 2
+    # rail bumpers on the back wall: rounded vertical fins out to 1.0 short of the rail's wall
+    ry = c['rail_w'] / 2 - c['bumper_gap'] - c['bumper_w'] / 2
     for bxx in c['bumper_x']:
         tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], zl),
                    cyl((bxx, ry, c['floor_z']), (bxx, ry, zl), c['bumper_w'] / 2))
