@@ -314,32 +314,48 @@ fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], C['edge_r'], C['zl'], 0.
        'Lid': round_edges(comps['Lid'], C['top'], C['edge_r'], C['zl'], 0.6, groove=True)}
 
 
-def engrave(comp, z, lines, x0, x1, y0, y1, depth, flip):
-    """Engrave text (0.4 deep) into the component's body from the plane at height z. flip: read from below."""
+def engrave(comp, z, lines, xc, yc, w, h):
+    """Engrave text 0.4 deep into the body's downward-facing face at height z, sketched ON that face, so it reads
+    right when you look at that face (from below)."""
     try:
-        pl_in = comp.constructionPlanes.createInput()
-        pl_in.setByOffset(comp.xYConstructionPlane, adsk.core.ValueInput.createByReal(z / 10))
-        pl = comp.constructionPlanes.add(pl_in)
-        sk = comp.sketches.add(pl)
+        body = comp.bRepBodies.item(0)
+        face = None
+        for f in body.faces:
+            g = f.geometry
+            if isinstance(g, adsk.core.Plane) and abs(g.origin.z * 10 - z) < 0.01 and f.evaluator.getNormalAtPoint(f.pointOnFace)[1].z < -0.99:
+                ok, prm = f.evaluator.getParameterAtPoint(P3(xc, yc, z))
+                if ok and f.evaluator.isParameterOnFace(prm):
+                    face = f
+                    break
+        if face is None:
+            return 'failed: no face at the text'
+        sk = comp.sketches.add(face)
+        a = sk.modelToSketchSpace(P3(xc - w / 2, yc - h / 2, z))
+        b = sk.modelToSketchSpace(P3(xc + w / 2, yc + h / 2, z))
         ti = sk.sketchTexts.createInput2(lines, 0.32)
-        ti.setAsMultiLine(adsk.core.Point3D.create(x0 / 10, y0 / 10, 0), adsk.core.Point3D.create(x1 / 10, y1 / 10, 0),
+        ti.setAsMultiLine(adsk.core.Point3D.create(min(a.x, b.x), min(a.y, b.y), 0),
+                          adsk.core.Point3D.create(max(a.x, b.x), max(a.y, b.y), 0),
                           adsk.core.HorizontalAlignments.CenterHorizontalAlignment,
                           adsk.core.VerticalAlignments.MiddleVerticalAlignment, 0)
-        ti.isHorizontalFlip = flip
         tx = sk.sketchTexts.add(ti)
-        ei = comp.features.extrudeFeatures.createInput(tx, adsk.fusion.FeatureOperations.CutFeatureOperation)
-        ei.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(depth / 10)),
-                            adsk.fusion.ExtentDirections.PositiveExtentDirection if depth > 0 else adsk.fusion.ExtentDirections.NegativeExtentDirection)
-        ei.participantBodies = [comp.bRepBodies.item(0)]
-        comp.features.extrudeFeatures.add(ei)
-        pl.isLightBulbOn = False
-        return 'ok'
+        v0 = body.volume
+        for d in (adsk.fusion.ExtentDirections.NegativeExtentDirection, adsk.fusion.ExtentDirections.PositiveExtentDirection):
+            try:
+                ei = comp.features.extrudeFeatures.createInput(tx, adsk.fusion.FeatureOperations.CutFeatureOperation)
+                ei.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(0.04)), d)
+                ei.participantBodies = [body]
+                comp.features.extrudeFeatures.add(ei)
+                if comp.bRepBodies.item(0).volume < v0 - 1e-6:
+                    return 'ok'
+            except Exception:
+                pass
+        return 'failed: cut did not remove material'
     except Exception as ex:
         return 'failed: %s' % str(ex)[:120]
 
 
-eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER V5\n4 x M3x10 FLAT HEAD FROM BELOW', 66, 118, -2, 20, 0.4, False),
-       'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID - 4 x M3 INSERTS', 78, 122, -22, -12, -0.4, False)}
+eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER V5\n4 x M3x10 FLAT HEAD FROM BELOW', 92, 9, 52, 22),
+       'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID - 4 x M3 INSERTS', 100, -17, 44, 10)}
 files = []
 em = design.exportManager
 for g, nm in (('Tray', 'controller_v5_tray'), ('Lid', 'controller_v5_lid')):
@@ -408,6 +424,26 @@ move('Lid', 0)
 vis(hide=('Rail', 'Wires')); res.append(shot('ctrl-v5-closed.png', (-130, -170, 120)))
 res.append(shot('ctrl-v5-end-b.png', (L + 150, -95, 70), (L - 25, 0, 14), fit=False))
 res.append(shot('ctrl-v5-under.png', (L / 2 - 120, -150, -160)))
+cam = vp.camera
+cam.cameraType = adsk.core.CameraTypes.OrthographicCameraType
+cam.eye = P3(92, 9, -300)
+cam.target = P3(92, 9, 0)
+cam.upVector = adsk.core.Vector3D.create(0, 1, 0)
+cam.isFitView = False
+vp.camera = cam
+cam = vp.camera
+cam.viewExtents = 8.0
+vp.camera = cam
+res.append(os.path.join(out, 'ctrl-v5-bottom-text.png')); vp.saveAsImageFile(res[-1], 1400, 800)
+cam.eye = P3(146, 0, 220)
+cam.target = P3(L, 0, 10)
+cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
+cam.eye = P3(L + 80, 0, 12)
+cam.target = P3(L, 0, 12)
+cam.upVector = adsk.core.Vector3D.create(0, 0, 1)
+cam.viewExtents = 5.0
+vp.camera = cam
+res.append(os.path.join(out, 'ctrl-v5-end-b-flat.png')); vp.saveAsImageFile(res[-1], 1400, 800)
 res.append(shot('ctrl-v5-end-a.png', (-150, -95, 70), (25, 0, 14), fit=False))
 vis(hide=('Rail', 'Wires', 'Tray', 'PCB', 'Parts', 'Screws')); res.append(shot('ctrl-v5-lid-under.png', (L / 2 - 100, -140, -170)))
 vis(); res.append(shot('ctrl-v5-in-rail.png', (-140, -90, 90)))
