@@ -83,7 +83,9 @@ for nm, (ex, yc, s) in M.RJ.items():                       # plug-shaped opening
     xa, xb = (-1, M.END_T + 0.01) if s > 0 else (L - M.END_T - 0.01, L + 1)
     tray = cut(tray, bx(xa, xb, yc - 5.08, yc + 5.08, zt + 1.45, zt + 8.8), bx(xa, xb, yc - 2.5, yc + 2.5, zt + 0.3, zt + 1.5))
 tray = cut(tray, bx(-1, M.END_T + 0.01, M.UYC - 4.7, M.UYC + 4.7, zt - 0.8, zt + 2.9))          # USB-C
-tray = cut(tray, cyl((-1, M.SYC, zt + 6.5), (M.END_T + 0.01, M.SYC, zt + 6.5), 3.6))             # solar jack barrel
+tray = cut(tray, bx(L - M.END_T - 0.01, L + 1, M.AUX_Y - 6.1, M.AUX_Y + 6.1, zt + 1.4, zt + 10.0),
+           bx(L - M.END_T - 0.01, L + 1, M.AUX_Y - 2.5, M.AUX_Y + 2.5, zt + 0.3, zt + 1.5))           # RJ45 aux
+tray = cut(tray, cyl((-1, M.SYC, zt + 2.6), (M.END_T + 0.01, M.SYC, zt + 2.6), 2.1))             # 1.35 mm solar jack
 lid = uni(rbox(0, L, yo0, yo1, zl, top, 4.0), cut(groove(M.GROOVE_T, 0, L), bx(-1, L + 1, -20, 20, top, top + 30)))
 lid = cut(lid, groove(0, -1, L + 1))
 rh = 55.5 / 2
@@ -152,7 +154,7 @@ def appearance(name):
             return design.appearances.addByCopy(src, name)
 
 
-COL = [('PCB', 'Plastic - Glossy (Green)'), ('18650 cell', 'Plastic - Glossy (Blue)'), ('18650 holder', 'Plastic - Matte (Black)'),
+COL = [('RJ45', 'Plastic - Glossy (Red)'), ('PCB', 'Plastic - Glossy (Green)'), ('18650 cell', 'Plastic - Glossy (Blue)'), ('18650 holder', 'Plastic - Matte (Black)'),
        ('ESP32', 'Plastic - Glossy (Blue)'), ('Charger', 'Plastic - Glossy (Red)'), ('Solar', 'Plastic - Glossy (Yellow)')]
 occs = {}
 for g, lst in (('Parts', parts), ('Tray', [('Tray', tray)]), ('Lid', [('Lid', lid)]), ('Rail', rail)):

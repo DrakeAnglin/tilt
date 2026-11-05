@@ -13,7 +13,7 @@ import os
 
 # ---------------------------------------------------------------- case and board
 WALL, END_T, FLOOR = 2.0, 1.6, 1.2
-BOARD = dict(x0=END_T + 0.4, len=115.0, y0=-24.0, y1=24.0, zb=2.9, t=1.6)       # 115 x 48, same height as V5's PCB
+BOARD = dict(x0=END_T + 0.4, len=117.0, y0=-24.0, y1=24.0, zb=2.9, t=1.6)       # 115 x 48, same height as V5's PCB
 ZT = BOARD['zb'] + BOARD['t']                                                    # board top 4.5
 X0, X1 = BOARD['x0'], BOARD['x0'] + BOARD['len']
 L = X1 + 0.4 + END_T                                                             # box length
@@ -32,7 +32,7 @@ def under_channel(y):
 # ---------------------------------------------------------------- parts
 P = {}       # name: ('box', x0, x1, y0, y1, z0, z1) | ('cylx', x0, x1, yc, zc, r) | ('cylz', xc, yc, z0, z1, r)
 # 18650 holder: Keystone 1042P, through-hole pins, 77.05 L x 20.65 W x 14.86 H above the board (DigiKey / Future)
-HX0 = X0 + 18.0
+HX0 = X0 + 14.0
 P['18650 holder (Keystone 1042P)'] = ('box', HX0, HX0 + 77.05, BOARD['y1'] - 20.65, BOARD['y1'], ZT, ZT + 14.86)
 CELL_Y = BOARD['y1'] - 20.65 / 2
 CELL_ZC = ZT + 1.0 + 9.25                                     # cell resting ~1 mm up in the holder
@@ -51,19 +51,25 @@ P['NTC (on the holder)'] = ('box', HX0 + 36.0, HX0 + 40.0, BOARD['y1'] - 22.0, B
 P['470 uF (SMD 8 x 10)'] = ('cylz', X0 + 87.0, -12.0, ZT, ZT + 10.5, 4.0)
 # ports. RJ12 Amphenol 87180-066LF: 13.2 W x 11.5 H, 17.3 deep, plug opening 1.73-8.50 above the board
 RJ_W, RJ_H, RJ_D = 13.2, 11.5, 17.32
-RJ = {'Port 1 (end A)': (X0, -15.0, +1), 'Port 2 (end B)': (X1, -14.6, -1), 'Port 3 (end B)': (X1, +1.0, -1)}
+RJ = {'Port 1 (end A)': (X0, -15.0, +1), 'Port 2 (end B)': (X1, -15.6, -1), 'Port 3 (end B)': (X1, -0.6, -1)}
 for nm, (ex, yc, s) in RJ.items():
     xa, xb = sorted((ex + s * 0.55, ex + s * RJ_D))
     P['RJ12 ' + nm] = ('box', xa, xb, yc - RJ_W / 2, yc + RJ_W / 2, ZT, ZT + RJ_H)
     P['PTC ' + nm] = ('box', ex + s * 20.0 - 2.3, ex + s * 20.0 + 2.3, yc - 1.6, yc + 1.6, ZT, ZT + 1.0)   # 1812 SMD
+# aux / lifter port: RJ45 8P8C, right angle, unshielded (~16 W x 13.5 H x 21 deep): 2 x VBAT + 2 x GND for up to ~2 A,
+# plus IN1, IN2, EN, sensor - the same signals as the tilter ports, with the power doubled up
+AUX_Y, AUX_W, AUX_H, AUX_D = 15.9, 15.9, 13.5, 21.0
+P['RJ45 aux / lifter (end B)'] = ('box', X1 - AUX_D, X1 - 0.5, AUX_Y - AUX_W / 2, AUX_Y + AUX_W / 2, ZT, ZT + AUX_H)
+P['PTC 2 A aux'] = ('box', X1 - AUX_D - 3.6, X1 - AUX_D - 0.4, AUX_Y - 2.25, AUX_Y + 2.25, ZT, ZT + 1.0)   # turned 90 deg
 # USB-C receptacle, SMD 16-pin (JLC basic part), mid-mount at the board edge: 8.94 W x 3.26 H x 7.35 deep
 UYC = -2.0
 P['USB-C (SMD)'] = ('box', X0 - 0.3, X0 + 7.05, UYC - 4.47, UYC + 4.47, ZT - 0.6, ZT - 0.6 + 3.26)
-# solar input: barrel jack, right angle THT, CUI PJ-002AH: 14.4 L x 9 W x 11 H, 2.0 mm pin (takes 5.5 x 2.1 plugs)
-SYC = 8.3
-P['Solar jack (PJ-002AH)'] = ('box', X0, X0 + 14.4, SYC - 4.5, SYC + 4.5, ZT, ZT + 11.0)
+# solar input: 3.5 x 1.35 mm barrel jack, right angle THT, SHOU HAN DC003-1.3 (LCSC C668594, JLC-assemblable):
+# 9 L x 6.3 W x 5 H, barrel centre ~2.6 above the board
+SYC = 6.0
+P['Solar jack (DC003-1.3, 1.35 mm)'] = ('box', X0, X0 + 9.0, SYC - 3.15, SYC + 3.15, ZT, ZT + 5.0)
 # mounting holes (M3), in corners the ports and the holder leave free
-HOLES = [(X0 + 4.0, 20.5), (X1 - 4.0, 20.5), (X0 + 42.5, -21.0), (X0 + 80.0, -21.0)]
+HOLES = [(X0 + 4.0, 20.5), (X0 + 92.5, -4.5), (X0 + 42.5, -21.0), (X0 + 80.0, -21.0)]
 
 # the case height is set by the cell's top
 CELL_TOP = CELL_ZC + 9.25
@@ -103,7 +109,7 @@ def svg(path):
     def ty(y):                                       # +Y up the page
         return pad + (Y_OUT[1] - y) * k
 
-    col = {'RJ12': '#2f2f2f', 'ESP': '#2b4fa8', '18650 c': '#3a8f4a', '18650 h': '#9aa', 'USB': '#888', 'Solar': '#c57b00',
+    col = {'RJ45': '#5a3a1a', 'RJ12': '#2f2f2f', 'ESP': '#2b4fa8', '18650 c': '#3a8f4a', '18650 h': '#9aa', 'USB': '#888', 'Solar': '#c57b00',
            'Charger': '#7a3fa0', 'PTC': '#d07a2a', '470': '#444', 'NTC': '#b33'}
     s = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" font-family="Helvetica,Arial">' % (W, H),
          '<rect width="100%" height="100%" fill="#fff"/>',
@@ -138,7 +144,7 @@ def svg(path):
     for hx, hy in HOLES:
         s.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#fff" stroke="#000"/>' % (tx(hx), ty(hy), 1.7 * k))
     s.append('<text x="%.1f" y="%.1f" font-size="13">End A: port 1, USB-C, solar jack</text>' % (tx(0), H - 30))
-    s.append('<text x="%.1f" y="%.1f" font-size="13" text-anchor="end">End B: ports 2 and 3</text>' % (tx(L), H - 30))
+    s.append('<text x="%.1f" y="%.1f" font-size="13" text-anchor="end">End B: ports 2 and 3, aux / lifter (RJ45)</text>' % (tx(L), H - 30))
     s.append('<text x="%.1f" y="%.1f" font-size="13" text-anchor="middle">Board %.0f x %.0f mm, case %.0f x %.1f x %.1f mm (to scale)</text>' % (
         W / 2, H - 10, BOARD['len'], BOARD['y1'] - BOARD['y0'], L, Y_OUT[1] - Y_OUT[0], TOP))
     s.append('</svg>')

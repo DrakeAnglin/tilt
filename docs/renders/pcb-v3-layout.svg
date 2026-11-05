@@ -1,45 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="774" height="426" font-family="Helvetica,Arial">
+<svg xmlns="http://www.w3.org/2000/svg" width="786" height="426" font-family="Helvetica,Arial">
 <rect width="100%" height="100%" fill="#fff"/>
-<rect x="30.0" y="30.0" width="714.0" height="316.8" rx="24.0" fill="#f4f4f4" stroke="#999"/>
-<rect x="42.0" y="44.4" width="690.0" height="288.0" fill="#2f6b4f" opacity="0.85"/>
-<line x1="18.0" y1="188.4" x2="756.0" y2="188.4" stroke="#c00" stroke-dasharray="6,4" stroke-width="1.5"/>
-<text x="207.0" y="183.4" font-size="12" fill="#c00">tilt rod (lid groove above)</text>
+<rect x="30.0" y="30.0" width="726.0" height="316.8" rx="24.0" fill="#f4f4f4" stroke="#999"/>
+<rect x="42.0" y="44.4" width="702.0" height="288.0" fill="#2f6b4f" opacity="0.85"/>
+<line x1="18.0" y1="188.4" x2="768.0" y2="188.4" stroke="#c00" stroke-dasharray="6,4" stroke-width="1.5"/>
+<text x="213.0" y="183.4" font-size="12" fill="#c00">tilt rod (lid groove above)</text>
 <circle cx="564.0" cy="260.4" r="24.0" fill="#444" opacity="0.85"/>
 <text x="564.0" y="264.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">470 uF</text>
-<rect x="366.0" y="169.8" width="24.0" height="6.6" fill="#b33" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<text x="378.0" y="177.1" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">NTC</text>
+<rect x="342.0" y="169.8" width="24.0" height="6.6" fill="#b33" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="354.0" y="177.1" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">NTC</text>
 <rect x="148.2" y="268.8" width="27.6" height="19.2" fill="#d07a2a" opacity="0.85" stroke="#000" stroke-width="0.5"/>
 <text x="162.0" y="282.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">PTC</text>
-<rect x="598.2" y="266.4" width="27.6" height="19.2" fill="#d07a2a" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<text x="612.0" y="280.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">PTC</text>
-<rect x="598.2" y="172.8" width="27.6" height="19.2" fill="#d07a2a" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<text x="612.0" y="186.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">PTC</text>
+<rect x="610.2" y="272.4" width="27.6" height="19.2" fill="#d07a2a" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="624.0" y="286.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">PTC</text>
+<rect x="610.2" y="182.4" width="27.6" height="19.2" fill="#d07a2a" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="624.0" y="196.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">PTC</text>
+<rect x="596.4" y="79.5" width="19.2" height="27.0" fill="#d07a2a" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="606.0" y="97.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">PTC</text>
 <rect x="186.0" y="224.4" width="93.0" height="96.0" fill="#7a3fa0" opacity="0.85" stroke="#000" stroke-width="0.5"/>
 <text x="232.5" y="276.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">Charger + protection</text>
 <rect x="40.2" y="173.6" width="44.1" height="53.6" fill="#888" opacity="0.85" stroke="#000" stroke-width="0.5"/>
 <text x="62.2" y="204.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">USB-C</text>
+<rect x="42.0" y="133.5" width="54.0" height="37.8" fill="#c57b00" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="69.0" y="156.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">Solar jack</text>
 <rect x="324.0" y="303.9" width="152.4" height="15.2" fill="#2b4fa8" opacity="0.85" stroke="#000" stroke-width="0.5"/>
 <rect x="324.0" y="212.5" width="152.4" height="15.2" fill="#2b4fa8" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<rect x="42.0" y="111.6" width="86.4" height="54.0" fill="#c57b00" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<text x="85.2" y="142.6" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">Solar jack</text>
 <rect x="45.3" y="238.8" width="100.6" height="79.2" fill="#2f2f2f" opacity="0.85" stroke="#000" stroke-width="0.5"/>
 <text x="95.6" y="282.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">RJ12 Port 1</text>
-<rect x="628.1" y="236.4" width="100.6" height="79.2" fill="#2f2f2f" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<text x="678.4" y="280.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">RJ12 Port 2</text>
-<rect x="628.1" y="142.8" width="100.6" height="79.2" fill="#2f2f2f" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<text x="678.4" y="186.4" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">RJ12 Port 3</text>
+<rect x="640.1" y="242.4" width="100.6" height="79.2" fill="#2f2f2f" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="690.4" y="286.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">RJ12 Port 2</text>
+<rect x="640.1" y="152.4" width="100.6" height="79.2" fill="#2f2f2f" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="690.4" y="196.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">RJ12 Port 3</text>
 <rect x="322.2" y="211.8" width="156.0" height="108.0" fill="#2b4fa8" opacity="0.85" stroke="#000" stroke-width="0.5"/>
 <text x="400.2" y="269.8" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">ESP32-C6 SuperMini</text>
+<rect x="618.0" y="45.3" width="123.0" height="95.4" fill="#5a3a1a" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<text x="679.5" y="97.0" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">RJ45 aux / lifter</text>
 <rect x="324.0" y="213.6" width="152.4" height="104.4" fill="#2b4fa8" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<rect x="150.0" y="44.4" width="462.3" height="123.9" fill="#9aa" opacity="0.85" stroke="#000" stroke-width="0.5"/>
+<rect x="126.0" y="44.4" width="462.3" height="123.9" fill="#9aa" opacity="0.85" stroke="#000" stroke-width="0.5"/>
 <rect x="442.2" y="238.8" width="45.0" height="54.0" fill="#2b4fa8" opacity="0.85" stroke="#000" stroke-width="0.5"/>
-<rect x="174.0" y="50.8" width="414.0" height="111.0" rx="12.0" fill="#3a8f4a" opacity="0.6" stroke="#000" stroke-width="0.5"/>
-<text x="381.0" y="110.3" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">18650 cell</text>
+<rect x="150.0" y="50.8" width="414.0" height="111.0" rx="12.0" fill="#3a8f4a" opacity="0.6" stroke="#000" stroke-width="0.5"/>
+<text x="357.0" y="110.3" font-size="11" fill="#fff" text-anchor="middle" stroke="#000" stroke-width="2.5" paint-order="stroke">18650 cell</text>
 <circle cx="66.0" cy="65.4" r="10.2" fill="#fff" stroke="#000"/>
-<circle cx="708.0" cy="65.4" r="10.2" fill="#fff" stroke="#000"/>
+<circle cx="597.0" cy="215.4" r="10.2" fill="#fff" stroke="#000"/>
 <circle cx="297.0" cy="314.4" r="10.2" fill="#fff" stroke="#000"/>
 <circle cx="522.0" cy="314.4" r="10.2" fill="#fff" stroke="#000"/>
 <text x="30.0" y="396.8" font-size="13">End A: port 1, USB-C, solar jack</text>
-<text x="744.0" y="396.8" font-size="13" text-anchor="end">End B: ports 2 and 3</text>
-<text x="387.0" y="416.8" font-size="13" text-anchor="middle">Board 115 x 48 mm, case 119 x 52.8 x 26.4 mm (to scale)</text>
+<text x="756.0" y="396.8" font-size="13" text-anchor="end">End B: ports 2 and 3, aux / lifter (RJ45)</text>
+<text x="393.0" y="416.8" font-size="13" text-anchor="middle">Board 117 x 48 mm, case 121 x 52.8 x 26.4 mm (to scale)</text>
 </svg>
