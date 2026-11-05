@@ -64,6 +64,9 @@ C = dict(
     esp_l=26.0, esp_w=18.0, esp_t=1.0, esp_xc=12.12, esp_y0=47.57, sock_h=8.59, spacer=2.5, esp_tip=1.9,
     # 18650 (protected, JST-XH lead) along the back wall
     bat_d=19.0, bat_l=69.0,
+    # cell cradles (tray saddles + matching lid cradles): 6 wide, never thinner than 1.5; the PCB-side face 0.6 off the
+    # PCB's edge, so on that side each horn stops where its wall is still 1.5 thick; on the back side they run to the wall
+    cradle_w=6.0, cradle_t=1.5, cradle_y0=2.6, cradle_at=(9.0, 54.0),
     # charger module (DIYMORE MCP73871, 31.5 x 30.5) and its capacitor (16 x 26)
     # module photo x (31.5) runs across the box (+Y), photo y (30.5) along it (+X): its capacitor corner ends up at the
     # back wall, its PWR / BATT pads on the groove side
@@ -188,9 +191,14 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
             tray = cut(tray, cyl((-1, y + dy, 2.6), (0.5, y + dy, 2.6), 0.6))
     # --- 18650: two saddles and two end stops (the end-B stop is low: the lead leaves that end)
     by, bc = C['bat_y'], C['bat_zc']
-    for sx in (C['bat_x0'] + 9, C['bat_x0'] + c['bat_l'] - 13):
-        tray = uni(tray, cut(bx(sx, sx + 4, by - 6.5, ihi + 0.5, F0, bc - 2.0),
-                             cyl((sx - 1, by, bc), (sx + 5, by, bc), c['bat_d'] / 2 + 0.2)))
+    rc = c['bat_d'] / 2 + 0.2                                   # cradle bore
+    ytrim = by - (by - c['cradle_y0'] - c['cradle_t'])          # PCB-side horn: where its wall is cradle_t thick
+    hz = math.sqrt(rc * rc - (by - ytrim) ** 2)                 # bore's height above / below the axis there
+    for sx in (C['bat_x0'] + a for a in c['cradle_at']):
+        sad = cut(bx(sx, sx + c['cradle_w'], c['cradle_y0'], ihi + 0.5, F0, bc - 0.5),          # back horn into the wall
+                  cyl((sx - 1, by, bc), (sx + c['cradle_w'] + 1, by, bc), rc),
+                  bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - hz, bc + 1))   # PCB-side horn, flat top
+        tray = uni(tray, sad)
     # end stops, centred on the cell's axis; they bear on its end below the + button (the lead leaves the end-B end higher up)
     tray = uni(tray, bx(C['bat_x0'] - 1.4, C['bat_x0'] - 0.2, by - 4.0, by + 4.0, F0, bc - 2.5),
                bx(C['bat_x0'] + c['bat_l'] + 0.2, C['bat_x0'] + c['bat_l'] + 1.4, by - 4.0, by + 4.0, F0, bc - 4.0))
@@ -284,10 +292,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     for xk in c['rj_x']:
         x, y = K(xk, 9.0)
         lid = uni(lid, bx(x - 2, x + 2, y - 2, y + 2, jtop + 0.05, ceiling(y, 2) + 0.01))
-    # cell: two curved cradles over the tray's two saddles (same X, same width), 0.2 over the cell
-    for sx in (C['bat_x0'] + 9, C['bat_x0'] + c['bat_l'] - 13):
-        lid = uni(lid, cut(bx(sx, sx + 4, by - 6.5, ihi - 0.2, bc + 2.0, zl + 0.01),
-                           cyl((sx - 1, by, bc), (sx + 5, by, bc), c['bat_d'] / 2 + 0.2)))
+    # cell: two cradles matching the tray's saddles (same X, same width, same bore, the same 1.5 trim on the PCB side),
+    # coming down to the cell's axis on the back side, 0.2 off the back wall
+    for sx in (C['bat_x0'] + a for a in c['cradle_at']):
+        lid = uni(lid, cut(bx(sx, sx + c['cradle_w'], c['cradle_y0'], ihi - 0.2, bc + 0.5, zl + 0.01),
+                           cyl((sx - 1, by, bc), (sx + c['cradle_w'] + 1, by, bc), rc),
+                           bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - 1, bc + hz)))
     # charger: two pins clamp the module's edges where it has no pads (left edge between CN1 and GND, top edge
     # between PWR and the capacitor), mostly off the board; a pad 0.2 over the capacitor (it never bears on its legs)
     ctop = cz + c['chg_t']

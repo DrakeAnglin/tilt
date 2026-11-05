@@ -93,8 +93,13 @@ The top stays clean (no screw heads) and the screw heads sit flush with the bott
   clear it by 0.5 mm at the bottom and about 1.9 mm each side at the axis. Printed upside down, it's a 7 mm arch that
   flattens to about a 2 mm bridge at its crown, so no supports. The channel under it rises away from the middle, leaving the ESP's pins
   over 3 mm of room.
-- **Battery cradle:** the lid's flat pads are now two curved cradles at the same X as the tray's two saddles (same
-  width, 0.2 mm over the cell), so the cell is held round its whole circumference at two stations.
+- **Battery cradle:** two stations, each a tray saddle plus a matching lid cradle: 6 mm wide, the same 19.4 mm bore, and
+  never thinner than 1.5 mm, so there are no feathered edges. On the back side, the saddle's horn runs up to just under
+  the cell's centreline and blends into the back wall (so the cell still drops straight in), and the lid cradle comes
+  down to the centreline. On the PCB side, both stop flat where their wall is still 1.5 mm thick; they can't reach further
+  without going over the PCB's edge. The lid cradles sit 0.4 mm over the cell.
+
+![tray saddle](renders/ctrl-v5-cradle.png) ![lid cradle](renders/ctrl-v5-cradle-lid.png)
 
 ## Height (rev F)
 Folding the fuses brought the box from 33.3 to **25.8 mm** tall. Nothing else changed in length or width: the length is
