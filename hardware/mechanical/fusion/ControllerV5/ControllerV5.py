@@ -33,7 +33,7 @@ import math
 import os
 
 C = dict(
-    half_w=27.7, top=25.8, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=1.6, corner_r=4.0, edge_r=1.5,
+    room_out=-27.7, back_in=22.8, top=25.8, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=1.6, corner_r=4.0, edge_r=1.5,
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0, rod_z=24.0, rod=4.0,
     # height: with the three fuses folded, the tallest part outside the groove is the charger's capacitor lying on its
     # module (top 23.3), so the lid's underside is at 23.8 and its top at 25.8 (was 33.3 with the fuses upright)
@@ -41,8 +41,13 @@ C = dict(
     # 11.5 disc on ~11.9 mm legs (KiCad's model; B - A). Each is folded toward the ESP, legs bent 1.6 below the body,
     # so the disc lies flat over its own four resistors
     fuse_leg=11.9, fuse_bend=1.6, fuse_w=11.5, fuse_t=4.8, fuse_body=11.5,
-    # rod groove: floor 20.2 (the rod sweeps down to 21.17), 1.0 thick, so its underside is 19.2
-    groove_hw=6.0, groove_floor=20.2, groove_t=1.0, groove_wall=1.2,
+    # width: the room-side wall stays put (the PCB is 0.7 off it); the back wall comes in to 0.4 past the PCB's 47 mm jack
+    # strip (the widest thing in the box) and 0.3 past the H2 screw post, so the box no longer fills the rail: three rounded bumpers on the back wall
+    # touch the rail wall (0.2 clear) and keep the groove on the rod
+    bumper_x=(20.0, 82.0, 144.0), bumper_w=2.4,
+    # rod groove: a teardrop - r 6 round top (centre 26.2), 45 deg flanks, a 5 mm flat at 20.2 (the rod sweeps down to
+    # 21.17). Printed upside down it bridges 5 mm instead of 12 and needs no supports. The channel under it is 1.0 thick
+    groove_r=6.0, groove_floor=20.2, groove_t=1.0,
     # PCB: 1.7 mm above the floor, which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
     # reach 1.8 below), board 1.52 (as exported)
     pcb_gap=1.7, floor_recess=0.4, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
@@ -61,26 +66,29 @@ C = dict(
     # charger module (DIYMORE MCP73871, 31.5 x 30.5) and its capacitor (16 x 26)
     # module photo x (31.5) runs across the box (+Y), photo y (30.5) along it (+X): its capacitor corner ends up at the
     # back wall, its PWR / BATT pads on the groove side
-    chg_w=31.5, chg_d=30.5, chg_t=1.6, chg_gap=3.0, chg_y0=-6.1,
+    chg_w=31.5, chg_d=30.5, chg_t=1.6, chg_gap=3.0,
     cap_d=16.0, cap_h=26.0, cap_holes=((19.0, 5.5), (26.0, 5.5)), cap_up=1.5, cap_end=1.5,
     # USB-C breakout (Cermant, 22.1 x 13.05, socket 9.1 x 3.26 x 7.35 sticking out 1.45), on edge, socket face flush
     usb_w=22.1, usb_d=13.05, usb_t=1.6, usb_sw=9.1, usb_sh=3.26, usb_sl=7.35, usb_stick=1.45, usb_yc=-21.2,
     usb_z0=0.7, usb_pin_row=1.04,
 )
 c = C
-C['iw'] = c['half_w'] - c['wall']
+C['iw_lo'] = c['room_out'] + c['wall']                  # room-side inner face
+C['iw_hi'] = c['back_in']                              # back inner face
+C['out_hi'] = c['back_in'] + c['wall']
+C['g_zc'] = c['groove_floor'] + c['groove_r']          # groove's round top: centre height
+C['groove_top_hw'] = math.sqrt(c['groove_r'] ** 2 - (C['g_zc'] - c['top']) ** 2) if c['top'] < C['g_zc'] else c['groove_r']
 C['fz'] = c['floor_z'] + c['floor']
 C['zl'] = c['top'] - c['lid']
 C['zb'] = C['fz'] + c['pcb_gap']                     # PCB underside
 C['zt'] = C['zb'] + c['pcb_t']                       # PCB top
-C['g_under'] = c['groove_floor'] - c['groove_t']     # 19.2
-C['gw_out'] = c['groove_hw'] + c['groove_wall']      # 7.2
 C['pcb_end'] = c['pcb_x'] + c['pcb_len']
+C['chg_y0'] = C['iw_hi'] - 0.3 - c['chg_w']            # module 0.3 off the back wall
 C['chg_x0'] = C['pcb_end'] + 2.0                       # charger bay: room for its corner seat between it and the PCB
 C['bat_x0'] = c['pcb_x'] + c['pcb_bar'] + 2.0          # cell starts past the PCB's bar (end stop clear of the H2 post)
 C['in_b'] = C['chg_x0'] + c['cap_holes'][0][1] + c['cap_end'] + c['cap_h'] + 0.4    # end wall B inner face: past the capacitor
 C['L'] = C['in_b'] + c['end_t']
-C['bat_y'] = C['iw'] - 0.4 - c['bat_d'] / 2
+C['bat_y'] = 10.3                                     # as close to the PCB as the groove's underside and the PCB's edge allow
 C['bat_zc'] = C['fz'] + 0.5 + c['bat_d'] / 2
 C['esp_z0'] = C['zt'] + c['sock_h'] + c['spacer']    # ESP underside
 # USB-C breakout on edge: component face toward the room-side wall, socket face flush with end B's outer face
@@ -88,8 +96,18 @@ C['usb_front'] = C['L'] - c['usb_stick']
 C['usb_back'] = C['usb_front'] - c['usb_d']
 C['usb_yf'] = c['usb_yc'] + c['usb_sh'] / 2          # board's component face
 C['usb_zc'] = c['usb_z0'] + c['usb_w'] / 2
-C['solar_y'] = -9.8
+C['solar_y'] = -13.4
 L = C['L']
+
+
+def z_under(y, off):
+    """Lower edge of the groove (off 0) or of the channel under it (off = groove_t) at |y|; inf outside it."""
+    R, y = c['groove_r'] + off, abs(y)
+    if y > R:
+        return float('inf')
+    if y <= R / math.sqrt(2):
+        return max(y + C['g_zc'] - R * math.sqrt(2), c['groove_floor'] - off)
+    return C['g_zc'] - math.sqrt(R * R - y * y)
 
 
 def K(x, y):
@@ -98,39 +116,56 @@ def K(x, y):
 
 
 HOLES = [K(*h) for h in c['holes']]
-POST_B = (C['chg_x0'] + 6.6, -17.5)                              # fourth screw: the lid post in the charger bay
+POST_B = (C['chg_x0'] + 9.2, -20.5)                              # fourth screw: the lid post in the charger bay
 SCREWS = [(x, y, C['zb'], c['screw_l']) for x, y in HOLES + [POST_B]]   # (x, y, boss top, length): one size, M3 x 10
 
 
-def build(tbm, bx, cyl, cone, uni, cut, rbox):
-    """{group: [(name, body)]}. rbox(x0, x1, y0, y1, z0, z1, r) = box with its four vertical edges rounded."""
-    iw, fz, zl, zb, zt = C['iw'], C['fz'], C['zl'], C['zb'], C['zt']
-    hw, gu, gw = c['half_w'], C['g_under'], C['gw_out']
+def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
+    """{group: [(name, body)]}. rbox(x0, x1, y0, y1, z0, z1, r) = box with its four vertical edges rounded;
+    obox(centre, u, w, L, W, H) = box along unit vectors u, w."""
+    ilo, ihi, fz, zl, zb, zt = C['iw_lo'], C['iw_hi'], C['fz'], C['zl'], C['zb'], C['zt']
+    olo, ohi = c['room_out'], C['out_hi']
     in_b = C['in_b']
     out = {}
 
+    def groove(off, x0, x1):
+        """The groove (off 0), or its outline grown by off: round top r, 45 deg flanks, flat floor, open above."""
+        R, zc, fo = c['groove_r'] + off, C['g_zc'], c['groove_floor'] - off
+        zt_ = zc - R / math.sqrt(2)                       # where the flanks meet the round top
+        h = math.sqrt(0.5)
+        sq = cut(obox(((x0 + x1) / 2, 0, zc), (1, 0, 0), (0, h, h), x1 - x0, 2 * R, 2 * R),
+                 bx(x0 - 1, x1 + 1, -3 * R, 3 * R, zt_, zc + 3 * R))
+        g = uni(cyl((x0, 0, zc), (x1, 0, zc), R), sq, bx(x0, x1, -R, R, zc, zc + 20))
+        return cut(g, bx(x0 - 1, x1 + 1, -3 * R, 3 * R, fo - 3 * R - 5, fo))
+
     def ceiling(y, half=0.0):
-        """Lid underside over a feature spanning y +/- half: the groove channel's underside if it overlaps it."""
-        return gu if abs(y) - half < gw + 0.3 else zl
+        """Lid features run up to the lid's underside; under the groove they are trimmed by the final groove cut."""
+        return zl
 
     # ================================================================ tray
     F0 = c['floor_z'] + 0.3                              # floor-standing features start inside the floor
-    tray = cut(rbox(0, L, -hw, hw, c['floor_z'], zl, c['corner_r']),
-               rbox(c['end_a'], in_b, -iw, iw, fz, zl + 1, c['corner_r'] - c['wall']))
-    # relief in end A's room-side inner corner fillet for the PCB's corner (the board sits 0.2 off end wall A)
-    tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, -iw - 0.01, -iw + 2.2, zb - 0.3, zt + 0.3))
+    tray = cut(rbox(0, L, olo, ohi, c['floor_z'], zl, c['corner_r']),
+               rbox(c['end_a'], in_b, ilo, ihi, fz, zl + 1, c['corner_r'] - c['wall']))
+    # rail bumpers on the back wall: rounded vertical fins out to 0.2 short of the rail's wall
+    ry = c['rail_w'] / 2 - 0.2 - c['bumper_w'] / 2
+    for bxx in c['bumper_x']:
+        tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], zl),
+                   cyl((bxx, ry, c['floor_z']), (bxx, ry, zl), c['bumper_w'] / 2))
+    # reliefs in end A's inner corner fillets for the PCB's corners (the board sits 0.2 off end wall A)
+    tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + 0.3))
+    tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + 0.3))   # and the back one
     for xa, xb in ((-1, c['end_a'] + 0.01), (in_b - 0.01, L + 1)):        # the lid's groove channel crosses both ends
-        tray = cut(tray, bx(xa, xb, -gw - 0.15, gw + 0.15, gu - 0.15, zl + 1))
+        tray = cut(tray, groove(c['groove_t'] + 0.15, xa, xb))
     # --- floor recessed 0.4 under the PCB's outline (+0.5): room for its leads without raising the ESP
     fr = fz - c['floor_recess']
     bar_x1, _ = K(0, c['pcb_bar'])
-    tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.5, -iw - 0.01, K(c['pcb_bar'], 0)[1] + 0.5, fr, fz + 0.01),
-               bx(bar_x1 - 0.01, C['pcb_end'] + 0.5, -iw - 0.01, K(c['pcb_body'], 0)[1] + 0.5, fr, fz + 0.01))
+    tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.5, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.5, ihi + 0.01), fr, fz + 0.01),
+               bx(bar_x1 - 0.01, C['pcb_end'] + 0.5, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.5, fr, fz + 0.01))
     # --- PCB nest: it drops in and is located before the lid goes on: end wall A (0.2), the room-side wall (0.7) and
     # free-standing ribs along the bar's and the body's back edges (0.2); all below the board's top face
     ztop = C['zt'] - 0.3
     by_bar, by_body = K(c['pcb_bar'], 0)[1], K(c['pcb_body'], 0)[1]
-    for x0, x1, y0 in ((20.0, 40.0, by_bar), (58.0, 72.0, by_body), (100.0, 114.0, by_body)):
+    for x0, x1, y0 in ((58.0, 72.0, by_body), (100.0, 114.0, by_body)):       # (the back wall now locates the bar's edge)
         tray = uni(tray, bx(x0, x1, y0 + 0.2, y0 + 1.4, F0, ztop))
     # --- PCB: three bosses under its holes; through holes with countersinks from below (screws come up)
     for hx, hy in HOLES:
@@ -160,7 +195,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     # --- 18650: two saddles and two end stops (the end-B stop is low: the lead leaves that end)
     by, bc = C['bat_y'], C['bat_zc']
     for sx in (C['bat_x0'] + 9, C['bat_x0'] + c['bat_l'] - 13):
-        tray = uni(tray, cut(bx(sx, sx + 4, by - 6.5, iw + 0.5, F0, bc - 2.0),
+        tray = uni(tray, cut(bx(sx, sx + 4, by - 6.5, ihi + 0.5, F0, bc - 2.0),
                              cyl((sx - 1, by, bc), (sx + 5, by, bc), c['bat_d'] / 2 + 0.2)))
     # end stops, centred on the cell's axis; they bear on its end below the + button (the lead leaves the end-B end higher up)
     tray = uni(tray, bx(C['bat_x0'] - 1.4, C['bat_x0'] - 0.2, by - 4.0, by + 4.0, F0, bc - 2.5),
@@ -168,14 +203,14 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     # --- charger subassembly: four one-piece corner seats. Each is a 2 x 2 ledge under the board's corner (clear of the
     # pads' solder) joined to an L of 1.2 mm walls round the corner, 0.2 clear of the board and 1 mm above its top. On
     # the back-wall side there is no wall leg (the tray wall is 0.3 away and locates it); the ledge runs into the wall.
-    gx0, gx1, gy0 = C['chg_x0'], C['chg_x0'] + c['chg_d'], c['chg_y0']
+    gx0, gx1, gy0 = C['chg_x0'], C['chg_x0'] + c['chg_d'], C['chg_y0']
     gy1 = gy0 + c['chg_w']
     cz = fz + c['chg_gap']
     gtop = cz + c['chg_t'] + 1.0
     for px, py in ((gx0, gy0), (gx1, gy0), (gx0, gy1), (gx1, gy1)):
         sx, sy = (1 if px == gx0 else -1), (1 if py == gy0 else -1)
         wall_side = py == gy1                                  # back wall within 0.3
-        yo = (iw + 0.01) if wall_side else py - sy * 1.4       # outer edge of the seat across the box
+        yo = (ihi + 0.01) if wall_side else py - sy * 1.4       # outer edge of the seat across the box
         seat = bx(px - sx * 1.4, px + sx * 2.0, yo, py + sy * 2.0, F0, cz)                          # ledge
         seat = uni(seat, bx(px - sx * 1.4, px - sx * 0.2, yo, py + sy * 5.0, F0, gtop))             # leg along the end
         if not wall_side:
@@ -222,20 +257,21 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     out['Tray'] = [('Tray', tray)]
 
     # ================================================================ lid
-    lid = rbox(0, L, -hw, hw, zl, c['top'], c['corner_r'])
-    reg = cut(rbox(c['end_a'] + 0.2, in_b - 0.2, -iw + 0.2, iw - 0.2, zl - 1.4, zl + 0.01, c['corner_r'] - c['wall'] - 0.2),
-              rbox(c['end_a'] + 1.6, in_b - 1.6, -iw + 1.6, iw - 1.6, zl - 2, zl + 1, max(c['corner_r'] - c['wall'] - 1.6, 0.3)))
+    lid = rbox(0, L, olo, ohi, zl, c['top'], c['corner_r'])
+    reg = cut(rbox(c['end_a'] + 0.2, in_b - 0.2, ilo + 0.2, ihi - 0.2, zl - 1.4, zl + 0.01, c['corner_r'] - c['wall'] - 0.2),
+              rbox(c['end_a'] + 1.6, in_b - 1.6, ilo + 1.6, ihi - 1.6, zl - 2, zl + 1, max(c['corner_r'] - c['wall'] - 1.6, 0.3)))
     # no lip along end wall B: the capacitor's end and the USB-C board's top edge come up to within 1 mm of the lid there;
     # the lid locates on the other three sides and its four posts
-    reg = cut(reg, bx(in_b - 2.0, in_b + 1, -iw - 1, iw + 1, zl - 2, zl))
+    reg = cut(reg, bx(in_b - 2.0, in_b + 1, ilo - 1, ihi + 1, zl - 2, zl))
     lid = uni(lid, reg)
-    lid = cut(lid, bx(-1, L + 1, -gw, gw, gu, c['top'] + 1))
-    lid = uni(lid, cut(bx(0, L, -gw, gw, gu, c['top']),
-                       bx(-1, L + 1, -c['groove_hw'], c['groove_hw'], c['groove_floor'], c['top'] + 1)))
+    # the channel under the groove (the groove itself is cut last, so it also trims every feature that reaches it)
+    lid = uni(lid, cut(groove(c['groove_t'], 0, L), bx(-1, L + 1, -20, 20, c['top'], c['top'] + 30)))
     # posts with inserts: three on the PCB's holes (they clamp it), one on the charger-bay boss
     def root(px, py, r, top, want=2.0):
         """A 45 deg root fillet (cone) where a post meets the lid, as big as the room to the wall / groove allows."""
-        room = (gw - abs(py) - r) if top == gu else (iw - 0.6 - abs(py) - r)
+        if z_under(abs(py) + r + want, c['groove_t']) < zl + 0.5:      # under the groove's channel: it merges into it
+            return None
+        room = (ihi if py > 0 else -ilo) - 0.6 - abs(py) - r
         f = min(want, room)
         return cone((px, py, top - f), r, (px, py, top + 0.01), r + f) if f >= 0.6 else None
 
@@ -254,9 +290,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     for xk in c['rj_x']:
         x, y = K(xk, 9.0)
         lid = uni(lid, bx(x - 2, x + 2, y - 2, y + 2, jtop + 0.05, ceiling(y, 2) + 0.01))
-    btop = bc + c['bat_d'] / 2
-    for fx in (C['bat_x0'] + 24, C['bat_x0'] + c['bat_l'] - 24):
-        lid = uni(lid, bx(fx - 2.5, fx + 2.5, by - 3, by + 3, btop + 0.05, zl + 0.01))
+    # cell: two curved cradles over the tray's two saddles (same X, same width), 0.2 over the cell
+    for sx in (C['bat_x0'] + 9, C['bat_x0'] + c['bat_l'] - 13):
+        lid = uni(lid, cut(bx(sx, sx + 4, by - 6.5, ihi - 0.2, bc + 2.0, zl + 0.01),
+                           cyl((sx - 1, by, bc), (sx + 5, by, bc), c['bat_d'] / 2 + 0.2)))
     # charger: two pins clamp the module's edges where it has no pads (left edge between CN1 and GND, top edge
     # between PWR and the capacitor), mostly off the board; a pad 0.2 over the capacitor (it never bears on its legs)
     ctop = cz + c['chg_t']
@@ -270,6 +307,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     lid = uni(lid, bx(C['usb_back'] + 2.0, C['usb_front'] - 3.0, yf + 0.1, yb - 0.1, zu1 + 0.05, zl + 0.01))
     ex, ey = K(c['esp_xc'] - 4.0, c['esp_y0'] + 4.0)
     lid = uni(lid, bx(ex - 2, ex + 2, ey - 2, ey + 2, C['esp_z0'] + c['esp_t'] + 0.5, zl + 0.01))
+    lid = cut(lid, groove(0, -1, L + 1))
     out['Lid'] = [('Lid', lid)]
 
     # ================================================================ parts that are not in the PCB's 3D export
@@ -360,7 +398,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     P.append(('USB-C socket', sock))
     upx = C['usb_back'] + c['usb_pin_row']
     P.append(('USB-C header', bx(upx - 1.27, upx + 1.27, yb, yb + 2.5, C['usb_zc'] - 7.62, C['usb_zc'] + 7.62)))
-    P.append(('USB-C pins', bx(upx - 0.32, upx + 0.32, yb + 2.5, yb + 8.5, C['usb_zc'] - 6.67, C['usb_zc'] + 6.67)))
+    P.append(('USB-C pins', bx(upx - 0.32, upx + 0.32, yb + 2.5, yb + 5.5, C['usb_zc'] - 6.67, C['usb_zc'] + 6.67)))
     out['Parts'] = P
 
     # ================================================================ wires (render only)
@@ -389,14 +427,15 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     W.append(('Solar lead', uni(bx(sx8 + 3, L + 10, C['solar_y'] - 1.0, C['solar_y'] + 1.0, fz + 0.5, fz + 4.5),
                                 wire([(sx8 + 3, C['solar_y'], fz + 2.5), (sx8, sy8, fz + 2.5), (sx8, sy8, zt + 9.5)]))))
     jx3, jy3 = K(5.77, 122.5)
-    W.append(('USB lead', wire([(upx, yb + 8.5, C['usb_zc']), (upx, C['solar_y'] - 2.2, C['usb_zc']),
+    W.append(('USB lead', wire([(upx, yb + 5.5, C['usb_zc']), (upx, C['solar_y'] - 2.2, C['usb_zc']),
                                 (jx3 + 3, C['solar_y'] - 2.2, C['usb_zc']), (jx3, jy3, zt + c['sock_h'] + 2.5)], 0.7)))
     out['Wires'] = W
     return out
 
 
 if __name__ == '__main__':
-    print('Box %.1f x %.1f x %.1f mm (V4 was 126.1 long)' % (L, 2 * c['half_w'], c['top']))
-    print('PCB underside Z %.2f, top %.2f; ESP underside %.2f, pin tips %.2f; groove underside %.2f' % (
-        C['zb'], C['zt'], C['esp_z0'], C['esp_z0'] + c['esp_t'] + c['esp_tip'], C['g_under']))
+    print('Box %.1f x %.1f x %.1f mm (V4 was 126.1 long)' % (L, C['out_hi'] - c['room_out'], c['top']))
+    print('PCB underside Z %.2f, top %.2f; ESP underside %.2f, pin tips %.2f; channel underside %.2f at 0, %.2f at the ESP pin row' % (
+        C['zb'], C['zt'], C['esp_z0'], C['esp_z0'] + c['esp_t'] + c['esp_tip'], z_under(0, c['groove_t']), z_under(5.26, c['groove_t'])))
+    print('cell Y %.1f..%.1f; charger Y %.1f..%.1f' % (C['bat_y'] - c['bat_d'] / 2, C['bat_y'] + c['bat_d'] / 2, C['chg_y0'], C['chg_y0'] + c['chg_w']))
     print('screws (from below):', ', '.join('(%.1f, %.1f) M3x%.0f' % (x, y, l) for x, y, _, l in SCREWS))

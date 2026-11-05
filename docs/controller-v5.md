@@ -10,7 +10,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C 
 
 | | |
 |---|---|
-| Size | **164.6 × 55.4 × 25.8 mm**: fits the rail with the rod in the lid's groove; 7.5 mm lower than before, with the fuses folded |
+| Size | **164.6 × 52.5 × 25.8 mm** (+3 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 4 × M3 heat-set inserts (the M3 × 5.7 ones you have), **4 × M3 × 10 flat-head** (one screw size for the whole box) |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
@@ -27,7 +27,7 @@ edge in a slot. A short 2-wire lead joins it to J3.
 ## The tight spots (all checked in the model)
 | Where | Room |
 |---|---|
-| ESP32-C6 header pin tips (on the side under the groove) | **0.8 mm** below the groove (2.3 mm if you clip the tips flush) |
+| ESP32-C6 header pin tips (on the side under the groove) | **3.0 mm** below the groove's channel (the round groove rises away from the middle) |
 | Under the PCB | 2.1 mm (the floor is recessed 0.4 under the board). The tallest tails (JST-XH headers) reach 1.8 mm: **trim every other lead to 1.8 mm or less**. The jacks' tails and pegs sit in deeper pockets |
 | Fuses (folded) | 2–3 mm under the lid / groove |
 | 470 µF capacitor | 2–3 mm under the groove (standing, as soldered) |
@@ -39,7 +39,7 @@ edge in a slot. A short 2-wire lead joins it to J3.
    23.4 mm seated). Bend both legs over toward the ESP **about 1.6 mm below the body** (not at the body: the coating
    can crack), so the disc lies flat over its own four resistors, roughly 8–13 mm above the board. The H1 screw post is
    0.35 mm past the end of F1's disc, and the 470 µF is 1.3 mm past F3's, so fold them straight, not skewed.
-4. **USB-C lead**: two wires, about 45 mm. Solder one end to the USB-C board's **VBUS** and **GND** pins. Solder the
+4. **USB-C board's header pins: clip them to 3 mm** past their plastic (the charger module sits beside them now). **USB-C lead**: two wires, about 45 mm. Solder one end to the USB-C board's **VBUS** and **GND** pins. Solder the
    other end to a 2-pin piece of male header that plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Use red for VBUS and black for GND,
    or the white flat 2-core cable with the VBUS side marked.
 5. **Charger subassembly**: build it on the bench first. It goes into the box as one piece.
@@ -81,6 +81,19 @@ Nothing presses on the capacitor's legs.
    bay. Together they hold the lid on.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
+
+## Width, groove and battery cradle (rev G)
+- **Narrower:** the back wall comes in to 0.4 mm past the PCB's 47 mm jack strip (the widest part) and 0.3 mm past the H2
+  screw post. The 18650 moves 5.6 mm toward the PCB. It now starts 1.2 mm in from the PCB's edge, above it, and its
+  top clears the groove's channel. The charger module moves 3.3 mm toward the room side, which is why the USB-C board's
+  header pins get clipped to 3 mm. The bay's screw post and the solar cable's floor route moved with it. The box no
+  longer fills the rail, so **three rounded bumpers** on the back wall touch the rail's wall (0.2 mm clear) and keep the
+  groove on the rod.
+- **Round groove:** a teardrop: an r 6 round top, 45° flanks and a 5 mm flat floor (the rod still clears it by 0.97 mm at
+  the bottom of its sweep). Printed upside down, it bridges 5 mm instead of 12 and needs no supports, and the channel
+  under it rises away from the middle. That leaves the ESP's pins 3 mm of room, up from 0.8.
+- **Battery cradle:** the lid's flat pads are now two curved cradles at the same X as the tray's two saddles (same
+  width, 0.2 mm over the cell), so the cell is held round its whole circumference at two stations.
 
 ## Height (rev F)
 Folding the fuses brought the box from 33.3 to **25.8 mm** tall. Nothing else changed in length or width: the length is

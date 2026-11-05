@@ -31,6 +31,13 @@ def bx(x0, x1, y0, y1, z0, z1):
     return tbm.createBox(obb)
 
 
+def obox(c, u, w, L, W, H):
+    """Box centred at c (mm) with its length along unit vector u and width along w."""
+    obb = adsk.core.OrientedBoundingBox3D.create(P3(*c), adsk.core.Vector3D.create(*u), adsk.core.Vector3D.create(*w),
+                                                 L / 10, W / 10, H / 10)
+    return tbm.createBox(obb)
+
+
 def cyl(p1, p2, r):
     return tbm.createCylinderOrCone(P3(*p1), r / 10, P3(*p2), r / 10)
 
@@ -60,7 +67,7 @@ def rbox(x0, x1, y0, y1, z0, z1, r):
     return b
 
 
-groups = M.build(tbm, bx, cyl, cone, uni, cut, rbox)
+groups = M.build(tbm, bx, cyl, cone, uni, cut, rbox, obox)
 L = C['L']
 rh, rt = C['rail_w'] / 2, C['rail_wall']
 groups['Rail'] = [('Rail floor', bx(-20, L + 20, -rh - rt, rh + rt, -rt, 0)),
@@ -246,14 +253,14 @@ occs['PCB'] = pcb_occ
 
 
 def on_outline(x, y):
-    L_, hw, r = C['L'] / 10, C['half_w'] / 10, C['corner_r'] / 10
-    if abs(abs(y) - hw) < 0.003 and r - 0.003 <= x <= L_ - r + 0.003:
+    L_, ylo, yhi, r = C['L'] / 10, C['room_out'] / 10, C['out_hi'] / 10, C['corner_r'] / 10
+    if (abs(y - ylo) < 0.003 or abs(y - yhi) < 0.003) and r - 0.003 <= x <= L_ - r + 0.003:
         return True
-    if (abs(x) < 0.003 or abs(x - L_) < 0.003) and abs(y) <= hw - r + 0.003:
+    if (abs(x) < 0.003 or abs(x - L_) < 0.003) and ylo + r - 0.003 <= y <= yhi - r + 0.003:
         return True
     for cx in (r, L_ - r):
-        for cy in (hw - r, -(hw - r)):
-            if abs(math.hypot(x - cx, y - cy) - r) < 0.003 and ((x < cx) == (cx < L_ / 2)) and ((y > cy) == (cy > 0)):
+        for cy in (yhi - r, ylo + r):
+            if abs(math.hypot(x - cx, y - cy) - r) < 0.003 and ((x < cx) == (cx < L_ / 2)) and ((y > cy) == (cy > (ylo + yhi) / 2)):
                 return True
     return False
 
@@ -274,7 +281,7 @@ def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
                 if on_outline(mid.x, mid.y):
                     sets[rr].add(e)
                 elif groove and zz == z_big and isinstance(e.geometry, adsk.core.Line3D) and \
-                        abs(abs(mid.y) - C['groove_hw'] / 10) < 0.002:
+                        abs(abs(mid.y) - C['groove_top_hw'] / 10) < 0.002:
                     sets[rr].add(e)
     done = {}
     for rr, col in sets.items():
@@ -463,7 +470,7 @@ for i in range(root.occurrences.count):
         o.component.bRepBodies.item(j).isLightBulbOn = True
 vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('ctrl-v5-bay-top.png', (146, 0, 260), (146, 0, 0)))
 vis(hide=('Rail', 'Wires'))
-result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, 2 * C['half_w'], C['top']), 'notes': notes,
+result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,
           'step bodies': len(step_bodies), 'interference': hits or 'none', 'room above (mm, first contact with lid)': gaps,
           'fillets': fil, 'engraving': eng, 'exported': files, 'renders': res}
