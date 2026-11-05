@@ -10,7 +10,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C 
 
 | | |
 |---|---|
-| Size | **163.6 × 55.4 × 33.3 mm**: same cross-section as V4 (fits the rail, rod in the lid's groove), 39 mm longer |
+| Size | **164.6 × 55.4 × 33.3 mm**: same cross-section as V4 (fits the rail, rod in the lid's groove), 39 mm longer |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 4 × M3 heat-set inserts (the M3 × 5.7 ones you have), **4 × M3 × 10 flat-head** (one screw size for the whole box) |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
@@ -96,6 +96,18 @@ The top stays clean (no screw heads) and the screw heads sit flush with the bott
 - **Fit coupon:** print it and push a plug through into a soldered jack. It should click in and release with the latch
   squeezed, with no rubbing. If it rubs, tell me which edge and by how much; the opening is one parameter (`ap_w`,
   `ap_z`).
+
+## Mount review (rev E)
+| Mount | Rev E |
+|---|---|
+| Charger module | **Four one-piece corner seats.** Each is a 2 × 2 ledge under the board's corner joined to a closed L of 1.2 mm walls round it (0.2 clear of the board, 1 mm above its top). On the back-wall side there is no wall leg (the tray wall, 0.3 away, does that); the ledge runs into the wall. The legs at the capacitor end stay below the capacitor. The bay moved 1 mm toward end B so the seat by the PCB clears the board's end and the H3 post |
+| Capacitor | Saddle under its free end, merged with the end-B corner seat; lid pad 0.2 over it |
+| 18650 | Two saddles (into the back wall) + two end stops centred on the cell's axis, bearing on its end below the + button. The cell moved 0.4 mm toward end B so the end-A stop clears the H2 post without being cut short |
+| PCB | Three bosses (screw clamps) + end wall A (0.2) + the room-side wall (0.7) + free-standing ribs on the bar's and body's back edges (0.2). The thin ribs that only narrowed the gap to the room-side wall are gone (they did nothing the wall doesn't) |
+| USB-C board | End-wall pocket, back-edge slot with stop, floor groove, lid fin |
+| Lid | Four screw posts, edge pins on the charger, pads over the jacks, cell, capacitor, ESP (0.5 clear) |
+
+![charger seats](renders/ctrl-v5-seats.png)
 
 ## Engineering review (rev B)
 Changes made after a design review against production practice:

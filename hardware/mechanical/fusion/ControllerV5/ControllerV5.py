@@ -70,8 +70,8 @@ C['zt'] = C['zb'] + c['pcb_t']                       # PCB top
 C['g_under'] = c['groove_floor'] - c['groove_t']     # 19.2
 C['gw_out'] = c['groove_hw'] + c['groove_wall']      # 7.2
 C['pcb_end'] = c['pcb_x'] + c['pcb_len']
-C['chg_x0'] = C['pcb_end'] + 1.0                       # charger bay starts 1 mm past the PCB
-C['bat_x0'] = c['pcb_x'] + c['pcb_bar'] + 1.6          # cell starts past the PCB's bar
+C['chg_x0'] = C['pcb_end'] + 2.0                       # charger bay: room for its corner seat between it and the PCB
+C['bat_x0'] = c['pcb_x'] + c['pcb_bar'] + 2.0          # cell starts past the PCB's bar (end stop clear of the H2 post)
 C['in_b'] = C['chg_x0'] + c['cap_holes'][0][1] + c['cap_end'] + c['cap_h'] + 0.4    # end wall B inner face: past the capacitor
 C['L'] = C['in_b'] + c['end_t']
 C['bat_y'] = C['iw'] - 0.4 - c['bat_d'] / 2
@@ -120,14 +120,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     bar_x1, _ = K(0, c['pcb_bar'])
     tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.5, -iw - 0.01, K(c['pcb_bar'], 0)[1] + 0.5, fr, fz + 0.01),
                bx(bar_x1 - 0.01, C['pcb_end'] + 0.5, -iw - 0.01, K(c['pcb_body'], 0)[1] + 0.5, fr, fz + 0.01))
-    # --- PCB nest: it drops in and is located before the lid goes on (0.2 clear): end wall A itself, ribs along the
-    # bar's and the body's back edges and the room-side wall; all below the board's top face
+    # --- PCB nest: it drops in and is located before the lid goes on: end wall A (0.2), the room-side wall (0.7) and
+    # free-standing ribs along the bar's and the body's back edges (0.2); all below the board's top face
     ztop = C['zt'] - 0.3
     by_bar, by_body = K(c['pcb_bar'], 0)[1], K(c['pcb_body'], 0)[1]
     for x0, x1, y0 in ((20.0, 40.0, by_bar), (58.0, 72.0, by_body), (100.0, 114.0, by_body)):
         tray = uni(tray, bx(x0, x1, y0 + 0.2, y0 + 1.4, F0, ztop))
-    for x0, x1 in ((58.0, 72.0), (100.0, 114.0)):
-        tray = uni(tray, bx(x0, x1, -iw - 0.01, c['pcb_y'] - 0.2, F0, ztop))
     # --- PCB: three bosses under its holes; through holes with countersinks from below (screws come up)
     for hx, hy in HOLES:
         tray = uni(tray, cyl((hx, hy, F0), (hx, hy, zb), c['boss_d'] / 2))
@@ -158,21 +156,25 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     for sx in (C['bat_x0'] + 9, C['bat_x0'] + c['bat_l'] - 13):
         tray = uni(tray, cut(bx(sx, sx + 4, by - 6.5, iw + 0.5, F0, bc - 2.0),
                              cyl((sx - 1, by, bc), (sx + 5, by, bc), c['bat_d'] / 2 + 0.2)))
-    tray = uni(tray, bx(C['bat_x0'] - 1.4, C['bat_x0'] - 0.2, by - 5, by + 1.0, F0, bc - 2.5),      # clear of the H2 post
-               bx(C['bat_x0'] + c['bat_l'] + 0.2, C['bat_x0'] + c['bat_l'] + 1.4, by - 5, by + 5, F0, fz + 4.0))
-    # --- charger subassembly: four corner pads (2 x 2, clear of the pads' solder), corner guides at the back-wall corner
-    # on the end-A side and both room-side corners (the back wall and end wall B do the rest; no guide at the room-side
-    # end-A corner, where the PCB and the H3 post are), and a saddle under the capacitor's free end
-    gx0, gx1, gy0, gy1 = C['chg_x0'], C['chg_x0'] + c['chg_d'], c['chg_y0'], c['chg_y0'] + c['chg_w']
+    # end stops, centred on the cell's axis; they bear on its end below the + button (the lead leaves the end-B end higher up)
+    tray = uni(tray, bx(C['bat_x0'] - 1.4, C['bat_x0'] - 0.2, by - 4.0, by + 4.0, F0, bc - 2.5),
+               bx(C['bat_x0'] + c['bat_l'] + 0.2, C['bat_x0'] + c['bat_l'] + 1.4, by - 4.0, by + 4.0, F0, bc - 4.0))
+    # --- charger subassembly: four one-piece corner seats. Each is a 2 x 2 ledge under the board's corner (clear of the
+    # pads' solder) joined to an L of 1.2 mm walls round the corner, 0.2 clear of the board and 1 mm above its top. On
+    # the back-wall side there is no wall leg (the tray wall is 0.3 away and locates it); the ledge runs into the wall.
+    gx0, gx1, gy0 = C['chg_x0'], C['chg_x0'] + c['chg_d'], c['chg_y0']
+    gy1 = gy0 + c['chg_w']
     cz = fz + c['chg_gap']
-    for px, py in ((gx0, gy0), (gx0, gy1), (gx1, gy0), (gx1, gy1)):
+    gtop = cz + c['chg_t'] + 1.0
+    for px, py in ((gx0, gy0), (gx1, gy0), (gx0, gy1), (gx1, gy1)):
         sx, sy = (1 if px == gx0 else -1), (1 if py == gy0 else -1)
-        tray = uni(tray, bx(px, px + sx * 2.0, py, py + sy * 2.0, F0, cz))
-    for px, py, legs in ((gx0, gy1, 'xy'), (gx0, gy0, 'y'), (gx1, gy0, 'xy')):
-        sx, sy = (1 if px == gx0 else -1), (1 if py == gy0 else -1)
-        if 'x' in legs:
-            tray = uni(tray, bx(px - sx * 1.4, px - sx * 0.2, py - sy * 0.2, py + sy * 4.0, F0, cz + 3.0))
-        tray = uni(tray, bx(px - sx * 0.2, px + sx * 4.0, py - sy * 1.4, py - sy * 0.2, F0, cz + 3.0))
+        wall_side = py == gy1                                  # back wall within 0.3
+        yo = (iw + 0.01) if wall_side else py - sy * 1.4       # outer edge of the seat across the box
+        seat = bx(px - sx * 1.4, px + sx * 2.0, yo, py + sy * 2.0, F0, cz)                          # ledge
+        seat = uni(seat, bx(px - sx * 1.4, px - sx * 0.2, yo, py + sy * 5.0, F0, gtop))             # leg along the end
+        if not wall_side:
+            seat = uni(seat, bx(px - sx * 1.4, px + sx * 5.0, py - sy * 1.4, py - sy * 0.2, F0, gtop))   # leg along the side
+        tray = uni(tray, seat)
     cap_y = gy0 + (c['cap_holes'][0][0] + c['cap_holes'][1][0]) / 2
     cap_x0 = gx0 + c['cap_holes'][0][1] + c['cap_end']
     cap_z = cz + c['chg_t'] + c['cap_up'] + c['cap_d'] / 2
