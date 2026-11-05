@@ -412,6 +412,24 @@ res.append(shot('ctrl-v5-end-a.png', (-150, -95, 70), (25, 0, 14), fit=False))
 vis(hide=('Rail', 'Wires', 'Tray', 'PCB', 'Parts', 'Screws')); res.append(shot('ctrl-v5-lid-under.png', (L / 2 - 100, -140, -170)))
 vis(); res.append(shot('ctrl-v5-in-rail.png', (-140, -90, 90)))
 vis(hide=('Lid', 'Rail', 'Wires', 'Screws', 'PCB', 'Parts')); res.append(shot('ctrl-v5-tray.png', (L / 2 - 150, -170, 200)))
+
+
+def only(prefixes):
+    """Show just the bodies whose names start with one of the prefixes (Parts / Wires); hide everything else."""
+    for i in range(root.occurrences.count):
+        o = root.occurrences.item(i)
+        o.isLightBulbOn = o.component.name in ('C5 Parts', 'C5 Wires')
+        for j in range(o.component.bRepBodies.count):
+            b = o.component.bRepBodies.item(j)
+            b.isLightBulbOn = b.name.startswith(prefixes)
+
+
+only(('Charger', 'Harness')); res.append(shot('ctrl-v5-charger-sub.png', (L - 130, -150, 140), (146, 10, 8)))
+for i in range(root.occurrences.count):
+    o = root.occurrences.item(i)
+    for j in range(o.component.bRepBodies.count):
+        o.component.bRepBodies.item(j).isLightBulbOn = True
+vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('ctrl-v5-bay-top.png', (146, 0, 260), (146, 0, 0)))
 vis(hide=('Rail', 'Wires'))
 result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, 2 * C['half_w'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,

@@ -11,9 +11,13 @@ Layout, end A (ports) to end B (USB-C):
     box, through the bosses and the PCB's holes, into heat-set inserts in three lid posts: the screws clamp the PCB
     between the floor and the lid, and hold the lid on.
   * 18650 in two saddles along the back wall, beside the PCB body; the lid presses it down.
-  * Charger bay: the module on four corner pads, its capacitor standing in a cup beside it (legs run under the module
-    into its capacitor holes), a lid post with a fourth insert (fourth screw from below), the solar lead through
-    end wall B along a channel between the cup and the module.
+  * Charger bay: the charger goes in as ONE subassembly - module + its capacitor + the 6-pin harness, soldered on the
+    bench. The capacitor is soldered in the module's own footprint (two holes 7 mm apart at one corner) with its legs
+    bent 90 deg, so it lies on its side across the module (standing up it would be 33 mm: too tall). It covers the
+    LOAD pad, so that one harness wire is soldered from underneath and runs under the module (3 mm standoffs).
+    The module sits on four corner pads between guides; two lid pins clamp its edges; a tray saddle carries the
+    capacitor's free end. A lid post with a fourth insert (fourth screw from below) and the solar lead's floor
+    route are on the room side of the bay.
   * USB-C breakout on edge: front edge in a pocket in end wall B (socket face flush), back edge in a slot, bottom edge
     in a floor groove, top edge under a lid fin.
 
@@ -46,8 +50,10 @@ C = dict(
     # 18650 (protected, JST-XH lead) along the back wall
     bat_d=19.0, bat_l=69.0, bat_x0=52.0,
     # charger module (DIYMORE MCP73871, 31.5 x 30.5) and its capacitor (16 x 26)
-    chg_w=31.5, chg_d=30.5, chg_t=1.6, chg_gap=2.0, chg_x0=130.5, chg_y0=-5.6, cap_d=16.0, cap_h=26.0, cap_lift=1.5,
-    cap_x=138.5, cap_y=-17.4,
+    # module photo x (31.5) runs across the box (+Y), photo y (30.5) along it (+X): its capacitor corner ends up at the
+    # back wall, its PWR / BATT pads on the groove side
+    chg_w=31.5, chg_d=30.5, chg_t=1.6, chg_gap=3.0, chg_x0=129.4, chg_y0=-6.1,
+    cap_d=16.0, cap_h=26.0, cap_holes=((19.0, 5.5), (26.0, 5.5)), cap_up=1.5, cap_end=1.5,
     # USB-C breakout (Cermant, 22.1 x 13.05, socket 9.1 x 3.26 x 7.35 sticking out 1.45), on edge, socket face flush
     usb_w=22.1, usb_d=13.05, usb_t=1.6, usb_sw=9.1, usb_sh=3.26, usb_sl=7.35, usb_stick=1.45, usb_yc=-21.2,
     usb_z0=0.7, usb_pin_row=1.04,
@@ -60,7 +66,7 @@ C['zb'] = C['fz'] + c['pcb_gap']                     # PCB underside
 C['zt'] = C['zb'] + c['pcb_t']                       # PCB top
 C['g_under'] = c['groove_floor'] - c['groove_t']     # 19.2
 C['gw_out'] = c['groove_hw'] + c['groove_wall']      # 7.2
-C['in_b'] = c['chg_x0'] + c['chg_w'] + 0.8           # end wall B inner face
+C['in_b'] = c['chg_x0'] + c['cap_holes'][0][1] + c['cap_end'] + c['cap_h'] + 0.4    # end wall B inner face: past the capacitor
 C['L'] = C['in_b'] + c['end_t']
 C['pcb_end'] = c['pcb_x'] + c['pcb_len']
 C['bat_y'] = C['iw'] - 0.4 - c['bat_d'] / 2
@@ -71,7 +77,7 @@ C['usb_front'] = C['L'] - c['usb_stick']
 C['usb_back'] = C['usb_front'] - c['usb_d']
 C['usb_yf'] = c['usb_yc'] + c['usb_sh'] / 2          # board's component face
 C['usb_zc'] = c['usb_z0'] + c['usb_w'] / 2
-C['solar_y'] = -6.75
+C['solar_y'] = -9.8
 L = C['L']
 
 
@@ -81,7 +87,7 @@ def K(x, y):
 
 
 HOLES = [K(*h) for h in c['holes']]
-POST_B = (156.5, -12.5)                              # fourth screw: the lid post in the charger bay
+POST_B = (136.0, -17.5)                              # fourth screw: the lid post in the charger bay
 SCREWS = [(x, y, C['zb'], c['screw_l']) for x, y in HOLES + [POST_B]]   # (x, y, boss top, length): one size, M3 x 10
 
 
@@ -138,26 +144,24 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
                              cyl((sx - 1, by, bc), (sx + 5, by, bc), c['bat_d'] / 2 + 0.2)))
     tray = uni(tray, bx(c['bat_x0'] - 1.4, c['bat_x0'] - 0.2, by - 5, by + 1.0, F0, bc - 2.5),      # clear of the H2 post
                bx(c['bat_x0'] + c['bat_l'] + 0.2, c['bat_x0'] + c['bat_l'] + 1.4, by - 5, by + 5, F0, fz + 4.0))
-    # --- charger: four corner pads (2 x 2, clear of its pads' solder), corner guides at the end-A corners and the
-    # room-side end-B corner (the back wall and end wall B guide the rest)
-    gx0, gx1, gy0, gy1 = c['chg_x0'], c['chg_x0'] + c['chg_w'], c['chg_y0'], c['chg_y0'] + c['chg_d']
+    # --- charger subassembly: four corner pads (2 x 2, clear of the pads' solder), corner guides at the back-wall corner
+    # on the end-A side and both room-side corners (the back wall and end wall B do the rest; no guide at the room-side
+    # end-A corner, where the PCB and the H3 post are), and a saddle under the capacitor's free end
+    gx0, gx1, gy0, gy1 = c['chg_x0'], c['chg_x0'] + c['chg_d'], c['chg_y0'], c['chg_y0'] + c['chg_w']
     cz = fz + c['chg_gap']
     for px, py in ((gx0, gy0), (gx0, gy1), (gx1, gy0), (gx1, gy1)):
         sx, sy = (1 if px == gx0 else -1), (1 if py == gy0 else -1)
         tray = uni(tray, bx(px, px + sx * 2.0, py, py + sy * 2.0, F0, cz))
-    for px, py in ((gx0, gy0), (gx0, gy1), (gx1, gy0)):
+    for px, py, legs in ((gx0, gy1, 'xy'), (gx0, gy0, 'y'), (gx1, gy0, 'xy')):
         sx, sy = (1 if px == gx0 else -1), (1 if py == gy0 else -1)
-        g = uni(bx(px - sx * 1.4, px - sx * 0.2, py - sy * 0.2, py + sy * 4.0, F0, cz + 3.0),
-                bx(px - sx * 0.2, px + sx * 4.0, py - sy * 1.4, py - sy * 0.2, F0, cz + 3.0))
-        tray = uni(tray, g)
-    # --- capacitor cup (open on the back-wall side; a notch toward the module for its legs), three 1.5 mm pads
-    cx, cy, cr = c['cap_x'], c['cap_y'], c['cap_d'] / 2 + 0.3
-    cup = cut(cyl((cx, cy, F0), (cx, cy, fz + 7.0), cr + 1.2), cyl((cx, cy, fz), (cx, cy, fz + 8.0), cr))
-    cup = cut(cup, bx(cx - 3.5, cx + 3.5, cy, cy + cr + 2, fz + 0.01, fz + 3.0))          # legs out toward the module
-    tray = uni(tray, cup)
-    for a in (0, 120, 240):
-        px, py = cx + 5.5 * math.cos(math.radians(a + 30)), cy + 5.5 * math.sin(math.radians(a + 30))
-        tray = uni(tray, cyl((px, py, F0), (px, py, fz + c['cap_lift']), 1.2))
+        if 'x' in legs:
+            tray = uni(tray, bx(px - sx * 1.4, px - sx * 0.2, py - sy * 0.2, py + sy * 4.0, F0, cz + 3.0))
+        tray = uni(tray, bx(px - sx * 0.2, px + sx * 4.0, py - sy * 1.4, py - sy * 0.2, F0, cz + 3.0))
+    cap_y = gy0 + (c['cap_holes'][0][0] + c['cap_holes'][1][0]) / 2
+    cap_x0 = gx0 + c['cap_holes'][0][1] + c['cap_end']
+    cap_z = cz + c['chg_t'] + c['cap_up'] + c['cap_d'] / 2
+    tray = uni(tray, cut(bx(gx1 + 0.3, in_b + 0.01, cap_y - 6.5, cap_y + 6.5, F0, cap_z - 3.0),
+                         cyl((gx1, cap_y, cap_z), (in_b + 1, cap_y, cap_z), c['cap_d'] / 2 + 0.3)))
     # --- USB-C breakout: front edge in a pocket in end wall B, back edge in a slot, bottom edge in a floor groove;
     # vertical stadium window for the socket
     yf, yb = C['usb_yf'], C['usb_yf'] + c['usb_t']
@@ -180,12 +184,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
                cyl((L - 0.5, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr2),
                cyl((L - 0.5, c['usb_yc'], zc + hz), (L + 1, c['usb_yc'], zc + hz), wr2))
     # --- charger vents: four slots in end wall B above the module (the floor sits on the rail, so not there)
-    for vy in (9.0, 12.5, 16.0, 19.5):
+    for vy in (-2.5, 1.0, 4.5):
         tray = cut(tray, bx(in_b - 1, L + 1, vy - 0.8, vy + 0.8, fz + 8.0, fz + 17.0),
                    cyl((in_b - 1, vy, fz + 8.0), (L + 1, vy, fz + 8.0), 0.8), cyl((in_b - 1, vy, fz + 17.0), (L + 1, vy, fz + 17.0), 0.8))
-    # --- fourth screw boss (charger bay) and the solar lead slot in end wall B (flat 2-core cable on edge)
+    # --- fourth screw boss (charger bay) and the solar lead slot in end wall B (flat 2-core cable lying flat)
     tray = uni(tray, cyl((POST_B[0], POST_B[1], F0), (POST_B[0], POST_B[1], zb), c['boss_d'] / 2 + 0.5))
-    tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 1.15, C['solar_y'] + 1.15, fz + 0.3, fz + 5.2))
+    tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 2.4, C['solar_y'] + 2.4, fz - 0.01, fz + 2.5))   # flat cable
     # --- screw holes + countersinks from below (all four)
     for sx, sy, _, _ in SCREWS:
         tray = cut(tray, cyl((sx, sy, -1), (sx, sy, zb + 1), 1.7),
@@ -225,14 +229,16 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     btop = bc + c['bat_d'] / 2
     for fx in (c['bat_x0'] + 24, c['bat_x0'] + c['bat_l'] - 24):
         lid = uni(lid, bx(fx - 2.5, fx + 2.5, by - 3, by + 3, btop + 0.05, zl + 0.01))
+    # charger: two pins clamp the module's edges where it has no pads (left edge between CN1 and GND, top edge
+    # between PWR and the capacitor), mostly off the board; a pad 0.2 over the capacitor (it never bears on its legs)
     ctop = cz + c['chg_t']
-    for fx, fy in ((147.0, 22.5), (147.0, -2.7)):
-        tp = ceiling(fy, 3.0)
-        lid = uni(lid, cyl((fx, fy, ctop + 0.05), (fx, fy, tp + 0.01), 3.0))
-        f = root(fx, fy, 3.0, tp, 1.5)
+    for fx, fy in ((gx0 + 21.5, gy0 - 0.3), (gx0 - 0.3, gy0 + 14.0)):
+        tp = ceiling(fy, 1.6)
+        lid = uni(lid, cyl((fx, fy, ctop + 0.05), (fx, fy, tp + 0.01), 1.6))
+        f = root(fx, fy, 1.6, tp, 1.5)
         if f:
             lid = uni(lid, f)
-    lid = uni(lid, cyl((cx, cy, fz + c['cap_lift'] + c['cap_h'] + 0.3), (cx, cy, zl + 0.01), 3.0))
+    lid = uni(lid, bx(cap_x0 + 10, cap_x0 + 18, cap_y - 3, cap_y + 3, cap_z + c['cap_d'] / 2 + 0.2, zl + 0.01))
     lid = uni(lid, bx(C['usb_back'] + 2.0, C['usb_front'] - 3.0, yf + 0.1, yb - 0.1, zu1 + 0.05, zl + 0.01))
     ex, ey = K(c['esp_xc'] - 4.0, c['esp_y0'] + 4.0)
     lid = uni(lid, bx(ex - 2, ex + 2, ey - 2, ey + 2, C['esp_z0'] + c['esp_t'] + 0.5, zl + 0.01))
@@ -293,23 +299,23 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
     P.append(('18650', cyl((c['bat_x0'], by, bc), (c['bat_x0'] + c['bat_l'], by, bc), c['bat_d'] / 2)))
     # charger module: board, parts area, the big pads (rings), its capacitor and legs
     P.append(('Charger board', bx(gx0, gx1, gy0, gy1, cz, cz + c['chg_t'])))
-    P.append(('Charger parts', bx(gx1 - 28.0, gx1 - 6.0, gy0 + 6.0, gy0 + 25.0, cz + c['chg_t'], cz + c['chg_t'] + 1.0)))
 
     def M(xm, ym):
-        """module (photo x right, y down) -> box: x runs toward end A, y toward the back wall."""
-        return gx1 - xm, gy0 + ym
+        """module (listing photo: x right, y down) -> box."""
+        return gx0 + ym, gy0 + xm
 
+    x0, y0 = M(6.0, 6.0)
+    x1, y1 = M(28.0, 25.0)
+    P.append(('Charger parts', bx(x0, x1, y0, y1, cz + c['chg_t'], cz + c['chg_t'] + 1.0)))
     for nm, (xm, ym) in (('PWR', (9.0, 3.3)), ('GND a', (4.3, 3.3)), ('BATT', (9.0, 26.5)), ('GND b', (4.3, 26.5)),
                          ('LOAD', (20.0, 26.5)), ('GND c', (24.7, 26.5))):
         px, py = M(xm, ym)
-        P.append(('Charger pad %s' % nm, cyl((px, py, cz - 1.2), (px, py, cz + c['chg_t'] + 0.3), 2.0)))
-    cz0 = fz + c['cap_lift']
-    P.append(('Charger capacitor', cyl((cx, cy, cz0), (cx, cy, cz0 + c['cap_h']), c['cap_d'] / 2)))
-    for ym in (5.5,):
-        for xm in (22.0, 25.8):
-            px, py = M(xm, ym)
-            P.append(('Charger cap leg %.0f' % xm, uni(bx(px - 0.3, px + 0.3, cy, py + 0.3, cz0 - 0.3, cz0 + 0.3),
-                                                       bx(px - 0.3, px + 0.3, py - 0.3, py + 0.3, cz0 - 0.3, cz + c['chg_t'] + 1.0))))
+        P.append(('Charger pad %s' % nm, cyl((px, py, cz - 1.0), (px, py, cz + c['chg_t'] + 0.3), 2.0)))
+    P.append(('Charger capacitor', cyl((cap_x0, cap_y, cap_z), (cap_x0 + c['cap_h'], cap_y, cap_z), c['cap_d'] / 2)))
+    for xm, ym in c['cap_holes']:
+        px, py = M(xm, ym)
+        P.append(('Charger cap leg %.0f' % xm, uni(bx(px - 0.3, cap_x0 + 0.01, py - 0.3, py + 0.3, cap_z - 0.3, cap_z + 0.3),
+                                                   bx(px - 0.3, px + 0.3, py - 0.3, py + 0.3, cz - 1.0, cap_z + 0.3))))
     # USB-C breakout on edge
     P.append(('USB-C board', bx(C['usb_back'], C['usb_front'], yf, yb, zu0, zu1)))
     hz0 = C['usb_zc'] - c['usb_sw'] / 2 + c['usb_sh'] / 2
@@ -335,10 +341,13 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
 
     W = []
     jx, jy = K(9.25, 114.0)
-    for nm, (xm, ym) in (('PWR', (9.0, 3.3)), ('BATT', (9.0, 26.5)), ('LOAD', (20.0, 26.5)), ('GND', (4.3, 3.3))):
+    for nm, (xm, ym) in (('PWR', (9.0, 3.3)), ('BATT', (9.0, 26.5)), ('GND', (4.3, 3.3))):
         px, py = M(xm, ym)
-        zz = zt + 13.3 + 0.8 * len(W)
+        zz = zt + 12.5 + 1.7 * len(W)
         W.append(('Harness %s' % nm, wire([(jx, jy, zt + 12.5), (jx, jy, zz), (px, jy, zz), (px, py, zz), (px, py, cz + c['chg_t'])])))
+    px, py = M(20.0, 26.5)                      # LOAD: under the capacitor, so soldered from underneath, run under the module
+    W.append(('Harness LOAD', wire([(jx, jy, zt + 12.5), (jx, jy, zt + 17.6), (gx0 - 1.0, jy, zt + 17.6), (gx0 - 1.0, py, zt + 17.6),
+                                    (gx0 - 1.0, py, fz + 1.4), (px, py, fz + 1.4), (px, py, cz + 0.5)])))
     bx4, by4 = K(18.75, 105.5)
     end = c['bat_x0'] + c['bat_l']
     W.append(('Battery lead', wire([(end, by, bc), (end + 3, by, bc), (end + 3, by4 + 6, bc), (bx4, by4 + 6, bc), (bx4, by4, zt + 12.5)])))
