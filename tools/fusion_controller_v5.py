@@ -200,7 +200,11 @@ for i in range(len(own)):
             continue
         v = vol(bi, bj)
         if v > 0.01:
-            hits.append('%s / %s: %.2f mm3' % (ni, nj, v))
+            cc = tbm.copy(bi)
+            tbm.booleanOperation(cc, tbm.copy(bj), B.IntersectionBooleanType)
+            q = cc.boundingBox
+            hits.append('%s / %s: %.2f mm3 at X %.1f-%.1f Y %.1f-%.1f Z %.1f-%.1f' % (
+                ni, nj, v, q.minPoint.x * 10, q.maxPoint.x * 10, q.minPoint.y * 10, q.maxPoint.y * 10, q.minPoint.z * 10, q.maxPoint.z * 10))
 
 
 # clearances to the lid (closest approach upward) for the tight spots
@@ -308,6 +312,34 @@ def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
 
 fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], C['edge_r'], C['zl'], 0.6),
        'Lid': round_edges(comps['Lid'], C['top'], C['edge_r'], C['zl'], 0.6, groove=True)}
+
+
+def engrave(comp, z, lines, x0, x1, y0, y1, depth, flip):
+    """Engrave text (0.4 deep) into the component's body from the plane at height z. flip: read from below."""
+    try:
+        pl_in = comp.constructionPlanes.createInput()
+        pl_in.setByOffset(comp.xYConstructionPlane, adsk.core.ValueInput.createByReal(z / 10))
+        pl = comp.constructionPlanes.add(pl_in)
+        sk = comp.sketches.add(pl)
+        ti = sk.sketchTexts.createInput2(lines, 0.32)
+        ti.setAsMultiLine(adsk.core.Point3D.create(x0 / 10, y0 / 10, 0), adsk.core.Point3D.create(x1 / 10, y1 / 10, 0),
+                          adsk.core.HorizontalAlignments.CenterHorizontalAlignment,
+                          adsk.core.VerticalAlignments.MiddleVerticalAlignment, 0)
+        ti.isHorizontalFlip = flip
+        tx = sk.sketchTexts.add(ti)
+        ei = comp.features.extrudeFeatures.createInput(tx, adsk.fusion.FeatureOperations.CutFeatureOperation)
+        ei.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(depth / 10)),
+                            adsk.fusion.ExtentDirections.PositiveExtentDirection if depth > 0 else adsk.fusion.ExtentDirections.NegativeExtentDirection)
+        ei.participantBodies = [comp.bRepBodies.item(0)]
+        comp.features.extrudeFeatures.add(ei)
+        pl.isLightBulbOn = False
+        return 'ok'
+    except Exception as ex:
+        return 'failed: %s' % str(ex)[:120]
+
+
+eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER V5\n4 x M3x10 FLAT HEAD FROM BELOW', 66, 118, -2, 20, 0.4, False),
+       'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID - 4 x M3 INSERTS', 78, 122, -22, -12, -0.4, False)}
 files = []
 em = design.exportManager
 for g, nm in (('Tray', 'controller_v5_tray'), ('Lid', 'controller_v5_lid')):
@@ -384,4 +416,4 @@ vis(hide=('Rail', 'Wires'))
 result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, 2 * C['half_w'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,
           'step bodies': len(step_bodies), 'interference': hits or 'none', 'room above (mm, first contact with lid)': gaps,
-          'fillets': fil, 'exported': files, 'renders': res}
+          'fillets': fil, 'engraving': eng, 'exported': files, 'renders': res}
