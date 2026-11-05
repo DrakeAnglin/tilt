@@ -354,7 +354,7 @@ def engrave(comp, z, lines, xc, yc, w, h):
         return 'failed: %s' % str(ex)[:120]
 
 
-eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER V5\n4 x M3x10 FLAT HEAD FROM BELOW', 92, 9, 52, 22),
+eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER\nV5', L / 2, 0, 52, 12),
        'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID - 4 x M3 INSERTS', 100, -17, 44, 10)}
 files = []
 em = design.exportManager

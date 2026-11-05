@@ -121,7 +121,7 @@ Changes made after a design review against production practice:
 | Sharp-edged jack and USB openings | **0.5 mm bezels** round all three jack windows and the USB-C window (finished look, plug lead-in) |
 | Charger heat (MCP73871 is linear: ~0.6 W while charging), no vents | **3 vent slots** in end wall B beside the charger, 2 mm wide on a 5 mm pitch (3 mm webs), tops 5 mm below the groove notch (the floor sits on the rail, so not there) |
 | Cell end stops 0.7 mm, a USB-slot rib 1.0 mm | 1.2 mm and 1.4 mm |
-| No part marking | Engraved (sketched on the faces themselves, so it reads right when you look at them): tray bottom `BLINDS CONTROLLER V5 / 4 x M3x10 FLAT HEAD FROM BELOW`, lid underside `V5 LID - 4 x M3 INSERTS` |
+| No part marking | Engraved (sketched on the faces themselves, so it reads right when you look at them): tray bottom `BLINDS CONTROLLER / V5`, centred, lid underside `V5 LID - 4 x M3 INSERTS` |
 
 **Checks on rev B:**
 - **Interference:** exact B-rep check of every part on the PCB (KiCad's 3D export) and every mock-up against the tray, the lid and each other: **none**.
