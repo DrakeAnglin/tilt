@@ -5,7 +5,8 @@
 |---|---|---|---|
 | [`TiltPartsV4`](TiltPartsV4/TiltPartsV4.py) | Tilter v0.4 (all printed parts) | `tools/fusion_render_v4.py` (STLs + renders), `tools/fusion_verify_v4.py`, `tools/fusion_wallcheck.py` | **current** |
 | [`TiltPod`](TiltPod/TiltPod.py) | Sensor module on the tilter | `tools/fusion_tiltpod.py` (tilter + module, interference, STL) | **current** |
-| [`ControllerV4`](ControllerV4/ControllerV4.py) | Controller box + dev-board layout | `python3 ControllerV4.py` (hole map, wiring), `tools/fusion_controller_v4.py` (Fusion, checks, STLs) | **current** |
+| [`ControllerV5`](ControllerV5/ControllerV5.py) | Controller box for the carrier PCB ([docs](../../../docs/controller-v5.md)) | `tools/fusion_controller_v5.py` (imports the PCB's KiCad STEP, checks, STLs, renders) | **current** |
+| [`ControllerV4`](ControllerV4/ControllerV4.py) | Controller box + dev-board layout | `python3 ControllerV4.py` (hole map, wiring), `tools/fusion_controller_v4.py` (Fusion, checks, STLs) | dev board |
 | `TiltParts`, `ControllerV1`–`V3`, `TiltLayout` | Earlier versions | their `tools/fusion_*` scripts | history |
 
 Run any of them through the bridge: `python3 hardware/mechanical/fusion/fusion.py exec tools/<script>.py --timeout 1500`.

@@ -136,7 +136,7 @@ Battery voltage GPIO3, input-power voltage GPIO0. RJ12 pinout (both ends): 1 bat
 - ESP32-C6 SuperMini pin rows 15.24 mm apart, pin 1 (5V / TX) at the USB end.
 - USB-C breakout pins VBUS, GND, CC1, D−, D+, CC2 at 2.54 mm.
 - The RJ12 jack and the PTC you buy match their footprints (RJ12: Amphenol 54601 / 87180-x66; PTC: 5.1 mm pin spacing).
-- The box (ControllerV4) still has to be redrawn around this board.
+- Box: [ControllerV5](../../docs/controller-v5.md). In it the USB-C board sits on end wall B, joined to J3 pins 1–2 by a 2-wire lead (not plugged straight into J3).
 
 ## Rebuild the files
 ```bash
