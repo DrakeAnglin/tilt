@@ -10,8 +10,8 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C 
 
 | | |
 |---|---|
-| Size | **165.2 × 55.4 × 33.3 mm**: same cross-section as V4 (fits the rail, rod in the lid's groove), 39 mm longer |
-| Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports |
+| Size | **163.6 × 55.4 × 33.3 mm**: same cross-section as V4 (fits the rail, rod in the lid's groove), 39 mm longer |
+| Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 4 × M3 heat-set inserts (the M3 × 5.7 ones you have), **4 × M3 × 10 flat-head** (one screw size for the whole box) |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
 
@@ -81,6 +81,21 @@ Nothing presses on the capacitor's legs.
    bay. Together they hold the lid on.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
+
+## RJ12 ports (rev D)
+![ports](renders/ctrl-v5-port.png)
+
+- **Openings:** each opening in end wall A is the RJ12 plug's own outline, not the jack's body: 10.15 × 7.35 mm with
+  0.6 mm corner radii, i.e. the 9.65 mm plug + 0.25 a side. They sit at 1.45–8.80 mm above the PCB, around the
+  87180's plug opening at 1.73–8.50.
+- **Latch notch:** the 87180 is latch-down, so a 5 mm notch under each opening clears the latch lever, so you can still
+  squeeze it to release.
+- **Bezel and depth:** a 0.4 mm-deep, 0.5 mm-wide bezel frames each opening. The jack's face sits **2.35 mm** behind the
+  outer face: end wall A is 1.6 mm, and the PCB sits 0.2 mm off it, with a small relief in the corner fillet for the
+  board's corner.
+- **Fit coupon:** print it and push a plug through into a soldered jack. It should click in and release with the latch
+  squeezed, with no rubbing. If it rubs, tell me which edge and by how much; the opening is one parameter (`ap_w`,
+  `ap_z`).
 
 ## Engineering review (rev B)
 Changes made after a design review against production practice:

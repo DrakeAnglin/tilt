@@ -364,6 +364,21 @@ for g, nm in (('Tray', 'controller_v5_tray'), ('Lid', 'controller_v5_lid')):
     opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
     em.execute(opt)
     files.append(path)
+# fit coupon: just end wall A (first 12 mm of the tray), to check the plug fit against a real jack before the full print
+cb = tbm.copy(comps['Tray'].bRepBodies.item(0))
+tbm.booleanOperation(cb, bx(-1, 12, -30, 30, -1, 40), B.IntersectionBooleanType)
+main_doc = app.activeDocument
+cdoc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)      # its own throwaway document
+cdes = adsk.fusion.Design.cast(app.activeProduct)
+cdes.designType = adsk.fusion.DesignTypes.DirectDesignType
+cdes.rootComponent.bRepBodies.add(cb)
+path = os.path.join(STL, 'controller_v5_end_a_coupon.stl')
+opt = cdes.exportManager.createSTLExportOptions(cdes.rootComponent, path)
+opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
+cdes.exportManager.execute(opt)
+files.append(path)
+cdoc.close(False)
+main_doc.activate()
 
 # ------------------------------------------------------------------ renders
 ui.activeSelections.clear()
@@ -447,6 +462,7 @@ res.append(os.path.join(out, 'ctrl-v5-end-b-flat.png')); vp.saveAsImageFile(res[
 res.append(shot('ctrl-v5-end-a.png', (-150, -95, 70), (25, 0, 14), fit=False))
 vis(hide=('Rail', 'Wires', 'Tray', 'PCB', 'Parts', 'Screws')); res.append(shot('ctrl-v5-lid-under.png', (L / 2 - 100, -140, -170)))
 vis(); res.append(shot('ctrl-v5-in-rail.png', (-140, -90, 90)))
+vis(hide=('Rail', 'Wires')); res.append(shot('ctrl-v5-port.png', (-45, -40, 22), (0, -10, 10), fit=False))
 vis(hide=('Lid', 'Rail', 'Wires', 'Screws', 'PCB', 'Parts')); res.append(shot('ctrl-v5-tray.png', (L / 2 - 150, -170, 200)))
 
 
