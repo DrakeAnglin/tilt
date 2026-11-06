@@ -88,11 +88,11 @@ The top stays clean (no screw heads) and the screw heads sit flush with the bott
 
 ## Print 2: USB-C board held by its edges (rev L)
 The board didn't stay in well, and the supports at its back edge (the component-side rib, over the header's solder joints) could foul the joints. Now nothing touches its faces:
-- **Bottom edge:** in a U-channel on the floor (walls 2.5 mm tall, 1.2 mm thick, 0.25 mm clear a side). Its back end is as tall as the sides, only 0.15 mm behind the board's back edge, with a fully rounded top, so the board's corner rolls over it and snaps in. The board stands on the floor (0.05 mm gap); the old floor groove is gone, so the floor is a full 1.2 mm. The board is 0.55 mm higher than before, and its wires moved up with it.
+- **Bottom edge:** in a U-channel on the floor (walls 2.5 mm tall, 1.2 mm thick, 0.25 mm clear a side). Its back end is as tall as the sides, only 0.15 mm behind the board's back edge, its top edge on the board's side rounded (r 0.8), so the board's corner rolls over it and snaps in. The board stands on the floor (0.05 mm gap); the old floor groove is gone, so the floor is a full 1.2 mm. The board is 0.55 mm higher than before, and its wires moved up with it.
 - **Top edge:** in a U-channel on the lid, 2 mm deep, from the board's back edge to 1 mm short of the wall.
 - **Back edge:** the tall tray stop and its buttress are gone. The lid channel's back end is closed. It comes down 2.5 mm thick behind the board's back edge, to the top of the socket (where a plug pushes), on the component side of the header.
 - **Front edge:** in its pocket in end wall B, as before, with the socket in the closed round window. The wall isn't cut. The pocket is open at the top inside the wall; closed, it left a 0.25 mm sliver under the rim.
-- **To fit it:** socket into the window first with the board's back end tipped up, then push the back end down. Its bottom corner rolls over the rounded back end and snaps in. Then put the lid on.
+- **To fit it:** socket into the window first with the board's back end tipped up, then push the back end down. Its bottom corner rolls over the back end's rounded edge and snaps in. Then put the lid on.
 - If the board has a part within 2 mm of its top edge on the component side, the lid channel's wall would hit it. Tell me and I'll shorten it.
 
 ## Print 1 fixes, part 2 (rev K)
