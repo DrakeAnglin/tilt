@@ -115,10 +115,7 @@ def z_under(y, off):
     R, y = c['groove_r'] + off, abs(y)
     if y > R:
         return float('inf')
-    zc = C['g_zc']
-    circ = zc - math.sqrt(R * R - y * y)
-    tear = max(zc - R * math.sqrt(2) + y, zc - R) if y < R / math.sqrt(2) else circ   # the teardrop's flank / flat
-    return min(circ, tear)
+    return C['g_zc'] - math.sqrt(R * R - y * y)
 
 
 def K(x, y):
@@ -140,15 +137,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     out = {}
 
     def groove(off, x0, x1):
-        """The groove (off 0), or its outline grown by off: open above its centre; below, a teardrop (45 deg flanks
-        tangent to the circle) cut off flat at the circle's bottom. The lid prints upside down, so the groove is an arch
-        over the bed: a round arch overhangs past 45 deg over its top ~7 mm (print 1: unprintable); this one is 45 deg
-        flanks and a 4 mm bridge. Same bottom as the circle, so the rod's clearance under it is unchanged."""
+        """The groove (off 0), or its outline grown by off: a circle, open above its centre."""
         R, zc = c['groove_r'] + off, C['g_zc']
-        s = math.sqrt(0.5)
-        dia = cut(obox(((x0 + x1) / 2, 0, zc), (1, 0, 0), (0, s, s), x1 - x0, 2 * R, 2 * R),
-                  bx(x0 - 1, x1 + 1, -3 * R, 3 * R, zc - 3 * R, zc - c['groove_r']  - off))
-        return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20), dia)
+        return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20))
 
     def ceiling(y, half=0.0):
         """Lid features run up to the lid's underside; under the groove they are trimmed by the final groove cut."""
@@ -280,19 +271,15 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(in_b - 1, L + 1, c['usb_yc'] - wr, c['usb_yc'] + wr, zc - hz, zc + hz),
                cyl((in_b - 1, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr),
                cyl((in_b - 1, c['usb_yc'], zc + hz), (L + 1, c['usb_yc'], zc + hz), wr))
-    # print 1: the window's round top is an unsupported arch in the wall (and left a floating tip where it meets the
-    # board's pocket): its top is a 45 deg teardrop point instead
-    s45 = math.sqrt(0.5)
-    tip = cut(obox(((in_b + L) / 2, c['usb_yc'], zc + hz), (1, 0, 0), (0, s45, s45), L - in_b + 2, 2 * wr, 2 * wr),
-              bx(in_b - 2, L + 2, c['usb_yc'] - 3 * wr, c['usb_yc'] + 3 * wr, zc + hz - 3 * wr, zc + hz + wr * s45))
-    tray = cut(tray, tip)
+    # print 1: the board's pocket overlapped the window's edge by 0.45, leaving a one-line sliver of wall above the window
+    # that started in mid-air. The pocket now spans the window's full width from its bottom up, so above the window
+    # there is one even 1.25 mm skin with a plain round top
+    tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, c['usb_yc'] - wr, yf - sc + 0.01, zc - hz - wr, zu1 + 0.2))
     # --- charger vents: four slots in end wall B above the module (the floor sits on the rail, so not there)
     # 2 mm slots on a 3.5 mm pitch (1.5 mm webs), tops 5 mm below the groove notch in the wall
     for vy in (-1.0, 2.5, 6.0):    # print 1: the -4 slot was behind the module's corner seat (Y up to -2.7); above 6 the capacitor's end face is behind it
         tray = cut(tray, bx(in_b - 0.01, L + 1, vy - 1.0, vy + 1.0, fz + 5.0, fz + 12.0),          # through the wall only
-                   cyl((in_b - 0.01, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 0.01, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0),
-                   cut(obox(((in_b + L) / 2, vy, fz + 12.0), (1, 0, 0), (0, s45, s45), L - in_b + 2, 2.0, 2.0),     # 45 deg tops
-                       bx(in_b - 2, L + 2, vy - 3, vy + 3, fz + 8.0, fz + 12.0 + s45)))
+                   cyl((in_b - 0.01, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 0.01, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0))
     # --- fourth screw boss (charger bay) and the solar lead slot in end wall B (flat 2-core cable lying flat)
     tray = uni(tray, cyl((POST_B[0], POST_B[1], F0), (POST_B[0], POST_B[1], zb), c['boss_d'] / 2 + 0.5))
     tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 2.4, C['solar_y'] + 2.4, fz - 0.01, fz + 2.5))   # flat cable

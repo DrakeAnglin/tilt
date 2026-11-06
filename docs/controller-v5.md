@@ -87,13 +87,13 @@ Nothing presses on the capacitor's legs.
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
 ## Print 1 fixes, part 2 (rev K)
-- **Rod groove overhang:** the lid prints upside down, so the round groove was an arch over the bed whose top ~7 mm overhung past 45°. The groove is now a **teardrop**: 45° flanks tangent to the old circle, cut flat at the old circle's bottom (a 4 mm bridge). The rod's clearance at the bottom is unchanged, and it's a little roomier at the lower corners. The tray's end-wall notches follow the same shape.
+- **Rod groove:** stays a circle (a teardrop was tried and reverted).
 - **USB-C end stop:** behind the board's back edge, it takes the push when a cable is plugged in. It now runs to 2 mm under the board's top (20.8 mm tall), 2.75 mm thick with an 8 mm buttress behind it. A tab on the lid continues it to the top (0.4 mm gap between them), so the board can't be pushed back. The component-side rib is full height again. The socket window's stepped bezel is gone.
 - **Vents:** the lowest slot (Y −4) sat behind the charger module's corner seat. The three slots are now at Y −1, 2.5 and 6 (1.5 mm webs): nothing printed within 8 mm behind any of them (checked).
-- **USB-C window and vent tops:** printed upright, their round tops were small unsupported arches (and the window left a floating tip where it meets the board's pocket). Both now have 45° pointed tops. The only overhang left in end wall B is the solar slot's flat 4.8 mm bridge.
+- **USB-C window sliver:** the board's pocket in end wall B overlapped the window's edge by 0.45 mm, leaving a one-line sliver of wall above the window that started in mid-air. The pocket now spans the window's full width from its bottom up, so above the window there is one even 1.25 mm skin with a plain round top. Window and vents keep round ends.
 - **RJ12 openings:** the 0.4 mm stepped bezel washed out on a 0.4 nozzle, so it's gone; the openings are plain (plug outline + latch notch).
 
-Checked: no interference; STLs manifold; the only overhang left on the lid is the groove's 4 mm flat bridge.
+Checked: no interference; STLs manifold.
 
 ## Print 1 fixes (rev J)
 From the first test print (0.4 mm nozzle):
