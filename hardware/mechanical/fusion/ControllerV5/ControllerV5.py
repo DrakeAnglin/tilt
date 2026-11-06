@@ -259,12 +259,14 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     hz = c['usb_sw'] / 2 - c['usb_sh'] / 2
     zc = C['usb_zc']
     xs = C['usb_back']
-    # print 2b: the channel's back end is a low lip 0.15 behind the board's back edge, so it snaps in: socket into the
-    # window first, back end tipped up, then pushed down; the bottom corner rides over the 1.0 mm lip and drops in
+    # print 2b: the channel's back end is 0.15 behind the board's back edge and as tall as its sides (2.5), with a fully
+    # rounded top (r 0.6) so the board's corner rolls over it and snaps in: socket into the window first, back end
+    # tipped up, then pushed down
     xu0 = xs - 0.15
     tray = uni(tray, cut(bx(xu0 - 1.2, in_b + 0.01, yf - sc - 1.2, yb + sc + 1.2, F0, fz + 2.5),
                          bx(xu0, in_b + 1, yf - sc, yb + sc, fz, fz + 3),
-                         bx(xu0 - 2, xu0 + 0.01, yf - sc, yb + sc, fz + 1.0, fz + 3)))
+                         bx(xu0 - 2, xu0 + 0.01, yf - sc, yb + sc, fz + 1.9, fz + 3)),
+               cyl((xu0 - 0.6, yf - sc - 0.01, fz + 1.9), (xu0 - 0.6, yb + sc + 0.01, fz + 1.9), 0.6))
     # pocket for the front edge, open at the top (closed it left a 0.25 sliver under the rim); over the window it spans the window's width (no slivers), the wall's outer 1.25 skin intact
     tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, yf - sc, yb + sc, fz, zl + 0.01),
                bx(in_b - 0.01, C['usb_front'] + 0.2, c['usb_yc'] - wr, yf - sc + 0.01, zc - hz - wr, zl + 0.01))
