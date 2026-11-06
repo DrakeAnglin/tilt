@@ -156,11 +156,13 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + 0.3))   # and the back one
     for xa, xb in ((-1, c['end_a'] + 0.01), (in_b - 0.01, L + 1)):        # the lid's groove channel crosses both ends
         tray = cut(tray, groove(c['groove_t'] + 0.15, xa, xb))
-    # --- floor recessed 0.4 under the PCB's outline (+0.5): room for its leads without raising the ESP
+    # --- floor recessed 0.4 under the PCB's outline (+0.2): room for its leads without raising the ESP
     fr = fz - c['floor_recess']
     bar_x1, _ = K(0, c['pcb_bar'])
-    tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.5, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.5, ihi + 0.01), fr, fz + 0.01),
-               bx(bar_x1 - 0.01, C['pcb_end'] + 0.5, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.5, fr, fz + 0.01))
+    # (+0.2, not +0.5: the 8 mm bosses reach 0.5 (H2: 0.7) past the board, so at +0.5 they only touched the recess wall along a
+    # line, which made the STL non-manifold. At +0.2 they all overlap it and merge)
+    tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.2, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.2, ihi + 0.01), fr, fz + 0.01),
+               bx(bar_x1 - 0.01, C['pcb_end'] + 0.2, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.2, fr, fz + 0.01))
     # --- PCB nest: it drops in and is located before the lid goes on: end wall A (0.2), the room-side wall (0.7) and
     # free-standing ribs along the bar's and the body's back edges (0.2); all below the board's top face
     # the ribs' tops are level with the cell cradles' PCB-side horns (they run through them)
