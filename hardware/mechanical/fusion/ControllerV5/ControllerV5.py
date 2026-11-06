@@ -279,8 +279,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
                cyl((in_b - 1, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr),
                cyl((in_b - 1, c['usb_yc'], zc + hz), (L + 1, c['usb_yc'], zc + hz), wr))
     # --- charger vents: four slots in end wall B above the module (the floor sits on the rail, so not there)
-    # 2 mm slots on a 5 mm pitch (3 mm webs), tops 5 mm below the groove notch in the wall
-    for vy in (-4.0, 1.0, 6.0):
+    # 2 mm slots on a 3.5 mm pitch (1.5 mm webs), tops 5 mm below the groove notch in the wall
+    for vy in (-1.0, 2.5, 6.0):    # print 1: the -4 slot was behind the module's corner seat (Y up to -2.7); above 6 the capacitor's end face is behind it
         tray = cut(tray, bx(in_b - 0.01, L + 1, vy - 1.0, vy + 1.0, fz + 5.0, fz + 12.0),          # through the wall only
                    cyl((in_b - 0.01, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 0.01, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0))
     # --- fourth screw boss (charger bay) and the solar lead slot in end wall B (flat 2-core cable lying flat)
