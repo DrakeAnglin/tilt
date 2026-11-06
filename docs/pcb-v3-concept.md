@@ -6,6 +6,14 @@ schematic and routing.
 
 ![layout, to scale](renders/pcb-v3-layout.png)
 
+## Requirements added (2026-11-06)
+1. **See each source separately:** the ESP reads the **USB charge current and voltage**, the **solar charge current and
+   voltage**, and the **battery's own voltage and current** (charging and discharging), each on its own. V5's PCB can
+   only read the battery + rail, which shows the input voltage, not the cell, whenever USB or solar is plugged in.
+2. **USB, solar and battery all plugged in at once**, with nothing back-feeding anything and no switching by hand.
+
+How v3 meets them is under [Power monitoring](#power-monitoring-usb-solar-and-battery-separately) below.
+
 | | V5 (today) | **v3 concept** |
 |---|---|---|
 | Case | 164.6 × 52.5 × 25.8 mm | **121.0 × 52.8 × 26.4 mm** (44 mm shorter) |
@@ -33,25 +41,53 @@ including the tilt rod against the lid. The cell's top sets the height (0.4 mm u
 | Temperature | 10 k NTC at the holder → charger TS pin | no charging when the cell is hot (you have these) |
 | USB-C | 16-pin SMD receptacle + 5.1 k CC resistors, at the board edge | |
 | Solar | **3.5 × 1.35 mm barrel jack, SHOU HAN DC003-1.3** (LCSC C668594, JLC can solder it) | 9 × 6.3 × 5 mm, round 4 mm opening in end wall A. The panel lead gets a 3.5 × 1.35 plug (common) |
-| Source OR-ing | 2 Schottkys (USB, solar) | either charges, neither back-feeds the other |
+| Source OR-ing | 2 Schottkys (USB, solar) | both can stay plugged in with the battery: either charges, neither back-feeds the other |
+| **Power monitor** | **TI INA3221** (LCSC C181255, QFN-16 4 × 4), 3 channels on I²C, + 3 shunt resistors | USB in, solar in, battery: current and voltage of each, separately. See below |
 | Tilter ports | 3 × RJ12 87180-066LF (yours): 1 at end A, 2 at end B | V5's plug-shaped openings carry over |
 | **Lifter port** | **RJ45 8P8C** at end B, its own **2 A** PTC | see below |
 | Port fuses | SMD PTCs (1812): 0.75 A × 3, 2 A × 1 | nothing to fold |
 | ESP32-C6 SuperMini | **on sockets**, room side, clear of the groove | stays replaceable |
 
 ```
-USB-C VBUS --|>|--+                     SYS --> ESP 5V pin (its LDO makes 3.3 V)
-                  +--> BQ25185 IN ------+
-solar 1.35 --|>|--+    (3-18 V)         BAT --> DW01A/FS8205A --> 18650
-                                                    |
-                         0.75 A PTC x3 <------------+------------> 2 A PTC --> RJ45 lifter (2 x VBAT, 2 x GND)
-                         RJ12 tilters (pin 1)
-CHG --> ESP      battery/2 --> ESP ADC      NTC --> TS
+USB-C VBUS --[R1 0.1]--|>|--+                     SYS --> ESP 5V pin (its LDO makes 3.3 V)
+                            +--> BQ25185 IN ------+
+solar 1.35 --[R2 0.1]--|>|--+    (3-18 V)         BAT --+--> 0.75 A PTC x3 --> RJ12 tilters (pin 1)
+                                                        +--> 2 A PTC --> RJ45 lifter (2 x VBAT, 2 x GND)
+                                                        |
+                                                     [R3 0.02] --> DW01A/FS8205A --> 18650
+INA3221 (I2C to the ESP): ch1 across R1 = USB, ch2 across R2 = solar, ch3 across R3 = battery (+ charging / - discharging)
+NTC --> TS
 ```
 
-**GPIO:** 4 ports × (IN1, IN2, EN, angle) = 16, plus the battery ADC and CHG = **18 of the SuperMini's 18 free pins**.
-The 5 analog inputs fit GPIO0–6. That's full: the charger's power-good pin is left off (CHG and the battery trend tell the
-same story). If the lifter needs more signals later, its own small driver/MCU at the lifter can talk over 2 of the RJ45's wires (I²C).
+**GPIO:** 4 ports × (IN1, IN2, EN, angle) = 16, plus **I²C (SDA, SCL) to the INA3221** = **18 of the SuperMini's 18 free
+pins**. The INA3221 replaces both the battery ADC divider and the CHG pin: it reads the cell's voltage directly, and the
+sign of the battery current says charging or not. The 4 angle inputs fit GPIO0–6. If the lifter needs more signals later, its
+own small driver/MCU at the lifter can share the same I²C bus over 2 of the RJ45's wires.
+
+## Power monitoring: USB, solar and battery separately
+One **TI INA3221** (three-channel current / voltage monitor, I²C, 0–26 V on every channel) with a shunt resistor in each path:
+
+| Channel | Shunt | Where | Reads | Range / resolution |
+|---|---|---|---|---|
+| 1 USB | 0.1 Ω, 0805 | VBUS, **before** its Schottky | USB charge current + USB voltage | 0–1.6 A, 0.4 mA steps |
+| 2 Solar | 0.1 Ω, 0805 | panel +, **before** its Schottky | solar charge current + panel voltage (up to 26 V) | 0–1.6 A, 0.4 mA steps |
+| 3 Battery | 0.02 Ω, 1206 | between the charger's BAT node (where the ports tap off) and the cell | **the cell's own voltage**, and its current: + charging, − discharging (motor peaks included) | ±8 A, 2 mA steps |
+
+Each shunt sits in only one path, so the ESP reports **USB in, solar in and battery** as separate numbers (volts, amps,
+watts), and from those the charge rate and where it comes from. The battery channel is on the cell side of every load, so
+it is the cell's true net current: charging minus whatever the ESP and motors draw. The monitor draws about 0.35 mA, or
+can sit in power-down between readings on a sleepy device.
+
+**All three plugged in at once:** the two Schottkys make a diode-OR into the charger's single input, so USB and solar
+can both stay connected with the cell, and neither can push current back into the other.
+- Whichever source is higher at the moment feeds the charger. A sunny panel (6–7 V) takes over from USB (5 V). In
+  shade, when the panel sags below about 5 V, USB takes over. Channels 1 and 2 show that handover live.
+- Both together don't add up: it's one or the other at any instant (or a share during the handover). If summing
+  both is ever wanted, that needs two chargers, not this one.
+- The cell stays on the charger's BAT pin the whole time. The BQ25185's power path runs the ESP from SYS while it charges.
+  Unplugging either source, or both, needs no action.
+- Option: ideal-diode chips (TI **LM66100**, ~0.08 Ω instead of a Schottky's 0.3–0.45 V drop) in place of the two
+  Schottkys, if the lost ~0.4 V on USB matters. Same behavior, slightly cooler.
 
 ## The lifter port
 Raising slats means lifting the stack, roughly **6–15 W** for small blind motors (about 1 A at 12 V). From a
@@ -82,6 +118,8 @@ stay out of direct sun.
 | Part | Source | Price | Stock / lead time |
 |---|---|---|---|
 | BQ25185DLHR | LCSC C19725033 | $1.83 (1), $1.12 (1k) | 2,377 at LCSC; TI: active |
+| INA3221AIRGVR | LCSC C181255 | ~$0.83–0.92 (1), ~$0.51 (100) | ~2,000–3,000 at LCSC (2026-11); TI: active |
+| Shunts 0.1 Ω 0805 ×2, 0.02 Ω 1206 ×1 | LCSC | cents | stocked |
 | DC003-1.3 jack | LCSC C668594 | ~$0.1 | in JLC's assembly library |
 | Keystone 1042P holder | DigiKey 36-1042P-ND | ~$5.40 (1), $4.23 (25) | ~7,600 in stock; 14-week factory lead time if that runs out. Alternative: MPD BH-18650-PC or a generic LCSC 18650 holder (JLC can solder those) |
 | DW01A, FS8205A, USB-C, R/C | JLC basic parts | cents | stocked |
@@ -119,7 +157,8 @@ the PCB) so you see the exact number.
 - Cells: either. The board protects them; the holder takes both lengths (check the 1042P's length range against the cell you buy).
 
 ## Next
-1. Your OK on the 18650 recommendation and the lifter port.
+1. Your OK on the 18650 recommendation, the lifter port, and the INA3221 power monitor (it takes the two pins that were
+   the battery ADC and CHG).
 2. Schematic, then a KiCad board generated like v2 (netlist → placement → routing → DRC / ERC / parity), then the
    PCB's 3D export into this same Fusion fit check.
 3. BOM + placement files → JLC quote. Then the V6 case around the real board.
