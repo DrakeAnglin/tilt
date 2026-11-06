@@ -18,8 +18,8 @@ Layout, end A (ports) to end B (USB-C):
     The module sits on four corner pads between guides; two lid pins clamp its edges; a tray saddle carries the
     capacitor's free end. A lid post with a fourth insert (fourth screw from below) and the solar lead's floor
     route are on the room side of the bay.
-  * USB-C breakout on edge: front edge in a pocket in end wall B (socket face flush), back edge in a slot, bottom edge
-    in a floor groove, top edge under a lid fin.
+  * USB-C breakout on edge, dropped in from the top and held by its edges: front edge in a pocket in end wall B (socket
+    down a slot, face flush), back edge on a stop, bottom edge between floor rails, top edge in a lid channel.
 
 Height budget (the reason the PCB sits 2 mm off the floor): ESP pins on its sockets reach 18.7 mm under a 19.2 mm groove.
 
@@ -80,7 +80,7 @@ C = dict(
     therm_xy=(23.3, 15.8), ntc_on_cell=4.0,
     # USB-C breakout (Cermant, 22.1 x 13.05, socket 9.1 x 3.26 x 7.35 sticking out 1.45), on edge, socket face flush
     usb_w=22.1, usb_d=13.05, usb_t=1.6, usb_sw=9.1, usb_sh=3.26, usb_sl=7.35, usb_stick=1.45, usb_yc=-21.2,
-    usb_z0=0.7, usb_pin_row=1.04,
+    usb_z0=1.25, usb_pin_row=1.04,      # print 2: stands on the floor (0.05 over it) between two low rails; no floor groove
 )
 c = C
 C['iw_lo'] = c['room_out'] + c['wall']                  # room-side inner face
@@ -248,34 +248,29 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # print 1: the capacitor's bore runs right through to the back wall (into its face where the can reaches it), so
     # nothing stands between the can and the wall
     tray = cut(tray, cyl((cap_x0 - 0.3, cap_y, cap_z), (in_b - 0.01, cap_y, cap_z), cr))
-    # --- USB-C breakout: front edge in a pocket in end wall B, back edge in a slot, bottom edge in a floor groove;
-    # vertical stadium window for the socket
+    # --- USB-C breakout, print 2: drops in from the top and is held by its four edges only, never on its faces where
+    # the header's solder joints and the parts are. Front edge in a pocket in end wall B that is open at the top, the
+    # socket dropping down a slot in the wall (the lid's tongue closes the slot above the window, keeping it round);
+    # bottom edge between two low floor rails; back edge against the end stop; top edge in a channel under the lid
     yf, yb = C['usb_yf'], C['usb_yf'] + c['usb_t']
     zu0, zu1 = c['usb_z0'], c['usb_z0'] + c['usb_w']
-    # print 1: it couldn't go in: the low rib on the header side, under the header, blocked it from being angled in.
-    # That rib is gone; the board's back edge is held by the end stop and the component-side rib. Slot clearances
-    # 0.25 a side (0.4 nozzle)
     sc = 0.25
-    tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, yf - sc, yb + sc, zu0 - 0.2, zu1 + 0.2))
-    tray = cut(tray, bx(C['usb_back'] - 0.2, in_b + 0.01, yf - sc, yb + sc, zu0 - 0.2, fz + 0.01))
-    xs = C['usb_back']
-    # print 1: the end stop was too short and weak for a plug being pushed in. It runs nearly full height again, 2.75
-    # thick with a buttress behind it, and a lid tab continues it to the top (see the lid)
-    zrib = zu1 - 2.0
-    slot = uni(bx(xs - 2.0, xs + 1.6, yf - sc - 1.6, yf - sc, F0, zrib),           # component side
-               bx(xs - 3.0, xs - 0.25, yf - sc - 1.6, yb, F0, zrib),                # end stop
-               bx(xs - 7.0, xs - 2.9, yf - sc - 1.6, yb, F0, 8.0))                  # its buttress
-    tray = uni(tray, slot)
     wr = c['usb_sh'] / 2 + 0.2
     hz = c['usb_sw'] / 2 - c['usb_sh'] / 2
     zc = C['usb_zc']
-    tray = cut(tray, bx(in_b - 1, L + 1, c['usb_yc'] - wr, c['usb_yc'] + wr, zc - hz, zc + hz),
-               cyl((in_b - 1, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr),
-               cyl((in_b - 1, c['usb_yc'], zc + hz), (L + 1, c['usb_yc'], zc + hz), wr))
-    # print 1: the board's pocket overlapped the window's edge by 0.45, leaving a one-line sliver of wall above the window
-    # that started in mid-air. The pocket now spans the window's full width from its bottom up, so above the window
-    # there is one even 1.25 mm skin with a plain round top
-    tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, c['usb_yc'] - wr, yf - sc + 0.01, zc - hz - wr, zu1 + 0.2))
+    xs = C['usb_back']
+    zrib = zu1 - 2.0
+    stop = uni(bx(xs - 3.0, xs - 0.25, yf - sc - 1.6, yb, F0, zrib),                # end stop (behind the edge only)
+               bx(xs - 7.0, xs - 2.9, yf - sc - 1.6, yb, F0, 8.0),                  # its buttress
+               bx(xs - 0.3, in_b + 0.01, yf - sc - 1.2, yf - sc, F0, fz + 1.5),      # floor rail, component side
+               bx(xs - 0.3, in_b + 0.01, yb + sc, yb + sc + 1.2, F0, fz + 1.5))      # floor rail, header side
+    tray = uni(tray, stop)
+    # pocket for the front edge, open at the top; over the window it spans the window's width (no slivers)
+    tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, yf - sc, yb + sc, fz, zl + 0.01),
+               bx(in_b - 0.01, C['usb_front'] + 0.2, c['usb_yc'] - wr, yf - sc + 0.01, zc - hz - wr, zl + 0.01))
+    # window: round bottom, then a straight slot up and out of the wall's top for the socket
+    tray = cut(tray, bx(in_b - 1, L + 1, c['usb_yc'] - wr, c['usb_yc'] + wr, zc - hz, zl + 1),
+               cyl((in_b - 1, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr))
     # --- charger vents: four slots in end wall B above the module (the floor sits on the rail, so not there)
     # 2 mm slots on a 3.5 mm pitch (1.5 mm webs), tops 5 mm below the groove notch in the wall
     for vy in (-1.0, 2.5, 6.0):    # print 1: the -4 slot was behind the module's corner seat (Y up to -2.7); above 6 the capacitor's end face is behind it
@@ -342,7 +337,15 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         if f:
             lid = uni(lid, f)
     lid = uni(lid, bx(cap_x0 + 10, cap_x0 + 18, cap_y - 3, cap_y + 3, cap_z + c['cap_d'] / 2 + 0.2, zl + 0.01))
-    lid = uni(lid, bx(C['usb_back'] + 2.0, C['usb_front'] - 3.0, yf + 0.1, yb - 0.1, zu1 + 0.05, zl + 0.01))
+    # USB-C board, print 2: a channel 2.0 deep over 9 mm of its top edge (clear of the header at the back), and a tongue
+    # that closes the socket's slot in end wall B down to the window, its end rounded so the window stays a stadium
+    ux0, ux1 = C['usb_back'] + 3.0, C['usb_front'] - 1.0
+    lid = uni(lid, cut(bx(ux0, ux1, yf - 0.25 - 1.2, yb + 0.25 + 1.2, zu1 - 2.0, zl + 0.01),
+                       bx(ux0 - 1, ux1 + 1, yf - 0.25, yb + 0.25, zu1 - 3.0, zu1 + 0.15)))
+    uwr = c['usb_sh'] / 2 + 0.2
+    uzt = C['usb_zc'] + c['usb_sw'] / 2 - c['usb_sh'] / 2
+    lid = uni(lid, cut(bx(C['usb_front'] + 0.25, L, c['usb_yc'] - uwr + 0.15, c['usb_yc'] + uwr - 0.15, uzt, zl + 0.01),
+                       cyl((C['usb_front'], c['usb_yc'], uzt), (L + 1, c['usb_yc'], uzt), uwr)))
     # USB end-stop tab: behind the board's back edge, from the lid down to 0.4 over the tray's stop (together a full-height
     # wall that takes the plug's push)
     sc = 0.25
