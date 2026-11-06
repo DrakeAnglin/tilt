@@ -1,118 +1,88 @@
-# Controller PCB v3: concept (rev 2)
+# Controller PCB v3: concept (rev 3, hand-solder only)
 
-One board that carries everything: the cell, charger, USB-C, solar jack, three tilter ports and a lifter port, and the
-ESP32-C6. The case is then just a shell with openings. This is the placement-and-parts proposal for review, before the
-schematic and routing.
+One board that carries everything: the cell, charger, USB-C, solar input, three tilter ports and a lifter port, and the
+ESP32-C6. The case is then just a shell with openings. This is the parts proposal for review, before the schematic and
+routing.
 
-![layout, to scale](renders/pcb-v3-layout.png)
+**Rev 3 (2026-11-06): everything on this board is something you can hand-solder.** The order is a bare PCB with no
+assembly service. Every part is through-hole, or a ready-made module that plugs onto header pins or solders on by its
+own pins. Rev 2's chip-level parts (a 2 × 2 mm charger chip, protection chips, an SMD USB-C socket, SMD fuses, a QFN
+power monitor) are gone; they are listed at the bottom only so the reasons stay on record.
 
-## Requirements added (2026-11-06)
+## Requirements
 1. **See each source separately:** the ESP reads the **USB charge current and voltage**, the **solar charge current and
    voltage**, and the **battery's own voltage and current** (charging and discharging), each on its own. V5's PCB can
    only read the battery + rail, which shows the input voltage, not the cell, whenever USB or solar is plugged in.
 2. **USB, solar and battery all plugged in at once**, with nothing back-feeding anything and no switching by hand.
-3. **No small parts that need the PCB maker to assemble them.** Everything on the board must be hand-solderable:
-   through-hole parts, or ready-made modules on header pins (like the ESP and the USB-C board today). The order is a
-   bare PCB; no assembly service. This **replaces the chip-level design below** (BQ25185, DW01A/FS8205A, INA3221 chip,
-   SMD USB-C, SMD fuses). See [Hand-solder only: what changes](#hand-solder-only-what-changes).
-
-How v3 meets 1 and 2 is under [Power monitoring](#power-monitoring-usb-solar-and-battery-separately), and 3 under
-[Hand-solder only](#hand-solder-only-what-changes). The parts table and layout further down are the first (chip-level)
-pass and are kept for reference; where they disagree, the hand-solder section wins.
-
-## Hand-solder only: what changes
-Every part either goes through holes or is a module that plugs onto header pins. Nothing smaller than a 1206-size
-resistor, and preferably not even that.
-
-| Job | Chip-level pass (needs assembly) | **Hand-solder version** |
-|---|---|---|
-| Charger + power path | BQ25185, WSON-10 2.2 × 2 mm | **A charger module on header pins**, as in V5. The MCP73871 module you have works (power path, USB + solar input) but needs its input clamped at 6.2 V, so it keeps V2.1's 3 W zener. A module that takes the panel's ~7 V directly would drop the zener: to research before drawing the board |
-| Cell protection | DW01A + FS8205A, SOT-23 / TSSOP | **Protected 18650 cells** (the protection board is built into the cell, button top). Nothing on the PCB |
-| USB-C input | 16-pin SMD receptacle | **The Cermant USB-C breakout on a header** (as on V2.1), its own 5.1 k CC resistors on board |
-| Solar input | DC003 barrel jack | same jack: it's through-hole, hand-solderable. Or the V2.1 JST-ZH header |
-| Power monitor (USB / solar / battery separately) | INA3221 chip, QFN-16 4 × 4 mm | **An INA3221 3-channel module** (common breakout, about 25 × 20 mm, header pins, I²C), plugged onto the board. Its stock shunts are 0.1 Ω, fine for USB and solar (to 1.6 A); the **battery channel's shunt gets swapped for 0.02 Ω** (a 2512-size resistor, large and easy to hand-solder) so lifter peaks of 3–4 A stay in range |
-| Port fuses | SMD 1812 PTCs | **Radial through-hole PTCs**, as on V2.1 (0.75 A × 3), plus a radial 2 A for the lifter. They fold flat, as in V5 |
-| Source OR-ing | Schottkys | 1N5819 / 1N5822 through-hole (1N5822 for 3 A) |
-| Everything else | — | through-hole resistors, capacitors, RJ12 / RJ45 jacks, ESP on sockets, cell holder (Keystone 1042P is through-hole) |
-
-**What that costs:** the board gets bigger again. The charger module (30.5 × 31.5 mm) and the INA3221 module sit on
-the board on headers, so the 121 mm case grows back toward V5's length. The layout and case size get re-done once the
-modules are picked. GPIO stays at 18 of 18: the INA3221 module is I²C (2 pins), as in the chip version.
-
-| | V5 (today) | **v3 concept** |
-|---|---|---|
-| Case | 164.6 × 52.5 × 25.8 mm | **121.0 × 52.8 × 26.4 mm** (44 mm shorter) |
-| Inside the case | PCB + charger module + capacitor + USB-C board + cell, wired together | **one board**, four screws |
-| Brackets | cell saddles, charger seats, capacitor saddle, USB-C card slot, PCB nest | **none**: four bosses under the board |
-| Wiring inside | charger harness, battery lead, USB lead, solar lead | **none** |
-| Ports | 3 tilter | 3 tilter + **1 lifter (RJ45)** |
-
-Checked in Fusion with every part as a datasheet-sized block in a minimal case in the rail: **no interference**,
-including the tilt rod against the lid. The cell's top sets the height (0.4 mm under the lid). The ESP's pins have
-3 mm under the groove.
-
-![board](renders/pcb-v3-board.png)
-
-| | |
-|---|---|
-| ![end A](renders/pcb-v3-case-end-a.png) | ![end B](renders/pcb-v3-case-end-b.png) |
+3. **Everything hand-solderable.** Through-hole parts and off-the-shelf modules only. The PCB gives each module its
+   mounting points: header holes (or pads for its wires), screw or standoff holes where the module has mounting holes,
+   and a keep-out under it. Each module's footprint is drawn from the real part once it's measured.
+4. Three tilter ports and one lifter port (RJ45, below), the ESP32-C6 on sockets so it stays replaceable.
 
 ## What's on the board
-| Function | Part | Notes |
-|---|---|---|
-| Charger | **TI BQ25185** (LCSC C19725033, WSON-10 2.2 × 2) | 3.0–18 V operating input, 25 V tolerant: the 6 V panel (≈7 V open-circuit) plugs straight in, with **no zener**. Power path (the ESP runs while the cell charges), battery-tracking input regulation for the panel, charge-status pin to the ESP. The usual alternatives (BQ24074, MCP73871) shut off at ~6.6 V, under the panel's open-circuit voltage |
-| Cell protection | DW01A + FS8205A (JLC basic parts) | so any standard 18650, protected or not, is safe |
-| Cell | 18650 in a **Keystone 1042P** holder (77 × 21 × 15 mm, through-hole) | see "Is the 18650 right?" below |
-| Temperature | 10 k NTC at the holder → charger TS pin | no charging when the cell is hot (you have these) |
-| USB-C | 16-pin SMD receptacle + 5.1 k CC resistors, at the board edge | |
-| Solar | **3.5 × 1.35 mm barrel jack, SHOU HAN DC003-1.3** (LCSC C668594, JLC can solder it) | 9 × 6.3 × 5 mm, round 4 mm opening in end wall A. The panel lead gets a 3.5 × 1.35 plug (common) |
-| Source OR-ing | 2 Schottkys (USB, solar) | both can stay plugged in with the battery: either charges, neither back-feeds the other |
-| **Power monitor** | **TI INA3221** (LCSC C181255, QFN-16 4 × 4), 3 channels on I²C, + 3 shunt resistors | USB in, solar in, battery: current and voltage of each, separately. See below |
-| Tilter ports | 3 × RJ12 87180-066LF (yours): 1 at end A, 2 at end B | V5's plug-shaped openings carry over |
-| **Lifter port** | **RJ45 8P8C** at end B, its own **2 A** PTC | see below |
-| Port fuses | SMD PTCs (1812): 0.75 A × 3, 2 A × 1 | nothing to fold |
-| ESP32-C6 SuperMini | **on sockets**, room side, clear of the groove | stays replaceable |
+| Function | Part | How it's mounted | Notes |
+|---|---|---|---|
+| Charger + power path | **A charger module** | header pins or its own pads, plus its mounting holes | The MCP73871 module you have works: power path (the ESP runs while the cell charges), USB and solar both into one input. It needs its input held at 6.2 V or less, so it keeps V2.1's **3 W zener** (through-hole). A module that takes the panel's ~7 V open-circuit directly would drop the zener: **to research** |
+| Cell | 18650 in a **Keystone 1042P** holder (77 × 21 × 15 mm) | through-hole | see "Is the 18650 right?" below |
+| Cell protection | **Protected 18650 cells** (protection board built into the cell, button top) | nothing on the PCB | the board itself has no protection chips, so **only protected cells** go in |
+| Temperature | 10 k NTC on the cell → the charger module's THERM pads | two wires | as in V5: no charging when the cell is hot |
+| USB-C | **The Cermant USB-C breakout** (has its own 5.1 k CC resistors) | on a header, at the board edge | as on V2.1 |
+| Solar | **3.5 × 1.35 mm barrel jack, SHOU HAN DC003-1.3** (LCSC C668594) | through-hole | 9 × 6.3 × 5 mm, round 4 mm opening in the end wall. The panel lead gets a 3.5 × 1.35 plug (common) |
+| Source OR-ing | **1N5822** Schottky × 2 (3 A) | through-hole | USB and solar into the charger's single input: both can stay plugged in, neither back-feeds the other |
+| **Power monitor** | **An INA3221 3-channel module** (common breakout, about 25 × 20 mm, I²C) | header pins | USB in, solar in and battery: current and voltage of each, separately. See below |
+| Battery current shunt | **0.025 Ω 3 W through-hole current-sense resistor** (e.g. Vishay LVR03 series) | through-hole | across the INA3221 module's battery channel, so lifter peaks stay in range with no rework on the module. See below |
+| Tilter ports | 3 × RJ12 87180-066LF (yours) | through-hole | V5's plug-shaped openings carry over |
+| **Lifter port** | **RJ45 8P8C**, right angle, unshielded | through-hole | see below |
+| Port fuses | **Radial PTCs**: Bel 0ZRE0075FF (0.75 A) × 3, one 2 A for the lifter | through-hole | as on V2.1; folded flat over their resistors, as in V5 |
+| ESP32-C6 SuperMini | female header sockets | through-hole | stays replaceable |
+| Resistors, capacitors | 1/4 W axial resistors, radial / disc capacitors | through-hole | as on V2.1 |
 
 ```
-USB-C VBUS --[R1 0.1]--|>|--+                     SYS --> ESP 5V pin (its LDO makes 3.3 V)
-                            +--> BQ25185 IN ------+
-solar 1.35 --[R2 0.1]--|>|--+    (3-18 V)         BAT --+--> 0.75 A PTC x3 --> RJ12 tilters (pin 1)
-                                                        +--> 2 A PTC --> RJ45 lifter (2 x VBAT, 2 x GND)
-                                                        |
-                                                     [R3 0.02] --> DW01A/FS8205A --> 18650
-INA3221 (I2C to the ESP): ch1 across R1 = USB, ch2 across R2 = solar, ch3 across R3 = battery (+ charging / - discharging)
-NTC --> TS
+USB-C board VBUS --[INA ch1]--|>|--+                         OUT --> ESP 5V pin (its LDO makes 3.3 V)
+                                   +--> charger module IN ---+
+solar jack + ------[INA ch2]--|>|--+   (zener 6.2 V on IN)   BAT --+--> 0.75 A PTC x3 --> RJ12 tilters (pin 1)
+                                                                   +--> 2 A PTC --> RJ45 lifter (2 x BAT+, 2 x GND)
+                                                                   |
+                                                               [INA ch3] --> protected 18650
+INA3221 module (I2C to the ESP): ch1 = USB, ch2 = solar, ch3 = battery (+ charging / - discharging)
+NTC on the cell --> charger THERM
 ```
 
-**GPIO:** 4 ports × (IN1, IN2, EN, angle) = 16, plus **I²C (SDA, SCL) to the INA3221** = **18 of the SuperMini's 18 free
-pins**. The INA3221 replaces both the battery ADC divider and the CHG pin: it reads the cell's voltage directly, and the
-sign of the battery current says charging or not. The 4 angle inputs fit GPIO0–6. If the lifter needs more signals later, its
-own small driver/MCU at the lifter can share the same I²C bus over 2 of the RJ45's wires.
+Where the motor ports tap off (the charger's BAT side or its OUT side) gets settled with the module picked: the motor
+current has to stay inside what the module's power path can pass.
+
+**GPIO:** 4 ports × (IN1, IN2, EN, angle) = 16, plus **I²C (SDA, SCL) to the INA3221 module** = **18 of the SuperMini's 18
+free pins**. The module replaces V2.1's battery and input-power dividers: it reads the cell's voltage directly, and the
+sign of the battery current says charging or not. The 4 angle inputs fit GPIO0–6. If the lifter needs more signals later,
+its own small driver/MCU at the lifter can share the same I²C bus over 2 of the RJ45's wires.
 
 ## Power monitoring: USB, solar and battery separately
-One **TI INA3221** (three-channel current / voltage monitor, I²C, 0–26 V on every channel) with a shunt resistor in each path:
+The INA3221 module measures three paths, each through its own shunt resistor, and reports volts and amps on each over I²C
+(0–26 V on every channel):
 
 | Channel | Shunt | Where | Reads | Range / resolution |
 |---|---|---|---|---|
-| 1 USB | 0.1 Ω, 0805 | VBUS, **before** its Schottky | USB charge current + USB voltage | 0–1.6 A, 0.4 mA steps |
-| 2 Solar | 0.1 Ω, 0805 | panel +, **before** its Schottky | solar charge current + panel voltage (up to 26 V) | 0–1.6 A, 0.4 mA steps |
-| 3 Battery | 0.02 Ω, 1206 | between the charger's BAT node (where the ports tap off) and the cell | **the cell's own voltage**, and its current: + charging, − discharging (motor peaks included) | ±8 A, 2 mA steps |
+| 1 USB | the module's own 0.1 Ω | USB VBUS, **before** its Schottky | USB charge current + USB voltage | 0–1.6 A, 0.4 mA steps |
+| 2 Solar | the module's own 0.1 Ω | panel +, **before** its Schottky | solar charge current + panel voltage | 0–1.6 A, 0.4 mA steps |
+| 3 Battery | the module's 0.1 Ω **in parallel with the board's 0.025 Ω through-hole shunt** = 0.02 Ω | between the ports' tap and the cell | **the cell's own voltage**, and its current: + charging, − discharging, motor peaks included | ±8 A, 2 mA steps |
 
-Each shunt sits in only one path, so the ESP reports **USB in, solar in and battery** as separate numbers (volts, amps,
-watts), and from those the charge rate and where it comes from. The battery channel is on the cell side of every load, so
-it is the cell's true net current: charging minus whatever the ESP and motors draw. The monitor draws about 0.35 mA, or
-can sit in power-down between readings on a sleepy device.
+- **No rework on the module:** the PCB puts the 0.025 Ω shunt straight across channel 3's two terminals. The module's
+  own 0.1 Ω carries a fifth of the current (0.8 A at a 4 A peak, 64 mW: fine), and the firmware is set for 0.02 Ω.
+- Each shunt sits in only one path, so the ESP reports **USB in, solar in and battery** as separate numbers (volts, amps,
+  watts), and from those the charge rate and where it comes from. The battery channel is on the cell side of every load,
+  so it is the cell's true net current: charging minus whatever the ESP and motors draw.
+- The monitor draws about 0.35 mA, or can sit in power-down between readings on a sleepy device.
+- To check when the module arrives: its shunt value (usually R100 = 0.1 Ω, marked on the part), and that each channel's
+  IN+ / IN− are on its pins.
 
 **All three plugged in at once:** the two Schottkys make a diode-OR into the charger's single input, so USB and solar
 can both stay connected with the cell, and neither can push current back into the other.
-- Whichever source is higher at the moment feeds the charger. A sunny panel (6–7 V) takes over from USB (5 V). In
-  shade, when the panel sags below about 5 V, USB takes over. Channels 1 and 2 show that handover live.
-- Both together don't add up: it's one or the other at any instant (or a share during the handover). If summing
-  both is ever wanted, that needs two chargers, not this one.
-- The cell stays on the charger's BAT pin the whole time. The BQ25185's power path runs the ESP from SYS while it charges.
+- Whichever source is higher at the moment feeds the charger. A sunny panel (6–7 V, held at 6.2 V by the zener) takes over
+  from USB (5 V). In shade, when the panel sags below about 5 V, USB takes over. Channels 1 and 2 show that handover live.
+- Both together don't add up: it's one or the other at any instant (or a share during the handover). Summing both would
+  take two chargers.
+- The cell stays on the charger's BAT side the whole time, and the module's power path runs the ESP while it charges.
   Unplugging either source, or both, needs no action.
-- Option: ideal-diode chips (TI **LM66100**, ~0.08 Ω instead of a Schottky's 0.3–0.45 V drop) in place of the two
-  Schottkys, if the lost ~0.4 V on USB matters. Same behavior, slightly cooler.
 
 ## The lifter port
 Raising slats means lifting the stack, roughly **6–15 W** for small blind motors (about 1 A at 12 V). From a
@@ -128,7 +98,7 @@ The port and its wiring are reserved now, so no new board is needed.
 ## Is the 18650 right?
 | Option | Capacity | Fits? | Verdict |
 |---|---|---|---|
-| **18650, high-drain** (e.g. Molicel P28A 2800 mAh / 35 A, Samsung 25R 2500 mAh / 20 A) | 9–10 Wh | yes (this layout) | **recommended**: standard, cheap ($4–6), holders everywhere, easily handles lifter peaks |
+| **18650, high-drain, protected** (e.g. Molicel P28A 2800 mAh / 35 A, Samsung 25R 2500 mAh / 20 A, with a protection board) | 9–10 Wh | yes | **recommended**: standard, cheap ($5–8 protected), holders everywhere, easily handles lifter peaks. Protected cells are ~2–3 mm longer: check the holder's length range |
 | 21700 (4000–5000 mAh, 30–45 A) | 15–18 Wh | +3.5 mm wide, +2.6 mm tall, +4 mm long | worth it only if the ESP has to stay always-on without solar, or the lifter is heavy |
 | LiPo pouch | any | flat | no standard size or holder, swells in heat (a sunny window), easy to puncture: no |
 | LiFePO4 18650 | ~5 Wh | yes | safest in heat, but 3.2 V makes the N20s weaker (already torque-limited): no |
@@ -139,56 +109,48 @@ What decides the capacity is the ESP. As a Thread sleepy device it averages roug
 rounding error. The window's heat matters more than capacity: the NTC stops charging above ~45 °C, and the case should
 stay out of direct sun.
 
-## Costs, stock and lead times (checked 2026-11)
-| Part | Source | Price | Stock / lead time |
-|---|---|---|---|
-| BQ25185DLHR | LCSC C19725033 | $1.83 (1), $1.12 (1k) | 2,377 at LCSC; TI: active |
-| INA3221AIRGVR | LCSC C181255 | ~$0.83–0.92 (1), ~$0.51 (100) | ~2,000–3,000 at LCSC (2026-11); TI: active |
-| Shunts 0.1 Ω 0805 ×2, 0.02 Ω 1206 ×1 | LCSC | cents | stocked |
-| DC003-1.3 jack | LCSC C668594 | ~$0.1 | in JLC's assembly library |
-| Keystone 1042P holder | DigiKey 36-1042P-ND | ~$5.40 (1), $4.23 (25) | ~7,600 in stock; 14-week factory lead time if that runs out. Alternative: MPD BH-18650-PC or a generic LCSC 18650 holder (JLC can solder those) |
-| DW01A, FS8205A, USB-C, R/C | JLC basic parts | cents | stocked |
-| SMD PTCs (0.75 A, 2 A) | LCSC | ~$0.2–0.4 | stocked |
-| RJ45 8P8C right angle, unshielded | LCSC | ~$0.3–0.6 | stocked |
-| RJ12 87180-066LF | you have 10 | — | — |
-| 18650 cell (high-drain) | battery shops | $4–6 | — |
+## Size: to be redone
+Rev 2's layout (121 × 52.8 × 26.4 mm case, everything as chips) no longer applies: the charger module (30.5 × 31.5 mm
+for the MCP73871 one) and the INA3221 module (~25 × 20 mm) sit on the board, so it grows back toward V5's 164.6 mm. The
+layout, the Fusion fit check and the case get redone once both modules are picked and measured. Rev 2's pictures are
+kept below as the starting point.
 
-## JLC assembly (superseded: requirement 3 says no assembly; kept for reference)
-JLC solders through-hole parts too: hand-soldered, $3.50 labor per order plus a small per-joint charge. So the board
-can arrive with **everything soldered** (charger, protection, USB-C, solar jack, RJ12s, RJ45, holder, ESP sockets). You
-plug in the ESP and the cell. If they don't stock a part (your RJ12s, the Keystone holder), it can be bought through their
-global sourcing, or left off for you to solder.
+![rev 2 layout (chip-level, superseded)](renders/pcb-v3-layout.png)
 
-**Estimate for 5 boards** (JLC's published Economic PCBA rates; the real quote comes from uploading the files):
-
-| | |
-|---|---|
-| PCB, 117 × 48 mm, 2-layer, ×5 | ~$5–8 |
-| Assembly setup + stencil | $9.71 |
-| Extended-part fees (~5 parts × $3.07) | ~$15 |
-| SMD joints (~180 per board × 5 × $0.0016) | ~$1.50 |
-| Through-hole labor + joints | ~$9 |
-| Parts (~$16/board fully loaded, ~$5 without RJ12s/holder) | ~$25–80 |
-| Shipping (DHL) | ~$15–20 |
-| **Total** | **~$80–140 for 5** (~$16–28 each), depending on who supplies the RJ12s and holders |
-
-When the board is drawn I'll generate the BOM and placement files and fill in JLC's quote form (stopping before checkout, as with
-the PCB) so you see the exact number.
+## Costs (rough, checked 2026-11)
+| Part | Source | Price |
+|---|---|---|
+| Bare PCB, 2-layer, × 5 | JLC / PCBWay | ~$5–10 + shipping |
+| INA3221 3-channel module | Amazon / AliExpress | ~$3–6 |
+| Charger module | to pick | ~$2–8 |
+| 0.025 Ω 3 W through-hole shunt | DigiKey / Mouser | ~$1 |
+| Keystone 1042P holder | DigiKey 36-1042P-ND | ~$5.40 (1), $4.23 (25) |
+| DC003-1.3 jack, 1N5822 × 2, 6.2 V 3 W zener, radial PTCs, RJ45 | LCSC / DigiKey | ~$2 together |
+| RJ12 87180-066LF | you have 10 | — |
+| Protected 18650 (high-drain) | battery shops | $5–8 |
 
 ## Decided
-- ~~JLC assembly: yes (quote first).~~ **No assembly (2026-11-06):** bare PCB, everything hand-soldered or plugged in.
-- **Off-the-shelf modules with mounting points (2026-11-06):** the charger / battery module, the INA3221 monitor and the
-  USB-C board are bought ready-made. The PCB just gives each one its mounting points: header holes it plugs into (or
-  pads its wires solder to), plus screw holes or standoff points where the module has mounting holes, and a keep-out
-  under it. Each module is measured when it arrives and its footprint drawn from the real part.
+- **No assembly (2026-11-06):** bare PCB; everything hand-soldered or plugged in.
+- **Off-the-shelf modules on mounting points (2026-11-06):** the charger module, the INA3221 monitor and the USB-C board
+  are bought ready-made; the PCB gives them header holes / pads, mounting holes and a keep-out.
+- **Protected cells only:** the board has no protection of its own.
 - Solar: 3.5 × 1.35 mm barrel jack.
 - Port split: doesn't matter. 1 + USB-C + solar at end A; 2 + lifter at end B.
-- Cells: either. The board protects them; the holder takes both lengths (check the 1042P's length range against the cell you buy).
 
 ## Next
-1. Your OK on the 18650 recommendation, the lifter port, and the INA3221 power monitor (it takes the two pins that were
-   the battery ADC and CHG).
-2. Schematic, then a KiCad board generated like v2 (netlist → placement → routing → DRC / ERC / parity), then the
-   PCB's 3D export into this same Fusion fit check.
-3. Pick the charger module (ideally one that takes the panel's ~7 V with no zener) and the INA3221 module; measure both.
-4. Bare PCB order (no assembly). Then the V6 case around the real board.
+1. Pick the charger module: ideally one with power path that takes the panel's ~7 V directly (no zener); otherwise the
+   MCP73871 module you have, with the zener. Pick an INA3221 module. Measure both.
+2. Your OK on the 18650 recommendation and the lifter port.
+3. Schematic, then a KiCad board generated like v2 (netlist → placement → routing → DRC / ERC / parity), then the PCB's 3D
+   export into the Fusion fit check, then the V6 case around it.
+4. Bare PCB order.
+
+## Rev 2 parts that are out (needed factory assembly)
+| Part | Why it was there | Replaced by |
+|---|---|---|
+| TI BQ25185 charger chip (WSON-10, 2.2 × 2 mm) | took the panel's 7 V directly, power path | a charger module |
+| DW01A + FS8205A protection (SOT-23-6, TSSOP-8) | made unprotected cells safe | protected cells |
+| 16-pin SMD USB-C receptacle | USB-C on the board edge | the Cermant breakout on a header |
+| INA3221 chip (QFN-16, 4 × 4 mm) + SMD shunts | per-source monitoring | the INA3221 module + a through-hole shunt |
+| SMD 1812 PTCs | fuses that don't need folding | radial PTCs, folded |
+| LM66100 ideal diodes (option) | lower drop than Schottkys | dropped: 1N5822 Schottkys |
