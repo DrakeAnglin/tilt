@@ -95,6 +95,7 @@ The board didn't stay in well, and the supports at its back edge (the component-
 - **Fourth screw removed:** the post in the charger bay (room side) is gone, from the tray and the lid. Wires crowd that corner, and it was only 24 mm from H3. Three screws and inserts now. The lid still locates on its lip and the three PCB posts.
 - **Lid seam:** no rounding where the lid meets the tray (the two 0.6 mm rounds read as a groove round the box). Only the box's bottom and top edges are rounded (1.5 mm).
 - **Groove channel:** 2.0 mm thick, the same as the lid (was 1.0). It sits in the end walls' notches with 0.05 mm round it (was 0.15, a visible gap). The thicker channel hangs 1.0 mm lower: the cell's + lead now crosses under it at 17.6 mm, the harness GND drops before it, and the ESP's pin tips have 1.5–2.0 mm under it (was 2.3). The PWR, BATT and cell + wires pass 0.2 mm under it.
+- **RJ12 openings:** opened to the jack's whole front face + 0.3 (13.8 × 13.3 mm). A real phone plug's latch didn't get through the old plug-shaped opening. See RJ12 ports.
 - If the board has a part within 2 mm of its top edge on the component side, the lid channel's wall would hit it. Tell me and I'll shorten it.
 
 ## Print 1 fixes, part 2 (rev K)
@@ -103,7 +104,7 @@ The board didn't stay in well, and the supports at its back edge (the component-
 - **Vents:** the lowest slot (Y −4) sat behind the charger module's corner seat. The three slots are now at Y −1, 2.5 and 6 (1.5 mm webs): nothing printed within 8 mm behind any of them (checked).
 - **USB-C window sliver:** the board's pocket in end wall B overlapped the window's edge by 0.45 mm, leaving a one-line sliver of wall above the window that started in mid-air. The pocket now spans the window's full width from its bottom up, so above the window there is one even 1.25 mm skin with a plain round top. Window and vents keep round ends.
 - **PCB raised 0.7 mm** (2.4 mm off the floor, was 1.7). The floor under the RJ12 jacks was cut to 0.5 mm for their tails and pegs, and the floor under the whole board was recessed to 0.8 mm for the header pins. Both are gone: the floor is a full 1.2 mm everywhere, with the jack tails 0.3 mm and the header pins 0.6 mm above it. The wire runs over the plugs moved up 0.7 to match (still clear of the lid and groove). ESP pin tips to the groove channel: 2.3 mm (was 3.0).
-- **RJ12 openings:** the 0.4 mm stepped bezel washed out on a 0.4 nozzle, so it's gone; the openings are plain (plug outline + latch notch).
+- **RJ12 openings:** the 0.4 mm stepped bezel washed out on a 0.4 nozzle, so it's gone; the openings are plain (plug outline + latch notch; opened to the jack's full face in rev L).
 
 Checked: no interference; STLs manifold.
 
@@ -219,17 +220,19 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
 ## RJ12 ports (rev D)
 ![ports](renders/ctrl-v5-port.png)
 
-- **Openings:** each opening in end wall A is the RJ12 plug's own outline, not the jack's body: 10.15 × 7.35 mm with
-  0.6 mm corner radii, i.e. the 9.65 mm plug + 0.25 a side. They sit at 1.45–8.80 mm above the PCB, around the
-  87180's plug opening at 1.73–8.50.
-- **Latch notch:** the 87180 is latch-down, so a 5 mm notch under each opening clears the latch lever, so you can still
-  squeeze it to release.
-- **Bezel and depth:** a 0.4 mm-deep, 0.5 mm-wide bezel frames each opening. The jack's face sits **2.35 mm** behind the
-  outer face: end wall A is 1.6 mm, and the PCB sits 0.2 mm off it, with a small relief in the corner fillet for the
-  board's corner.
-- **Fit coupon:** print it and push a plug through into a soldered jack. It should click in and release with the latch
-  squeezed, with no rubbing. If it rubs, tell me which edge and by how much; the opening is one parameter (`ap_w`,
-  `ap_z`).
+- **Openings (rev L, print 2):** each opening in end wall A is now the **jack's whole front face + 0.3 mm a side**:
+  13.8 × 13.3 mm, corners r 1.0, from 1.5 mm below the PCB's top to 0.3 mm over the jack. (It used to be the plug's
+  outline, 10.15 × 7.35, with a 5 mm latch notch. A real phone plug wouldn't go through it.) The plug now only ever
+  meets the jack's own mouth. Its latch has the whole space down to below the PCB's top, with room on both sides for a
+  thumbnail to press it.
+- **Walls left:** 1.7 mm webs between the openings, 3.6 / 4.1 mm at the sides, 2.4 mm over the floor, and 1.7 mm
+  under the groove's notch over the middle port. Each opening's top is a flat 13.8 mm bridge (prints without support).
+- **Depth:** the jack's face sits **2.35 mm** behind the outer face. End wall A is 1.6 mm, and the PCB sits 0.2 mm off it,
+  with a small relief in the corner fillet for the board's corner. No bezel (0.4 nozzle).
+- **Fit coupon:** `controller_v5_end_a_coupon.stl` is the 12 mm end of the tray. Print it and push your phone cord's plug
+  through all three openings. It should pass with no rubbing, latch and all. When the jacks arrive, check that it clicks
+  into a soldered jack and releases with the latch pressed. Opening size: `ap_clear`, `ap_r`.
+- **Openings before (rev D–K):** the plug's outline + 0.25 a side, 10.15 × 7.35 mm, with a 5 mm notch for the latch.
 
 ## Mount review (rev E)
 | Mount | Rev E |

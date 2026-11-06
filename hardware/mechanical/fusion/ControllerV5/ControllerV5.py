@@ -57,8 +57,8 @@ C = dict(
     # RJ12 Amphenol 87180-066LF (drawing 87180 sheet 1-3): 13.2 W x 11.5 H, front face 0.55 behind the board edge
     rj_w=13.2, rj_h=11.5, rj_front=0.55, rj_back=17.32, rj_x=(7.825, 23.325, 38.825), rj_mouth_w=9.65,
     rj_mouth=(1.73, 8.50),          # the jack's plug opening, above the board (87180 drawing); latch tab-down
-    # end wall A aperture: the plug's outline + 0.25 a side, a notch under it for the latch lever, 0.4 chamfered bezel
-    ap_w=10.15, ap_z=(1.45, 8.80), ap_r=0.6, latch_w=5.0, latch_z0=0.3, bezel=0.5,
+    # end wall A aperture (print 2): the jack's whole front face + 0.3 a side, corners r 1.0 (1.7 webs between them)
+    ap_clear=0.3, ap_r=1.0,
     rj_tail=2.1, rj_peg=1.9,
     # ESP32-C6 SuperMini (26 x 18) on 8.5 mm sockets + 2.5 mm header spacers, USB toward end B
     esp_l=26.0, esp_w=18.0, esp_t=1.0, esp_xc=12.12, esp_y0=47.57, sock_h=8.59, spacer=2.5, esp_tip=1.9,
@@ -180,19 +180,20 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         tray = uni(tray, cyl((hx, hy, F0), (hx, hy, zb), c['boss_d'] / 2))
     # --- jacks: plug-shaped apertures in end wall A, pockets under their tails and pegs, port marks (1, 2, 3 dots)
     def aperture(y, grow, xa, xb):
-        """The plug's outline (rounded corners) + the latch-lever notch under it, grown by `grow` all round."""
-        w, (z0, z1), r = c['ap_w'] / 2 + grow, c['ap_z'], c['ap_r'] + grow
-        z0, z1 = zt + z0 - grow, zt + z1 + grow
+        """print 2: the jack's whole front face + 0.3 a side (was the plug's outline + a latch notch, which a real plug's
+        latch, standing off its body, and the plug's 9.85 width didn't get through once printed). Now the plug only
+        ever meets the jack's own mouth, and the latch has the full space down to the PCB and room for a thumbnail"""
+        w, r = c['rj_w'] / 2 + c['ap_clear'] + grow, c['ap_r'] + grow
+        z0, z1 = zt - 1.5 - grow, zt + c['rj_h'] + c['ap_clear'] + grow     # 1.5 under the PCB's top: the latch's free tail
         a = uni(bx(xa, xb, y - w + r, y + w - r, z0, z1), bx(xa, xb, y - w, y + w, z0 + r, z1 - r))
         for yy in (y - w + r, y + w - r):
             for zz in (z0 + r, z1 - r):
                 a = uni(a, cyl((xa, yy, zz), (xb, yy, zz), r))
-        lw = c['latch_w'] / 2 + grow
-        return uni(a, bx(xa, xb, y - lw, y + lw, zt + c['latch_z0'] - grow, z0 + r))
+        return a
 
     for n, xk in enumerate(c['rj_x']):
         _, y = K(xk, 0)
-        tray = cut(tray, aperture(y, 0.0, -1, c['end_a'] + 0.01))   # plain opening (print 1: the 0.4 stepped bezel washed out)
+        tray = cut(tray, aperture(y, 0.0, -1, c['end_a'] + 0.01))   # plain opening, no bezel (0.4 nozzle)
         x0, _ = K(0, 7.0)
         x1, _ = K(0, c['rj_back'] + 1.0)
         # (print 1: no pocket in the floor under the jack any more: the PCB is 0.7 higher, so its tails clear the full floor)
