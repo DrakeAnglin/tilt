@@ -41,7 +41,7 @@ Soldering the PCB itself: [PCB build guide](pcb-build.md), step by step.
    23.4 mm seated). Bend both legs over toward the ESP **about 1.6 mm below the body** (not at the body: the coating
    can crack), so the disc lies flat over its own four resistors, roughly 8–13 mm above the board. The H1 screw post is
    0.35 mm past the end of F1's disc, and the 470 µF is 1.3 mm past F3's, so fold them straight, not skewed.
-2. **USB-C board's header pins: clip them to 3 mm** past their plastic (the charger module sits beside them now). **USB-C lead**: two wires, about 45 mm. Solder one end to the USB-C board's **VBUS** and **GND** pins. Solder the
+2. **USB-C board's header pins: clip them to 3 mm** past their plastic (the charger module sits beside them now). **USB-C lead**: two wires, **65 mm** each (the route in the box is 50 / 57 mm). Solder one end to the USB-C board's **VBUS** and **GND** pins. Solder the
    other end to a 2-pin piece of male header that plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Use red for VBUS and black for GND,
    or the white flat 2-core cable with the VBUS side marked.
 3. **Charger subassembly**: build it on the bench first. It goes into the box as one piece.

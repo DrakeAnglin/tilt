@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="660" font-family="Helvetica,Arial">
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="20.0" y="32.0" font-size="20.0" fill="#111" font-weight="bold" text-anchor="start">USB-C board: the 2-wire lead to J3</text>
+<text x="20.0" y="56.0" font-size="13.0" fill="#444" font-weight="normal" text-anchor="start">Component side. Only VBUS and GND are wired (the board has its 5.1 k CC resistors, the data pins aren&#x27;t used).</text>
+<rect x="120" y="230" width="398" height="235" rx="6" fill="#1f4fa0"/>
+<rect x="237" y="359" width="164" height="132" rx="18" fill="#c8c8c8" stroke="#888" stroke-width="2"/>
+<text x="318.9" y="509.0" font-size="12.0" fill="#333" font-weight="normal" text-anchor="middle">USB-C socket (out through end wall B)</text>
+<rect x="194" y="238" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>
+<text x="204.6" y="278.7" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="middle">VBUS</text>
+<polyline points="205,238 205,180 620,180" fill="none" stroke="#d62728" stroke-width="5"/>
+<rect x="239" y="238" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>
+<text x="250.3" y="278.7" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="middle">GND</text>
+<polyline points="250,238 250,150 620,150" fill="none" stroke="#222" stroke-width="5"/>
+<rect x="285" y="238" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>
+<text x="296.0" y="278.7" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="middle">CC1</text>
+<rect x="331" y="238" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>
+<text x="341.8" y="278.7" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="middle">D−</text>
+<rect x="376" y="238" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>
+<text x="387.5" y="278.7" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="middle">D+</text>
+<rect x="422" y="238" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>
+<text x="433.2" y="278.7" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="middle">CC2</text>
+<rect x="620" y="120" width="30" height="60" fill="#222"/>
+<text x="660.0" y="154.0" font-size="13.0" fill="#222" font-weight="bold" text-anchor="start">pin 2  GND (black)</text>
+<text x="660.0" y="184.0" font-size="13.0" fill="#d62728" font-weight="bold" text-anchor="start">pin 1  VBUS (red)</text>
+<text x="660.0" y="210.0" font-size="12.0" fill="#444" font-weight="normal" text-anchor="start">2-pin male header, into J3 pins 1-2</text>
+<text x="660.0" y="226.0" font-size="12.0" fill="#444" font-weight="normal" text-anchor="start">(J3 pin 1 = square pad, room-side edge)</text>
+<text x="40.0" y="534.9" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">1. Clip the board&#x27;s 6 header pins to 3 mm past their plastic (the charger sits beside them in the box).</text>
+<text x="40.0" y="556.9" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">2. Two wires, 65 mm each (the route in the box is 50 / 57 mm): red to VBUS, black to GND. Sleeve both joints.</text>
+<text x="40.0" y="578.9" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">3. Other ends: a 2-pin piece of male header, VBUS on pin 1, GND on pin 2. Mark the VBUS end.</text>
+<text x="40.0" y="600.9" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">4. Check: the pin names are printed beside the pins on the board; go by those, not by this drawing&#x27;s order.</text>
+</svg>

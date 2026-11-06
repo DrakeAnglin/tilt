@@ -245,6 +245,132 @@ def picture(k, title, done, now, col, fname):
     return fname
 
 
+def charger_picture():
+    """The Comimark MCP73871 module (front, as in the owner's photo; positions scaled from it, about +/-0.5 mm) and where
+    each of its wires goes on the PCB: the 4-wire J5 harness, the NTC pair, the capacitor."""
+    k, ox, oy = 14.0, 330, 110
+    bw, bh = 30.5, 31.5
+
+    def P(x, y):
+        return ox + k * x, oy + k * y
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="900" font-family="Helvetica,Arial">',
+         '<rect width="100%" height="100%" fill="#fff"/>',
+         text(20, 32, 'Charger module (MCP73871, 30.5 × 31.5 mm): wiring it for the PCB', 20, '#111', 'bold', 'start', halo=False),
+         text(20, 56, 'Front side. Drawn from the listing photo, so positions are approximate. 4 wires to J5, 2 NTC wires, the capacitor.',
+              13, '#444', anchor='start', halo=False)]
+    x0, y0 = P(0, 0)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="10" fill="#1a1a1a"/>' % (x0, y0, bw * k, bh * k))
+    chip = P(13.0, 13.0)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#333" stroke="#666"/>' % (chip[0], chip[1], 4.5 * k, 4.5 * k))
+    o.append(text(chip[0] + 2.25 * k, chip[1] + 2.5 * k, 'MCP73871', 11, '#aaa', halo=False))
+    for i in range(3):
+        lx, ly = P(5.5, 9.0 + 1.6 * i)
+        o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#c33"/>' % (lx, ly, 3.5 * k, 0.9 * k))
+    for i in range(5):
+        ex, ey = P(1.6, 7.6 + 2.54 * i)
+        o.append('<circle cx="%.0f" cy="%.0f" r="9" fill="#c9a400"/><circle cx="%.0f" cy="%.0f" r="4" fill="#1a1a1a"/>' % (ex, ey, ex, ey))
+    cx, cy = P(22.4, 3.1)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="none" stroke="#fff" stroke-width="2"/>' % (cx, cy, 3.8 * k, 5.0 * k))
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#fff"/>' % (cx + 2.6 * k, cy, 1.2 * k, 5.0 * k))
+    o.append(text(cx + 0.9 * k, cy + 3.0 * k, '+', 18, '#fff', 'bold', halo=False))
+    tx, ty = P(23.2, 19.3)
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#555" stroke="#0a7a3a" stroke-width="3"/>' % (tx - 0.8 * k, ty - 0.5 * k, 1.6 * k, 1.0 * k))
+    holes = [('GND', 4.2, 3.5, 'pin 1  G', '#222'), ('PWR', 8.8, 3.5, 'pin 6  P+', '#d62728'),
+             ('GND', 3.8, 27.9, 'empty', '#999'), ('BATT', 8.8, 27.9, 'pin 2  B+', '#d62728'),
+             ('LOAD', 20.8, 27.9, 'pin 4  L+', '#d62728'), ('GND', 25.6, 27.9, 'empty', '#999')]
+    for name, x, y, to, c in holes:
+        px, py = P(x, y)
+        up = -1 if y < 15 else 1
+        o.append('<circle cx="%.0f" cy="%.0f" r="24" fill="#c9a400"/><circle cx="%.0f" cy="%.0f" r="12" fill="#fff"/>' % (px, py, px, py))
+        ty_ = py + up * 66
+        o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="3"%s/>' % (
+            px, py + up * 24, px, ty_ - up * 12, c, ' stroke-dasharray="4 4"' if c == '#999' else ''))
+        # the pad's name beside its wire, not across it
+        o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#fff" font-weight="bold" text-anchor="end">%s</text>' % (
+            px - 6, py + (-30 if up < 0 else 40), name))
+        o.append('<rect x="%.0f" y="%.0f" width="74" height="22" rx="4" fill="#fff" stroke="%s" stroke-width="2"/>' % (px - 37, ty_ - 11, c))
+        o.append(text(px, ty_ + 4, to, 12, c, 'bold', halo=False))
+
+    def call(px, py, tx_, ty_, lines, c='#0a7a3a', anchor='start'):
+        o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="2"/>' % (px, py, tx_, ty_, c))
+        o.append('<circle cx="%.0f" cy="%.0f" r="4" fill="%s"/>' % (px, py, c))
+        for i, t in enumerate(lines):
+            o.append(text(tx_ + (6 if anchor == 'start' else -6), ty_ + 4 + 17 * i, t, 14 if i == 0 else 12,
+                          c if i == 0 else '#333', 'bold' if i == 0 else 'normal', anchor, halo=False))
+    call(cx + 1.9 * k, cy, 790, 110, ['Capacitor: LAST', 'long leg (+) in the hole on the + side,', 'legs bent 90° 1.5 mm from the body,',
+                                     'lying over the LOAD / BATT edge,', 'held 2 mm up on a spacer while soldering'])
+    call(tx + 0.8 * k, ty, 790, 300, ['THERM: remove the 103 (10 kΩ)', 'solder two 30 AWG wires, 60 mm,', 'one to each pad; the 10 kΩ NTC on',
+                                     'their far ends (sleeved), taped on the cell'])
+    lx, ly = P(20.8, 27.9)
+    call(lx + 18, ly - 18, 790, 470, ['LOAD: soldered from UNDERNEATH', 'wire up through the hole from the back,', 'joint on top kept low (the capacitor',
+                                     'lies 2.1 mm over it); wire flat under', 'the module'], '#d62728')
+    ex, ey = P(1.6, 12.7)
+    call(ex - 10, ey, 300, 330, ['Small edge pads: leave empty', '(CE, TE, PROG2, SEL)'], '#666', 'end')
+    # the J5 housing
+    by = oy + bh * k + 150
+    o.append(text(40, by - 24, 'J5 plug: one 6-pin JST-XH housing, 4 wires (pins 3 and 5 empty). Seen from the wire side, latch up.',
+                  15, '#111', 'bold', 'start', halo=False))
+    cav = [('1', 'G', 'GND', '#222', '76 mm'), ('2', 'B+', 'BATT', '#d62728', '76 mm'), ('3', '·', 'empty', '#999', ''),
+           ('4', 'L+', 'LOAD', '#d62728', '100 mm'), ('5', '·', 'empty', '#999', ''), ('6', 'P+', 'PWR', '#d62728', '52 mm')]
+    hx0 = 60
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="86" rx="6" fill="#f4f1e8" stroke="#777" stroke-width="2"/>' % (hx0, by, 110 * 6 + 16))
+    for q, (pin, silk, pad, c, cut) in enumerate(cav):
+        x_ = hx0 + 8 + 110 * q
+        o.append('<rect x="%.0f" y="%.0f" width="100" height="70" rx="4" fill="#fff" stroke="#bbb"/>' % (x_, by + 8))
+        o.append(text(x_ + 50, by + 28, 'pin %s (%s)' % (pin, silk), 12, '#444', halo=False))
+        o.append(text(x_ + 50, by + 50, pad, 15, c, 'bold', halo=False))
+        o.append(text(x_ + 50, by + 68, cut, 12, '#444', halo=False))
+    o.append(text(40, by + 116, 'Lengths are the pre-crimped 152 mm JST leads cut to length (crimp end on J5, bare end on the module): '
+                  'one lead and a half per box.', 12, '#444', anchor='start', halo=False))
+    o.append(text(40, by + 134, 'Hold the housing over J5 before plugging in: G over the silkscreen G, P+ over P+. '
+                  'The module\'s three GND pads are one connection: beep them first.', 12, '#444', anchor='start', halo=False))
+    o.append('</svg>')
+    open(os.path.join(OUT, 'pcb-build-charger.svg'), 'w').write('\n'.join(o))
+    return 'pcb-build-charger.svg'
+
+
+def usb_picture():
+    """The Cermant USB-C breakout (22.1 x 13.05) seen from its component side, its 6 pins, and the 2-wire lead to J3."""
+    k, ox, oy = 18.0, 120, 230
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="660" font-family="Helvetica,Arial">',
+         '<rect width="100%" height="100%" fill="#fff"/>',
+         text(20, 32, 'USB-C board: the 2-wire lead to J3', 20, '#111', 'bold', 'start', halo=False),
+         text(20, 56, 'Component side. Only VBUS and GND are wired (the board has its 5.1 k CC resistors, the data pins aren\'t used).',
+              13, '#444', anchor='start', halo=False)]
+    bw, bd = 22.1, 13.05
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="6" fill="#1f4fa0"/>' % (ox, oy, bw * k, bd * k))
+    sx = ox + (bw - 9.1) / 2 * k                                   # the socket on the front edge, sticking out 1.45
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="18" fill="#c8c8c8" stroke="#888" stroke-width="2"/>' % (
+        sx, oy + (bd - 7.35 + 1.45) * k, 9.1 * k, 7.35 * k))
+    o.append(text(ox + bw * k / 2, oy + (bd + 1.45) * k + 18, 'USB-C socket (out through end wall B)', 12, '#333', halo=False))
+    names = ['VBUS', 'GND', 'CC1', 'D−', 'D+', 'CC2']
+    py = oy + 1.04 * k
+    for i, n in enumerate(names):
+        px = ox + (bw / 2 - 6.35 + 2.54 * i) * k
+        c = '#d62728' if n == 'VBUS' else '#222' if n == 'GND' else '#999'
+        o.append('<rect x="%.0f" y="%.0f" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>' % (px - 11, py - 11))
+        o.append(text(px, py + 30, n, 12, '#fff', 'bold', halo=False))
+        if n in ('VBUS', 'GND'):
+            yy = oy - 50 - (0 if n == 'VBUS' else 30)
+            o.append('<polyline points="%.0f,%.0f %.0f,%.0f %.0f,%.0f" fill="none" stroke="%s" stroke-width="5"/>' % (
+                px, py - 11, px, yy, 620 + (0 if n == 'VBUS' else 0), yy, c))
+    # the 2-pin male header on the far end
+    o.append('<rect x="620" y="%.0f" width="30" height="60" fill="#222"/>' % (oy - 110))
+    o.append(text(660, oy - 76, 'pin 2  GND (black)', 13, '#222', 'bold', 'start', halo=False))
+    o.append(text(660, oy - 46, 'pin 1  VBUS (red)', 13, '#d62728', 'bold', 'start', halo=False))
+    o.append(text(660, oy - 20, '2-pin male header, into J3 pins 1-2', 12, '#444', anchor='start', halo=False))
+    o.append(text(660, oy - 4, '(J3 pin 1 = square pad, room-side edge)', 12, '#444', anchor='start', halo=False))
+    y2 = oy + bd * k + 70
+    for i, t in enumerate(['1. Clip the board\'s 6 header pins to 3 mm past their plastic (the charger sits beside them in the box).',
+                           '2. Two wires, 65 mm each (the route in the box is 50 / 57 mm): red to VBUS, black to GND. Sleeve both joints.',
+                           '3. Other ends: a 2-pin piece of male header, VBUS on pin 1, GND on pin 2. Mark the VBUS end.',
+                           '4. Check: the pin names are printed beside the pins on the board; go by those, not by this drawing\'s order.']):
+        o.append(text(40, y2 + 22 * i, t, 13, '#222', anchor='start', halo=False))
+    o.append('</svg>')
+    open(os.path.join(OUT, 'pcb-build-usb.svg'), 'w').write('\n'.join(o))
+    return 'pcb-build-usb.svg'
+
+
 def where(ref):
     x, y = mm(FPS[ref].GetPosition().x), mm(FPS[ref].GetPosition().y)
     return '%.0f mm from end A' % y
@@ -272,6 +398,8 @@ def md():
     o.append('</svg>')
     open(os.path.join(OUT, 'pcb-build-done.svg'), 'w').write('\n'.join(o))
     pics.append('pcb-build-done.svg')
+    pics.append(charger_picture())
+    pics.append(usb_picture())
 
     def rows(refs, cols):
         return '\n'.join('| ' + ' | '.join(c(r) for c in cols) + ' |' for r in refs)
@@ -474,29 +602,81 @@ def md():
     a('jacks, and check every lead is trimmed to 1.8 mm or less.')
     a('')
     # ---- step 11
-    a('## Step 11: Leads (charger harness, USB-C lead, solar)')
+    a('## Step 11: Wiring the charger module, the USB-C board, the battery and solar')
     a('')
-    a('Built on the bench; the full details are in the [V5 box guide](controller-v5.md#the-charger-subassembly).')
+    a('Everything off the PCB connects by a plug. Build these leads on the bench; nothing is soldered to the PCB itself.')
     a('')
-    a('**Charger harness (J5), 4 wires** in a 6-pin JST-XH housing. Pins 3 and 5 stay empty (pull those two out of a')
-    a('pre-made 6-wire lead). The module\'s GND pads are all one connection: use the one next to PWR. Beep them to each other')
-    a('first.')
+    a('**Cut list (one box):**')
     a('')
-    a('| J5 pin | Silk | Charger pad | Wire |')
+    a('| Lead | Wire | Cut | From → to |')
     a('|---|---|---|---|')
-    a('| 1 | G | GND (next to PWR) | black 22 AWG |')
-    a('| 2 | B+ | BATT | red 22 AWG |')
-    a('| 3 | · | (empty) | |')
-    a('| 4 | L+ | LOAD (soldered from under the module) | red 22 AWG |')
-    a('| 5 | · | (empty) | |')
-    a('| 6 | P+ | PWR | red 22 AWG |')
+    a('| Charger LOAD | 22 AWG, pre-crimped JST lead | **100 mm** | J5 pin 4 → LOAD pad (from underneath) |')
+    a('| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 2 → BATT pad |')
+    a('| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 1 → the GND pad next to PWR |')
+    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 52 mm (the LOAD lead\'s leftover) | J5 pin 6 → PWR pad |')
+    a('| NTC pair | 30 AWG silicone | 2 × 60 mm | THERM pads → the 10 kΩ NTC on the cell |')
+    a('| USB-C lead | 22 AWG, red + black | 2 × 65 mm | USB-C board VBUS / GND → 2-pin male header in J3 pins 1–2 |')
+    a('| Battery | the cell\'s own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |')
+    a('| Solar (optional) | the panel\'s flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |')
     a('')
-    a('Hold the housing over J5 before plugging it in: G over G, P+ over P+.')
+    a('The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.')
+    a('One lead and a half makes a harness.')
     a('')
-    a('**USB-C lead (J3), 2 wires, ~45 mm:** red from the USB-C board\'s **VBUS** pin, black from its **GND** pin, to a 2-pin')
-    a('piece of male header that plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Mark the VBUS end.')
+    a('### 11a: Charger module (build it as one piece)')
     a('')
-    a('**Solar (J8, optional):** the panel lead gets a JST-ZH 2-pin plug, **− on pin 1** (silk −), **+ on pin 2**.')
+    a('![charger wiring](renders/pcb-build-charger.png)')
+    a('')
+    a('The order matters, because the capacitor lies over the LOAD pad and the THERM pads once it\'s on:')
+    a('')
+    a('1. **Beep the module\'s three GND pads to each other.** They should all be one connection; only the one next to PWR')
+    a('   gets a wire. If any pair doesn\'t beep, stop and ask.')
+    a('2. **LOAD (J5 pin 4) first, from underneath:** push the bare end up through the LOAD hole from the back, solder it on')
+    a('   top with a low joint (the capacitor will lie 2.1 mm over it), and lay the wire flat along the underside. In the box the')
+    a('   module stands 2.4 mm off the floor and this wire runs under it.')
+    a('3. **PWR (pin 6), BATT (pin 2), GND (pin 1, the GND next to PWR)** from the top.')
+    a('4. **NTC:** remove the small **103** resistor beside the THERM label (it reads 10 kΩ before you take it off). Solder one')
+    a('   30 AWG wire to each of its pads, 60 mm long, with the 10 kΩ NTC on their far ends, joints sleeved. Lay the pair flat')
+    a('   along the module toward the capacitor\'s leg end; they leave from under the capacitor there.')
+    a('5. **Capacitor, last:** bend both legs 90° about 1.5 mm from the body, so it lies over the LOAD / BATT edge. **Long leg')
+    a('   (+) in the hole by the "+" mark** (the stripe on the can is −). Hold it 2 mm up on a spacer (a scrap of 1.6 mm board')
+    a('   plus a business card) while you solder, so it sits clear of the parts on its legs.')
+    a('6. **Check:** the capacitor\'s + leg beeps to the PWR pad, its − leg to GND.')
+    a('7. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a')
+    a('   pre-made 6-wire lead, pull the pin 3 and 5 wires out (lift the tab over each crimp with a pin) or cut them flush.')
+    a('8. Hold the housing over J5: **G over the silkscreen G, P+ over P+**.')
+    a('')
+    a('The dev board wired all six pads (three − wires onto one GND rail). That\'s the same circuit: the PCB\'s J5 has room for one')
+    a('GND, and the heavy motor current returns to the battery through the PCB, not through this wire.')
+    a('')
+    a('### 11b: USB-C board lead')
+    a('')
+    a('![USB-C lead](renders/pcb-build-usb.png)')
+    a('')
+    a('1. **Clip the USB-C board\'s six header pins to 3 mm** past their plastic (in the box the charger sits beside them).')
+    a('2. **Two 22 AWG wires, 65 mm each:** red soldered to **VBUS**, black to **GND**. Go by the names printed beside the pins on')
+    a('   your board. The dev board used the order VBUS, GND, CC1, D−, D+, CC2. Sleeve both joints.')
+    a('3. Other ends onto a **2-pin piece of male header**: VBUS on one pin, GND on the other. Mark the VBUS end.')
+    a('4. It plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Pin 1 is J3\'s square pad, at the room-side edge.')
+    a('5. CC1 / D− / D+ / CC2 stay unwired: the board has its own 5.1 kΩ CC resistors ("512"), so USB-C chargers give it 5 V.')
+    a('')
+    a('In the box the lead runs from those pins low along the room side, along the room-side wall, and up into J3.')
+    a('')
+    a('### 11c: Battery')
+    a('')
+    a('The 18650 plugs into **J4** with its own JST-XH lead: nothing to make. Before it ever goes in:')
+    a('')
+    a('1. Hold its plug against J4: the **red wire must sit over the silkscreen +**.')
+    a('2. Meter on volts, red probe on the plug\'s red wire: **+3.0 to +4.2 V**. A minus sign means the plug is wired backwards:')
+    a('   don\'t plug it in.')
+    a('3. In the box, its lead leaves the cell\'s end-B face, goes down the PCB side and along the channel between the cell and')
+    a('   the PCB\'s back edge to J4 (the two wires one above the other). It needs at least 45 mm.')
+    a('4. **The NTC** from 11a gets taped onto the top of the cell, about 4 mm from its end-B end (Kapton tape or a dab of')
+    a('   thermal glue).')
+    a('')
+    a('### 11d: Solar (optional)')
+    a('')
+    a('The panel\'s flat 2-core cable comes in through the slot in end wall B and gets a **JST-ZH 2-pin plug**: **− on pin 1**')
+    a('(silk −), **+ on pin 2** (silk +). Check the panel\'s polarity with the meter in sun before crimping.')
     a('')
     # ---- step 12
     a('## Step 12: First power (no ESP yet)')
@@ -542,7 +722,9 @@ if __name__ == '__main__':
     if '--png' in sys.argv:
         for n in names:
             svg = os.path.abspath(os.path.join(OUT, n))
+            head = open(svg).read(300)
+            w_, h_ = (int(head.split('%s="' % k)[1].split('"')[0]) for k in ('width', 'height'))
             subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=2',
-                            '--window-size=%d,%d' % (W, HGT), '--screenshot=' + svg[:-4] + '.png', 'file://' + svg],
+                            '--window-size=%d,%d' % (w_, h_), '--screenshot=' + svg[:-4] + '.png', 'file://' + svg],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     print('wrote', ', '.join(names), 'and docs/pcb-build.md')

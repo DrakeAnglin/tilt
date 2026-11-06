@@ -203,29 +203,81 @@ be on the square pad); open ("OL") is right.
 Finally, look at the underside in good light for bridges between neighboring pads, especially the sockets and
 jacks, and check every lead is trimmed to 1.8 mm or less.
 
-## Step 11: Leads (charger harness, USB-C lead, solar)
+## Step 11: Wiring the charger module, the USB-C board, the battery and solar
 
-Built on the bench; the full details are in the [V5 box guide](controller-v5.md#the-charger-subassembly).
+Everything off the PCB connects by a plug. Build these leads on the bench; nothing is soldered to the PCB itself.
 
-**Charger harness (J5), 4 wires** in a 6-pin JST-XH housing. Pins 3 and 5 stay empty (pull those two out of a
-pre-made 6-wire lead). The module's GND pads are all one connection: use the one next to PWR. Beep them to each other
-first.
+**Cut list (one box):**
 
-| J5 pin | Silk | Charger pad | Wire |
+| Lead | Wire | Cut | From → to |
 |---|---|---|---|
-| 1 | G | GND (next to PWR) | black 22 AWG |
-| 2 | B+ | BATT | red 22 AWG |
-| 3 | · | (empty) | |
-| 4 | L+ | LOAD (soldered from under the module) | red 22 AWG |
-| 5 | · | (empty) | |
-| 6 | P+ | PWR | red 22 AWG |
+| Charger LOAD | 22 AWG, pre-crimped JST lead | **100 mm** | J5 pin 4 → LOAD pad (from underneath) |
+| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 2 → BATT pad |
+| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 1 → the GND pad next to PWR |
+| Charger PWR | 22 AWG, pre-crimped JST lead | 52 mm (the LOAD lead's leftover) | J5 pin 6 → PWR pad |
+| NTC pair | 30 AWG silicone | 2 × 60 mm | THERM pads → the 10 kΩ NTC on the cell |
+| USB-C lead | 22 AWG, red + black | 2 × 65 mm | USB-C board VBUS / GND → 2-pin male header in J3 pins 1–2 |
+| Battery | the cell's own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |
+| Solar (optional) | the panel's flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |
 
-Hold the housing over J5 before plugging it in: G over G, P+ over P+.
+The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.
+One lead and a half makes a harness.
 
-**USB-C lead (J3), 2 wires, ~45 mm:** red from the USB-C board's **VBUS** pin, black from its **GND** pin, to a 2-pin
-piece of male header that plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Mark the VBUS end.
+### 11a: Charger module (build it as one piece)
 
-**Solar (J8, optional):** the panel lead gets a JST-ZH 2-pin plug, **− on pin 1** (silk −), **+ on pin 2**.
+![charger wiring](renders/pcb-build-charger.png)
+
+The order matters, because the capacitor lies over the LOAD pad and the THERM pads once it's on:
+
+1. **Beep the module's three GND pads to each other.** They should all be one connection; only the one next to PWR
+   gets a wire. If any pair doesn't beep, stop and ask.
+2. **LOAD (J5 pin 4) first, from underneath:** push the bare end up through the LOAD hole from the back, solder it on
+   top with a low joint (the capacitor will lie 2.1 mm over it), and lay the wire flat along the underside. In the box the
+   module stands 2.4 mm off the floor and this wire runs under it.
+3. **PWR (pin 6), BATT (pin 2), GND (pin 1, the GND next to PWR)** from the top.
+4. **NTC:** remove the small **103** resistor beside the THERM label (it reads 10 kΩ before you take it off). Solder one
+   30 AWG wire to each of its pads, 60 mm long, with the 10 kΩ NTC on their far ends, joints sleeved. Lay the pair flat
+   along the module toward the capacitor's leg end; they leave from under the capacitor there.
+5. **Capacitor, last:** bend both legs 90° about 1.5 mm from the body, so it lies over the LOAD / BATT edge. **Long leg
+   (+) in the hole by the "+" mark** (the stripe on the can is −). Hold it 2 mm up on a spacer (a scrap of 1.6 mm board
+   plus a business card) while you solder, so it sits clear of the parts on its legs.
+6. **Check:** the capacitor's + leg beeps to the PWR pad, its − leg to GND.
+7. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a
+   pre-made 6-wire lead, pull the pin 3 and 5 wires out (lift the tab over each crimp with a pin) or cut them flush.
+8. Hold the housing over J5: **G over the silkscreen G, P+ over P+**.
+
+The dev board wired all six pads (three − wires onto one GND rail). That's the same circuit: the PCB's J5 has room for one
+GND, and the heavy motor current returns to the battery through the PCB, not through this wire.
+
+### 11b: USB-C board lead
+
+![USB-C lead](renders/pcb-build-usb.png)
+
+1. **Clip the USB-C board's six header pins to 3 mm** past their plastic (in the box the charger sits beside them).
+2. **Two 22 AWG wires, 65 mm each:** red soldered to **VBUS**, black to **GND**. Go by the names printed beside the pins on
+   your board. The dev board used the order VBUS, GND, CC1, D−, D+, CC2. Sleeve both joints.
+3. Other ends onto a **2-pin piece of male header**: VBUS on one pin, GND on the other. Mark the VBUS end.
+4. It plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Pin 1 is J3's square pad, at the room-side edge.
+5. CC1 / D− / D+ / CC2 stay unwired: the board has its own 5.1 kΩ CC resistors ("512"), so USB-C chargers give it 5 V.
+
+In the box the lead runs from those pins low along the room side, along the room-side wall, and up into J3.
+
+### 11c: Battery
+
+The 18650 plugs into **J4** with its own JST-XH lead: nothing to make. Before it ever goes in:
+
+1. Hold its plug against J4: the **red wire must sit over the silkscreen +**.
+2. Meter on volts, red probe on the plug's red wire: **+3.0 to +4.2 V**. A minus sign means the plug is wired backwards:
+   don't plug it in.
+3. In the box, its lead leaves the cell's end-B face, goes down the PCB side and along the channel between the cell and
+   the PCB's back edge to J4 (the two wires one above the other). It needs at least 45 mm.
+4. **The NTC** from 11a gets taped onto the top of the cell, about 4 mm from its end-B end (Kapton tape or a dab of
+   thermal glue).
+
+### 11d: Solar (optional)
+
+The panel's flat 2-core cable comes in through the slot in end wall B and gets a **JST-ZH 2-pin plug**: **− on pin 1**
+(silk −), **+ on pin 2** (silk +). Check the panel's polarity with the meter in sun before crimping.
 
 ## Step 12: First power (no ESP yet)
 
