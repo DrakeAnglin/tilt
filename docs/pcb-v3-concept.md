@@ -177,6 +177,10 @@ the PCB) so you see the exact number.
 
 ## Decided
 - ~~JLC assembly: yes (quote first).~~ **No assembly (2026-11-06):** bare PCB, everything hand-soldered or plugged in.
+- **Off-the-shelf modules with mounting points (2026-11-06):** the charger / battery module, the INA3221 monitor and the
+  USB-C board are bought ready-made. The PCB just gives each one its mounting points: header holes it plugs into (or
+  pads its wires solder to), plus screw holes or standoff points where the module has mounting holes, and a keep-out
+  under it. Each module is measured when it arrives and its footprint drawn from the real part.
 - Solar: 3.5 × 1.35 mm barrel jack.
 - Port split: doesn't matter. 1 + USB-C + solar at end A; 2 + lifter at end B.
 - Cells: either. The board protects them; the holder takes both lengths (check the 1042P's length range against the cell you buy).
