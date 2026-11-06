@@ -267,6 +267,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
                          bx(xu0, in_b + 1, yf - sc, yb + sc, fz, fz + 3),
                          bx(xu0 - ru, xu0 + 0.01, yf - sc, yb + sc, fz + 2.5 - ru, fz + 3)),
                cyl((xu0 - ru, yf - sc - 0.01, fz + 2.5 - ru), (xu0 - ru, yb + sc + 0.01, fz + 2.5 - ru), ru))
+    tray = cut(tray, bx(xu0 - 3.0, xu0 - 1.2, yf - sc - 0.05, yb + sc + 0.05, fz + 0.01, fz + 2.6))   # the round's back half off
     # pocket for the front edge, open at the top (closed it left a 0.25 sliver under the rim); over the window it spans the window's width (no slivers), the wall's outer 1.25 skin intact
     tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, yf - sc, yb + sc, fz, zl + 0.01),
                bx(in_b - 0.01, C['usb_front'] + 0.2, c['usb_yc'] - wr, yf - sc + 0.01, zc - hz - wr, zl + 0.01))
