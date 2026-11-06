@@ -132,7 +132,8 @@ That's 1.5 leads per box. The USB lead is two ~65 mm wires you make up.
 
 **To confirm when the parts arrive:**
 - **The cell's lead:** it needs at least ~45 mm, and it should leave the cell's end face. If it comes out the side, tell me.
-- **Where the THERM pads are on the module:** placed from the listing photo. If they're at the other end, the wires come out the capacitor's free end instead; tell me and I'll reroute.
+- ~~Where the THERM pads are~~ **confirmed** on the real module: the NTC route stands.
+- ~~USB-C board's CC resistors~~ **confirmed**: it has both 5.1 k ("512"), so USB-C-to-C chargers give it 5 V. Only VBUS and GND are wired; the data pins aren't used (the ESP is flashed through its own USB-C on the bench).
 - **The 30 AWG wire:** the model uses 0.9 mm OD. Anything under 1.2 mm fits.
 - **Which USB-C board pins are VBUS and GND:** the route assumes the two at the bottom. If they're at the top, the wires run the same path, just higher.
 
