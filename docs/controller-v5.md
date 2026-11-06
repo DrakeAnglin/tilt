@@ -82,6 +82,18 @@ Nothing presses on the capacitor's legs.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
+## Clean-up (rev H)
+- **USB-C slot:** the back rib used to sit behind the board's edge, holding nothing, with a 0.15 mm sliver gap to the
+  end stop. It's now a low rib under the board's header that holds its back face, joined to the end stop and the side
+  rib as one piece.
+- **Cell cradles:** the PCB-edge ribs that run through the cradles are now level with the cradles' PCB-side horns (3.7 mm), with no step.
+- **Capacitor:** its saddle and the module's back corner seat are now one block. It's bored for the capacitor, its face
+  0.2 mm off the module's end locates the module, its ledge carries the module's corner, and its room-side horn stops
+  flat at 1.5 mm wall like the cell cradles. The end-wall vents no longer cut into it.
+- **Fix:** the lid cradles were being trimmed at the wrong height (a reused variable). Now they match the tray's.
+
+![USB-C slot](renders/ctrl-v5-fix-usb-slot.png) ![cradle](renders/ctrl-v5-fix-cradle.png) ![capacitor saddle](renders/ctrl-v5-fix-cap-saddle.png)
+
 ## Width, groove and battery cradle (rev G)
 - **Narrower:** the back wall comes in to 0.4 mm past the PCB's 47 mm jack strip (the widest part) and 0.3 mm past the H2
   screw post. The 18650 moves 5.6 mm toward the PCB. It now starts 1.2 mm in from the PCB's edge, above it, and its

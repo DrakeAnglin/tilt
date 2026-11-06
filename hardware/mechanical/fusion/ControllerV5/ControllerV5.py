@@ -160,7 +160,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
                bx(bar_x1 - 0.01, C['pcb_end'] + 0.5, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.5, fr, fz + 0.01))
     # --- PCB nest: it drops in and is located before the lid goes on: end wall A (0.2), the room-side wall (0.7) and
     # free-standing ribs along the bar's and the body's back edges (0.2); all below the board's top face
-    ztop = C['zt'] - 0.3
+    # the ribs' tops are level with the cell cradles' PCB-side horns (they run through them)
+    _rc = c['bat_d'] / 2 + 0.2
+    ztop = C['bat_zc'] - math.sqrt(_rc * _rc - (C['bat_y'] - c['cradle_y0'] - c['cradle_t']) ** 2)
     by_bar, by_body = K(c['pcb_bar'], 0)[1], K(c['pcb_body'], 0)[1]
     for x0, x1, y0 in ((58.0, 72.0, by_body), (100.0, 114.0, by_body)):       # (the back wall now locates the bar's edge)
         tray = uni(tray, bx(x0, x1, y0 + 0.2, y0 + 1.4, F0, ztop))
@@ -192,12 +194,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # --- 18650: two saddles and two end stops (the end-B stop is low: the lead leaves that end)
     by, bc = C['bat_y'], C['bat_zc']
     rc = c['bat_d'] / 2 + 0.2                                   # cradle bore
-    ytrim = by - (by - c['cradle_y0'] - c['cradle_t'])          # PCB-side horn: where its wall is cradle_t thick
-    hz = math.sqrt(rc * rc - (by - ytrim) ** 2)                 # bore's height above / below the axis there
+    ytrim = c['cradle_y0'] + c['cradle_t']                      # PCB-side horn: where its wall is cradle_t thick
+    chz = math.sqrt(rc * rc - (by - ytrim) ** 2)                # bore's height above / below the axis there
     for sx in (C['bat_x0'] + a for a in c['cradle_at']):
         sad = cut(bx(sx, sx + c['cradle_w'], c['cradle_y0'], ihi + 0.5, F0, bc - 0.5),          # back horn into the wall
                   cyl((sx - 1, by, bc), (sx + c['cradle_w'] + 1, by, bc), rc),
-                  bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - hz, bc + 1))   # PCB-side horn, flat top
+                  bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - chz, bc + 1))   # PCB-side horn, flat top
         tray = uni(tray, sad)
     # end stops, centred on the cell's axis; they bear on its end below the + button (the lead leaves the end-B end higher up)
     tray = uni(tray, bx(C['bat_x0'] - 1.4, C['bat_x0'] - 0.2, by - 4.0, by + 4.0, F0, bc - 2.5),
@@ -209,7 +211,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     gy1 = gy0 + c['chg_w']
     cz = fz + c['chg_gap']
     gtop = cz + c['chg_t'] + 1.0
-    for px, py in ((gx0, gy0), (gx1, gy0), (gx0, gy1), (gx1, gy1)):
+    for px, py in ((gx0, gy0), (gx1, gy0), (gx0, gy1)):       # (the 4th corner is the capacitor's saddle, below)
         sx, sy = (1 if px == gx0 else -1), (1 if py == gy0 else -1)
         wall_side = py == gy1                                  # back wall within 0.3
         yo = (ihi + 0.01) if wall_side else py - sy * 1.4       # outer edge of the seat across the box
@@ -221,8 +223,18 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     cap_y = gy0 + (c['cap_holes'][0][0] + c['cap_holes'][1][0]) / 2
     cap_x0 = gx0 + c['cap_holes'][0][1] + c['cap_end']
     cap_z = cz + c['chg_t'] + c['cap_up'] + c['cap_d'] / 2
-    tray = uni(tray, cut(bx(gx1 + 0.3, in_b + 0.01, cap_y - 6.5, cap_y + 6.5, F0, cap_z - 3.0),
-                         cyl((gx1, cap_y, cap_z), (in_b + 1, cap_y, cap_z), c['cap_d'] / 2 + 0.3)))
+    # the capacitor's saddle: one block from the module's end to end wall B and into the back wall, bored for the
+    # capacitor (0.3 clear); its face 0.2 off the module's end locates the module, and its ledge carries the module's
+    # corner. Like the cell cradles, its room-side horn stops flat where the wall is still 1.5 thick.
+    cr = c['cap_d'] / 2 + 0.3
+    cy0 = cap_y - 6.5
+    cyt = cy0 + 1.5
+    chz_c = math.sqrt(cr * cr - (cap_y - cyt) ** 2)
+    sad = cut(bx(gx1 + 0.2, in_b + 0.01, cy0, ihi + 0.01, F0, cap_z - 0.5),
+              cyl((gx1, cap_y, cap_z), (in_b + 1, cap_y, cap_z), cr),
+              bx(gx1, in_b + 1, cy0 - 1, cyt, cap_z - chz_c, cap_z + 1))
+    sad = uni(sad, bx(gx1 - 2.0, gx1 + 0.3, gy1 - 2.0, ihi + 0.01, F0, cz))                        # corner ledge
+    tray = uni(tray, sad)
     # --- USB-C breakout: front edge in a pocket in end wall B, back edge in a slot, bottom edge in a floor groove;
     # vertical stadium window for the socket
     yf, yb = C['usb_yf'], C['usb_yf'] + c['usb_t']
@@ -231,8 +243,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(C['usb_back'] - 0.2, in_b + 0.01, yf - 0.15, yb + 0.15, zu0 - 0.2, fz + 0.01))
     xs = C['usb_back']
     slot = uni(bx(xs - 2.0, xs + 1.6, yf - 2.0, yf - 0.15, F0, zu1 - 2.0),          # component side
-               bx(xs - 2.0, xs - 0.6, yb + 0.15, yb + 1.4, F0, zu1 - 2.0),           # back side (short of its header)
-               bx(xs - 2.0, xs - 0.2, yf - 2.0, yb, F0, zu1 - 2.0))                  # end stop
+               bx(xs - 2.0, xs + 1.6, yb + 0.15, yb + 1.4, F0, C['usb_zc'] - 7.62 - 0.3),   # back side, under the header
+               bx(xs - 2.0, xs - 0.2, yf - 2.0, yb, F0, zu1 - 2.0),                  # end stop
+               bx(xs - 2.0, xs - 0.6, yb - 0.01, yb + 1.4, F0, zu1 - 2.0))           # ...joined to the back rib (clear of the header)
     tray = uni(tray, slot)
     wr = c['usb_sh'] / 2 + 0.2
     hz = c['usb_sw'] / 2 - c['usb_sh'] / 2
@@ -247,8 +260,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # --- charger vents: four slots in end wall B above the module (the floor sits on the rail, so not there)
     # 2 mm slots on a 5 mm pitch (3 mm webs), tops 5 mm below the groove notch in the wall
     for vy in (-4.0, 1.0, 6.0):
-        tray = cut(tray, bx(in_b - 1, L + 1, vy - 1.0, vy + 1.0, fz + 5.0, fz + 12.0),
-                   cyl((in_b - 1, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 1, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0))
+        tray = cut(tray, bx(in_b - 0.01, L + 1, vy - 1.0, vy + 1.0, fz + 5.0, fz + 12.0),          # through the wall only
+                   cyl((in_b - 0.01, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 0.01, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0))
     # --- fourth screw boss (charger bay) and the solar lead slot in end wall B (flat 2-core cable lying flat)
     tray = uni(tray, cyl((POST_B[0], POST_B[1], F0), (POST_B[0], POST_B[1], zb), c['boss_d'] / 2 + 0.5))
     tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 2.4, C['solar_y'] + 2.4, fz - 0.01, fz + 2.5))   # flat cable
@@ -297,7 +310,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     for sx in (C['bat_x0'] + a for a in c['cradle_at']):
         lid = uni(lid, cut(bx(sx, sx + c['cradle_w'], c['cradle_y0'], ihi - 0.2, bc + 0.5, zl + 0.01),
                            cyl((sx - 1, by, bc), (sx + c['cradle_w'] + 1, by, bc), rc),
-                           bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - 1, bc + hz)))
+                           bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - 1, bc + chz)))
     # charger: two pins clamp the module's edges where it has no pads (left edge between CN1 and GND, top edge
     # between PWR and the capacitor), mostly off the board; a pad 0.2 over the capacitor (it never bears on its legs)
     ctop = cz + c['chg_t']
