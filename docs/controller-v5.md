@@ -27,22 +27,24 @@ edge in a slot. A short 2-wire lead joins it to J3.
 ## The tight spots (all checked in the model)
 | Where | Room |
 |---|---|
-| ESP32-C6 header pin tips (on the side under the groove) | **3.0 mm** below the groove's channel (the round groove rises away from the middle) |
-| Under the PCB | 2.1 mm (the floor is recessed 0.4 under the board). The tallest tails (JST-XH headers) reach 1.8 mm: **trim every other lead to 1.8 mm or less**. The jacks' tails and pegs sit in deeper pockets |
+| ESP32-C6 header pin tips (on the side under the groove) | **1.5–2.0 mm** below the groove's channel (the round groove rises away from the middle) |
+| Under the PCB | 2.4 mm over a full 1.2 mm floor. The tallest tails (JST-XH headers) reach 1.8 mm: **trim every other lead to 1.8 mm or less**. The jacks' tails clear the floor by 0.3 mm |
 | Fuses (folded) | 2–3 mm under the lid / groove |
 | 470 µF capacitor | 2–3 mm under the groove (standing, as soldered) |
 | Battery plug wires (J4) | 1.5 mm under the groove: bend them over as they leave the plug |
 | Cell, jacks, charger, capacitor, USB-C board | held by pads on the lid (0.05–0.3 mm, by design). **The capacitor lying on the charger is now the tallest part outside the groove**: it sets the lid height |
 
 ## Before it goes in the box
+Soldering the PCB itself: [PCB build guide](pcb-build.md), step by step.
+
 1. **Fold all three fuses** after soldering. Each one is an 11.5 mm disc on about 12 mm of legs (Bel 0ZRE0075FF:
    23.4 mm seated). Bend both legs over toward the ESP **about 1.6 mm below the body** (not at the body: the coating
    can crack), so the disc lies flat over its own four resistors, roughly 8–13 mm above the board. The H1 screw post is
    0.35 mm past the end of F1's disc, and the 470 µF is 1.3 mm past F3's, so fold them straight, not skewed.
-4. **USB-C board's header pins: clip them to 3 mm** past their plastic (the charger module sits beside them now). **USB-C lead**: two wires, about 45 mm. Solder one end to the USB-C board's **VBUS** and **GND** pins. Solder the
+2. **USB-C board's header pins: clip them to 3 mm** past their plastic (the charger module sits beside them now). **USB-C lead**: two wires, about 45 mm. Solder one end to the USB-C board's **VBUS** and **GND** pins. Solder the
    other end to a 2-pin piece of male header that plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Use red for VBUS and black for GND,
    or the white flat 2-core cable with the VBUS side marked.
-5. **Charger subassembly**: build it on the bench first. It goes into the box as one piece.
+3. **Charger subassembly**: build it on the bench first. It goes into the box as one piece.
 
 ## The charger subassembly
 ![charger subassembly](renders/ctrl-v5-charger-sub.png)

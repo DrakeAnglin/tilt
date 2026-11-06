@@ -113,6 +113,8 @@ Order the PCBs (5) and these together, so nothing is missing when the boards arr
 | 6 | PWR + | red 22 AWG |
 
 ## Soldering order (lowest parts first)
+**Full step-by-step guide with a picture per step: [docs/pcb-build.md](../../docs/pcb-build.md).** Short version:
+
 1. Resistors (19, flat, any way round). The four behind each jack stand in a row: 220, 10, 100k, 220 (see the silkscreen).
 2. Diodes: the band on the side marked **K**. 1N5819 ×3, zener ("6V2 3W Z").
 3. Ceramic capacitors (6), then the 470 µF (**+** marked; the long leg is +).
