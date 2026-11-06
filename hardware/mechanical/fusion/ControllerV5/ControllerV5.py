@@ -16,8 +16,8 @@ Layout, end A (ports) to end B (USB-C):
     bent 90 deg, so it lies on its side across the module (standing up it would be 33 mm: too tall). It covers the
     LOAD pad, so that one harness wire is soldered from underneath and runs under the module (3 mm standoffs).
     The module sits on four corner pads between guides; two lid pins clamp its edges; a tray saddle carries the
-    capacitor's free end. A lid post with a fourth insert (fourth screw from below) and the solar lead's floor
-    route are on the room side of the bay.
+    capacitor's free end. The solar lead's floor
+    route is on the room side of the bay.
   * USB-C breakout on edge, held by its edges: front edge in a pocket in end wall B (socket face flush), bottom edge in
     a floor U-channel, top edge in a lid U-channel whose closed back end keeps it from being pushed back.
 
@@ -124,8 +124,8 @@ def K(x, y):
 
 
 HOLES = [K(*h) for h in c['holes']]
-POST_B = (C['chg_x0'] + 9.2, -20.5)                              # fourth screw: the lid post in the charger bay
-SCREWS = [(x, y, C['zb'], c['screw_l']) for x, y in HOLES + [POST_B]]   # (x, y, boss top, length): one size, M3 x 10
+# print 2: the fourth screw (a post in the charger bay, room side) is gone: wires crowd there and it was 24 mm from H3
+SCREWS = [(x, y, C['zb'], c['screw_l']) for x, y in HOLES]   # (x, y, boss top, length): one size, M3 x 10
 
 
 def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
@@ -279,10 +279,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     for vy in (-1.0, 2.5, 6.0):    # print 1: the -4 slot was behind the module's corner seat (Y up to -2.7); above 6 the capacitor's end face is behind it
         tray = cut(tray, bx(in_b - 0.01, L + 1, vy - 1.0, vy + 1.0, fz + 5.0, fz + 12.0),          # through the wall only
                    cyl((in_b - 0.01, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 0.01, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0))
-    # --- fourth screw boss (charger bay) and the solar lead slot in end wall B (flat 2-core cable lying flat)
-    tray = uni(tray, cyl((POST_B[0], POST_B[1], F0), (POST_B[0], POST_B[1], zb), c['boss_d'] / 2 + 0.5))
+    # --- the solar lead slot in end wall B (flat 2-core cable lying flat)
     tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 2.4, C['solar_y'] + 2.4, fz - 0.01, fz + 2.5))   # flat cable
-    # --- screw holes + countersinks from below (all four)
+    # --- screw holes + countersinks from below (all three)
     for sx, sy, _, _ in SCREWS:
         tray = cut(tray, cyl((sx, sy, -1), (sx, sy, zb + 1), 1.7),
                    cone((sx, sy, c['floor_z'] - 0.01), 3.1, (sx, sy, c['floor_z'] + 1.65), 1.45))
@@ -293,12 +292,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     reg = cut(rbox(c['end_a'] + 0.2, in_b - 0.2, ilo + 0.2, ihi - 0.2, zl - 1.4, zl + 0.01, c['corner_r'] - c['wall'] - 0.2),
               rbox(c['end_a'] + 1.6, in_b - 1.6, ilo + 1.6, ihi - 1.6, zl - 2, zl + 1, max(c['corner_r'] - c['wall'] - 1.6, 0.3)))
     # no lip along end wall B: the capacitor's end and the USB-C board's top edge come up to within 1 mm of the lid there;
-    # the lid locates on the other three sides and its four posts
+    # the lid locates on the other three sides and its three posts
     reg = cut(reg, bx(in_b - 2.0, in_b + 1, ilo - 1, ihi + 1, zl - 2, zl))
     lid = uni(lid, reg)
     # the channel under the groove (the groove itself is cut last, so it also trims every feature that reaches it)
     lid = uni(lid, cut(groove(c['groove_t'], 0, L), bx(-1, L + 1, -20, 20, c['top'], c['top'] + 30)))
-    # posts with inserts: three on the PCB's holes (they clamp it), one on the charger-bay boss
+    # posts with inserts: three on the PCB's holes (they clamp it)
     def root(px, py, r, top, want=2.0):
         """A 45 deg root fillet (cone) where a post meets the lid, as big as the room to the wall / groove allows."""
         if z_under(abs(py) + r + want, c['groove_t']) < zl + 0.5:      # under the groove's channel: it merges into it
@@ -308,7 +307,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         return cone((px, py, top - f), r, (px, py, top + 0.01), r + f) if f >= 0.6 else None
 
     pr = c['post_d'] / 2
-    for (px, py), zbot in [(h, zt) for h in HOLES] + [(POST_B, zb)]:
+    for (px, py), zbot in [(h, zt) for h in HOLES]:
         top = ceiling(py, pr)
         lid = uni(lid, cyl((px, py, zbot), (px, py, top + 0.01), pr))
         f = root(px, py, pr, top)

@@ -12,7 +12,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C 
 |---|---|
 | Size | **164.6 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
-| Hardware | 4 × M3 heat-set inserts (the M3 × 5.7 ones you have), **4 × M3 × 10 flat-head** (one screw size for the whole box) |
+| Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head** (one screw size for the whole box) |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
 
 ## Why it is longer than V4
@@ -72,17 +72,16 @@ end. Two pins on the lid clamp the module's edges where it has no pads, and a pa
 Nothing presses on the capacitor's legs.
 
 ## Assembly
-1. Press the 4 inserts into the lid's 4 posts (lid upside down, soldering iron).
+1. Press the 3 inserts into the lid's 3 posts (lid upside down, soldering iron).
 2. Drop the PCB into its nest: it sits on its 3 floor bosses, located 0.2 mm all round by stops on end wall A and ribs along its edges, so it can't go in crooked.
 3. Cell into its two saddles along the back wall, lead at end B. Plug it into J4.
 4. Charger subassembly into its bay: capacitor end toward end wall B (its free end drops into the saddle), module onto its corner pads between the guides. Plug the harness into J5.
 5. USB-C board: component side toward the room-side wall, socket into the window with the back end tipped up, then push the back end down until it snaps in over the floor channel's rounded back end. The lid's channel locks it.
    Plug its lead into J3.
-6. Solar lead (if used): flat through the slot in end wall B, along the floor on the room side of the bay (beside the module, past the bay's screw post), into J8.
-7. Lid on: its posts land on the PCB's 3 holes and the boss in the charger bay; its two pins land on the module's edges.
-8. Turn the box over and drive the 4 **M3 × 10** flat-head screws up through the floor, snug only (they go into
-   plastic-held inserts). Three clamp the PCB between the floor bosses and the lid posts; the fourth is in the charger
-   bay. Together they hold the lid on.
+6. Solar lead (if used): flat through the slot in end wall B, along the floor on the room side of the bay (beside the module), into J8.
+7. Lid on: its posts land on the PCB's 3 holes; its two pins land on the module's edges.
+8. Turn the box over and drive the 3 **M3 × 10** flat-head screws up through the floor, snug only (they go into
+   plastic-held inserts). They clamp the PCB between the floor bosses and the lid posts, and hold the lid on.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
@@ -93,6 +92,7 @@ The board didn't stay in well, and the supports at its back edge (the component-
 - **Back edge:** the tall tray stop and its buttress are gone. The lid channel's back end is closed. It comes down 2.5 mm thick behind the board's back edge, to the top of the socket (where a plug pushes), on the component side of the header.
 - **Front edge:** in its pocket in end wall B, as before, with the socket in the closed round window. The wall isn't cut. The pocket is open at the top inside the wall; closed, it left a 0.25 mm sliver under the rim.
 - **To fit it:** socket into the window first with the board's back end tipped up, then push the back end down. Its bottom corner rolls over the back end's rounded edge and snaps in. Then put the lid on.
+- **Fourth screw removed:** the post in the charger bay (room side) is gone, from the tray and the lid. Wires crowd that corner, and it was only 24 mm from H3. Three screws and inserts now. The lid still locates on its lip and the three PCB posts.
 - If the board has a part within 2 mm of its top edge on the component side, the lid channel's wall would hit it. Tell me and I'll shorten it.
 
 ## Print 1 fixes, part 2 (rev K)
@@ -130,9 +130,9 @@ covers them against the tray, the lid (closed), every part, the screw posts and 
 | BATT (J5-2 → BATT) | at 17.0 mm diagonally over the module (room side of the capacitor), down onto the pad | 56 mm | 2 mm |
 | GND (J5-1 → GND by PWR) | at 20.4 mm, over the other three where they cross | 43 mm | 0.8 mm to the lid |
 | **Cell lead** (cell → J4) | out of the cell's end-B face, down its PCB side, past the H3 post's back, then **along the channel between the cell's PCB-side shoulder and the PCB's back edge** (the two wires one above the other, under the groove), into J4 | **40 mm** | 0.8 mm |
-| USB lead (USB-C board → J3 pins 1–2) | from the board's VBUS/GND pins low (~5–8 mm) along the room side, behind the bay's screw post, along the room-side wall, up into the 2-pin plug | 50 / 57 mm | >3 mm |
+| USB lead (USB-C board → J3 pins 1–2) | from the board's VBUS/GND pins low (~5–8 mm) along the room side, along the room-side wall, up into the 2-pin plug | 50 / 57 mm | >3 mm |
 | **NTC pair** (THERM pads → NTC on the cell) | flat on the module under the capacitor (2.1 mm gap, 30 AWG is 0.9), out at the capacitor's leg end, down past the legs, up over the bay's back corner to the cell's top, taped on near end B | 36 / 37 mm (cut 60) | >0.5 mm |
-| Solar cable (flat 2-core) | in through the end-B slot, on the floor between the bay's screw post and the module, up beside the PCB's end, over J3, into J8 | 68 mm | — |
+| Solar cable (flat 2-core) | in through the end-B slot, on the floor beside the module, up beside the PCB's end, over J3, into J8 | 68 mm | — |
 
 **What the review changed:**
 - **The 18650 moved back against the back wall (+2.7 mm).** Beside the PCB, the space between the cell's shoulder and the groove's underside only fit one wire, and the H3 post blocked the cell's end. The move opens a real channel for the lead. The box width is unchanged: the PCB and the H2 post set it, not the cell.
@@ -155,7 +155,7 @@ That's 1.5 leads per box. The USB lead is two ~65 mm wires you make up.
 1. Charger subassembly on the bench: LOAD wire first, from below, then the others, then the NTC pair, then the capacitor.
 2. Tray: PCB in. Cell into its saddles with its lead on the end-B end, tucked down the PCB side and along the channel to J4.
 3. Charger subassembly in: lay the LOAD wire on the floor, under where the module goes, out to the room side. Seat the module. Plug J5.
-4. USB-C board into its slot. Its lead goes low along the room side, behind the screw post, then up into J3.
+4. USB-C board into its slot. Its lead goes low along the room side, then up into J3.
 5. Solar cable (if used): along the floor, up beside the PCB's end, into J8.
 6. Tape the NTC onto the top of the cell, about 4 mm from its end-B end (Kapton or a dab of thermal glue).
 7. Lid on. Check nothing is pinched at the cell's end or over the module.
@@ -237,7 +237,7 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
 | 18650 | Two saddles (into the back wall) + two end stops centred on the cell's axis, bearing on its end below the + button. The cell moved 0.4 mm toward end B so the end-A stop clears the H2 post without being cut short |
 | PCB | Three bosses (screw clamps) + end wall A (0.2) + the room-side wall (0.7) + free-standing ribs on the bar's and body's back edges (0.2). The thin ribs that only narrowed the gap to the room-side wall are gone (they did nothing the wall doesn't) |
 | USB-C board | Edges only: end-wall pocket, floor U-channel, lid U-channel with a closed back end (rev L) |
-| Lid | Four screw posts, edge pins on the charger, pads over the jacks, cell, capacitor, ESP (0.5 clear) |
+| Lid | Three screw posts, edge pins on the charger, pads over the jacks, cell, capacitor, ESP (0.5 clear) |
 
 ![charger seats](renders/ctrl-v5-seats.png)
 
