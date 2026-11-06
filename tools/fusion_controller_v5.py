@@ -301,7 +301,7 @@ fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], C['edge_r'], C['zl'], 0.
        'Lid': round_edges(comps['Lid'], C['top'], C['edge_r'], C['zl'], 0.6, groove=True)}
 
 
-def engrave(comp, z, lines, xc, yc, w, h):
+def engrave(comp, z, lines, xc, yc, w, h, size=0.32):
     """Engrave text 0.4 deep into the body's downward-facing face at height z, sketched ON that face, so it reads
     right when you look at that face (from below)."""
     try:
@@ -319,7 +319,7 @@ def engrave(comp, z, lines, xc, yc, w, h):
         sk = comp.sketches.add(face)
         a = sk.modelToSketchSpace(P3(xc - w / 2, yc - h / 2, z))
         b = sk.modelToSketchSpace(P3(xc + w / 2, yc + h / 2, z))
-        ti = sk.sketchTexts.createInput2(lines, 0.32)
+        ti = sk.sketchTexts.createInput2(lines, size)
         ti.setAsMultiLine(adsk.core.Point3D.create(min(a.x, b.x), min(a.y, b.y), 0),
                           adsk.core.Point3D.create(max(a.x, b.x), max(a.y, b.y), 0),
                           adsk.core.HorizontalAlignments.CenterHorizontalAlignment,
@@ -341,8 +341,8 @@ def engrave(comp, z, lines, xc, yc, w, h):
         return 'failed: %s' % str(ex)[:120]
 
 
-eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER\nV5', L / 2, 0, 52, 12),
-       'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID - 4 x M3 INSERTS', 100, -17, 44, 10)}
+eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER\nV5', L / 2, 0, 110, 18, 0.6),
+       'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID', 100, -17, 30, 10, 0.5)}
 files = []
 em = design.exportManager
 for g, nm in (('Tray', 'controller_v5_tray'), ('Lid', 'controller_v5_lid')):

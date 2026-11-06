@@ -86,6 +86,17 @@ Nothing presses on the capacitor's legs.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
+## Print 1 fixes (rev J)
+From the first test print (0.4 mm nozzle):
+- **Charger module:** its two sides were swapped in the model. It's 30.5 mm across the box and 31.5 along it (pad layout unchanged). Its corner seats are now a **press fit**: 0 nominal clearance, which FDM prints slightly tight, so it pushes in and stays. It sits against the back wall.
+- **Capacitor:** its bore now runs right through to the back wall (0.3 into the wall's face, leaving 1.7 mm), so nothing stands between the can and the wall.
+- **USB-C board:** the low rib on the header side is gone, so the board can be angled in. Its back edge is still held by the end stop and the component-side rib. Slot clearance 0.25 a side.
+- **18650:** sized to the measured 65.7 mm cell. The end plates are 0.4 mm off each end (0.8 mm play in all), **2.5 mm thick** and 10 mm wide (were 1.2 × 8, with 0.2 + 3.3 mm play). The cell moved 1.7 mm toward end B so the end-A plate clears the H2 screw post.
+- **Harness GND** now drops to its pad 2.5 mm earlier (the pad moved 1.3 mm toward the groove).
+- **Printability:** bottom text 6 mm tall (was 3.2), lid text shortened to "V5 LID" at 5 mm. New features are ≥1.2 mm walls and ≥0.25 mm clearances.
+
+Checked: no interference (all parts and wires, lid closed); tray, lid and coupon STLs manifold.
+
 ## Wiring review (rev I)
 Every wire is now in the model at its real size, along the route you'd actually take. The collision check
 covers them against the tray, the lid (closed), every part, the screw posts and each other: **no interference**.
