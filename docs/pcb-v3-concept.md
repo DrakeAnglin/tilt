@@ -11,8 +11,33 @@ schematic and routing.
    voltage**, and the **battery's own voltage and current** (charging and discharging), each on its own. V5's PCB can
    only read the battery + rail, which shows the input voltage, not the cell, whenever USB or solar is plugged in.
 2. **USB, solar and battery all plugged in at once**, with nothing back-feeding anything and no switching by hand.
+3. **No small parts that need the PCB maker to assemble them.** Everything on the board must be hand-solderable:
+   through-hole parts, or ready-made modules on header pins (like the ESP and the USB-C board today). The order is a
+   bare PCB; no assembly service. This **replaces the chip-level design below** (BQ25185, DW01A/FS8205A, INA3221 chip,
+   SMD USB-C, SMD fuses). See [Hand-solder only: what changes](#hand-solder-only-what-changes).
 
-How v3 meets them is under [Power monitoring](#power-monitoring-usb-solar-and-battery-separately) below.
+How v3 meets 1 and 2 is under [Power monitoring](#power-monitoring-usb-solar-and-battery-separately), and 3 under
+[Hand-solder only](#hand-solder-only-what-changes). The parts table and layout further down are the first (chip-level)
+pass and are kept for reference; where they disagree, the hand-solder section wins.
+
+## Hand-solder only: what changes
+Every part either goes through holes or is a module that plugs onto header pins. Nothing smaller than a 1206-size
+resistor, and preferably not even that.
+
+| Job | Chip-level pass (needs assembly) | **Hand-solder version** |
+|---|---|---|
+| Charger + power path | BQ25185, WSON-10 2.2 × 2 mm | **A charger module on header pins**, as in V5. The MCP73871 module you have works (power path, USB + solar input) but needs its input clamped at 6.2 V, so it keeps V2.1's 3 W zener. A module that takes the panel's ~7 V directly would drop the zener: to research before drawing the board |
+| Cell protection | DW01A + FS8205A, SOT-23 / TSSOP | **Protected 18650 cells** (the protection board is built into the cell, button top). Nothing on the PCB |
+| USB-C input | 16-pin SMD receptacle | **The Cermant USB-C breakout on a header** (as on V2.1), its own 5.1 k CC resistors on board |
+| Solar input | DC003 barrel jack | same jack: it's through-hole, hand-solderable. Or the V2.1 JST-ZH header |
+| Power monitor (USB / solar / battery separately) | INA3221 chip, QFN-16 4 × 4 mm | **An INA3221 3-channel module** (common breakout, about 25 × 20 mm, header pins, I²C), plugged onto the board. Its stock shunts are 0.1 Ω, fine for USB and solar (to 1.6 A); the **battery channel's shunt gets swapped for 0.02 Ω** (a 2512-size resistor, large and easy to hand-solder) so lifter peaks of 3–4 A stay in range |
+| Port fuses | SMD 1812 PTCs | **Radial through-hole PTCs**, as on V2.1 (0.75 A × 3), plus a radial 2 A for the lifter. They fold flat, as in V5 |
+| Source OR-ing | Schottkys | 1N5819 / 1N5822 through-hole (1N5822 for 3 A) |
+| Everything else | — | through-hole resistors, capacitors, RJ12 / RJ45 jacks, ESP on sockets, cell holder (Keystone 1042P is through-hole) |
+
+**What that costs:** the board gets bigger again. The charger module (30.5 × 31.5 mm) and the INA3221 module sit on
+the board on headers, so the 121 mm case grows back toward V5's length. The layout and case size get re-done once the
+modules are picked. GPIO stays at 18 of 18: the INA3221 module is I²C (2 pins), as in the chip version.
 
 | | V5 (today) | **v3 concept** |
 |---|---|---|
@@ -128,7 +153,7 @@ stay out of direct sun.
 | RJ12 87180-066LF | you have 10 | — | — |
 | 18650 cell (high-drain) | battery shops | $4–6 | — |
 
-## JLC assembly: yes, they'd do all of it
+## JLC assembly (superseded: requirement 3 says no assembly; kept for reference)
 JLC solders through-hole parts too: hand-soldered, $3.50 labor per order plus a small per-joint charge. So the board
 can arrive with **everything soldered** (charger, protection, USB-C, solar jack, RJ12s, RJ45, holder, ESP sockets). You
 plug in the ESP and the cell. If they don't stock a part (your RJ12s, the Keystone holder), it can be bought through their
@@ -151,7 +176,7 @@ When the board is drawn I'll generate the BOM and placement files and fill in JL
 the PCB) so you see the exact number.
 
 ## Decided
-- JLC assembly: yes (quote first).
+- ~~JLC assembly: yes (quote first).~~ **No assembly (2026-11-06):** bare PCB, everything hand-soldered or plugged in.
 - Solar: 3.5 × 1.35 mm barrel jack.
 - Port split: doesn't matter. 1 + USB-C + solar at end A; 2 + lifter at end B.
 - Cells: either. The board protects them; the holder takes both lengths (check the 1042P's length range against the cell you buy).
@@ -161,4 +186,5 @@ the PCB) so you see the exact number.
    the battery ADC and CHG).
 2. Schematic, then a KiCad board generated like v2 (netlist → placement → routing → DRC / ERC / parity), then the
    PCB's 3D export into this same Fusion fit check.
-3. BOM + placement files → JLC quote. Then the V6 case around the real board.
+3. Pick the charger module (ideally one that takes the panel's ~7 V with no zener) and the INA3221 module; measure both.
+4. Bare PCB order (no assembly). Then the V6 case around the real board.
