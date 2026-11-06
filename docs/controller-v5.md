@@ -76,7 +76,7 @@ Nothing presses on the capacitor's legs.
 2. Drop the PCB into its nest: it sits on its 3 floor bosses, located 0.2 mm all round by stops on end wall A and ribs along its edges, so it can't go in crooked.
 3. Cell into its two saddles along the back wall, lead at end B. Plug it into J4.
 4. Charger subassembly into its bay: capacitor end toward end wall B (its free end drops into the saddle), module onto its corner pads between the guides. Plug the harness into J5.
-5. USB-C board: drop it straight down at end B, socket down the slot in the wall into the window, component side toward the room-side wall. The lid's channel and tongue lock it.
+5. USB-C board: drop it into the floor channel at end B about 1.6 mm back from the wall, component side toward the room-side wall, and slide it forward until the socket sits in the window. The lid's channel locks it.
    Plug its lead into J3.
 6. Solar lead (if used): flat through the slot in end wall B, along the floor on the room side of the bay (beside the module, past the bay's screw post), into J8.
 7. Lid on: its posts land on the PCB's 3 holes and the boss in the charger bay; its two pins land on the module's edges.
@@ -86,14 +86,14 @@ Nothing presses on the capacitor's legs.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
-## Print 2: USB-C board drops in from the top (rev L)
-The board didn't stay in well. It was held on only three sides, and the component-side rib at its back edge sat over the header's solder joints.
-Now it drops straight in from the top and is held only by its four edges. Nothing touches its faces, so it stays clear of the solder joints and parts.
-- **Front edge:** a pocket in end wall B, now open at the top. The socket drops down a slot in the wall. A tongue on the lid fills that slot down to the window, and its end is rounded, so with the lid on the window is the same round-ended stadium.
-- **Bottom edge:** stands on the floor (0.05 mm gap) between two floor rails, 1.5 mm tall and 1.2 mm thick, 0.25 mm clear a side. The old floor groove is gone, so the floor is a full 1.2 mm there too. The board is 0.55 mm higher, and its wires moved up with it.
-- **Back edge:** against the end stop (with its buttress, and the lid tab above it), which takes the push when a cable goes in. The component-side rib is removed.
-- **Top edge:** in a channel on the lid, 2 mm deep, over 9 mm of the edge, between the header and the front, 0.25 mm clear a side.
-- If the board has a part within 2 mm of its top edge, between 3 and 12 mm from its back edge, on the component side, the lid channel's finger would hit it. Tell me and I'll shorten or move it.
+## Print 2: USB-C board held by its edges (rev L)
+The board didn't stay in well, and the supports at its back edge (the component-side rib, over the header's solder joints) could foul the joints. Now nothing touches its faces:
+- **Bottom edge:** in a U-channel on the floor (walls 2.5 mm tall, 1.2 mm thick, 0.25 mm clear a side). The board stands on the floor (0.05 mm gap); the old floor groove is gone, so the floor is a full 1.2 mm. The board is 0.55 mm higher than before, and its wires moved up with it.
+- **Top edge:** in a U-channel on the lid, 2 mm deep, from the board's back edge to 1 mm short of the wall.
+- **Back edge:** the tall tray stop and its buttress are gone. The lid channel's back end is closed. It comes down 2.5 mm thick behind the board's back edge, to the top of the socket (where a plug pushes), on the component side of the header.
+- **Front edge:** in its pocket in end wall B, as before, with the socket in the closed round window. The wall isn't cut. The pocket is open at the top inside the wall; closed, it left a 0.25 mm sliver under the rim.
+- **To fit it:** drop it into the floor channel about 1.6 mm back from the wall, slide it forward until the socket is in the window, then put the lid on.
+- If the board has a part within 2 mm of its top edge on the component side, the lid channel's wall would hit it. Tell me and I'll shorten it.
 
 ## Print 1 fixes, part 2 (rev K)
 - **Rod groove:** stays a circle (a teardrop was tried and reverted).
@@ -236,7 +236,7 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
 | Capacitor | Saddle under its free end, merged with the end-B corner seat; lid pad 0.2 over it |
 | 18650 | Two saddles (into the back wall) + two end stops centred on the cell's axis, bearing on its end below the + button. The cell moved 0.4 mm toward end B so the end-A stop clears the H2 post without being cut short |
 | PCB | Three bosses (screw clamps) + end wall A (0.2) + the room-side wall (0.7) + free-standing ribs on the bar's and body's back edges (0.2). The thin ribs that only narrowed the gap to the room-side wall are gone (they did nothing the wall doesn't) |
-| USB-C board | Edges only: end-wall pocket (open top), back-edge stop, floor rails, lid channel + slot tongue (rev L) |
+| USB-C board | Edges only: end-wall pocket, floor U-channel, lid U-channel with a closed back end (rev L) |
 | Lid | Four screw posts, edge pins on the charger, pads over the jacks, cell, capacitor, ESP (0.5 clear) |
 
 ![charger seats](renders/ctrl-v5-seats.png)
