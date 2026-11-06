@@ -280,11 +280,19 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(in_b - 1, L + 1, c['usb_yc'] - wr, c['usb_yc'] + wr, zc - hz, zc + hz),
                cyl((in_b - 1, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr),
                cyl((in_b - 1, c['usb_yc'], zc + hz), (L + 1, c['usb_yc'], zc + hz), wr))
+    # print 1: the window's round top is an unsupported arch in the wall (and left a floating tip where it meets the
+    # board's pocket): its top is a 45 deg teardrop point instead
+    s45 = math.sqrt(0.5)
+    tip = cut(obox(((in_b + L) / 2, c['usb_yc'], zc + hz), (1, 0, 0), (0, s45, s45), L - in_b + 2, 2 * wr, 2 * wr),
+              bx(in_b - 2, L + 2, c['usb_yc'] - 3 * wr, c['usb_yc'] + 3 * wr, zc + hz - 3 * wr, zc + hz + wr * s45))
+    tray = cut(tray, tip)
     # --- charger vents: four slots in end wall B above the module (the floor sits on the rail, so not there)
     # 2 mm slots on a 3.5 mm pitch (1.5 mm webs), tops 5 mm below the groove notch in the wall
     for vy in (-1.0, 2.5, 6.0):    # print 1: the -4 slot was behind the module's corner seat (Y up to -2.7); above 6 the capacitor's end face is behind it
         tray = cut(tray, bx(in_b - 0.01, L + 1, vy - 1.0, vy + 1.0, fz + 5.0, fz + 12.0),          # through the wall only
-                   cyl((in_b - 0.01, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 0.01, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0))
+                   cyl((in_b - 0.01, vy, fz + 5.0), (L + 1, vy, fz + 5.0), 1.0), cyl((in_b - 0.01, vy, fz + 12.0), (L + 1, vy, fz + 12.0), 1.0),
+                   cut(obox(((in_b + L) / 2, vy, fz + 12.0), (1, 0, 0), (0, s45, s45), L - in_b + 2, 2.0, 2.0),     # 45 deg tops
+                       bx(in_b - 2, L + 2, vy - 3, vy + 3, fz + 8.0, fz + 12.0 + s45)))
     # --- fourth screw boss (charger bay) and the solar lead slot in end wall B (flat 2-core cable lying flat)
     tray = uni(tray, cyl((POST_B[0], POST_B[1], F0), (POST_B[0], POST_B[1], zb), c['boss_d'] / 2 + 0.5))
     tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 2.4, C['solar_y'] + 2.4, fz - 0.01, fz + 2.5))   # flat cable

@@ -400,7 +400,12 @@ def move(g, dz):
     occs[g].transform2 = mm
 
 
+RENDERS = False   # the doc renders: turn on only when the pictures need refreshing (each run is slower with them)
+
+
 def shot(name, eye, target=(L / 2, 0, 12), fit=True):
+    if not RENDERS:
+        return None
     cam = vp.camera
     cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
     cam.eye = P3(*eye)
@@ -436,7 +441,8 @@ vp.camera = cam
 cam = vp.camera
 cam.viewExtents = 8.0
 vp.camera = cam
-res.append(os.path.join(out, 'ctrl-v5-bottom-text.png')); vp.saveAsImageFile(res[-1], 1400, 800)
+if RENDERS:
+    res.append(os.path.join(out, 'ctrl-v5-bottom-text.png')); vp.saveAsImageFile(res[-1], 1400, 800)
 cam.eye = P3(146, 0, 220)
 cam.target = P3(L, 0, 10)
 cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
@@ -445,7 +451,8 @@ cam.target = P3(L, 0, 12)
 cam.upVector = adsk.core.Vector3D.create(0, 0, 1)
 cam.viewExtents = 5.0
 vp.camera = cam
-res.append(os.path.join(out, 'ctrl-v5-end-b-flat.png')); vp.saveAsImageFile(res[-1], 1400, 800)
+if RENDERS:
+    res.append(os.path.join(out, 'ctrl-v5-end-b-flat.png')); vp.saveAsImageFile(res[-1], 1400, 800)
 res.append(shot('ctrl-v5-end-a.png', (-150, -95, 70), (25, 0, 14), fit=False))
 vis(hide=('Rail', 'Wires', 'Tray', 'PCB', 'Parts', 'Screws')); res.append(shot('ctrl-v5-lid-under.png', (L / 2 - 100, -140, -170)))
 vis(); res.append(shot('ctrl-v5-in-rail.png', (-140, -90, 90)))
@@ -473,4 +480,4 @@ vis(hide=('Rail', 'Wires'))
 result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,
           'step bodies': len(step_bodies), 'interference': hits or 'none', 'room above (mm, first contact with lid)': gaps,
-          'wire lengths (mm)': C.get('wire_lengths'), 'fillets': fil, 'engraving': eng, 'exported': files, 'renders': res}
+          'wire lengths (mm)': C.get('wire_lengths'), 'fillets': fil, 'engraving': eng, 'exported': files, 'renders': [r for r in res if r]}
