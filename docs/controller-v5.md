@@ -52,6 +52,10 @@ the **+** mark beside one of them. Standing up, it would make the module 33 mm t
 rail. So it lies on its side across its own module. The order matters, because once the capacitor is on, it covers
 the LOAD pad:
 
+The J5 harness has **4 wires**: GND (pin 1), BATT (2), LOAD (4), PWR (6). Pins 3 and 5 aren't connected on the PCB. If
+your 6-pin XH lead comes with all six wires, pull the pin 3 and 5 wires out of the housing: lift the little tab over each
+crimp with a pin and pull. Or cut them off flush at the housing.
+
 1. **LOAD wire first, from underneath.** Push the J5 harness's LOAD lead (pin 4) up through the **LOAD** pad from the
    bottom of the module and solder it on top. Keep the top joint low; the capacitor will lie 2.1 mm over it. Lay the
    wire flat along the underside. The module stands 2.4 mm off the floor, so the wire runs under it.
