@@ -250,9 +250,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, cyl((cap_x0 - 0.3, cap_y, cap_z), (in_b - 0.01, cap_y, cap_z), cr))
     # --- USB-C breakout, print 2: held by its edges only, never on its faces (the header's solder joints and parts are
     # there). A U-channel on the floor takes the bottom edge, a U-channel on the lid the top edge; the front edge sits in
-    # a pocket in end wall B with the socket in a closed stadium window. No tall stop behind the board: it drops into the
-    # floor channel 1.65 back from home, slides forward until the socket is in the window, and the lid channel's closed
-    # back end then comes down behind its back edge and keeps it there
+    # a pocket in end wall B with the socket in a closed stadium window. No tall stop behind the board: a low lip at the
+    # floor channel's back end snaps it in, and the lid channel's closed back end comes down behind its back edge
     yf, yb = C['usb_yf'], C['usb_yf'] + c['usb_t']
     zu0, zu1 = c['usb_z0'], c['usb_z0'] + c['usb_w']
     sc = 0.25
@@ -260,9 +259,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     hz = c['usb_sw'] / 2 - c['usb_sh'] / 2
     zc = C['usb_zc']
     xs = C['usb_back']
-    xu0 = xs - 1.9                                                    # the floor channel's back end (1.65 to slide)
+    # print 2b: the channel's back end is a low lip 0.15 behind the board's back edge, so it snaps in: socket into the
+    # window first, back end tipped up, then pushed down; the bottom corner rides over the 1.0 mm lip and drops in
+    xu0 = xs - 0.15
     tray = uni(tray, cut(bx(xu0 - 1.2, in_b + 0.01, yf - sc - 1.2, yb + sc + 1.2, F0, fz + 2.5),
-                         bx(xu0, in_b + 1, yf - sc, yb + sc, fz, fz + 3)))
+                         bx(xu0, in_b + 1, yf - sc, yb + sc, fz, fz + 3),
+                         bx(xu0 - 2, xu0 + 0.01, yf - sc, yb + sc, fz + 1.0, fz + 3)))
     # pocket for the front edge, open at the top (closed it left a 0.25 sliver under the rim); over the window it spans the window's width (no slivers), the wall's outer 1.25 skin intact
     tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, yf - sc, yb + sc, fz, zl + 0.01),
                bx(in_b - 0.01, C['usb_front'] + 0.2, c['usb_yc'] - wr, yf - sc + 0.01, zc - hz - wr, zl + 0.01))
