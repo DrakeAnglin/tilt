@@ -86,6 +86,13 @@ Nothing presses on the capacitor's legs.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
+## Print 1 fixes, part 2 (rev K)
+- **Rod groove overhang:** the lid prints upside down, so the round groove was an arch over the bed whose top ~7 mm overhung past 45°. The groove is now a **teardrop**: 45° flanks tangent to the old circle, cut flat at the old circle's bottom (a 4 mm bridge). The rod's clearance at the bottom is unchanged, and it's a little roomier at the lower corners. The tray's end-wall notches follow the same shape.
+- **USB-C window:** the component-side rib and end stop behind the board stood in line with the socket window. They now stop 1 mm below the window (about 6 mm tall). The window's stepped bezel is gone.
+- **RJ12 openings:** the 0.4 mm stepped bezel washed out on a 0.4 nozzle, so it's gone; the openings are plain (plug outline + latch notch).
+
+Checked: no interference; STLs manifold; the only overhang left on the lid is the groove's 4 mm flat bridge.
+
 ## Print 1 fixes (rev J)
 From the first test print (0.4 mm nozzle):
 - **Charger module:** its two sides were swapped in the model. It's 30.5 mm across the box and 31.5 along it (pad layout unchanged). Its corner seats are now a **press fit**: 0 nominal clearance, which FDM prints slightly tight, so it pushes in and stays. It sits against the back wall.

@@ -115,7 +115,10 @@ def z_under(y, off):
     R, y = c['groove_r'] + off, abs(y)
     if y > R:
         return float('inf')
-    return C['g_zc'] - math.sqrt(R * R - y * y)
+    zc = C['g_zc']
+    circ = zc - math.sqrt(R * R - y * y)
+    tear = max(zc - R * math.sqrt(2) + y, zc - R) if y < R / math.sqrt(2) else circ   # the teardrop's flank / flat
+    return min(circ, tear)
 
 
 def K(x, y):
@@ -137,9 +140,15 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     out = {}
 
     def groove(off, x0, x1):
-        """The groove (off 0), or its outline grown by off: a circle, open above its centre."""
+        """The groove (off 0), or its outline grown by off: open above its centre; below, a teardrop (45 deg flanks
+        tangent to the circle) cut off flat at the circle's bottom. The lid prints upside down, so the groove is an arch
+        over the bed: a round arch overhangs past 45 deg over its top ~7 mm (print 1: unprintable); this one is 45 deg
+        flanks and a 4 mm bridge. Same bottom as the circle, so the rod's clearance under it is unchanged."""
         R, zc = c['groove_r'] + off, C['g_zc']
-        return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20))
+        s = math.sqrt(0.5)
+        dia = cut(obox(((x0 + x1) / 2, 0, zc), (1, 0, 0), (0, s, s), x1 - x0, 2 * R, 2 * R),
+                  bx(x0 - 1, x1 + 1, -3 * R, 3 * R, zc - 3 * R, zc - c['groove_r']  - off))
+        return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20), dia)
 
     def ceiling(y, half=0.0):
         """Lid features run up to the lid's underside; under the groove they are trimmed by the final groove cut."""
@@ -191,8 +200,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
 
     for n, xk in enumerate(c['rj_x']):
         _, y = K(xk, 0)
-        tray = cut(tray, aperture(y, 0.0, -1, c['end_a'] + 0.01),
-                   aperture(y, c['bezel'], -1, 0.4))                                 # 0.4 deep bezel round it
+        tray = cut(tray, aperture(y, 0.0, -1, c['end_a'] + 0.01))   # plain opening (print 1: the 0.4 stepped bezel washed out)
         x0, _ = K(0, 7.0)
         x1, _ = K(0, c['rj_back'] + 1.0)
         tray = cut(tray, bx(x0, x1, y - 6.6, y + 6.6, c['floor_z'] + 0.5, fz + 0.01))
@@ -259,8 +267,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, yf - sc, yb + sc, zu0 - 0.2, zu1 + 0.2))
     tray = cut(tray, bx(C['usb_back'] - 0.2, in_b + 0.01, yf - sc, yb + sc, zu0 - 0.2, fz + 0.01))
     xs = C['usb_back']
-    slot = uni(bx(xs - 2.0, xs + 1.6, yf - sc - 1.6, yf - sc, F0, zu1 - 2.0),           # component side
-               bx(xs - 2.0, xs - 0.25, yf - sc - 1.6, yb, F0, zu1 - 2.0))                # end stop
+    # print 1: the rib and stop stood in line with the socket window; now they stop 1 mm below the window
+    zrib = C['usb_zc'] - c['usb_sw'] / 2 - 0.2 - 1.0
+    slot = uni(bx(xs - 2.0, xs + 1.6, yf - sc - 1.6, yf - sc, F0, zrib),           # component side
+               bx(xs - 2.0, xs - 0.25, yf - sc - 1.6, yb, F0, zrib))                # end stop
     tray = uni(tray, slot)
     wr = c['usb_sh'] / 2 + 0.2
     hz = c['usb_sw'] / 2 - c['usb_sh'] / 2
@@ -268,10 +278,6 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(in_b - 1, L + 1, c['usb_yc'] - wr, c['usb_yc'] + wr, zc - hz, zc + hz),
                cyl((in_b - 1, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr),
                cyl((in_b - 1, c['usb_yc'], zc + hz), (L + 1, c['usb_yc'], zc + hz), wr))
-    wr2 = wr + 0.6
-    tray = cut(tray, bx(L - 0.5, L + 1, c['usb_yc'] - wr2, c['usb_yc'] + wr2, zc - hz, zc + hz),
-               cyl((L - 0.5, c['usb_yc'], zc - hz), (L + 1, c['usb_yc'], zc - hz), wr2),
-               cyl((L - 0.5, c['usb_yc'], zc + hz), (L + 1, c['usb_yc'], zc + hz), wr2))
     # --- charger vents: four slots in end wall B above the module (the floor sits on the rail, so not there)
     # 2 mm slots on a 5 mm pitch (3 mm webs), tops 5 mm below the groove notch in the wall
     for vy in (-4.0, 1.0, 6.0):
