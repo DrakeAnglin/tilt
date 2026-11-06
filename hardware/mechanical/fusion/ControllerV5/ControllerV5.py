@@ -49,9 +49,9 @@ C = dict(
     # rod groove: a circle, r 5, its centre 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
     # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 1.0 thick
     groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=1.0,
-    # PCB: 1.7 mm above the floor, which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
+    # PCB: 2.4 mm above the floor (print 1: was 1.7; raised so the RJ12 tails clear a full 1.2 floor), which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
     # reach 1.8 below), board 1.52 (as exported)
-    pcb_gap=1.7, floor_recess=0.4, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
+    pcb_gap=2.4, floor_recess=0.0, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
     holes=((3.5, 41.0), (43.5, 43.3), (23.8, 121.5)),            # H1, H2, H3 (KiCad x, y)
     boss_d=8.0, post_d=8.0, ins_d=4.0, ins_depth=6.7, screw_l=10.0,            # M3 x 5.7 heat-set inserts, Ø4.0 hole
     # RJ12 Amphenol 87180-066LF (drawing 87180 sheet 1-3): 13.2 W x 11.5 H, front face 0.55 behind the board edge
@@ -164,8 +164,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     bar_x1, _ = K(0, c['pcb_bar'])
     # (+0.2, not +0.5: the 8 mm bosses reach 0.5 (H2: 0.7) past the board, so at +0.5 they only touched the recess wall along a
     # line, which made the STL non-manifold. At +0.2 they all overlap it and merge)
-    tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.2, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.2, ihi + 0.01), fr, fz + 0.01),
-               bx(bar_x1 - 0.01, C['pcb_end'] + 0.2, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.2, fr, fz + 0.01))
+    if c['floor_recess'] > 0:   # (print 1: none now - the raised PCB's header tails clear the full floor)
+        tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.2, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.2, ihi + 0.01), fr, fz + 0.01),
+                   bx(bar_x1 - 0.01, C['pcb_end'] + 0.2, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.2, fr, fz + 0.01))
     # --- PCB nest: it drops in and is located before the lid goes on: end wall A (0.2), the room-side wall (0.7) and
     # free-standing ribs along the bar's and the body's back edges (0.2); all below the board's top face
     # the ribs' tops are level with the cell cradles' PCB-side horns (they run through them)
@@ -194,7 +195,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         tray = cut(tray, aperture(y, 0.0, -1, c['end_a'] + 0.01))   # plain opening (print 1: the 0.4 stepped bezel washed out)
         x0, _ = K(0, 7.0)
         x1, _ = K(0, c['rj_back'] + 1.0)
-        tray = cut(tray, bx(x0, x1, y - 6.6, y + 6.6, c['floor_z'] + 0.5, fz + 0.01))
+        # (print 1: no pocket in the floor under the jack any more: the PCB is 0.7 higher, so its tails clear the full floor)
         for k in range(n + 1):
             dy = (k - n / 2.0) * 2.4
             tray = cut(tray, cyl((-1, y + dy, 2.6), (0.5, y + dy, 2.6), 0.6))
@@ -467,17 +468,17 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     R = {}
     # charger harness: each wire on its own level where they cross (PWR and BATT 17.0, LOAD 18.7, GND 20.4)
     px_, py_ = pad['PWR']
-    R['Harness PWR (J5-6)'] = [(jx5, j5[6], PLUG), (jx5, j5[6], 17.0), (127.9, -6.6, 17.0), (px_, py_ - 1.5, 17.0),
-                               (px_, py_, 17.0), (px_, py_, ptop)]
+    R['Harness PWR (J5-6)'] = [(jx5, j5[6], PLUG), (jx5, j5[6], 17.7), (127.9, -6.6, 17.7), (px_, py_ - 1.5, 17.7),
+                               (px_, py_, 17.7), (px_, py_, ptop)]
     px_, py_ = pad['BATT']
-    R['Harness BATT (J5-2)'] = [(jx5, j5[2], PLUG), (jx5, j5[2], 17.0), (128.0, -13.5, 17.0), (150.0, -3.0, 17.0),
-                                (px_, py_, 17.0), (px_, py_, ptop)]
+    R['Harness BATT (J5-2)'] = [(jx5, j5[2], PLUG), (jx5, j5[2], 17.7), (128.0, -13.5, 17.7), (150.0, -3.0, 17.7),
+                                (px_, py_, 17.7), (px_, py_, ptop)]
     px_, py_ = pad['LOAD']                            # under the capacitor: in from below, run under the module
-    R['Harness LOAD (J5-4)'] = [(jx5, j5[4], PLUG), (jx5, j5[4], 18.7), (144.0, -10.2, 18.7), (144.0, -10.2, fz + 0.8),
+    R['Harness LOAD (J5-4)'] = [(jx5, j5[4], PLUG), (jx5, j5[4], 19.4), (144.0, -10.2, 19.4), (144.0, -10.2, fz + 0.8),
                                 (147.0, -7.5, fz + 0.8), (147.0, py_, fz + 0.8), (px_ - 1.8, py_, fz + 0.8),
                                 (px_, py_, cz - 1.05)]
     px_, py_ = pad['GND']
-    R['Harness GND (J5-1)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 20.4), (130.0, -9.0, 20.4), (px_, py_ - 2.5, 20.4),
+    R['Harness GND (J5-1)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 21.1), (130.0, -9.0, 21.1), (px_, py_ - 2.5, 21.1),
                                (px_, py_, 16.0), (px_, py_, ptop)]   # drops before the groove's channel
     # cell lead (both wires out of the cell's end-B face): down the end face's PCB side, past the H3 post's back, along the
     # channel between the cell's PCB-side shoulder and the PCB's back edge (the two wires one above the other), into J4
@@ -486,18 +487,19 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     j4b = K(20.0, 0)[1]
     R['Cell lead -'] = [(ce + 0.85, by - 0.9, bc - 0.5), (ce + 2.0, by - 0.9, bc - 0.5), (ce + 0.9, 6.0, 14.4),
                         (ce + 0.9, 2.7, 16.2), (118.6, 2.7, 16.2), (110.0, 2.7, 16.2), (104.0, -1.5, 16.2),
-                        (104.0, j4a, 17.0), (j4x, j4a, 17.0), (j4x, j4a, PLUG)]
+                        (104.0, j4a, 17.7), (j4x, j4a, 17.7), (j4x, j4a, PLUG)]
     R['Cell lead +'] = [(ce + 0.85, by + 0.9, bc + 0.5), (ce + 2.0, by + 0.9, bc + 0.5), (ce + 0.9, 6.0, 16.6),
-                        (ce + 0.9, 2.7, 18.1), (118.6, 2.7, 18.1), (110.0, 2.7, 18.1), (j4x, j4b, 18.1), (j4x, j4b, PLUG)]
+                        (ce + 0.9, 2.7, 18.8), (118.6, 2.7, 18.8), (110.0, 2.7, 18.8), (j4x, j4b, 18.8), (j4x, j4b, PLUG)]
     # USB lead: soldered to the USB-C board's VBUS / GND pins (here the two lowest), low along the room side, behind the
     # bay's screw post, along the room-side wall, up into the 2-pin plug on J3 pins 1-2
     j3x = K(0, 122.5)[0]
     j3p = zt + c['sock_h'] + 2.5 + 0.05
     zv, zg = C['usb_zc'] - 6.35, C['usb_zc'] - 3.81
-    R['USB lead VBUS'] = [(upx, yb + 5.55, zv), (upx - 1.2, -13.2, zv), (130.8, -13.2, zv), (130.8, -22.6, zv),
-                          (j3x, -22.6, zv), (j3x, -22.6, 16.4), (j3x, K(4.5, 0)[1], 16.4), (j3x, K(4.5, 0)[1], j3p)]
+    zvr = max(zv, zt + 1.1)                            # VBUS's run clears the (raised) PCB
+    R['USB lead VBUS'] = [(upx, yb + 5.55, zv), (upx - 1.2, -13.2, zvr), (130.8, -13.2, zvr), (130.8, -22.6, zvr),
+                          (j3x, -22.6, zvr), (j3x, -22.6, 17.1), (j3x, K(4.5, 0)[1], 17.1), (j3x, K(4.5, 0)[1], j3p)]
     R['USB lead GND'] = [(upx, yb + 5.55, zg), (upx - 1.2, -14.9, zg), (132.5, -14.9, zg), (132.5, -24.3, zg),
-                         (j3x, -24.3, zg), (j3x, -24.3, 18.1), (j3x, K(7.04, 0)[1], 18.1), (j3x, K(7.04, 0)[1], j3p)]
+                         (j3x, -24.3, zg), (j3x, -24.3, 18.8), (j3x, K(7.04, 0)[1], 18.8), (j3x, K(7.04, 0)[1], j3p)]
     W = []
     for nm, pts in R.items():
         W.append((nm, wire(pts, 0.8)))
@@ -532,8 +534,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
 
     # solar cable: flat 2-core lying on the floor from the end-B slot, up beside the PCB's end, over J3, into J8
     sx8 = K(0, 113.5)[0]
-    sp = [(L + 0.5, C['solar_y'], fz + 1.0), (128.0, C['solar_y'], fz + 1.0), (128.0, C['solar_y'], 15.0),
-          (122.0, -8.3, 15.0), (119.2, -6.0, 15.0), (116.8, -2.6, 15.0), (sx8, -2.25, 15.0), (sx8, -2.25, zt + 9.5 + 0.05)]
+    sp = [(L + 0.5, C['solar_y'], fz + 1.0), (128.0, C['solar_y'], fz + 1.0), (128.0, C['solar_y'], 15.7),
+          (122.0, -8.3, 15.7), (119.2, -6.0, 15.7), (116.8, -2.6, 15.7), (sx8, -2.25, 15.7), (sx8, -2.25, zt + 9.5 + 0.05)]
     for k, pts in enumerate(pair(sp, 2.2)):
         W.append(('Solar cable core %d' % (k + 1), wire(pts, 1.0)))
     R['Solar cable'] = sp
