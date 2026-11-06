@@ -267,7 +267,7 @@ def on_outline(x, y):
 
 def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
     body = comp.bRepBodies.item(0)
-    sets = {r_big: adsk.core.ObjectCollection.create(), r_small: adsk.core.ObjectCollection.create()}
+    sets = {r: adsk.core.ObjectCollection.create() for r in (r_big, r_small) if r is not None}
     for e in body.edges:
         a, b = e.startVertex, e.endVertex
         if a is None or b is None:
@@ -277,6 +277,8 @@ def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
         ext = ev.getParameterExtents()
         mid = ev.getPointAtParameter((ext[1] + ext[2]) / 2)[1]
         for zz, rr in ((z_big, r_big), (z_small, r_small)):
+            if rr is None:
+                continue
             if abs(a.z - zz / 10) < 0.002 and abs(b.z - zz / 10) < 0.002:
                 if on_outline(mid.x, mid.y):
                     sets[rr].add(e)
@@ -297,8 +299,9 @@ def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
     return done
 
 
-fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], C['edge_r'], C['zl'], 0.6),
-       'Lid': round_edges(comps['Lid'], C['top'], C['edge_r'], C['zl'], 0.6, groove=True)}
+# print 2: no rounding where the lid meets the tray (it showed as a groove round the box): only the bottom and top edges
+fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], C['edge_r'], C['zl'], None),
+       'Lid': round_edges(comps['Lid'], C['top'], C['edge_r'], C['zl'], None, groove=True)}
 
 
 def engrave(comp, z, lines, xc, yc, w, h, size=0.32):

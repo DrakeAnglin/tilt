@@ -93,6 +93,8 @@ The board didn't stay in well, and the supports at its back edge (the component-
 - **Front edge:** in its pocket in end wall B, as before, with the socket in the closed round window. The wall isn't cut. The pocket is open at the top inside the wall; closed, it left a 0.25 mm sliver under the rim.
 - **To fit it:** socket into the window first with the board's back end tipped up, then push the back end down. Its bottom corner rolls over the back end's rounded edge and snaps in. Then put the lid on.
 - **Fourth screw removed:** the post in the charger bay (room side) is gone, from the tray and the lid. Wires crowd that corner, and it was only 24 mm from H3. Three screws and inserts now. The lid still locates on its lip and the three PCB posts.
+- **Lid seam:** no rounding where the lid meets the tray (the two 0.6 mm rounds read as a groove round the box). Only the box's bottom and top edges are rounded (1.5 mm).
+- **Groove channel:** 2.0 mm thick, the same as the lid (was 1.0). It sits in the end walls' notches with 0.05 mm round it (was 0.15, a visible gap). The thicker channel hangs 1.0 mm lower: the cell's + lead now crosses under it at 17.6 mm, the harness GND drops before it, and the ESP's pin tips have 1.5–2.0 mm under it (was 2.3). The PWR, BATT and cell + wires pass 0.2 mm under it.
 - If the board has a part within 2 mm of its top edge on the component side, the lid channel's wall would hit it. Tell me and I'll shorten it.
 
 ## Print 1 fixes, part 2 (rev K)

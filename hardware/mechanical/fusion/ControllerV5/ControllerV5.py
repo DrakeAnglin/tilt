@@ -47,8 +47,8 @@ C = dict(
     # sides (1.9 clear each side)
     bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=1.0, bumper_h=6.0,   # low: wires can run along the rail above them
     # rod groove: a circle, r 5, its centre 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
-    # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 1.0 thick
-    groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=1.0,
+    # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 2.0 thick, like the lid
+    groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=2.0,   # print 2: as thick as the lid (was 1.0)
     # PCB: 2.4 mm above the floor (print 1: was 1.7; raised so the RJ12 tails clear a full 1.2 floor), which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
     # reach 1.8 below), board 1.52 (as exported)
     pcb_gap=2.4, floor_recess=0.0, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
@@ -158,7 +158,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + 0.3))
     tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + 0.3))   # and the back one
     for xa, xb in ((-1, c['end_a'] + 0.01), (in_b - 0.01, L + 1)):        # the lid's groove channel crosses both ends
-        tray = cut(tray, groove(c['groove_t'] + 0.15, xa, xb))
+        tray = cut(tray, groove(c['groove_t'] + 0.05, xa, xb))   # print 2: 0.05 round the channel (was 0.15, a visible gap)
     # --- floor recessed 0.4 under the PCB's outline (+0.2): room for its leads without raising the ESP
     fr = fz - c['floor_recess']
     bar_x1, _ = K(0, c['pcb_bar'])
@@ -480,8 +480,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
                                 (147.0, -7.5, fz + 0.8), (147.0, py_, fz + 0.8), (px_ - 1.8, py_, fz + 0.8),
                                 (px_, py_, cz - 1.05)]
     px_, py_ = pad['GND']
-    R['Harness GND (J5-1)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 21.1), (130.0, -9.0, 21.1), (px_, py_ - 2.5, 21.1),
-                               (px_, py_, 16.0), (px_, py_, ptop)]   # drops before the groove's channel
+    R['Harness GND (J5-1)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 21.1), (130.0, -9.0, 21.1), (px_, -7.6, 21.1),
+                               (px_, py_ - 1.0, 17.0), (px_, py_, 16.0), (px_, py_, ptop)]   # drops before the groove's (2.0) channel
     # cell lead (both wires out of the cell's end-B face): down the end face's PCB side, past the H3 post's back, along the
     # channel between the cell's PCB-side shoulder and the PCB's back edge (the two wires one above the other), into J4
     ce = C['bat_x0'] + c['bat_l'] + 0.05
@@ -491,7 +491,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
                         (ce + 0.9, 2.7, 16.2), (118.6, 2.7, 16.2), (110.0, 2.7, 16.2), (104.0, -1.5, 16.2),
                         (104.0, j4a, 17.7), (j4x, j4a, 17.7), (j4x, j4a, PLUG)]
     R['Cell lead +'] = [(ce + 0.85, by + 0.9, bc + 0.5), (ce + 2.0, by + 0.9, bc + 0.5), (ce + 0.9, 6.0, 16.6),
-                        (ce + 0.9, 2.7, 18.8), (118.6, 2.7, 18.8), (110.0, 2.7, 18.8), (j4x, j4b, 18.8), (j4x, j4b, PLUG)]
+                        (ce + 0.9, 2.7, 18.1), (118.6, 2.7, 18.1), (110.0, 2.7, 18.1), (108.4, -0.8, 17.6),
+                        (j4x, j4b, 17.6), (j4x, j4b, PLUG)]          # under the groove's 2.0 channel
     # USB lead: soldered to the USB-C board's VBUS / GND pins (here the two lowest), low along the room side, behind the
     # bay's screw post, along the room-side wall, up into the 2-pin plug on J3 pins 1-2
     j3x = K(0, 122.5)[0]
