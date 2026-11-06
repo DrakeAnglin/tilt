@@ -215,7 +215,7 @@ Everything off the PCB connects by a plug. Build these leads on the bench; nothi
 | Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 2 → BATT pad |
 | Charger GND | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 1 → the GND pad next to PWR |
 | Charger PWR | 22 AWG, pre-crimped JST lead | 52 mm (the LOAD lead's leftover) | J5 pin 6 → PWR pad |
-| NTC pair | 30 AWG silicone | 2 × 60 mm | THERM pads → the 10 kΩ NTC on the cell |
+| NTC | its own leads (9 cm) | as is, or trimmed to ~50 mm | THERM pads → NTC bead on the cell |
 | USB-C lead | 22 AWG, red + black | 2 × 65 mm | USB-C board VBUS / GND → 2-pin male header in J3 pins 1–2 |
 | Battery | the cell's own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |
 | Solar (optional) | the panel's flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |
@@ -229,22 +229,22 @@ One lead and a half makes a harness.
 
 The order matters, because the capacitor lies over the LOAD pad and the THERM pads once it's on:
 
-1. **Beep the module's three GND pads to each other.** They should all be one connection; only the one next to PWR
-   gets a wire. If any pair doesn't beep, stop and ask.
-2. **LOAD (J5 pin 4) first, from underneath:** push the bare end up through the LOAD hole from the back, solder it on
+1. **LOAD (J5 pin 4) first, from underneath:** push the bare end up through the LOAD hole from the back, solder it on
    top with a low joint (the capacitor will lie 2.1 mm over it), and lay the wire flat along the underside. In the box the
    module stands 2.4 mm off the floor and this wire runs under it.
-3. **PWR (pin 6), BATT (pin 2), GND (pin 1, the GND next to PWR)** from the top.
-4. **NTC:** remove the small **103** resistor beside the THERM label (it reads 10 kΩ before you take it off). Solder one
-   30 AWG wire to each of its pads, 60 mm long, with the 10 kΩ NTC on their far ends, joints sleeved. Lay the pair flat
-   along the module toward the capacitor's leg end; they leave from under the capacitor there.
-5. **Capacitor, last:** bend both legs 90° about 1.5 mm from the body, so it lies over the LOAD / BATT edge. **Long leg
+2. **PWR (pin 6), BATT (pin 2), GND (pin 1, the GND next to PWR)** from the top. The module's GND pads are all one
+   connection, so any GND works; the one next to PWR keeps the wire short.
+3. **NTC:** remove the small **103** resistor beside the THERM label (it reads 10 kΩ before you take it off). Solder the
+   NTC's own two leads (they come 9 cm long) straight to its two pads, either way round, joints sleeved. No extra wire.
+   Lay the pair flat along the module toward the capacitor's leg end; they leave from under the capacitor there. The
+   route to the cell's top is about 40 mm: trim the leads to ~50 mm, or coil the spare beside the cell.
+4. **Capacitor, last:** bend both legs 90° about 1.5 mm from the body, so it lies over the LOAD / BATT edge. **Long leg
    (+) in the hole by the "+" mark** (the stripe on the can is −). Hold it 2 mm up on a spacer (a scrap of 1.6 mm board
    plus a business card) while you solder, so it sits clear of the parts on its legs.
-6. **Check:** the capacitor's + leg beeps to the PWR pad, its − leg to GND.
-7. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a
+5. **Check:** the capacitor's + leg beeps to the PWR pad, its − leg to GND.
+6. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a
    pre-made 6-wire lead, pull the pin 3 and 5 wires out (lift the tab over each crimp with a pin) or cut them flush.
-8. Hold the housing over J5: **G over the silkscreen G, P+ over P+**.
+7. Hold the housing over J5: **G over the silkscreen G, P+ over P+**.
 
 The dev board wired all six pads (three − wires onto one GND rail). That's the same circuit: the PCB's J5 has room for one
 GND, and the heavy motor current returns to the battery through the PCB, not through this wire.

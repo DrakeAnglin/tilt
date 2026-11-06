@@ -57,9 +57,9 @@
 <line x1="666" y1="380" x2="790" y2="300" stroke="#0a7a3a" stroke-width="2"/>
 <circle cx="666" cy="380" r="4" fill="#0a7a3a"/>
 <text x="796.0" y="304.0" font-size="14.0" fill="#0a7a3a" font-weight="bold" text-anchor="start">THERM: remove the 103 (10 kΩ)</text>
-<text x="796.0" y="321.0" font-size="12.0" fill="#333" font-weight="normal" text-anchor="start">solder two 30 AWG wires, 60 mm,</text>
-<text x="796.0" y="338.0" font-size="12.0" fill="#333" font-weight="normal" text-anchor="start">one to each pad; the 10 kΩ NTC on</text>
-<text x="796.0" y="355.0" font-size="12.0" fill="#333" font-weight="normal" text-anchor="start">their far ends (sleeved), taped on the cell</text>
+<text x="796.0" y="321.0" font-size="12.0" fill="#333" font-weight="normal" text-anchor="start">solder the NTC&#x27;s own two leads (9 cm)</text>
+<text x="796.0" y="338.0" font-size="12.0" fill="#333" font-weight="normal" text-anchor="start">one to each pad, joints sleeved;</text>
+<text x="796.0" y="355.0" font-size="12.0" fill="#333" font-weight="normal" text-anchor="start">the NTC bead gets taped on the cell</text>
 <line x1="639" y1="483" x2="790" y2="470" stroke="#d62728" stroke-width="2"/>
 <circle cx="639" cy="483" r="4" fill="#d62728"/>
 <text x="796.0" y="474.0" font-size="14.0" fill="#d62728" font-weight="bold" text-anchor="start">LOAD: soldered from UNDERNEATH</text>
@@ -98,5 +98,5 @@
 <text x="668.0" y="751.0" font-size="15.0" fill="#d62728" font-weight="bold" text-anchor="middle">PWR</text>
 <text x="668.0" y="769.0" font-size="12.0" fill="#444" font-weight="normal" text-anchor="middle">52 mm</text>
 <text x="40.0" y="817.0" font-size="12.0" fill="#444" font-weight="normal" text-anchor="start">Lengths are the pre-crimped 152 mm JST leads cut to length (crimp end on J5, bare end on the module): one lead and a half per box.</text>
-<text x="40.0" y="835.0" font-size="12.0" fill="#444" font-weight="normal" text-anchor="start">Hold the housing over J5 before plugging in: G over the silkscreen G, P+ over P+. The module&#x27;s three GND pads are one connection: beep them first.</text>
+<text x="40.0" y="835.0" font-size="12.0" fill="#444" font-weight="normal" text-anchor="start">Hold the housing over J5 before plugging in: G over the silkscreen G, P+ over P+. The module&#x27;s GND pads are all one connection.</text>
 </svg>

@@ -64,8 +64,8 @@ crimp with a pin and pull. Or cut them off flush at the housing.
 2. **PWR (pin 6), BATT (pin 2) and GND (pin 1)** from the top. Use the **GND next to PWR** (or the one next to BATT),
    not the one beside LOAD, which goes under the capacitor.
 3. **NTC wires** (the cell's temperature sensor). The module's **THERM** pads carry a 10 k resistor marked "103" that
-   fakes a cool cell. Remove it and solder two **30 AWG** wires, about **60 mm**, one to each pad, with your 10 k NTC on
-   the other end (sleeve the joints). Lay them flat along the module toward the capacitor's **leg end**; they leave
+   fakes a cool cell. Remove it and solder the NTC's own two leads (they come **9 cm** long) straight to the two pads,
+   joints sleeved; no extra wire. Trim them to ~50 mm or coil the spare. Lay them flat along the module toward the capacitor's **leg end**; they leave
    from under the capacitor there. Do this before the capacitor: afterward the pads are covered.
 4. **Capacitor**: bend both legs 90° about 1.5 mm from its body, so it lies flat with its body over the
    LOAD/BATT edge of the module. Put the **+ leg in the hole by the "+" mark** (the stripe on the can is −). Hold a 2 mm
@@ -140,7 +140,7 @@ covers them against the tray, the lid (closed), every part, the screw posts and 
 | GND (J5-1 → GND by PWR) | at 20.4 mm, over the other three where they cross | 43 mm | 0.8 mm to the lid |
 | **Cell lead** (cell → J4) | out of the cell's end-B face, down its PCB side, past the H3 post's back, then **along the channel between the cell's PCB-side shoulder and the PCB's back edge** (the two wires one above the other, under the groove), into J4 | **40 mm** | 0.8 mm |
 | USB lead (USB-C board → J3 pins 1–2) | from the board's VBUS/GND pins low (~5–8 mm) along the room side, along the room-side wall, up into the 2-pin plug | 50 / 57 mm | >3 mm |
-| **NTC pair** (THERM pads → NTC on the cell) | flat on the module under the capacitor (2.1 mm gap, 30 AWG is 0.9), out at the capacitor's leg end, down past the legs, up over the bay's back corner to the cell's top, taped on near end B | 36 / 37 mm (cut 60) | >0.5 mm |
+| **NTC pair** (THERM pads → NTC on the cell) | flat on the module under the capacitor (2.1 mm gap, the NTC's leads modeled at 0.9 mm), out at the capacitor's leg end, down past the legs, up over the bay's back corner to the cell's top, taped on near end B | 36 / 37 mm (the NTC's own 9 cm leads) | >0.5 mm |
 | Solar cable (flat 2-core) | in through the end-B slot, on the floor beside the module, up beside the PCB's end, over J3, into J8 | 68 mm | — |
 
 **What the review changed:**
@@ -173,7 +173,7 @@ That's 1.5 leads per box. The USB lead is two ~65 mm wires you make up.
 - **The cell's lead:** it needs at least ~45 mm, and it should leave the cell's end face. If it comes out the side, tell me.
 - ~~Where the THERM pads are~~ **confirmed** on the real module: the NTC route stands.
 - ~~USB-C board's CC resistors~~ **confirmed**: it has both 5.1 k ("512"), so USB-C-to-C chargers give it 5 V. Only VBUS and GND are wired; the data pins aren't used (the ESP is flashed through its own USB-C on the bench).
-- **The 30 AWG wire:** the model uses 0.9 mm OD. Anything under 1.2 mm fits.
+- **The NTC's leads:** the model uses 0.9 mm OD. Anything under 1.2 mm fits under the capacitor.
 - **Which USB-C board pins are VBUS and GND:** the route assumes the two at the bottom. If they're at the top, the wires run the same path, just higher.
 
 ## Clean-up (rev H)
