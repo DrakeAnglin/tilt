@@ -267,10 +267,12 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     tray = cut(tray, bx(in_b - 0.01, C['usb_front'] + 0.2, yf - sc, yb + sc, zu0 - 0.2, zu1 + 0.2))
     tray = cut(tray, bx(C['usb_back'] - 0.2, in_b + 0.01, yf - sc, yb + sc, zu0 - 0.2, fz + 0.01))
     xs = C['usb_back']
-    # print 1: the rib and stop stood in line with the socket window; now they stop 1 mm below the window
-    zrib = C['usb_zc'] - c['usb_sw'] / 2 - 0.2 - 1.0
+    # print 1: the end stop was too short and weak for a plug being pushed in. It runs nearly full height again, 2.75
+    # thick with a buttress behind it, and a lid tab continues it to the top (see the lid)
+    zrib = zu1 - 2.0
     slot = uni(bx(xs - 2.0, xs + 1.6, yf - sc - 1.6, yf - sc, F0, zrib),           # component side
-               bx(xs - 2.0, xs - 0.25, yf - sc - 1.6, yb, F0, zrib))                # end stop
+               bx(xs - 3.0, xs - 0.25, yf - sc - 1.6, yb, F0, zrib),                # end stop
+               bx(xs - 7.0, xs - 2.9, yf - sc - 1.6, yb, F0, 8.0))                  # its buttress
     tray = uni(tray, slot)
     wr = c['usb_sh'] / 2 + 0.2
     hz = c['usb_sw'] / 2 - c['usb_sh'] / 2
@@ -345,6 +347,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
             lid = uni(lid, f)
     lid = uni(lid, bx(cap_x0 + 10, cap_x0 + 18, cap_y - 3, cap_y + 3, cap_z + c['cap_d'] / 2 + 0.2, zl + 0.01))
     lid = uni(lid, bx(C['usb_back'] + 2.0, C['usb_front'] - 3.0, yf + 0.1, yb - 0.1, zu1 + 0.05, zl + 0.01))
+    # USB end-stop tab: behind the board's back edge, from the lid down to 0.4 over the tray's stop (together a full-height
+    # wall that takes the plug's push)
+    sc = 0.25
+    lid = uni(lid, bx(C['usb_back'] - 3.0, C['usb_back'] - 0.25, yf - sc - 1.6, yb, zu1 - 2.0 + 0.4, zl + 0.01))
     ex, ey = K(c['esp_xc'] - 4.0, c['esp_y0'] + 4.0)
     lid = uni(lid, bx(ex - 2, ex + 2, ey - 2, ey + 2, C['esp_z0'] + c['esp_t'] + 0.5, zl + 0.01))
     lid = cut(lid, groove(0, -1, L + 1))
