@@ -143,7 +143,7 @@ board_bb = [b for n, b in step_bodies if 'controller_PCB' in n or n == 'PCB:boar
 bb0 = board_bb[0].boundingBox if board_bb else None
 
 # ------------------------------------------------------------------ interference
-own = [(g, nm, b) for g in ('Tray', 'Lid', 'Parts', 'Screws', 'Rail') for nm, b in groups[g]]
+own = [(g, nm, b) for g in ('Tray', 'Lid', 'Parts', 'Screws', 'Rail', 'Wires') for nm, b in groups[g]]
 own += [('PCB', nm, b) for nm, b in step_bodies]
 
 
@@ -160,7 +160,7 @@ def vol(a, b):
         return 0.0
 
 
-MATES = [('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F1 folded', 'controller_PCB'), ('F2 folded', 'controller_PCB'), ('F3 folded', 'controller_PCB'), ('J3 USB lead plug', 'PinSocket_1x06'),
+MATES = [('Harness LOAD', 'Charger pad LOAD'), ('USB lead', 'USB-C pins'), ('USB lead', 'USB-C header'), ('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F1 folded', 'controller_PCB'), ('F2 folded', 'controller_PCB'), ('F3 folded', 'controller_PCB'), ('J3 USB lead plug', 'PinSocket_1x06'),
          ('ESP32-C6 spacer', 'PinSocket_1x10'), ('RJ12', 'controller_PCB'), ('RJ12', 'PCB:board'),
          ('Screws', 'controller_PCB'), ('Charger cap leg', 'Charger'), ('USB-C', 'USB-C'), ('ESP32-C6', 'ESP32-C6'),
          ('Charger', 'Charger'), ('J8', 'J8'), ('RJ12 1', 'RJ12 1'), ('RJ12 2', 'RJ12 2'), ('RJ12 3', 'RJ12 3'),
@@ -181,7 +181,7 @@ for i in range(len(own)):
         gj, nj, bj = own[j]
         if gi == gj and gi in ('Tray', 'Lid', 'Screws', 'Rail', 'PCB'):
             continue
-        if {gi, gj} == {'Rail', 'Parts'} or {gi, gj} == {'Rail', 'PCB'} or {gi, gj} == {'Rail', 'Screws'}:
+        if 'Rail' in (gi, gj) and ({gi, gj} & {'Parts', 'PCB', 'Screws', 'Wires'}):
             continue
         if mated(ni, nj) or ('Screws' in (gi, gj) and ('PCB' in (gi, gj) or 'Lid' in (gi, gj))):
             continue
@@ -199,7 +199,7 @@ def gap_up(name_part):
     lid = groups['Lid'][0][1]
     res = []
     for g, nm, b in own:
-        if name_part in nm and g in ('Parts', 'PCB'):
+        if name_part in nm and g in ('Parts', 'PCB', 'Wires'):
             for dz in (0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 3.0):
                 t = adsk.core.Matrix3D.create()
                 t.translation = adsk.core.Vector3D.create(0, 0, dz / 10)
@@ -213,7 +213,7 @@ def gap_up(name_part):
     return res
 
 
-gaps = gap_up('ESP32-C6') + gap_up('RJ12 2 jack') + gap_up('C9') + gap_up(' folded') + gap_up('Charger capacitor') + gap_up('USB-C board') + gap_up('Charger board') + gap_up('J4') + gap_up('18650')
+gaps = gap_up('Harness') + gap_up('Cell lead') + gap_up('USB lead') + gap_up('ESP32-C6') + gap_up('RJ12 2 jack') + gap_up('C9') + gap_up(' folded') + gap_up('Charger capacitor') + gap_up('USB-C board') + gap_up('Charger board') + gap_up('J4') + gap_up('18650')
 
 # ------------------------------------------------------------------ components
 APPEAR = {'Tray': 'Plastic - Matte (White)', 'Lid': 'Plastic - Matte (White)', 'Parts': 'Plastic - Matte (Black)',
@@ -473,4 +473,4 @@ vis(hide=('Rail', 'Wires'))
 result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,
           'step bodies': len(step_bodies), 'interference': hits or 'none', 'room above (mm, first contact with lid)': gaps,
-          'fillets': fil, 'engraving': eng, 'exported': files, 'renders': res}
+          'wire lengths (mm)': C.get('wire_lengths'), 'fillets': fil, 'engraving': eng, 'exported': files, 'renders': res}

@@ -45,7 +45,7 @@ C = dict(
     # strip (the widest thing in the box) and 0.3 past the H2 screw post, so the box no longer fills the rail: two rounded
     # bumpers on the back wall stop 1.0 short of the rail's wall - an easy fit that still keeps the rod off the groove's
     # sides (1.9 clear each side)
-    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=1.0,
+    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=1.0, bumper_h=6.0,   # low: wires can run along the rail above them
     # rod groove: a circle, r 5, its centre 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
     # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 1.0 thick
     groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=1.0,
@@ -66,7 +66,7 @@ C = dict(
     bat_d=19.0, bat_l=69.0,
     # cell cradles (tray saddles + matching lid cradles): 6 wide, never thinner than 1.5; the PCB-side face 0.6 off the
     # PCB's edge, so on that side each horn stops where its wall is still 1.5 thick; on the back side they run to the wall
-    cradle_w=6.0, cradle_t=1.5, cradle_y0=2.6, cradle_at=(9.0, 54.0),
+    cradle_w=6.0, cradle_t=1.5, cradle_y0=2.6, cradle_lid_y0=4.6, cradle_at=(9.0, 54.0),   # lid cradles start clear of the lead's channel
     # charger module (DIYMORE MCP73871, 31.5 x 30.5) and its capacitor (16 x 26)
     # module photo x (31.5) runs across the box (+Y), photo y (30.5) along it (+X): its capacitor corner ends up at the
     # back wall, its PWR / BATT pads on the groove side
@@ -92,7 +92,7 @@ C['chg_x0'] = C['pcb_end'] + 2.0                       # charger bay: room for i
 C['bat_x0'] = c['pcb_x'] + c['pcb_bar'] + 2.0          # cell starts past the PCB's bar (end stop clear of the H2 post)
 C['in_b'] = C['chg_x0'] + c['cap_holes'][0][1] + c['cap_end'] + c['cap_h'] + 0.4    # end wall B inner face: past the capacitor
 C['L'] = C['in_b'] + c['end_t']
-C['bat_y'] = 10.3                                     # as close to the PCB as the groove's underside and the PCB's edge allow
+C['bat_y'] = C['iw_hi'] - 0.3 - c['bat_d'] / 2        # against the back wall: leaves a channel for the cell's lead along its PCB-side shoulder
 C['bat_zc'] = C['fz'] + 0.5 + c['bat_d'] / 2
 C['esp_z0'] = C['zt'] + c['sock_h'] + c['spacer']    # ESP underside
 # USB-C breakout on edge: component face toward the room-side wall, socket face flush with end B's outer face
@@ -146,8 +146,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # rail bumpers on the back wall: rounded vertical fins out to 1.0 short of the rail's wall
     ry = c['rail_w'] / 2 - c['bumper_gap'] - c['bumper_w'] / 2
     for bxx in c['bumper_x']:
-        tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], zl),
-                   cyl((bxx, ry, c['floor_z']), (bxx, ry, zl), c['bumper_w'] / 2))
+        tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], c['bumper_h']),
+                   cyl((bxx, ry, c['floor_z']), (bxx, ry, c['bumper_h']), c['bumper_w'] / 2))
     # reliefs in end A's inner corner fillets for the PCB's corners (the board sits 0.2 off end wall A)
     tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + 0.3))
     tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + 0.3))   # and the back one
@@ -308,9 +308,11 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # cell: two cradles matching the tray's saddles (same X, same width, same bore, the same 1.5 trim on the PCB side),
     # coming down to the cell's axis on the back side, 0.2 off the back wall
     for sx in (C['bat_x0'] + a for a in c['cradle_at']):
-        lid = uni(lid, cut(bx(sx, sx + c['cradle_w'], c['cradle_y0'], ihi - 0.2, bc + 0.5, zl + 0.01),
+        ylt = c['cradle_lid_y0'] + c['cradle_t']
+        lhz = math.sqrt(rc * rc - (by - ylt) ** 2)
+        lid = uni(lid, cut(bx(sx, sx + c['cradle_w'], c['cradle_lid_y0'], ihi - 0.2, bc + 0.5, zl + 0.01),
                            cyl((sx - 1, by, bc), (sx + c['cradle_w'] + 1, by, bc), rc),
-                           bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - 1, bc + chz)))
+                           bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_lid_y0'] - 1, ylt, bc - 1, bc + lhz)))
     # charger: two pins clamp the module's edges where it has no pads (left edge between CN1 and GND, top edge
     # between PWR and the capacitor), mostly off the board; a pad 0.2 over the capacitor (it never bears on its legs)
     ctop = cz + c['chg_t']
@@ -376,7 +378,6 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         x0, y0 = K(xa + 0.6, ya + 0.6)
         x1, y1 = K(xb - 0.6, yb_ - 0.6)
         P.append((name, bx(x0, x1, y0, y1, zt + 3.0, zt + 11.7)))
-        P.append((name + ' wires', bx(x0 + 1, x1 - 1, y0 + 1, y1 - 1, zt + 11.7, zt + 13.3)))
     x0, y0 = K(22.75 - 2.25, 113.5 - 1.7)
     x1, y1 = K(22.75 + 2.25, 113.5 + 1.7)
     P.append(('J8 ZH header', bx(x0, x1, y0, y1, zt, zt + 6.0)))
@@ -418,34 +419,91 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     P.append(('USB-C pins', bx(upx - 0.32, upx + 0.32, yb + 2.5, yb + 5.5, C['usb_zc'] - 6.67, C['usb_zc'] + 6.67)))
     out['Parts'] = P
 
-    # ================================================================ wires (render only)
+    # ================================================================ wires, routed as built (checked like parts)
+    # 22 AWG silicone (1.6 OD) for the charger harness and the USB lead; the cell's own lead (assumed 22 AWG); the solar
+    # cable is the white flat 2-core 22 AWG (two 2.0 cores side by side). Every route keeps clear of the lid, the groove's
+    # channel, the screw posts and the other wires; ends stop on the plug tops / pads they go into.
     def wire(pts, r=0.8):
         body = None
-        for a, b in zip(pts, pts[1:]):
-            if math.dist(a, b) < 0.05:
+        for a_, b_ in zip(pts, pts[1:]):
+            if math.dist(a_, b_) < 0.05:
                 continue
-            seg = cyl(a, b, r)
+            seg = cyl(a_, b_, r)
             body = seg if body is None else uni(body, seg)
         return body
 
+    def length(pts):
+        return sum(math.dist(a_, b_) for a_, b_ in zip(pts, pts[1:]))
+
+    PLUG = zt + 11.7 + 0.05                           # top of the XH plugs (J4, J5)
+    jx5 = K(0, 113.5)[0]                              # J5 pins: y 113.5, x 3 + 2.5 k (pin 1 = GND ... pin 6 = PWR)
+    j5 = {n: K(3.0 + 2.5 * (n - 1), 0)[1] for n in range(1, 7)}
+    pad = {nm: M(*xy) for nm, xy in (('PWR', (9.0, 3.3)), ('GND', (4.3, 3.3)), ('BATT', (9.0, 26.5)), ('LOAD', (20.0, 26.5)))}
+    ptop = cz + c['chg_t'] + 0.35
+    R = {}
+    # charger harness: each wire on its own level where they cross (PWR and BATT 17.0, LOAD 18.7, GND 20.4)
+    px_, py_ = pad['PWR']
+    R['Harness PWR (J5-6)'] = [(jx5, j5[6], PLUG), (jx5, j5[6], 17.0), (127.9, -6.6, 17.0), (px_, py_ - 1.5, 17.0),
+                               (px_, py_, 17.0), (px_, py_, ptop)]
+    px_, py_ = pad['BATT']
+    R['Harness BATT (J5-2)'] = [(jx5, j5[2], PLUG), (jx5, j5[2], 17.0), (128.0, -13.5, 17.0), (150.0, -3.0, 17.0),
+                                (px_, py_, 17.0), (px_, py_, ptop)]
+    px_, py_ = pad['LOAD']                            # under the capacitor: in from below, run under the module
+    R['Harness LOAD (J5-4)'] = [(jx5, j5[4], PLUG), (jx5, j5[4], 18.7), (144.0, -10.2, 18.7), (144.0, -10.2, fz + 0.8),
+                                (147.0, -7.5, fz + 0.8), (147.0, py_, fz + 0.8), (px_ - 1.8, py_, fz + 0.8),
+                                (px_, py_, cz - 1.05)]
+    px_, py_ = pad['GND']
+    R['Harness GND (J5-1)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 20.4), (130.0, -9.0, 20.4), (px_, py_ - 1.0, 20.4),
+                               (px_, py_, 20.4), (px_, py_, ptop)]
+    # cell lead (both wires out of the cell's end-B face): down the end face's PCB side, past the H3 post's back, along the
+    # channel between the cell's PCB-side shoulder and the PCB's back edge (the two wires one above the other), into J4
+    ce = C['bat_x0'] + c['bat_l'] + 0.05
+    j4x, j4a = K(0, 105.0)[0], K(17.5, 0)[1]
+    j4b = K(20.0, 0)[1]
+    R['Cell lead -'] = [(ce + 0.85, by - 0.9, bc - 0.5), (ce + 2.0, by - 0.9, bc - 0.5), (ce + 0.9, 6.0, 14.4),
+                        (ce + 0.9, 2.7, 16.2), (118.6, 2.7, 16.2), (110.0, 2.7, 16.2), (104.0, -1.5, 16.2),
+                        (104.0, j4a, 17.0), (j4x, j4a, 17.0), (j4x, j4a, PLUG)]
+    R['Cell lead +'] = [(ce + 0.85, by + 0.9, bc + 0.5), (ce + 2.0, by + 0.9, bc + 0.5), (ce + 0.9, 6.0, 16.6),
+                        (ce + 0.9, 2.7, 18.1), (118.6, 2.7, 18.1), (110.0, 2.7, 18.1), (j4x, j4b, 18.1), (j4x, j4b, PLUG)]
+    # USB lead: soldered to the USB-C board's VBUS / GND pins (here the two lowest), low along the room side, behind the
+    # bay's screw post, along the room-side wall, up into the 2-pin plug on J3 pins 1-2
+    j3x = K(0, 122.5)[0]
+    j3p = zt + c['sock_h'] + 2.5 + 0.05
+    zv, zg = C['usb_zc'] - 6.35, C['usb_zc'] - 3.81
+    R['USB lead VBUS'] = [(upx, yb + 5.55, zv), (upx - 1.2, -13.2, zv), (130.8, -13.2, zv), (130.8, -22.6, zv),
+                          (j3x, -22.6, zv), (j3x, -22.6, 16.4), (j3x, K(4.5, 0)[1], 16.4), (j3x, K(4.5, 0)[1], j3p)]
+    R['USB lead GND'] = [(upx, yb + 5.55, zg), (upx - 1.2, -14.9, zg), (132.5, -14.9, zg), (132.5, -24.3, zg),
+                         (j3x, -24.3, zg), (j3x, -24.3, 18.1), (j3x, K(7.04, 0)[1], 18.1), (j3x, K(7.04, 0)[1], j3p)]
     W = []
-    jx, jy = K(9.25, 114.0)
-    for nm, (xm, ym) in (('PWR', (9.0, 3.3)), ('BATT', (9.0, 26.5)), ('GND', (4.3, 3.3))):
-        px, py = M(xm, ym)
-        zz = zt + 12.5 + 1.7 * len(W)
-        W.append(('Harness %s' % nm, wire([(jx, jy, zt + 12.5), (jx, jy, zz), (px, jy, zz), (px, py, zz), (px, py, cz + c['chg_t'])])))
-    px, py = M(20.0, 26.5)                      # LOAD: under the capacitor, so soldered from underneath, run under the module
-    W.append(('Harness LOAD', wire([(jx, jy, zt + 12.5), (jx, jy, zt + 17.6), (gx0 - 1.0, jy, zt + 17.6), (gx0 - 1.0, py, zt + 17.6),
-                                    (gx0 - 1.0, py, fz + 1.4), (px, py, fz + 1.4), (px, py, cz + 0.5)])))
-    bx4, by4 = K(18.75, 105.5)
-    end = C['bat_x0'] + c['bat_l']
-    W.append(('Battery lead', wire([(end, by, bc), (end + 3, by, bc), (end + 3, by4 + 6, bc), (bx4, by4 + 6, bc), (bx4, by4, zt + 12.5)])))
-    sx8, sy8 = K(22.75, 113.5)
-    W.append(('Solar lead', uni(bx(sx8 + 3, L + 10, C['solar_y'] - 1.0, C['solar_y'] + 1.0, fz + 0.5, fz + 4.5),
-                                wire([(sx8 + 3, C['solar_y'], fz + 2.5), (sx8, sy8, fz + 2.5), (sx8, sy8, zt + 9.5)]))))
-    jx3, jy3 = K(5.77, 122.5)
-    W.append(('USB lead', wire([(upx, yb + 5.5, C['usb_zc']), (upx, C['solar_y'] - 2.2, C['usb_zc']),
-                                (jx3 + 3, C['solar_y'] - 2.2, C['usb_zc']), (jx3, jy3, zt + c['sock_h'] + 2.5)], 0.7)))
+    for nm, pts in R.items():
+        W.append((nm, wire(pts, 0.8)))
+
+    def pair(pts, gap):
+        """Two polylines either side of pts (horizontally, square to the local direction)."""
+        a_, b_, n_prev = [], [], (0.0, 1.0)
+        for i, p_ in enumerate(pts):
+            d = [0.0, 0.0]
+            for q0, q1 in ((pts[max(i - 1, 0)], p_), (p_, pts[min(i + 1, len(pts) - 1)])):
+                dx, dy = q1[0] - q0[0], q1[1] - q0[1]
+                h = math.hypot(dx, dy)
+                if h > 1e-6:
+                    d[0] += dx / h
+                    d[1] += dy / h
+            h = math.hypot(*d)
+            n_ = (-d[1] / h, d[0] / h) if h > 1e-6 else n_prev
+            n_prev = n_
+            a_.append((p_[0] + n_[0] * gap / 2, p_[1] + n_[1] * gap / 2, p_[2]))
+            b_.append((p_[0] - n_[0] * gap / 2, p_[1] - n_[1] * gap / 2, p_[2]))
+        return a_, b_
+
+    # solar cable: flat 2-core lying on the floor from the end-B slot, up beside the PCB's end, over J3, into J8
+    sx8 = K(0, 113.5)[0]
+    sp = [(L + 0.5, C['solar_y'], fz + 1.0), (128.0, C['solar_y'], fz + 1.0), (128.0, C['solar_y'], 15.0),
+          (122.0, -8.3, 15.0), (119.2, -6.0, 15.0), (116.8, -2.6, 15.0), (sx8, -2.25, 15.0), (sx8, -2.25, zt + 9.5 + 0.05)]
+    for k, pts in enumerate(pair(sp, 2.2)):
+        W.append(('Solar cable core %d' % (k + 1), wire(pts, 1.0)))
+    R['Solar cable'] = sp
+    C['wire_lengths'] = {nm: round(length(pts), 1) for nm, pts in R.items()}
     out['Wires'] = W
     return out
 

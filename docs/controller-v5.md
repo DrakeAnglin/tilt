@@ -82,6 +82,50 @@ Nothing presses on the capacitor's legs.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
+## Wiring review (rev I)
+Every wire is now in the model at its real size, along the route you'd actually take. The collision check
+covers them against the tray, the lid (closed), every part, the screw posts and each other: **no interference**.
+
+![wiring, top](renders/ctrl-v5-wiring-top.png)
+
+| Wire | Route | Length in the box | Room |
+|---|---|---|---|
+| **LOAD** (J5 pin 4 → charger LOAD, *under the capacitor*) | up out of J5 at 18.7 mm → across to the room side of the module → **down to the floor** between the two room-side corner seats → **under the module** (it stands 3 mm off the floor; the wire is 1.6) → bare end bent up into the LOAD pad from below. Nothing runs between the capacitor and the module | **79 mm** | >3 mm |
+| PWR (J5-6 → PWR) | at 17.0 mm, past the H3 post's room side, down onto the pad | 33 mm | 2 mm to the lid |
+| BATT (J5-2 → BATT) | at 17.0 mm diagonally over the module (room side of the capacitor), down onto the pad | 56 mm | 2 mm |
+| GND (J5-1 → GND by PWR) | at 20.4 mm, over the other three where they cross | 43 mm | 0.8 mm to the lid |
+| **Cell lead** (cell → J4) | out of the cell's end-B face, down its PCB side, past the H3 post's back, then **along the channel between the cell's PCB-side shoulder and the PCB's back edge** (the two wires one above the other, under the groove), into J4 | **40 mm** | 0.8 mm |
+| USB lead (USB-C board → J3 pins 1–2) | from the board's VBUS/GND pins low (~5–8 mm) along the room side, behind the bay's screw post, along the room-side wall, up into the 2-pin plug | 50 / 57 mm | >3 mm |
+| Solar cable (flat 2-core) | in through the end-B slot, on the floor between the bay's screw post and the module, up beside the PCB's end, over J3, into J8 | 68 mm | — |
+
+**What the review changed:**
+- **The 18650 moved back against the back wall (+2.7 mm).** Beside the PCB, the space between the cell's shoulder and the groove's underside only fit one wire, and the H3 post blocked the cell's end. The move opens a real channel for the lead. The box width is unchanged: the PCB and the H2 post set it, not the cell.
+- **The lid's cell cradles** now start at Y 4.6 instead of 2.6, so they stay clear of that channel.
+- **The bumpers are now 6 mm tall**, at the bottom of the back wall only, so wires can run along the rail above them.
+
+**Lead lengths to cut** (pre-crimped 6" / 152 mm JST leads, crimped both ends):
+
+| Lead | Cut |
+|---|---|
+| LOAD | **100 mm**. Half a lead (76 mm) is too short for its 79 mm route |
+| PWR | the leftover 52 mm (33 mm needed) |
+| BATT | half a lead, 76 mm |
+| GND | half a lead, 76 mm |
+
+That's 1.5 leads per box. The USB lead is two ~65 mm wires you make up.
+
+**Assembly order that works with these routes:**
+1. Charger subassembly on the bench: LOAD wire first, from below, then the others, then the capacitor.
+2. Tray: PCB in. Cell into its saddles with its lead on the end-B end, tucked down the PCB side and along the channel to J4.
+3. Charger subassembly in: lay the LOAD wire on the floor, under where the module goes, out to the room side. Seat the module. Plug J5.
+4. USB-C board into its slot. Its lead goes low along the room side, behind the screw post, then up into J3.
+5. Solar cable (if used): along the floor, up beside the PCB's end, into J8.
+6. Lid on. Check nothing is pinched at the cell's end or over the module.
+
+**To confirm when the parts arrive:**
+- **The cell's lead:** it needs at least ~45 mm, and it should leave the cell's end face. If it comes out the side, tell me.
+- **Which USB-C board pins are VBUS and GND:** the route assumes the two at the bottom. If they're at the top, the wires run the same path, just higher.
+
 ## Clean-up (rev H)
 - **USB-C slot:** the back rib used to sit behind the board's edge, holding nothing, with a 0.15 mm sliver gap to the
   end stop. It's now a low rib under the board's header that holds its back face, joined to the end stop and the side
