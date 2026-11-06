@@ -2,7 +2,7 @@
 (docs/renders/pcb-build-NN.svg/.png), all drawn from the real board file (controller.kicad_pcb) and netlist.py, so the
 pictures, part lists and positions always match the board you're holding.
 
-In each picture the current step's parts are in colour and labelled, earlier steps are grey, later ones are only their
+In each picture the current step's parts are in color and labeled, earlier steps are gray, later ones are only their
 pads. End A (the RJ12 jacks) is on the left, end B (the USB-C socket) on the right; you're looking at the top (parts) side.
 
 Run with KiCad's Python (it has pcbnew):
@@ -60,7 +60,7 @@ STEPS = [
 ]
 LATER = {'TP1', 'TP2', 'TP3', 'TP4', 'TP5', 'H1', 'H2', 'H3'}
 
-# resistor colour codes (4-band carbon film / 5-band metal film)
+# resistor color codes (4-band carbon film / 5-band metal film)
 BANDS = {'1M': ('brown black green gold', 'brown black black yellow brown'),
          '1k': ('brown black red gold', 'brown black black brown brown'),
          '220': ('red red brown gold', 'red red black black brown'),
@@ -222,7 +222,7 @@ def marks(o, ref):
 def picture(k, title, done, now, col, fname):
     o = base()
     o.append(text(MX, 26, 'Step %d: %s' % (k, title) if k else title, 18, '#111', 'bold', 'start', halo=False))
-    o.append(text(MX, 46, 'top side, end A (jacks) left, end B (USB-C) right. Colour: this step. Grey: done. Gold: holes still empty.',
+    o.append(text(MX, 46, 'top side, end A (jacks) left, end B (USB-C) right. Color: this step. Gray: done. Gold: holes still empty.',
                   12, '#555', anchor='start', halo=False))
     occupied = set(done) | set(now)
     for fp in board.GetFootprints():
@@ -288,7 +288,7 @@ def md():
     a('')
     a('**Order:** lowest parts first, so the board lies flat on the bench while you solder: resistors, diodes, small')
     a('capacitors, then the sockets and headers, the jacks, the big capacitor and the fuses (tallest) last. Then meter checks,')
-    a('the leads, and plugging in. In each picture the step\'s parts are in colour and labelled; done parts are grey; the')
+    a('the leads, and plugging in. In each picture the step\'s parts are in color and labeled; done parts are gray; the')
     a('gold holes are still empty. End A (the RJ12 jacks) is on the left, end B (the USB-C socket) on the right.')
     a('')
     a('**The silkscreen prints each part\'s value** (1M, 220, 100n, 1N5819 …), not its reference, so you can match parts to the')
@@ -348,7 +348,7 @@ def md():
         v = val(r)
         a('| %s | %s | %s / %s | %s |' % (r, v, BANDS[v][0], BANDS[v][1], NOTE[r][1]))
     a('')
-    a('Not sure of a colour? Measure it (1M reads 0.98–1.02 MΩ).')
+    a('Not sure of a color? Measure it (1M reads 0.98–1.02 MΩ).')
     a('')
     # ---- step 2
     a('## Step 2: Resistors behind the jacks (12)')
@@ -470,7 +470,7 @@ def md():
     a('Then **diode mode**, red on TP4 (PWR), black on TP5 (GND): about 0.7–0.9 V is wrong (D4 is in backwards: its band must')
     a('be on the square pad); open ("OL") is right.')
     a('')
-    a('Finally, look at the underside in good light for bridges between neighbouring pads, especially the sockets and')
+    a('Finally, look at the underside in good light for bridges between neighboring pads, especially the sockets and')
     a('jacks, and check every lead is trimmed to 1.8 mm or less.')
     a('')
     # ---- step 11

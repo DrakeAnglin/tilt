@@ -36,7 +36,7 @@ P = dict(
     rj_bw=20.3, rj_bd=13.1, rj_bt=1.6, rj_jw=12.6, rj_jh=11.7, rj_jd=16.3, rj_over=12.9,
     rj_hole_side=2.6, rj_hole_back=3.8, rj_hole_d=3.0, rj_mouth_w=9.9, rj_mouth_h=8.6, rj_mouth_z=5.4,
     standoff=3.0,         # breakout boards' underside above the case floor (through-hole pins below)
-    rj_y=10.75,           # |Y| of the RJ12 centres
+    rj_y=10.75,           # |Y| of the RJ12 centers
     # USB-C 16-pin breakout (Teansic; size estimated, check on arrival)
     usb_bw=18.0, usb_bd=15.0, usb_y=-11.5, rec_w=8.94, rec_h=3.26, rec_d=7.35, rec_over=0.5,
     # perfboard strip on posts

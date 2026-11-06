@@ -69,7 +69,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 
 | ID | Pri | Requirement |
 |---|---|---|
-| E-1 | Must | **Cordless**: 18650 cell per controller, ≥ 2 months per charge with no sun; charged from any USB-C charger. No mains on our boards |
+| E-1 | Must | **Cordless**: 18650 cell per controller, ≥ 2 months per charge with no sun; charged from any USB-C charger. No wall (AC) power on our boards |
 | E-2 | Should | Optional small solar panel on the glass keeps the cell charged |
 | E-3 | Must | A stalled motor never browns out the ESP32 (one motor runs at a time; stall stop) |
 | E-4 | Must | Charging stops when the cell is hot (NTC); solar input clamped; ESD protection on the ports (PCB) |

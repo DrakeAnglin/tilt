@@ -24,7 +24,7 @@ as STLs.
 | What | Value | Source |
 |---|---|---|
 | Headrail inner width × height | ≈ 55.5 × 36.5 mm, 2 mm plastic walls, lips 4.5 mm in at the top | owner, [photos](../../docs/reference/) |
-| Tilt rod | **4 mm square steel**, axis 24 mm above the inner floor, centred | owner |
+| Tilt rod | **4 mm square steel**, axis 24 mm above the inner floor, centered | owner |
 | Free length, end cap → first tilt drum cradle | 110 mm (the tilter sits here, rod through its worm wheel) | owner |
 | Free length on the tilter's sensor side | ≈ 100 mm (the sensor module uses 29 mm) | owner |
 | Clearance above the installed headrail | ≈ 6.5 mm: nothing may stick up more than ~5 mm | owner |

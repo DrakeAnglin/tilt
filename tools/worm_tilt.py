@@ -63,7 +63,7 @@ tilt = max(abs((sgn2 * c2 - sgn1 * c1) / (s2 - s1)) for (s1, c1), (s2, c2) in it
            for sgn1 in (1, -1) for sgn2 in (1, -1) if abs(s2 - s1) > 1e-6
            if all(abs(sgn1 * c1 + (sgn2 * c2 - sgn1 * c1) / (s2 - s1) * (s - s1)) <= c + 1e-9 for s, c in stations))
 print('bearings: ' + ', '.join('%s s %.1f..%.1f c%.2f' % b for b in bearings))
-print('max tilt %.2f deg; axis offset at the thread centre (mesh) %.2f mm' % (math.degrees(math.atan(tilt)), worst(0.0)))
+print('max tilt %.2f deg; axis offset at the thread center (mesh) %.2f mm' % (math.degrees(math.atan(tilt)), worst(0.0)))
 for name, s, c in others:
     w = worst(s)
     print('  %-20s s=%6.2f  can move %.2f mm, room %.2f mm  %s' % (name, s, w, c, 'RUBS' if w > c else 'clear'))

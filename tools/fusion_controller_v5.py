@@ -32,7 +32,7 @@ def bx(x0, x1, y0, y1, z0, z1):
 
 
 def obox(c, u, w, L, W, H):
-    """Box centred at c (mm) with its length along unit vector u and width along w."""
+    """Box centered at c (mm) with its length along unit vector u and width along w."""
     obb = adsk.core.OrientedBoundingBox3D.create(P3(*c), adsk.core.Vector3D.create(*u), adsk.core.Vector3D.create(*w),
                                                  L / 10, W / 10, H / 10)
     return tbm.createBox(obb)

@@ -229,6 +229,6 @@ def summary():
         'module': 'X %.2f..%.2f (%.1f mm beyond the lid face), same section as the tilter case, open toward the tilter' % (
             p['end_x'], p['lid_x'], p['lid_x'] - p['end_x']),
         'fasteners': '3 x M3 x 25 flat head from the main half back face (2 through the AS5600 board) into 3 inserts in the module',
-        'jack': 'end wall at X %.2f, flush; centre Y %.1f, Z %.1f' % (p['end_x'], p['rj_y'], p['rj_z'] + 1.6 + p['rj_jh'] / 2 - 0.5),
+        'jack': 'end wall at X %.2f, flush; center Y %.1f, Z %.1f' % (p['end_x'], p['rj_y'], p['rj_z'] + 1.6 + p['rj_jh'] / 2 - 0.5),
         'rod tube': 'Ø%.1f bore through the module at (Y 0, Z %.0f)' % (2 * (p['rod'] * math.sqrt(2) / 2 + p['rod_clear']), p['rod_z']),
     }

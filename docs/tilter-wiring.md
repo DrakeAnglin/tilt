@@ -2,8 +2,8 @@
 
 Each tilter's **sensor module** holds three small boards: the **RJ12 breakout** (where the phone cord plugs in), the
 **DRV8833** motor driver and the **AS5600** angle sensor, plus two leads to the **N20 motor**. The controller only sends
-battery power and logic down the cord; the driver right here turns that into motor current. Same colour code as the
-controller, so a cord can be checked end to end by colour.
+battery power and logic down the cord; the driver right here turns that into motor current. Same color code as the
+controller, so a cord can be checked end to end by color.
 
 ![tilter wiring](renders/tilter-wiring.png)
 
@@ -33,7 +33,7 @@ edge marked **J1** between the words **"en"** and **"sleep"** (some batches prin
 
 **AS5600: two links and two checks.** On this board the header pins are on opposite sides: **VCC, OUT, GND** on the
 left (VCC = square pad), **DIR, SCL, SDA, GPO** on the right (DIR = square pad). So the links are short pieces of
-**30 AWG wire on the back of the board**, pad to pad, not bridges between neighbours (dashed in the picture).
+**30 AWG wire on the back of the board**, pad to pad, not bridges between neighbors (dashed in the picture).
 1. **GPO to VCC** (blue): analog output mode, as the controller reads it.
 2. **DIR to GND** (black): DIR sets which way the angle counts; left open it floats and the reading can flip at random.
    Solder the links on the back before fitting header pins or leads to those pads, and keep them flat (the board sits
@@ -52,7 +52,7 @@ pin 6) on every cord: "straight-wired" is used loosely in listings, and a revers
 ## 2. Wire it
 Solder the leads to the **RJ12 breakout first** (pin 1 = the square pad), because in the module it slides in with its
 leads already attached. Then run each lead to its board. Cut leads ~6 cm and trim to length when you fit the boards in
-the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch a neighbour.
+the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch a neighbor.
 
 | # | From | To | Wire |
 |---|---|---|---|

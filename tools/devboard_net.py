@@ -1,5 +1,5 @@
 """One net (or a few) of the dev board on its own: the underside copper of just those nets, plus every part pin and
-lead on them, labelled. Default: the two battery-voltage nets.
+lead on them, labeled. Default: the two battery-voltage nets.
 
   python3 tools/devboard_net.py            # writes docs/renders/devboard-hot.svg / .png
 """
@@ -103,7 +103,7 @@ def run():
     o.append('<text x="%d" y="%.0f" font-size="13"><tspan font-weight="bold">Underneath:</tspan> rail %s; bridges %s</text>' % (
         G.MX - 40, y, ', '.join('%s-%s' % r for r in rails), ', '.join('%s-%s' % b for b in bridges)))
     o.append('<text x="%d" y="%.0f" font-size="12" fill="#444">Solid = bare rail / bridge; numbered dots = part pins and leads soldered '
-             'in from the top. Every dot of one colour must beep to every other dot of that colour, and never to the other colour.</text>'
+             'in from the top. Every dot of one color must beep to every other dot of that color, and never to the other color.</text>'
              % (G.MX - 40, y + 22))
     hgt = int(y + 50)
     o[0] = o[0].replace('height="%d"' % G.HGT, 'height="%d"' % hgt)

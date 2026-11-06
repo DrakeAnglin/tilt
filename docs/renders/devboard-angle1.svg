@@ -303,5 +303,5 @@
 <circle cx="39" cy="478" r="9" fill="#888888"/><text x="39" y="482" font-size="10" font-weight="bold" fill="#fff" text-anchor="middle">4</text><text x="56" y="482" font-size="13"><tspan font-weight="bold">b14</tspan>  R ADC1 1k</text>
 <circle cx="459" cy="478" r="9" fill="#888888"/><text x="459" y="482" font-size="10" font-weight="bold" fill="#fff" text-anchor="middle">5</text><text x="476" y="482" font-size="13"><tspan font-weight="bold">b15</tspan>  RJ12 lead P1 ANG</text>
 <text x="30" y="518" font-size="13"><tspan font-weight="bold">Underneath:</tspan> rail ; bridges c9-c10, c10-c11, c11-b11, b14-b15</text>
-<text x="30" y="540" font-size="12" fill="#444">Solid = bare rail / bridge; numbered dots = part pins and leads soldered in from the top. Every dot of one colour must beep to every other dot of that colour, and never to the other colour.</text>
+<text x="30" y="540" font-size="12" fill="#444">Solid = bare rail / bridge; numbered dots = part pins and leads soldered in from the top. Every dot of one color must beep to every other dot of that color, and never to the other color.</text>
 </svg>

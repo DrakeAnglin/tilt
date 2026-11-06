@@ -34,7 +34,7 @@ used the wand. The ESP32 + motor drivers are a separate **controller unit** (one
 | M2 × 16 screw | 3 | Tilter halves (heads sit flush in the lid) |
 | M2 heat-set insert | 1 | Lid, bottom-right AS5600 standoff (the top-left one threads into a pilot hole) |
 | M2 × 5 mm standoff (male-female) + M2 × 4 screw | 2 + 2 | AS5600 board |
-| AS5600 breakout, ≤ 23.4 × 23.4 mm, chip centred | 1 | I²C to the controller |
+| AS5600 breakout, ≤ 23.4 × 23.4 mm, chip centered | 1 | I²C to the controller |
 | 6 × 2.5 mm diametric neodymium magnet | 1 | Often sold with AS5600 boards |
 | Wire | — | 2-core motor lead, 4-core sensor lead (3V3, GND, SDA, SCL) |
 

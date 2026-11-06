@@ -65,7 +65,7 @@ P['PTC 2 A aux'] = ('box', X1 - AUX_D - 3.6, X1 - AUX_D - 0.4, AUX_Y - 2.25, AUX
 UYC = -2.0
 P['USB-C (SMD)'] = ('box', X0 - 0.3, X0 + 7.05, UYC - 4.47, UYC + 4.47, ZT - 0.6, ZT - 0.6 + 3.26)
 # solar input: 3.5 x 1.35 mm barrel jack, right angle THT, SHOU HAN DC003-1.3 (LCSC C668594, JLC-assemblable):
-# 9 L x 6.3 W x 5 H, barrel centre ~2.6 above the board
+# 9 L x 6.3 W x 5 H, barrel center ~2.6 above the board
 SYC = 6.0
 P['Solar jack (DC003-1.3, 1.35 mm)'] = ('box', X0, X0 + 9.0, SYC - 3.15, SYC + 3.15, ZT, ZT + 5.0)
 # mounting holes (M3), in corners the ports and the holder leave free

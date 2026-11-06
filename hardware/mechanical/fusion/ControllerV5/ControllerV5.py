@@ -46,7 +46,7 @@ C = dict(
     # bumpers on the back wall stop 1.0 short of the rail's wall - an easy fit that still keeps the rod off the groove's
     # sides (1.9 clear each side)
     bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=1.0, bumper_h=6.0,   # low: wires can run along the rail above them
-    # rod groove: a circle, r 5, its centre 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
+    # rod groove: a circle, r 5, its center 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
     # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 2.0 thick, like the lid
     groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=2.0,   # print 2: as thick as the lid (was 1.0)
     # PCB: 2.4 mm above the floor (print 1: was 1.7; raised so the RJ12 tails clear a full 1.2 floor), which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
@@ -58,7 +58,7 @@ C = dict(
     rj_w=13.2, rj_h=11.5, rj_front=0.55, rj_back=17.32, rj_x=(7.825, 23.325, 38.825), rj_mouth_w=9.65,
     rj_mouth=(1.73, 8.50),          # the jack's plug opening, above the board (87180 drawing); latch tab-down
     # end wall A aperture (print 2): the plug's outline, measured on the user's phone cord: body 9.55 x 6.55, latch 6.0 wide
-    # standing 1.5 under it; + 0.35 a side (FDM holes print small). Centred on the jack's mouth; no view into the box
+    # standing 1.5 under it; + 0.35 a side (FDM holes print small). Centered on the jack's mouth; no view into the box
     plug_w=9.55, plug_h=6.55, plug_latch_w=6.0, plug_latch_h=1.5, ap_clear=0.35, ap_r=0.6,
     rj_tail=2.1, rj_peg=1.9,
     # ESP32-C6 SuperMini (26 x 18) on 8.5 mm sockets + 2.5 mm header spacers, USB toward end B
@@ -87,7 +87,7 @@ c = C
 C['iw_lo'] = c['room_out'] + c['wall']                  # room-side inner face
 C['iw_hi'] = c['back_in']                              # back inner face
 C['out_hi'] = c['back_in'] + c['wall']
-C['g_zc'] = c['groove_floor'] + c['groove_r']          # groove's round top: centre height
+C['g_zc'] = c['groove_floor'] + c['groove_r']          # groove's round top: center height
 C['groove_top_hw'] = math.sqrt(c['groove_r'] ** 2 - (C['g_zc'] - c['top']) ** 2) if c['top'] < C['g_zc'] else c['groove_r']
 C['fz'] = c['floor_z'] + c['floor']
 C['zl'] = c['top'] - c['lid']
@@ -131,14 +131,14 @@ SCREWS = [(x, y, C['zb'], c['screw_l']) for x, y in HOLES]   # (x, y, boss top, 
 
 def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     """{group: [(name, body)]}. rbox(x0, x1, y0, y1, z0, z1, r) = box with its four vertical edges rounded;
-    obox(centre, u, w, L, W, H) = box along unit vectors u, w."""
+    obox(center, u, w, L, W, H) = box along unit vectors u, w."""
     ilo, ihi, fz, zl, zb, zt = C['iw_lo'], C['iw_hi'], C['fz'], C['zl'], C['zb'], C['zt']
     olo, ohi = c['room_out'], C['out_hi']
     in_b = C['in_b']
     out = {}
 
     def groove(off, x0, x1):
-        """The groove (off 0), or its outline grown by off: a circle, open above its centre."""
+        """The groove (off 0), or its outline grown by off: a circle, open above its center."""
         R, zc = c['groove_r'] + off, C['g_zc']
         return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20))
 
@@ -181,10 +181,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         tray = uni(tray, cyl((hx, hy, F0), (hx, hy, zb), c['boss_d'] / 2))
     # --- jacks: plug-shaped apertures in end wall A, pockets under their tails and pegs, port marks (1, 2, 3 dots)
     def aperture(y, grow, xa, xb):
-        """The plug's outline + ap_clear (print 2: measured plug). Body centred on the jack's mouth, latch notch under it
+        """The plug's outline + ap_clear (print 2: measured plug). Body centered on the jack's mouth, latch notch under it
         (the jack is latch-down). The first print's 5 mm notch was narrower than the 6 mm latch."""
         k = c['ap_clear'] + grow
-        zm = zt + sum(c['rj_mouth']) / 2                          # the mouth's centre
+        zm = zt + sum(c['rj_mouth']) / 2                          # the mouth's center
         w, r = c['plug_w'] / 2 + k, c['ap_r'] + grow
         z0, z1 = zm - c['plug_h'] / 2 - k, zm + c['plug_h'] / 2 + k
         a = uni(bx(xa, xb, y - w + r, y + w - r, z0, z1), bx(xa, xb, y - w, y + w, z0 + r, z1 - r))
@@ -213,7 +213,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
                   cyl((sx - 1, by, bc), (sx + c['cradle_w'] + 1, by, bc), rc),
                   bx(sx - 1, sx + c['cradle_w'] + 1, c['cradle_y0'] - 1, ytrim, bc - chz, bc + 1))   # PCB-side horn, flat top
         tray = uni(tray, sad)
-    # end stops, centred on the cell's axis; they bear on its end below the + button (the lead leaves the end-B end higher up)
+    # end stops, centered on the cell's axis; they bear on its end below the + button (the lead leaves the end-B end higher up)
     g, t, hw = c['bat_gap'], c['stop_t'], c['stop_hw']
     tray = uni(tray, bx(C['bat_x0'] - g - t, C['bat_x0'] - g, by - hw, min(by + hw, ihi + 0.01), F0, bc - 2.5),
                bx(C['bat_x0'] + c['bat_l'] + g, C['bat_x0'] + c['bat_l'] + g + t, by - hw, min(by + hw, ihi + 0.01), F0, bc - 4.0))

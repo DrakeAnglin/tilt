@@ -16,7 +16,7 @@ leaves through the headrail's corner notch, and the 16:1 single-start ratio (sel
   SENSOR GEAR   20T spur on the worm wheel, turning on a pin in the main half; magnet glued into its short head.
 
 Global coordinates (mm): X along the rod (0 = tilter mid-plane, +X toward the tilt drums), Y across the rail
-(-Y = room side), Z up from the rail's inner floor. s = distance along the worm axis from its thread centre,
+(-Y = room side), Z up from the rail's inner floor. s = distance along the worm axis from its thread center,
 positive toward the wand.
 """
 
@@ -36,7 +36,7 @@ P = dict(
     backlash=0.15,
     ss_backlash=0.3,          # the sensor gear now has the wheel's helix: a normal mesh (0.6 as a straight spur thinned its teeth)
     ss_hand=-1.0,             # helix hand of the sensor gear: opposite to the (right-hand) worm wheel
-    ss_phase_trim=-0.25,      # deg: centre of the measured contact-free window (Fusion scan)
+    ss_phase_trim=-0.25,      # deg: center of the measured contact-free window (Fusion scan)
           # sensor spur on the (5° helix) worm wheel teeth: extra room for the helix mismatch
     # worm + worm wheel: same ratio / size class as the factory pair (16:1, m 0.88)
     module_worm=0.88, z_wheel=16, worm_d=9.6, worm_angle=60.0, cd_extra=0.2,
@@ -96,7 +96,7 @@ P = dict(
     pod_bolts=((-23.0, 27.0),),
     # AS5600: board flush on the lid's outer face, chip facing in; magnet glued into the sensor gear inside the case
     ss_z=18, ss_m=0.88, ss_face=3.0, ss_cd_extra=0.15, ss_y=14.45, ss_shaft_d=4.0,   # 18T: the board bolts pass it
-    ss_bore=3.5,              # the gear turns on a Ø4 pin moulded into the main half (gear prints flat, no stub)
+    ss_bore=3.5,              # the gear turns on a Ø4 pin molded into the main half (gear prints flat, no stub)
     ss_x0=1.0,                # X of the sensor gear's main-half face: near the wheel's middle (a worm wheel's teeth change
                               # shape toward its faces, a spur gear only meshes cleanly near the middle)
     ss_head_d=8.0,
@@ -261,7 +261,7 @@ def wheel_section(zz):
 
 
 def wheel_tooth_angle(zz=0.0):
-    """Wheel-local angle of a tooth centre in the plane zz (middle of the tip land)."""
+    """Wheel-local angle of a tooth center in the plane zz (middle of the tip land)."""
     pts = wheel_section(zz)
     n = P['wheel_pts']
     rs = [math.hypot(*q) for q in pts[:n]]
@@ -288,11 +288,11 @@ def layout():
     gc = S((s_g0 + s_back) / 2)
     off = unit(mul(cross(d, X), -1.0))              # common perpendicular, away from the room-side wall
     cd = ga['rp'] + gp['rp'] + P['hx_cd_extra']
-    pin_c = add(gc, mul(off, cd))                   # pinion centre (X = 0)
+    pin_c = add(gc, mul(off, cd))                   # pinion center (X = 0)
     u = mul(X, P['motor_side'])                     # motor axis, toward the motor
     vz = (0.0, 0.0, 1.0)
     wv = cross(u, vz)
-    t_face = P['slab_half'] - P['motor_inset']     # gearbox face, from the pinion centre along u (lid stays 8.33)
+    t_face = P['slab_half'] - P['motor_inset']     # gearbox face, from the pinion center along u (lid stays 8.33)
     face = add(pin_c, mul(u, t_face))
     return dict(X=X, d=d, n=n, u=u, w=wv, vz=vz, rod_c=rod_c, p0=p0, S=S, half=half, ga=ga, gp=gp, cd=cd, off=off,
                 s_g0=s_g0, s_back=s_back, gear_c=gc, pin_c=pin_c, t_face=t_face, face=face, worm=w, wheel=wh)
@@ -467,7 +467,7 @@ def helical_body(comp, g, z0, face, hand=1.0, backlash=None):
 
 # ------------------------------------------------------------------ printed parts
 def build_worm(root, L):
-    """Local z = s (worm axis toward the wand), origin at the thread centre; local x = the rod direction (X)."""
+    """Local z = s (worm axis toward the wand), origin at the thread center; local x = the rod direction (X)."""
     occ, comp = new_component(root, 'Worm')
     w, half = L['worm'], L['half']
     # threads: transverse section swept straight along the axis with one full twist per lead (right hand)
@@ -517,7 +517,7 @@ def build_worm(root, L):
         keep = tbm.createCylinderOrCone(P3((0, 0, s0)), (rf - 0.5) / 10, P3((0, 0, s3)), (ra + 2.0) / 10)
         tbm.booleanOperation(tool, keep, adsk.fusion.BooleanTypes.DifferenceBooleanType)
         tbm.booleanOperation(body, tool, adsk.fusion.BooleanTypes.DifferenceBooleanType)
-        sc = (L['s_g0'] + L['s_back']) / 2                   # gear centre: the pinion crosses here
+        sc = (L['s_g0'] + L['s_back']) / 2                   # gear center: the pinion crosses here
 
         def r_top(z):
             line = rf + (z - sg) - 0.02
@@ -1141,9 +1141,9 @@ def build(design, export_dir=None):
     place(occ_named('Worm'), L['p0'], X, d)                    # thread phase = the one the wheel was cut with
     place(occ_named('Worm wheel'), L['rod_c'], L['n'], X)
     place(occ_named('Motor pinion'), add(L['pin_c'], mul(L['u'], -P['pinion_face'] / 2)), L['w'], L['u'])
-    # sensor gear phase: a tooth space where the wheel has a tooth on the centre line, then rolled with the wheel
+    # sensor gear phase: a tooth space where the wheel has a tooth on the center line, then rolled with the wheel
     v = sub((0, SL['y'], SL['z']), L['rod_c'])
-    line_w = math.atan2(dot(v, L['d']), dot(v, L['n']))                # centre line, wheel-local angle
+    line_w = math.atan2(dot(v, L['d']), dot(v, L['n']))                # center line, wheel-local angle
     pw = 2 * math.pi / P['z_wheel']
     dw = (wheel_tooth_angle((SL['gear_x0'] + SL['gear_x1']) / 2) - line_w + pw / 2) % pw - pw / 2   # nearest tooth
     beta = math.atan2(v[2], -v[1])                                       # toward the rod, sensor-local angle
@@ -1178,8 +1178,8 @@ def build(design, export_dir=None):
     return '\n'.join([
         'Worm: single start m%.2f, pitch Ø%.2f, OD %.2f, lead angle %.1f° (self-locking), threads s ±%.2f' % (
             wd['m'], 2 * wd['rp'], 2 * wd['ra'], wd['lead_deg'], L['half']),
-        'Worm wheel: %dT, OD %.2f, centre distance %.2f' % (wh['z'], 2 * wh['ra'], wh['cd']),
-        'Crossed helicals: worm %dT (face %.1f) / motor %dT (face %.1f) mn%.1f 45°, centres %.2f, pinion at (Y %.1f, Z %.1f)' % (
+        'Worm wheel: %dT, OD %.2f, center distance %.2f' % (wh['z'], 2 * wh['ra'], wh['cd']),
+        'Crossed helicals: worm %dT (face %.1f) / motor %dT (face %.1f) mn%.1f 45°, centers %.2f, pinion at (Y %.1f, Z %.1f)' % (
             ga['z'], P['worm_gear_face'], gp['z'], P['pinion_face'], P['mn'], L['cd'], L['pin_c'][1], L['pin_c'][2]),
         'N20 gearbox face X=%.2f in a %.1f mm pocket, %.0f mm shaft uncut (tip at X=%.2f, in the main half), D-flat '
         'from X=%.2f, pinion X %.1f..%.1f; case X %.2f .. %.2f' % (

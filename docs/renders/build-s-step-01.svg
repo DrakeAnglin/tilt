@@ -301,5 +301,5 @@
 <line x1="400" y1="210" x2="400" y2="180" stroke="#888" stroke-width="2"/>
 <circle cx="400" cy="210" r="9" fill="#e8c88a" stroke="#8a6a2a" stroke-width="1.5"/>
 <text x="400" y="213" font-size="9" text-anchor="middle" font-weight="bold">1k</text>
-<text x="30" y="447" font-size="13" fill="#222">Colour bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.</text>
+<text x="30" y="447" font-size="13" fill="#222">Color bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.</text>
 </svg>

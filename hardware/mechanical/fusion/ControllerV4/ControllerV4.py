@@ -33,7 +33,7 @@ C = dict(
     pb_z=8.0, pb_t=1.6, plastic=2.5,
     # USB-C breakout: Cermant 16P (B0CB2VFJ54), 21.6 x 12.8 (listing drawing). Scaled from its photo (confirm on the
     # board): socket 8.94 x 3.26 sticks out ~1.8 past the front edge; two ~Ø3.6 holes ~2.4 from the front edge,
-    # ~17.3 apart; pin row (VBUS GND CC1 D- D+ CC2) centred, 1.3 from the back edge
+    # ~17.3 apart; pin row (VBUS GND CC1 D- D+ CC2) centered, 1.3 from the back edge
     usb_bw=21.6, usb_bd=12.8, usb_y=6.0, usb_z=2.8, usb_stick=1.8, usb_sw=8.94, usb_sh=3.26, usb_sl=7.5,
     usb_hole=3.6, usb_hole_x=2.4, usb_hole_y=8.65,
     # lid screws: M3 x 8 flat head into heat-set inserts (Ø4.0 x 6.7) in four pillars
@@ -86,7 +86,7 @@ C['usb_x0'] = PB[1] + 6.0                                  # USB-C board's back 
 C['in_b'] = max(C['usb_x0'] + c['usb_bd'] + c['usb_stick'] - c['end_t'], c['bat_x0'] + c['bat_l'] + 14.0)
 C['usb_x0'] = C['in_b'] + c['end_t'] - c['usb_stick'] - c['usb_bd']
 C['L'] = C['in_b'] + c['end_t']
-# pillars: two between the port bay and the electronics bay, two at end B; centred 0.5 inside the side walls' faces
+# pillars: two between the port bay and the electronics bay, two at end B; centered 0.5 inside the side walls' faces
 PY = C['iw'] - c['pillar_r'] + 0.5
 PILLARS = ((C['rj_x1'] + 6.5, -PY), (C['rj_x1'] + 6.5, PY), (C['in_b'] - c['pillar_r'] - 1.0, -PY), (C['in_b'] - c['pillar_r'] - 1.0, PY))
 
@@ -176,7 +176,7 @@ WIRES = [
     # rails (bare tinned wire along the column, soldered at every hole)
     ('a12', 'a24', 'GND rail: bare wire down column a, rows 12-24'),
     ('j4', 'j24', 'VBAT rail: bare wire down column j, rows 4-24'),
-    # ESP pins to their neighbours
+    # ESP pins to their neighbors
     ('a1', 'b1', 'bridge: port 3 IN1 -> GPIO16'), ('a2', 'b2', 'bridge: port 3 IN2 -> GPIO17'),
     ('a3', 'b3', 'bridge: angle 1 -> GPIO0'), ('a4', 'b4', 'bridge: angle 2 -> GPIO1'), ('a5', 'b5', 'bridge: angle 3 -> GPIO2'),
     ('a6', 'b6', 'bridge: battery divider -> GPIO3'),
@@ -336,7 +336,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox):
                    bx(px - c['pillar_r'], px + c['pillar_r'], py, sy * (iw + 0.5), fz - 0.1, zl))
     for px, py in PILLARS:
         tray = cut(tray, cyl((px, py, zl + 1), (px, py, zl - c['ins_depth']), c['ins_d'] / 2))
-    # port bay: ledges for the RJ12 boards (shared between neighbours), front step + 1 mm rear lip; jack windows
+    # port bay: ledges for the RJ12 boards (shared between neighbors), front step + 1 mm rear lip; jack windows
     zb = c['rj_z']
     edges = sorted({round(y + s * c['rj_w'] / 2, 3) for y in c['rj_y'] for s in (-1, 1)})
     rails = [(-iw - 0.5, edges[0] + 0.8)] + [(a - 0.8, b + 0.8) for a, b in zip(edges[1:-1:2], edges[2:-1:2])] + \

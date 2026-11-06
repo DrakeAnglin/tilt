@@ -22,7 +22,7 @@ import os
 
 SOURCES = {
     'ESP32-C6 SuperMini': '26 x 18 drawing in the listing; 10 pins a side (labels from the listing photo); row spacing '
-                          'not readable: modelled 15.24 (6 holes), col 8 kept free for 17.78 (7 holes)',
+                          'not readable: modeled 15.24 (6 holes), col 8 kept free for 17.78 (7 holes)',
     'DRV8833 (Suuoo)': '18.5 x 16 (listing); rows IN4 IN3 GND VCC IN2 IN1 / EEP OUT1 OUT2 OUT3 OUT4 ULT; rows 12.7 apart '
                        '(estimated from photo)',
     'RJ12 breakout (risingsaplings)': 'board 19.4 x 19.9, jack 13.5 W x 14.7 L overhanging the front edge 4.5, pin row '

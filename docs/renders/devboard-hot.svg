@@ -314,5 +314,5 @@
 <circle cx="459" cy="500" r="9" fill="#d62728"/><text x="459" y="504" font-size="10" font-weight="bold" fill="#fff" text-anchor="middle">8</text><text x="476" y="504" font-size="13"><tspan font-weight="bold">j21</tspan>  charger JST LOAD+</text>
 <circle cx="879" cy="500" r="9" fill="#d62728"/><text x="879" y="504" font-size="10" font-weight="bold" fill="#fff" text-anchor="middle">9</text><text x="896" y="504" font-size="13"><tspan font-weight="bold">h23</tspan>  R div top 1M</text>
 <text x="30" y="540" font-size="13"><tspan font-weight="bold">Underneath:</tspan> rail j11-j24; bridges i15-j15, h23-i23, i23-j23, b19-c19, c19-d19</text>
-<text x="30" y="562" font-size="12" fill="#444">Solid = bare rail / bridge; numbered dots = part pins and leads soldered in from the top. Every dot of one colour must beep to every other dot of that colour, and never to the other colour.</text>
+<text x="30" y="562" font-size="12" fill="#444">Solid = bare rail / bridge; numbered dots = part pins and leads soldered in from the top. Every dot of one color must beep to every other dot of that color, and never to the other color.</text>
 </svg>

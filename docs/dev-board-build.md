@@ -12,7 +12,7 @@ every hole holds exactly one thing (a part leg, a lead or a wire end).
 is still open; then the rails (10) and the bare bridges (11–15: every board, then one step per port, then solar), which land on those
 holes' pads; then the charger, which only plugs in (16); the ESP and USB-C board plug in last (17). **Ports 2 and 3 and
 the solar lead are optional:** skip a port's lead step and its bridge step together. Each
-step does one kind of part, and in its picture that step is in colour while everything already done is grey.
+step does one kind of part, and in its picture that step is in color while everything already done is gray.
 
 ## Parts for one board
 
@@ -176,7 +176,7 @@ meter as you go.
 
 Solder 6 leads, 5–8 cm long, to port 1's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
+signals. **Colors, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
 **black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
 underneath, trim to ~1 mm.
 
@@ -197,7 +197,7 @@ underneath, trim to ~1 mm.
 
 **Optional:** skip it on a controller that drives only 1 blind; the holes stay free for later. Solder 6 leads, 5–8 cm long, to port 2's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
+signals. **Colors, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
 **black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
 underneath, trim to ~1 mm.
 
@@ -218,7 +218,7 @@ underneath, trim to ~1 mm.
 
 **Optional:** skip it on the controller that drives only 2 blinds; the holes stay free for later. Solder 6 leads, 5–8 cm long, to port 3's RJ12 board: **22 AWG stranded insulated wire** (the white two-conductor
 wire, split) for **battery + and GND**, which carry the motor current, and **30 AWG silicone stranded wire** for the four
-signals. **Colours, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
+signals. **Colors, the same on every port and on the tilter end:** pin 1 battery + **red**, 2 IN1 **green**, 3 GND
 **black**, 4 angle **white**, 5 EN **blue**, 6 IN2 **yellow**. Then push each lead into its hole from the top (table), solder
 underneath, trim to ~1 mm.
 

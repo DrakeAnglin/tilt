@@ -7,8 +7,8 @@ Nothing plugged in: no cord, no battery. Meter in **beep (continuity) mode** unl
 (the 10 µF, or the AS5600's own capacitors): that's normal, not a short. Treat it as "no beep".
 
 ## 1. Look first
-- [ ] No solder blobs bridging neighbouring pins on any of the three boards.
-- [ ] No bare wire or stray strand touching a neighbouring pad; heat-shrink where it could.
+- [ ] No solder blobs bridging neighboring pins on any of the three boards.
+- [ ] No bare wire or stray strand touching a neighboring pad; heat-shrink where it could.
 - [ ] DRV8833 **J1** (between "en" and "sleep") is **open**.
 - [ ] Nothing soldered to IN3, IN4, OUT3, OUT4, EEP (driver) or SCL, SDA (sensor).
 

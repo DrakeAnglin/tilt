@@ -2,7 +2,7 @@
 <defs><filter id="mute"><feColorMatrix type="saturate" values="0"/></filter></defs>
 <rect width="100%" height="100%" fill="#ffffff"/>
 <text x="30" y="30" font-size="20" font-weight="bold">Step 7: Insulated wires underneath (12)</text>
-<text x="30" y="54" font-size="13" fill="#444">Bottom view: flip the board over its long edge, row 1 still on the left, column a now at the TOP. Grey = done already.</text>
+<text x="30" y="54" font-size="13" fill="#444">Bottom view: flip the board over its long edge, row 1 still on the left, column a now at the TOP. Gray = done already.</text>
 <rect x="49" y="69" width="732" height="312" rx="6" fill="#f3efe2" stroke="#3a7a2a" stroke-width="2"/>
 <text x="70" y="63" font-size="11" fill="#666" text-anchor="middle">1</text>
 <text x="100" y="63" font-size="11" fill="#666" text-anchor="middle">2</text>
@@ -398,5 +398,5 @@
 <path d="M730 330 Q655 196 580 90" fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7,3"/>
 <circle cx="730" cy="330" r="3.5" fill="#222222"/>
 <circle cx="580" cy="90" r="3.5" fill="#222222"/>
-<text x="30" y="447" font-size="13" fill="#222">Dashed = 30 AWG insulated wire, dots = its two ends. Colours: black GND, red battery +, orange 5V, blue signal.</text>
+<text x="30" y="447" font-size="13" fill="#222">Dashed = 30 AWG insulated wire, dots = its two ends. Colors: black GND, red battery +, orange 5V, blue signal.</text>
 </svg>

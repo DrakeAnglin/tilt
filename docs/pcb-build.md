@@ -7,7 +7,7 @@ wiring. Every part drops into its own holes, and the copper does the rest.
 
 **Order:** lowest parts first, so the board lies flat on the bench while you solder: resistors, diodes, small
 capacitors, then the sockets and headers, the jacks, the big capacitor and the fuses (tallest) last. Then meter checks,
-the leads, and plugging in. In each picture the step's parts are in colour and labelled; done parts are grey; the
+the leads, and plugging in. In each picture the step's parts are in color and labeled; done parts are gray; the
 gold holes are still empty. End A (the RJ12 jacks) is on the left, end B (the USB-C socket) on the right.
 
 **The silkscreen prints each part's value** (1M, 220, 100n, 1N5819 …), not its reference, so you can match parts to the
@@ -83,7 +83,7 @@ sit where the ESP goes: they have to go in before its sockets.
 | R6 | 1k | brown black red gold / brown black black brown brown | angle filter |
 | R7 | 1k | brown black red gold / brown black black brown brown | angle filter |
 
-Not sure of a colour? Measure it (1M reads 0.98–1.02 MΩ).
+Not sure of a color? Measure it (1M reads 0.98–1.02 MΩ).
 
 ## Step 2: Resistors behind the jacks (12)
 
@@ -200,7 +200,7 @@ Set the meter to beep (continuity). Black probe on **TP5 (GND)**:
 Then **diode mode**, red on TP4 (PWR), black on TP5 (GND): about 0.7–0.9 V is wrong (D4 is in backwards: its band must
 be on the square pad); open ("OL") is right.
 
-Finally, look at the underside in good light for bridges between neighbouring pads, especially the sockets and
+Finally, look at the underside in good light for bridges between neighboring pads, especially the sockets and
 jacks, and check every lead is trimmed to 1.8 mm or less.
 
 ## Step 11: Leads (charger harness, USB-C lead, solar)

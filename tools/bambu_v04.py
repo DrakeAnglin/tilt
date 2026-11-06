@@ -24,14 +24,14 @@ CLI = '/Applications/BambuStudio.app/Contents/MacOS/BambuStudio'
 
 PRESETS = (('machine', 'Bambu Lab H2D 0.4 nozzle'), ('process', '0.12mm Fine @BBL H2D'),
            ('filament', 'Bambu PLA Basic @BBL H2D'))
-TWEAKS = {'filament_colour': ['#FFFFFF'], 'wall_loops': '4', 'sparse_infill_density': '40%',
+TWEAKS = {'filament_color': ['#FFFFFF'], 'wall_loops': '4', 'sparse_infill_density': '40%',
           'brim_type': 'outer_only', 'brim_width': '8',
           # owner asked for supports: tree supports from the build plate only (never inside the case's gear pockets
           # and bearing bores, where support marks would land on running surfaces); 30° so the 45° gear and thread
           # flanks aren't supported
           'enable_support': '1', 'support_type': 'tree(auto)', 'support_on_build_plate_only': '1',
           'support_threshold_angle': '30'}
-# part -> centre on the bed (mm); H2D plate is 350 x 320. Brims are 8 mm, so parts sit >= 20 mm apart.
+# part -> center on the bed (mm); H2D plate is 350 x 320. Brims are 8 mm, so parts sit >= 20 mm apart.
 LAYOUT = {'case_left': (110, 160), 'case_right': (172, 160), 'worm': (218, 140), 'worm_wheel': (218, 182),
           'motor_pinion': (250, 140), 'sensor_gear': (254, 182)}
 

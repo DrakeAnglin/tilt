@@ -1,4 +1,4 @@
-"""Wiring diagram for the tilter's sensor module (RJ12 breakout -> DRV8833 + AS5600 -> N20), in the build's wire colours.
+"""Wiring diagram for the tilter's sensor module (RJ12 breakout -> DRV8833 + AS5600 -> N20), in the build's wire colors.
 The two boards are drawn as the owner's actually look (pin order as printed on them, 2026-11-01 photos).
 
   python3 tools/tilter_diagram.py        # writes docs/renders/tilter-wiring.svg and .png (headless Chrome)
@@ -26,20 +26,20 @@ def pad(x, y, name, side, square=False, dim=False, light=False):
         o.append('<rect x="%d" y="%d" width="14" height="14" fill="%s" stroke="#555"/>' % (x - 7, y - 7, fill))
     else:
         o.append('<circle cx="%d" cy="%d" r="7" fill="%s" stroke="#555"/>' % (x, y, fill))
-    colour = ('#888' if dim else '#fff') if light else ('#999' if dim else '#111')
+    color = ('#888' if dim else '#fff') if light else ('#999' if dim else '#111')
     anchor = 'start' if side == 'l' else 'end'
     o.append('<text x="%d" y="%d" font-size="14" font-weight="bold" fill="%s" text-anchor="%s">%s</text>' % (
-        x + 14 if side == 'l' else x - 14, y + 5, colour, anchor, name))
+        x + 14 if side == 'l' else x - 14, y + 5, color, anchor, name))
     return x, y
 
 
-def path(points, colour, thick=False, dash=False):
+def path(points, color, thick=False, dash=False):
     w = 5 if thick else 3
     d = 'M' + ' L'.join('%d %d' % p for p in points)
-    if colour in ('white', 'motor'):
+    if color in ('white', 'motor'):
         o.append('<path d="%s" fill="none" stroke="#555" stroke-width="%d" stroke-linejoin="round"/>' % (d, w + 2))
     o.append('<path d="%s" fill="none" stroke="%s" stroke-width="%d" stroke-linejoin="round"%s/>' % (
-        d, COL[colour], w, ' stroke-dasharray="7,4"' if dash else ''))
+        d, COL[color], w, ' stroke-dasharray="7,4"' if dash else ''))
 
 
 # ---------------------------------------------------------------- RJ12 breakout (left)
@@ -141,7 +141,7 @@ for k, (c, thick, t) in enumerate(legend):
         o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#555" stroke-width="%d"/>' % (lx, y, lx + 34, y, 7 if thick else 5))
     o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="%d"/>' % (lx, y, lx + 34, y, COL[c], 5 if thick else 3))
     o.append('<text x="%d" y="%d" font-size="12" fill="#222">%s (%s)</text>' % (lx + 42, y + 4, t, '22 AWG' if thick else '30 AWG'))
-o.append('<text x="24" y="860" font-size="13" fill="#222">Grey pads stay empty: IN3, IN4, ULT (= FAULT), OUT3, OUT4 on the driver; SCL, SDA on the sensor. '
+o.append('<text x="24" y="860" font-size="13" fill="#222">Gray pads stay empty: IN3, IN4, ULT (= FAULT), OUT3, OUT4 on the driver; SCL, SDA on the sensor. '
          'Two wires each on RJ12 pins 3 and 5.</text>')
 o.append('</svg>')
 open(OUT, 'w').write('\n'.join(o))

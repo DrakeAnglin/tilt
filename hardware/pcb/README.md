@@ -56,7 +56,7 @@ Things that can still be adjusted at assembly, so they don't need a new order:
   battery fitted, solder a wire link in D3's place (no 0.3 V drop).
 - **Pin plan:** all in firmware (per-board pin table), no copper change.
 
-Known limits (by design, not blockers): no reverse-battery protection beyond the keyed, labelled connectors (a
+Known limits (by design, not blockers): no reverse-battery protection beyond the keyed, labeled connectors (a
 MOSFET-based one is surface-mount or a TO-220; planned for v3); each port's battery + passes a 0.75 A PTC (~0.3 Ω)
 and the cord (~0.6 Ω per wire for 3 m of flat cord), which costs some motor voltage on long runs.
 

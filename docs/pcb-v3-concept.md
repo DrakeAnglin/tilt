@@ -91,7 +91,7 @@ stay out of direct sun.
 | 18650 cell (high-drain) | battery shops | $4–6 | — |
 
 ## JLC assembly: yes, they'd do all of it
-JLC solders through-hole parts too: hand-soldered, $3.50 labour per order plus a small per-joint charge. So the board
+JLC solders through-hole parts too: hand-soldered, $3.50 labor per order plus a small per-joint charge. So the board
 can arrive with **everything soldered** (charger, protection, USB-C, solar jack, RJ12s, RJ45, holder, ESP sockets). You
 plug in the ESP and the cell. If they don't stock a part (your RJ12s, the Keystone holder), it can be bought through their
 global sourcing, or left off for you to solder.
@@ -104,7 +104,7 @@ global sourcing, or left off for you to solder.
 | Assembly setup + stencil | $9.71 |
 | Extended-part fees (~5 parts × $3.07) | ~$15 |
 | SMD joints (~180 per board × 5 × $0.0016) | ~$1.50 |
-| Through-hole labour + joints | ~$9 |
+| Through-hole labor + joints | ~$9 |
 | Parts (~$16/board fully loaded, ~$5 without RJ12s/holder) | ~$25–80 |
 | Shipping (DHL) | ~$15–20 |
 | **Total** | **~$80–140 for 5** (~$16–28 each), depending on who supplies the RJ12s and holders |

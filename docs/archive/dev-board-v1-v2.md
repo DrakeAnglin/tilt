@@ -17,7 +17,7 @@ renders.
 **Part sizes are from the listing photos and drawings** (ESP32-C6 26 × 18 drawing; DRV8833 18.5 × 16; USB-C 22.1 ×
 13.05; RJ12 board 19.4 × 19.9 and jack 13.5 × 14.7 scaled from the quarter photo with the 2.54 pin row as the
 ruler; charger ≈ 19.6 × 18.3 scaled from its header; 18650 pack 68.1 × 19.05). Still unmeasured: the ESP32's
-row-to-row spacing (modelled 15.24, the next grid option 17.78 is kept free) and the RJ12 jack height (13.0).
+row-to-row spacing (modeled 15.24, the next grid option 17.78 is kept free) and the RJ12 jack height (13.0).
 
 ### Numbers (all checked by the script)
 | | |
@@ -70,7 +70,7 @@ parts (including the tilt rod's sweep) and saves renders to `docs/renders/ctrl-v
 
 ## Case
 - **Outer 118.2 × 46.0 × 23.0 mm.** 46 mm wide drops in between the rail lips (46.5 mm opening) and sits on the rail
-  floor, centred. A groove along the lid (|Y| < 4.5 mm, top at Z 20.2) leaves 0.97 mm under the tilt rod's sweep
+  floor, centered. A groove along the lid (|Y| < 4.5 mm, top at Z 20.2) leaves 0.97 mm under the tilt rod's sweep
   (4 mm square rod at Z 24 sweeps down to Z 21.17).
 - Two parts: **tray** (floor, walls, all supports) and **lid** (snap skirts with 4 bumps into windows in the long
   walls, plus fingers that hold down the jacks, the battery and the perfboard edge). No screws.
@@ -142,7 +142,7 @@ rows 3–10 and shortens the board and case.
   Remove the RGB LED (GPIO8) and the power LED.
 - **Charger:** confirm the pads: PWR, BATT, LOAD, THERM, PROG and the 5-pin header (the photos show no USB or DC
   jack).
-- **USB-C breakout:** measure the board (modelled 18 × 15); the case opening and rails follow it.
+- **USB-C breakout:** measure the board (modeled 18 × 15); the case opening and rails follow it.
 - **RJ12 cords:** pin 1 → pin 1 continuity on every cord.
 - **Solar panel:** open-circuit voltage behind glass.
 

@@ -469,7 +469,7 @@ def case_shapes(L):
                                  mouth + P['socket_depth'] + 0.5 + (P['collar_d'] - P['body_d']) / 2 + 0.3,
                                  P['collar_d'] / 2 + 0.3)),
         ('adapter exit', cyl_s(L, mouth + P['socket_depth'] + 0.5, mouth + 40, P['body_d'] / 2 + 0.3)),
-        # centred, 0.4 mm running room all round: leaves 0.59 mm of floor under it and ~0.7 mm walls to the worm's
+        # centered, 0.4 mm running room all round: leaves 0.59 mm of floor under it and ~0.7 mm walls to the worm's
         # lower-flange and adapter-collar pockets (owner: >= 0.4 mm prints fine)
         ('pinion', cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 0.3, P['pinion_face'] / 2 + 0.3, gp['ra'] + 0.4)),
         ('motor shaft tip', cyl_u(L, L['pin_c'], -P['pinion_face'] / 2 - 2.5, 0, 2.0)),
@@ -668,7 +668,7 @@ def sensor_layout():
 
 def build_sensor_gear(root):
     """20T spur meshing with the worm wheel, shaft + magnet head. Local Z points to the board (-X in the assembly);
-    local origin = gear centre plane (assembly X = 0)."""
+    local origin = gear center plane (assembly X = 0)."""
     occ, comp = new_component(root, 'Sensor gear')
     S = sensor_layout()
     head_l0 = -S['head_x0']                                # local z where the head starts
@@ -826,7 +826,7 @@ def build(design, export_dir=None):
         'Alignment pegs (Y, Z): %s' % ', '.join('(%.0f, %.0f)' % b for b in pegs),
         'AS5600 standoff holes: %s' % ', '.join('(%.1f, %.1f) %s, wall %.1f mm' % (
             pt[0], pt[1], kind, P['case_w'] / 2 - abs(pt[0]) - r) for pt, kind, r, _ in board_hole_plan()),
-        'Sensor gear %dT m%.2f on the worm wheel, centres %.2f, axis (Y, Z)=(%.1f, %.1f), magnet face X=%.2f, board chip side X=%.2f' % (
+        'Sensor gear %dT m%.2f on the worm wheel, centers %.2f, axis (Y, Z)=(%.1f, %.1f), magnet face X=%.2f, board chip side X=%.2f' % (
             P['ss_z'], P['ss_m'], SL['cd'], SL['y'], SL['z'], SL['magnet_x'], SL['chip_x']),
         'Exported: %s' % ', '.join(os.path.basename(f) for f in files),
     ])

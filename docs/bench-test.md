@@ -11,7 +11,7 @@ the tilter's wiring and the firmware's pin plan. Sketch: [firmware/bench_test](.
 - 1 kΩ + 100 nF (angle filter), 100 kΩ (EN pull-down), a breadboard and jumper wires
 - USB-C cable to the computer (ESP power + serial), the USB power meter or a multimeter
 
-The SuperMini's two pin rows are 0.6" apart: it straddles the breadboard's centre gap like a wide DIP chip. The RJ12
+The SuperMini's two pin rows are 0.6" apart: it straddles the breadboard's center gap like a wide DIP chip. The RJ12
 breakout's 6 pins plug into the breadboard too.
 
 ## Wiring (controller side, on the breadboard)
@@ -55,7 +55,7 @@ Battery and charger **unplugged**; only the ESP's own USB-C to the computer.
    - **USB CDC On Boot: Enabled** (without this the Serial Monitor stays blank)
    - Partition Scheme: the default (**4MB with spiffs**: it has the two app slots Wi-Fi updates need)
    - Port: the `/dev/cu.usbmodem…` that appears when the ESP is plugged in
-4. **Upload.** If it can't connect: hold **BOOT**, tap **RST**, release BOOT, upload again; tap RST afterwards.
+4. **Upload.** If it can't connect: hold **BOOT**, tap **RST**, release BOOT, upload again; tap RST afterward.
 5. *Tools → Serial Monitor*, **115200** baud. Tap RST: it prints the command list and `Wi-Fi <address>, telnet
    blinds-bench.local port 23`. If it says "Wi-Fi not connected", check `secrets.h` (it must be a 2.4 GHz network).
 

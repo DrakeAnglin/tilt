@@ -512,7 +512,7 @@
 <text x="50.0" y="281.5" font-size="13.0" fill="#333" font-weight="bold" text-anchor="middle" transform="rotate(-90 50.0 281.5)">END A: ports</text>
 <text x="1209.0" y="371.5" font-size="13.0" fill="#333" font-weight="bold" text-anchor="middle" transform="rotate(-90 1209.0 371.5)">END B: USB-C</text>
 <text x="60.0" y="26.0" font-size="18.0" fill="#111" font-weight="bold" text-anchor="start">Step 8: 470 µF capacitor</text>
-<text x="60.0" y="46.0" font-size="12.0" fill="#555" font-weight="normal" text-anchor="start">top side, end A (jacks) left, end B (USB-C) right. Colour: this step. Grey: done. Gold: holes still empty.</text>
+<text x="60.0" y="46.0" font-size="12.0" fill="#555" font-weight="normal" text-anchor="start">top side, end A (jacks) left, end B (USB-C) right. Color: this step. Gray: done. Gold: holes still empty.</text>
 <circle cx="312.0" cy="303.1" r="7.2" fill="#bfbfbf" stroke="#888" stroke-width="0.8"/><circle cx="312.0" cy="303.1" r="3.6" fill="#fff"/>
 <circle cx="380.6" cy="303.1" r="7.2" fill="#bfbfbf" stroke="#888" stroke-width="0.8"/><circle cx="380.6" cy="303.1" r="3.6" fill="#fff"/>
 <circle cx="263.4" cy="181.6" r="7.0" fill="#d9b44a" stroke="#8a6d1f" stroke-width="0.8"/><circle cx="263.4" cy="181.6" r="4.5" fill="#fff"/>

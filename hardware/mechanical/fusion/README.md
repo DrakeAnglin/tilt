@@ -48,7 +48,7 @@ python3 hardware/mechanical/fusion/fusion.py exec -c "result = [o.name for o in 
 
 ### Install (once)
 1. Fusion: **Shift+S → Add-Ins tab → +** next to "My Add-Ins" → *Script or add-in from device* → select the `FusionBridge` folder.
-2. Select **FusionBridge → Run**. Tick **Run on Startup** if you want it always available.
+2. Select **FusionBridge → Run**. Check **Run on Startup** if you want it always available.
 3. **Stop** it in the same dialog to close the port and delete the token.
 
 It runs whatever code it's sent, with your Fusion session's permissions, so only run it while you want Claude driving

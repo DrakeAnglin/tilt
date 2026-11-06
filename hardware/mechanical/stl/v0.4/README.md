@@ -78,4 +78,4 @@ headrail can pass PLA's ~55 °C). Print the worm and worm wheel in different pla
 
 ## Still to confirm on the real parts
 - How the printed worm pair feels and wears; the wheel's square bore (±0.1 mm); the helical mesh by hand (`hx_cd_extra`).
-- The RJ12 jack height (modelled 13.0 mm).
+- The RJ12 jack height (modeled 13.0 mm).

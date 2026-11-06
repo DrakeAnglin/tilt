@@ -66,7 +66,7 @@ crimp with a pin and pull. Or cut them off flush at the housing.
 3. **NTC wires** (the cell's temperature sensor). The module's **THERM** pads carry a 10 k resistor marked "103" that
    fakes a cool cell. Remove it and solder two **30 AWG** wires, about **60 mm**, one to each pad, with your 10 k NTC on
    the other end (sleeve the joints). Lay them flat along the module toward the capacitor's **leg end**; they leave
-   from under the capacitor there. Do this before the capacitor: afterwards the pads are covered.
+   from under the capacitor there. Do this before the capacitor: afterward the pads are covered.
 4. **Capacitor**: bend both legs 90° about 1.5 mm from its body, so it lies flat with its body over the
    LOAD/BATT edge of the module. Put the **+ leg in the hole by the "+" mark** (the stripe on the can is −). Hold a 2 mm
    spacer (a piece of 1.6 mm PCB plus a business card) under it while you solder, so it sits clear of the parts and is held
@@ -195,14 +195,14 @@ That's 1.5 leads per box. The USB lead is two ~65 mm wires you make up.
   header pins get clipped to 3 mm. The bay's screw post and the solar cable's floor route moved with it. The box no
   longer fills the rail, so **two rounded bumpers** on the back wall stop 1.0 mm short of the rail's wall. That's an
   easy squeeze-in fit, and the box can't shift more than 1 mm, less than the groove's 1.9 mm side clearance.
-- **Round groove:** a circle, r 5 mm, centred 1.67 mm above the rod's axis. The 4 mm square rod's corners (they sweep r 2.83)
+- **Round groove:** a circle, r 5 mm, centered 1.67 mm above the rod's axis. The 4 mm square rod's corners (they sweep r 2.83)
   clear it by 0.5 mm at the bottom and about 1.9 mm each side at the axis. Printed upside down, it's a 7 mm arch that
   flattens to about a 2 mm bridge at its crown, so no supports. The channel under it rises away from the middle, leaving the ESP's pins
   over 3 mm of room.
 - **Battery cradle:** two stations, each a tray saddle plus a matching lid cradle: 6 mm wide, the same 19.4 mm bore, and
   never thinner than 1.5 mm, so there are no feathered edges. On the back side, the saddle's horn runs up to just under
-  the cell's centreline and blends into the back wall (so the cell still drops straight in), and the lid cradle comes
-  down to the centreline. On the PCB side, both stop flat where their wall is still 1.5 mm thick; they can't reach further
+  the cell's centerline and blends into the back wall (so the cell still drops straight in), and the lid cradle comes
+  down to the centerline. On the PCB side, both stop flat where their wall is still 1.5 mm thick; they can't reach further
   without going over the PCB's edge. The lid cradles sit 0.4 mm over the cell.
 
 ![tray saddle](renders/ctrl-v5-cradle.png) ![lid cradle](renders/ctrl-v5-cradle-lid.png)
@@ -228,7 +228,7 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
 
 - **Openings (rev L, print 2):** the plug's outline, from your phone cord's plug: body **9.55 × 6.55**, latch **6.0 wide,
   1.5 under the body**. Each gets **0.35 mm a side** (FDM prints holes small): body opening 10.25 × 7.25 mm (corners
-  r 0.6) at 1.49–8.74 mm above the PCB, centred on the jack's mouth (1.73–8.50). The latch notch is 6.7 mm wide, down to
+  r 0.6) at 1.49–8.74 mm above the PCB, centered on the jack's mouth (1.73–8.50). The latch notch is 6.7 mm wide, down to
   the PCB's top (0.34 under the latch). The jack's face fills everything behind the opening, so you see the jack, not the
   inside of the box.
 - **What went wrong on print 1:** the latch notch was 5.0 mm wide. Your plug's latch is 6.0. (A middle version opened
@@ -246,7 +246,7 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
 |---|---|
 | Charger module | **Four one-piece corner seats.** Each is a 2 × 2 ledge under the board's corner joined to a closed L of 1.2 mm walls round it (0.2 clear of the board, 1 mm above its top). On the back-wall side there is no wall leg (the tray wall, 0.3 away, does that); the ledge runs into the wall. The legs at the capacitor end stay below the capacitor. The bay moved 1 mm toward end B so the seat by the PCB clears the board's end and the H3 post |
 | Capacitor | Saddle under its free end, merged with the end-B corner seat; lid pad 0.2 over it |
-| 18650 | Two saddles (into the back wall) + two end stops centred on the cell's axis, bearing on its end below the + button. The cell moved 0.4 mm toward end B so the end-A stop clears the H2 post without being cut short |
+| 18650 | Two saddles (into the back wall) + two end stops centered on the cell's axis, bearing on its end below the + button. The cell moved 0.4 mm toward end B so the end-A stop clears the H2 post without being cut short |
 | PCB | Three bosses (screw clamps) + end wall A (0.2) + the room-side wall (0.7) + free-standing ribs on the bar's and body's back edges (0.2). The thin ribs that only narrowed the gap to the room-side wall are gone (they did nothing the wall doesn't) |
 | USB-C board | Edges only: end-wall pocket, floor U-channel, lid U-channel with a closed back end (rev L) |
 | Lid | Three screw posts, edge pins on the charger, pads over the jacks, cell, capacitor, ESP (0.5 clear) |
@@ -265,7 +265,7 @@ Changes made after a design review against production practice:
 | Sharp-edged jack and USB openings | **0.5 mm bezels** round all three jack windows and the USB-C window (finished look, plug lead-in) |
 | Charger heat (MCP73871 is linear: ~0.6 W while charging), no vents | **3 vent slots** in end wall B beside the charger, 2 mm wide on a 5 mm pitch (3 mm webs), tops 5 mm below the groove notch (the floor sits on the rail, so not there) |
 | Cell end stops 0.7 mm, a USB-slot rib 1.0 mm | 1.2 mm and 1.4 mm |
-| No part marking | Engraved (sketched on the faces themselves, so it reads right when you look at them): tray bottom `BLINDS CONTROLLER / V5`, centred, lid underside `V5 LID - 4 x M3 INSERTS` |
+| No part marking | Engraved (sketched on the faces themselves, so it reads right when you look at them): tray bottom `BLINDS CONTROLLER / V5`, centered, lid underside `V5 LID - 4 x M3 INSERTS` |
 
 **Checks on rev B:**
 - **Interference:** exact B-rep check of every part on the PCB (KiCad's 3D export) and every mock-up against the tray, the lid and each other: **none**.

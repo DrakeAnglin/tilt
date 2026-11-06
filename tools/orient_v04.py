@@ -52,7 +52,7 @@ def orient(tris, rot):
         out.append(n + vs[0] + vs[1] + vs[2])
     lo = [min(t[3 + 3 * k + j] for t in out for k in range(3)) for j in range(3)]
     hi = [max(t[3 + 3 * k + j] for t in out for k in range(3)) for j in range(3)]
-    shift = (-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2])     # centred, standing on Z=0
+    shift = (-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2])     # centered, standing on Z=0
     moved = []
     for t in out:
         v = list(t)

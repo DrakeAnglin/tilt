@@ -3,7 +3,7 @@
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_wallcheck.py --timeout 600
   (prepend GEN = '<generator path>' to the code to check another version)
 
-Uses exactly the geometry TiltParts builds (case_plan): envelope, trims, cavities, per-half holes and pegs, modelled
+Uses exactly the geometry TiltParts builds (case_plan): envelope, trims, cavities, per-half holes and pegs, modeled
 as signed-distance functions. For every pocket / bore / hole surface it marches along the surface normal INTO the
 material until it reaches emptiness (another pocket, the outside, or the split face) and records that wall thickness.
 Grazing hits (ray running parallel to the other surface, e.g. where a bore exits a face) are ignored; only walls the

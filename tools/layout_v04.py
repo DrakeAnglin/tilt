@@ -149,7 +149,7 @@ def evaluate(L):
             best = (score, k, c)
     if best is None:
         return False, 'no room for the sensor gear'
-    rep['sensor'] = dict(z=zs, at_deg=best[1], centre=(round(best[2][0], 1), round(best[2][1], 1)), clear=round(best[0], 1))
+    rep['sensor'] = dict(z=zs, at_deg=best[1], center=(round(best[2][0], 1), round(best[2][1], 1)), clear=round(best[0], 1))
     # performance
     k_s = L['zg'] / L['zp']
     rep['wand_turns'] = round(L['zw'] * TRAVEL_DEG / 360.0, 1)
@@ -208,7 +208,7 @@ def svg(L, rep, path, title):
     def text(y, z, s, size=13, anchor='start'):
         el.append('<text x="%.1f" y="%.1f" font-family="Helvetica,Arial" font-size="%d" text-anchor="%s" fill="#111">%s</text>' % (
             X(y), Y(z), size, anchor, s))
-    # rail (grey) with the corner notch
+    # rail (gray) with the corner notch
     rail = [(-HW - 2, H), (-HW, H), (-HW, 10), (-29.75, 10), (-29.75, -2), (-19.25, -2), (-19.25, 0), (HW, 0), (HW, H),
             (HW + 2, H), (HW + 2, -2), (-19.25 + 0.01, -2), (-19.25, -2)]
     poly([(-HW - 2, H), (-HW, H), (-HW, 10), (-HW - 2, 10)], '#9aa0a6')
@@ -231,8 +231,8 @@ def svg(L, rep, path, title):
     poly([(ROD[0] - 2, ROD[1] - 2), (ROD[0] + 2, ROD[1] - 2), (ROD[0] + 2, ROD[1] + 2), (ROD[0] - 2, ROD[1] + 2)], '#eceff1')
     # sensor gear
     s = rep['sensor']
-    circ(s['centre'], s['z'] * L['m'] / 2 + L['m'], '#81c784', op=0.9)
-    circ(s['centre'], 3.0, '#5d4037')
+    circ(s['center'], s['z'] * L['m'] / 2 + L['m'], '#81c784', op=0.9)
+    circ(s['center'], 3.0, '#5d4037')
     # worm, worm gear, wand
     band(-L['half'], L['half'], L['ra1'], '#ffd54f')
     band(L['half'] if L['spur_end'] > 0 else -L['half'], L['tg'] - 2.5 * L['spur_end'], 2.5, '#ffd54f')
@@ -242,7 +242,7 @@ def svg(L, rep, path, title):
     text(*P(0, L['ra1'] + 2.5), 'worm', 12, 'middle')
     text(*P(L['tg'], L['ra_g'] + 2.0), 'spur', 12, 'middle')
     text(ROD[0], ROD[1] + L['ra_w'] + 1.0, 'wheel %dT' % L['zw'], 12, 'middle')
-    text(s['centre'][0], s['centre'][1] - 1.2, 'sensor', 11, 'middle')
+    text(s['center'][0], s['center'][1] - 1.2, 'sensor', 11, 'middle')
     text(*P(t_low - 22, 6), 'wand', 12)
     # caption
     lines = [title,

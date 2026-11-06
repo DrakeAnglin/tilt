@@ -3,7 +3,7 @@
 Both copper layers are a grid of cells (PITCH mm). Every pad, hole, track and via is painted onto the grid with the
 net that owns it; a cell is usable for a new track of net n only if nothing of another net lies within half the track
 width plus the clearance. Each net is routed pad by pad with A*: from the next pad to ANY copper the net already has,
-so multi-pin nets grow as a tree. Layer changes cost a via. KiCad's own DRC checks the result afterwards.
+so multi-pin nets grow as a tree. Layer changes cost a via. KiCad's own DRC checks the result afterward.
 """
 import heapq
 import math
@@ -63,7 +63,7 @@ class Grid:
         return inside
 
     def offsets(self, r):
-        """Cell offsets within radius r (mm) of a cell centre."""
+        """Cell offsets within radius r (mm) of a cell center."""
         k = round(r, 3)
         if k not in self._offs:
             n = int(math.ceil(r / PITCH))
@@ -100,7 +100,7 @@ class Grid:
             self.paint_disc(layer, x0 + t * (x1 - x0), y0 + t * (y1 - y0), half_w, owner)
 
     def free_for(self, layer, ix, iy, net, r):
-        """Can copper of 'net' with radius r (half width + clearance) be centred on this cell?"""
+        """Can copper of 'net' with radius r (half width + clearance) be centered on this cell?"""
         own = self.own[layer]
         nx, ny = self.nx, self.ny
         for dx, dy in self.offsets(r):
@@ -167,7 +167,7 @@ def pad_cells(grid, pad):
 DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 
 
-GRID_MARGIN = 0.15           # painted copper can reach this far past a cell centre: keep that much extra room
+GRID_MARGIN = 0.15           # painted copper can reach this far past a cell center: keep that much extra room
 
 
 def astar(grid, net, starts, goals, half_w, layers_allowed=(0, 1)):
@@ -176,7 +176,7 @@ def astar(grid, net, starts, goals, half_w, layers_allowed=(0, 1)):
     rv = max(VIA_D / 2 + CLEAR + GRID_MARGIN, r)     # a via is also where a (possibly wide) track starts
     nx = grid.nx
     # a track may only start / end where its full width clears other nets (a wide track ending on a pad's rim could
-    # otherwise reach a neighbour); keep at least the pad centre
+    # otherwise reach a neighbor); keep at least the pad center
     ok_starts = [c for c in starts if all(grid.free_for(l, c[0], c[1], net, r) for l in layers_allowed)]
     starts = ok_starts or starts[:1]
     start_set = set(starts)

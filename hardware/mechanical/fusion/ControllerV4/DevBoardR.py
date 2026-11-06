@@ -68,7 +68,7 @@ def layout():
 
     # ESP power, row 1 (the 10 u stands along row 1, clear of the ESP's edge)
     parts += [disc('C 10u', 'a1', 'c1', ('5V', 'G'))]
-    # angle filters: 100 n straight below its ESP pin, the 1 k flat in the neighbouring lane
+    # angle filters: 100 n straight below its ESP pin, the 1 k flat in the neighboring lane
     parts += [disc('C ADC1 100n', 'c10', 'c12'), flat('R ADC1 1k', 'b11', 'b14'),
               disc('C ADC2 100n', 'e10', 'e12'), flat('R ADC2 1k', 'd11', 'd14'),
               disc('C ADC3 100n', 'g10', 'g12'), flat('R ADC3 1k', 'h11', 'h14')]
@@ -152,7 +152,7 @@ WIRES = [
     ('b19', 'c19', 'bridge: battery + -> charger BATT + hole'), ('c19', 'd19', 'bridge: battery + -> charger BATT + hole'),
 ]
 
-# Pairs the owner dry-fitted and found tight but fine (2026-11-01). The JST housings here are modelled from catalogue sizes,
+# Pairs the owner dry-fitted and found tight but fine (2026-11-01). The JST housings here are modeled from catalog sizes,
 # so the checker reports these separately instead of failing on them; anything else that touches still fails.
 TIGHT_OK = {frozenset(p) for p in (('D1 1N5819 USB', 'JST charger GND'), ('JST battery', 'JST charger GND'),
                                     ('JST charger GND', 'USB-C socket strip'))}

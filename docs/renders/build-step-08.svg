@@ -510,6 +510,6 @@
 <circle cx="520" cy="360" r="6" fill="#222222"/>
 <text x="520" y="349" font-size="9" fill="#222222" text-anchor="middle" font-weight="bold">pin 3</text>
 <text x="30" y="447" font-size="13" fill="#222">You need: 1 × RJ12 breakout board, 22 AWG stranded, 5–8 cm: 1 red (battery +), 1 black (GND), 30 AWG silicone, 5–8 cm: 1 each green (IN1), yellow (IN2), blue (EN), white (angle)</text>
-<text x="30" y="467" font-size="13" fill="#222">RJ12 pads 1-6 as printed (1 = square pad). Colours, the same on every port: 1 red, 2 green, 3 black, 4 white, 5 blue, 6 yellow.</text>
+<text x="30" y="467" font-size="13" fill="#222">RJ12 pads 1-6 as printed (1 = square pad). Colors, the same on every port: 1 red, 2 green, 3 black, 4 white, 5 blue, 6 yellow.</text>
 <text x="30" y="487" font-size="13" fill="#222">The RJ12 board is drawn on the right for room: in the box the jacks sit at the row-1 end, so run the leads that way.</text>
 </svg>

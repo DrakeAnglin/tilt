@@ -254,7 +254,7 @@ def build(tbm, bx, cyl, cone, uni, cut, obox):
     out = {}
     # ---------------- tray
     tray = cut(bx(0, L, -hw, hw, c['floor_z'], zl), bx(C['in_a'], C['in_b'], -iw, iw, fz, zl + 1))
-    # RJ12 ledges: rails under each board's edges (shared between neighbours), front step, 1 mm rear lip
+    # RJ12 ledges: rails under each board's edges (shared between neighbors), front step, 1 mm rear lip
     zb = c['rj_z']
     edges = sorted({round(y + s * c['rj_w'] / 2, 3) for y in c['rj_y'] for s in (-1, 1)})
     rails = [(-iw - 0.5, edges[0] + 0.8)]

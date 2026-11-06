@@ -329,5 +329,5 @@
 <rect x="397" y="141" width="4" height="18" fill="#d62728"/>
 <text x="423" y="138" font-size="9" text-anchor="middle" font-weight="bold">1k</text>
 <text x="30" y="447" font-size="13" fill="#222">You need: 4 × 1 MΩ resistor, 3 × 1 kΩ resistor</text>
-<text x="30" y="467" font-size="13" fill="#222">Colour bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.</text>
+<text x="30" y="467" font-size="13" fill="#222">Color bands (4-band): 1k = brown black red, 1M = brown black green. Not sure? Measure it.</text>
 </svg>
