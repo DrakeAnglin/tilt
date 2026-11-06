@@ -160,7 +160,7 @@ def vol(a, b):
         return 0.0
 
 
-MATES = [('Harness LOAD', 'Charger pad LOAD'), ('USB lead', 'USB-C pins'), ('USB lead', 'USB-C header'), ('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F1 folded', 'controller_PCB'), ('F2 folded', 'controller_PCB'), ('F3 folded', 'controller_PCB'), ('J3 USB lead plug', 'PinSocket_1x06'),
+MATES = [('NTC wire', 'NTC on the cell'), ('NTC on the cell', '18650'), ('Harness LOAD', 'Charger pad LOAD'), ('USB lead', 'USB-C pins'), ('USB lead', 'USB-C header'), ('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F1 folded', 'controller_PCB'), ('F2 folded', 'controller_PCB'), ('F3 folded', 'controller_PCB'), ('J3 USB lead plug', 'PinSocket_1x06'),
          ('ESP32-C6 spacer', 'PinSocket_1x10'), ('RJ12', 'controller_PCB'), ('RJ12', 'PCB:board'),
          ('Screws', 'controller_PCB'), ('Charger cap leg', 'Charger'), ('USB-C', 'USB-C'), ('ESP32-C6', 'ESP32-C6'),
          ('Charger', 'Charger'), ('J8', 'J8'), ('RJ12 1', 'RJ12 1'), ('RJ12 2', 'RJ12 2'), ('RJ12 3', 'RJ12 3'),

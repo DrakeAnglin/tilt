@@ -53,17 +53,21 @@ rail. So it lies on its side across its own module. The order matters, because o
 the LOAD pad:
 
 1. **LOAD wire first, from underneath.** Push the J5 harness's LOAD lead (pin 4) up through the **LOAD** pad from the
-   bottom of the module and solder it on top. Keep the top joint low; the capacitor will lie 1.5 mm over it. Lay the
-   wire flat along the underside. The module stands 3 mm off the floor, so the wire runs under it.
+   bottom of the module and solder it on top. Keep the top joint low; the capacitor will lie 2.1 mm over it. Lay the
+   wire flat along the underside. The module stands 2.4 mm off the floor, so the wire runs under it.
 2. **PWR (pin 6), BATT (pin 2) and GND (pin 1)** from the top. Use the **GND next to PWR** (or the one next to BATT),
    not the one beside LOAD, which goes under the capacitor.
-3. **Capacitor**: bend both legs 90° about 1.5 mm from its body, so it lies flat with its body over the
-   LOAD/BATT edge of the module. Put the **+ leg in the hole by the "+" mark** (the stripe on the can is −). Hold a 1.5 mm
-   spacer (a piece of PCB or two business cards) under it while you solder, so it sits clear of the parts and is held
+3. **NTC wires** (the cell's temperature sensor). The module's **THERM** pads carry a 10 k resistor marked "103" that
+   fakes a cool cell. Remove it and solder two **30 AWG** wires, about **60 mm**, one to each pad, with your 10 k NTC on
+   the other end (sleeve the joints). Lay them flat along the module toward the capacitor's **leg end**; they leave
+   from under the capacitor there. Do this before the capacitor: afterwards the pads are covered.
+4. **Capacitor**: bend both legs 90° about 1.5 mm from its body, so it lies flat with its body over the
+   LOAD/BATT edge of the module. Put the **+ leg in the hole by the "+" mark** (the stripe on the can is −). Hold a 2 mm
+   spacer (a piece of 1.6 mm PCB plus a business card) under it while you solder, so it sits clear of the parts and is held
    by its legs.
-4. Check before it goes in: + to − on the capacitor matches PWR to GND (beep the legs to the pads).
+5. Check before it goes in: + to − on the capacitor matches PWR to GND (beep the legs to the pads).
 
-In the box, the module sits on four 3 mm corner pads between guides. A saddle in the tray carries the capacitor's free
+In the box, the module sits on four 2.4 mm corner pads between guides. A saddle in the tray carries the capacitor's free
 end. Two pins on the lid clamp the module's edges where it has no pads, and a pad on the lid sits 0.2 mm over the capacitor.
 Nothing presses on the capacitor's legs.
 
@@ -87,20 +91,23 @@ Every wire is now in the model at its real size, along the route you'd actually 
 covers them against the tray, the lid (closed), every part, the screw posts and each other: **no interference**.
 
 ![wiring, top](renders/ctrl-v5-wiring-top.png)
+![NTC pair](renders/ctrl-v5-wiring-ntc.png)
 
 | Wire | Route | Length in the box | Room |
 |---|---|---|---|
-| **LOAD** (J5 pin 4 → charger LOAD, *under the capacitor*) | up out of J5 at 18.7 mm → across to the room side of the module → **down to the floor** between the two room-side corner seats → **under the module** (it stands 3 mm off the floor; the wire is 1.6) → bare end bent up into the LOAD pad from below. Nothing runs between the capacitor and the module | **79 mm** | >3 mm |
+| **LOAD** (J5 pin 4 → charger LOAD, *under the capacitor*) | up out of J5 at 18.7 mm → across to the room side of the module → **down to the floor** between the two room-side corner seats → **under the module** (it stands 2.4 mm off the floor; the wire is 1.6) → bare end bent up into the LOAD pad from below. Nothing runs between the capacitor and the module | **79 mm** | >3 mm |
 | PWR (J5-6 → PWR) | at 17.0 mm, past the H3 post's room side, down onto the pad | 33 mm | 2 mm to the lid |
 | BATT (J5-2 → BATT) | at 17.0 mm diagonally over the module (room side of the capacitor), down onto the pad | 56 mm | 2 mm |
 | GND (J5-1 → GND by PWR) | at 20.4 mm, over the other three where they cross | 43 mm | 0.8 mm to the lid |
 | **Cell lead** (cell → J4) | out of the cell's end-B face, down its PCB side, past the H3 post's back, then **along the channel between the cell's PCB-side shoulder and the PCB's back edge** (the two wires one above the other, under the groove), into J4 | **40 mm** | 0.8 mm |
 | USB lead (USB-C board → J3 pins 1–2) | from the board's VBUS/GND pins low (~5–8 mm) along the room side, behind the bay's screw post, along the room-side wall, up into the 2-pin plug | 50 / 57 mm | >3 mm |
+| **NTC pair** (THERM pads → NTC on the cell) | flat on the module under the capacitor (2.1 mm gap, 30 AWG is 0.9), out at the capacitor's leg end, down past the legs, up over the bay's back corner to the cell's top, taped on near end B | 36 / 37 mm (cut 60) | >0.5 mm |
 | Solar cable (flat 2-core) | in through the end-B slot, on the floor between the bay's screw post and the module, up beside the PCB's end, over J3, into J8 | 68 mm | — |
 
 **What the review changed:**
 - **The 18650 moved back against the back wall (+2.7 mm).** Beside the PCB, the space between the cell's shoulder and the groove's underside only fit one wire, and the H3 post blocked the cell's end. The move opens a real channel for the lead. The box width is unchanged: the PCB and the H2 post set it, not the cell.
 - **The lid's cell cradles** now start at Y 4.6 instead of 2.6, so they stay clear of that channel.
+- **NTC wires added** (missed in the first pass). To make room for them under the capacitor, the module's corner pads drop 3.0 → 2.4 mm and the capacitor's spacer grows 1.5 → 2.1 mm; the capacitor's top is still 0.4 mm under the lid.
 - **The bumpers are now 6 mm tall**, at the bottom of the back wall only, so wires can run along the rail above them.
 
 **Lead lengths to cut** (pre-crimped 6" / 152 mm JST leads, crimped both ends):
@@ -115,15 +122,18 @@ covers them against the tray, the lid (closed), every part, the screw posts and 
 That's 1.5 leads per box. The USB lead is two ~65 mm wires you make up.
 
 **Assembly order that works with these routes:**
-1. Charger subassembly on the bench: LOAD wire first, from below, then the others, then the capacitor.
+1. Charger subassembly on the bench: LOAD wire first, from below, then the others, then the NTC pair, then the capacitor.
 2. Tray: PCB in. Cell into its saddles with its lead on the end-B end, tucked down the PCB side and along the channel to J4.
 3. Charger subassembly in: lay the LOAD wire on the floor, under where the module goes, out to the room side. Seat the module. Plug J5.
 4. USB-C board into its slot. Its lead goes low along the room side, behind the screw post, then up into J3.
 5. Solar cable (if used): along the floor, up beside the PCB's end, into J8.
-6. Lid on. Check nothing is pinched at the cell's end or over the module.
+6. Tape the NTC onto the top of the cell, about 4 mm from its end-B end (Kapton or a dab of thermal glue).
+7. Lid on. Check nothing is pinched at the cell's end or over the module.
 
 **To confirm when the parts arrive:**
 - **The cell's lead:** it needs at least ~45 mm, and it should leave the cell's end face. If it comes out the side, tell me.
+- **Where the THERM pads are on the module:** placed from the listing photo. If they're at the other end, the wires come out the capacitor's free end instead; tell me and I'll reroute.
+- **The 30 AWG wire:** the model uses 0.9 mm OD. Anything under 1.2 mm fits.
 - **Which USB-C board pins are VBUS and GND:** the route assumes the two at the bottom. If they're at the top, the wires run the same path, just higher.
 
 ## Clean-up (rev H)

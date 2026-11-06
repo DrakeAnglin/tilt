@@ -70,8 +70,11 @@ C = dict(
     # charger module (DIYMORE MCP73871, 31.5 x 30.5) and its capacitor (16 x 26)
     # module photo x (31.5) runs across the box (+Y), photo y (30.5) along it (+X): its capacitor corner ends up at the
     # back wall, its PWR / BATT pads on the groove side
-    chg_w=31.5, chg_d=30.5, chg_t=1.6, chg_gap=3.0,
-    cap_d=16.0, cap_h=26.0, cap_holes=((19.0, 5.5), (26.0, 5.5)), cap_up=1.5, cap_end=1.5,
+    chg_w=31.5, chg_d=30.5, chg_t=1.6, chg_gap=2.4,   # 2.4 under the module: the LOAD wire (1.6) runs there
+    cap_d=16.0, cap_h=26.0, cap_holes=((19.0, 5.5), (26.0, 5.5)), cap_up=2.1, cap_end=1.5,   # 2.1 over the module: the NTC wires run under it
+    # NTC: the module's THERM resistor (the '103' beside the THERM label, ~x 23.3 y 15.8 in the listing photo) comes off;
+    # two 30 AWG wires from its pads run out under the capacitor to a 10 k NTC taped on the cell's top near its end B
+    therm_xy=(23.3, 15.8), ntc_on_cell=4.0,
     # USB-C breakout (Cermant, 22.1 x 13.05, socket 9.1 x 3.26 x 7.35 sticking out 1.45), on edge, socket face flush
     usb_w=22.1, usb_d=13.05, usb_t=1.6, usb_sw=9.1, usb_sh=3.26, usb_sl=7.35, usb_stick=1.45, usb_yc=-21.2,
     usb_z0=0.7, usb_pin_row=1.04,
@@ -406,6 +409,8 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         px, py = M(xm, ym)
         P.append(('Charger cap leg %.0f' % xm, uni(bx(px - 0.3, cap_x0 + 0.01, py - 0.3, py + 0.3, cap_z - 0.3, cap_z + 0.3),
                                                    bx(px - 0.3, px + 0.3, py - 0.3, py + 0.3, cz - 1.0, cap_z + 0.3))))
+    P.append(('NTC on the cell', cyl((C['bat_x0'] + c['bat_l'] - c['ntc_on_cell'] - 1.2, C['bat_y'], C['bat_zc'] + c['bat_d'] / 2 + 1.0),
+                                     (C['bat_x0'] + c['bat_l'] - c['ntc_on_cell'] + 1.2, C['bat_y'], C['bat_zc'] + c['bat_d'] / 2 + 1.0), 1.0)))
     # USB-C breakout on edge
     P.append(('USB-C board', bx(C['usb_back'], C['usb_front'], yf, yb, zu0, zu1)))
     hz0 = C['usb_zc'] - c['usb_sw'] / 2 + c['usb_sh'] / 2
@@ -477,6 +482,16 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     W = []
     for nm, pts in R.items():
         W.append((nm, wire(pts, 0.8)))
+    # NTC wires (30 AWG, 0.9 OD): from the THERM pads flat between the module's parts, out under the capacitor at its
+    # leg end, up between its legs, across to the NTC bead on the cell's top
+    tx, ty = M(*c['therm_xy'])
+    zw = cz + c['chg_t'] + 1.0 + 0.5                  # just over the parts block (real parts are lower)
+    nx, ny, nz = C['bat_x0'] + c['bat_l'] - c['ntc_on_cell'], by, bc + c['bat_d'] / 2 + 1.0
+    for k, dx in enumerate((-0.8, 0.8)):
+        pts = [(tx, ty + dx, zw), (cap_x0 - 1.0, ty + dx, zw), (cap_x0 - 1.0, ty + dx, 12.0), (124.0, by + dx, 21.0),
+               (nx + 2.5, ny + dx, nz), (nx + 1.0, ny + dx, nz)]
+        W.append(('NTC wire %d' % (k + 1), wire(pts, 0.45)))
+        R['NTC wire %d' % (k + 1)] = pts
 
     def pair(pts, gap):
         """Two polylines either side of pts (horizontally, square to the local direction)."""
