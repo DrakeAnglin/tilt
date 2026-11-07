@@ -205,17 +205,20 @@ F3's 1.3 mm from the 470 µF.
 
 ## Step 10: Meter checks, nothing plugged in
 
-Set the meter to beep (continuity). Black probe on **TP5 (GND)**:
+![where the probes go](renders/pcb-build-meter.png)
 
-| Red probe on | Expect | If it beeps |
-|---|---|---|
-| TP1 BAT+ | no beep (a short chirp is the 470 µF charging, fine) | short on battery +: look at C9, the fuses, D3 |
-| TP2 5V | no beep (the 10 µF may chirp) | short on the ESP's 5V: C1, D3, the sockets |
-| TP3 3V3 | no beep | short on the ESP's 3V3: the sockets |
-| TP4 PWR | no beep | short on the charger input: D1, D2, **D4 backwards** |
-| each jack's pin 1 (battery +, after the fuse) | no beep | solder bridge at the jack |
+Set the meter to beep (continuity). Black probe on **TP5 (GND)** (black ring "B" in the picture) for every check;
+the red probe goes on each numbered point in turn:
 
-Then **diode mode**, red on TP4 (PWR), black on TP5 (GND): about 0.7–0.9 V is wrong (D4 is in backwards: its band must
+| # | Red probe on | Expect | If it beeps |
+|---|---|---|---|
+| 2 | TP1 BAT+ | no beep (a short chirp is the 470 µF charging, fine) | short on battery +: look at C9, the fuses, D3 |
+| 3 | TP2 5V | no beep (the 10 µF may chirp) | short on the ESP's 5V: C1, D3, the sockets |
+| 4 | TP3 3V3 | no beep | short on the ESP's 3V3: the sockets |
+| 5 | TP4 PWR | no beep | short on the charger input: D1, D2, **D4 backwards** |
+| 6–8 | each fuse's jack-side leg (same as that jack's pin 1: battery + after the fuse) | no beep | solder bridge at that jack or fuse |
+
+Then **diode mode** ("D" in the picture), red on TP4 (PWR), black on TP5 (GND): about 0.7–0.9 V is wrong (D4 is in backwards: its band must
 be on the square pad); open ("OL") is right.
 
 Finally, look at the underside in good light for bridges between neighboring pads, especially the sockets and
@@ -312,9 +315,9 @@ The panel's flat 2-core cable comes in through the slot in end wall B and gets a
 | Pad | Expect |
 |---|---|
 | TP1 BAT+ | about the cell's voltage (3.0–4.2 V) |
-| TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |
-| TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |
-| TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger's LEDs light |
+| 3 | TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |
+| 4 | TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |
+| 5 | TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger's LEDs light |
 
 If TP1 reads 0, check the J5 harness (pins 2 and 4) and that the cell isn't flat.
 

@@ -252,6 +252,76 @@ def picture(k, title, done, now, col, fname):
     return fname
 
 
+def meter_picture():
+    """Step 10: where each meter probe goes. Every part in gray; the probe points ringed and numbered in check order."""
+    o = base()
+    o.append(text(MX, 26, 'Step 10: Meter checks, where the probes go', 18, '#111', 'bold', 'start', halo=False))
+    o.append(text(MX, 46, 'top side, nothing plugged in. Black probe stays on TP5 (GND). Red probe on each numbered point in turn.',
+                  12, '#555', anchor='start', halo=False))
+    for fp in board.GetFootprints():
+        for p in fp.Pads():
+            o.append(pad_svg(p, '#bfbfbf', '#888'))
+    for _, refs, _ in STEPS:
+        for r in refs:
+            draw_part(o, r, 'done', None)
+    for r in ('TP1', 'TP2', 'TP3', 'TP4', 'TP5', 'H1', 'H2', 'H3'):
+        for p in FPS[r].Pads():
+            o.append(pad_svg(p, '#d9b44a'))
+
+    def pad(ref, num='1'):
+        return pt([p for p in FPS[ref].Pads() if p.GetNumber() == num][0].GetPosition())
+
+    def ring(x, y, c, r=13):
+        o.append('<circle cx="%.1f" cy="%.1f" r="%d" fill="none" stroke="%s" stroke-width="3"/>' % (x, y, r, c))
+
+    def badge(x, y, s, c):
+        o.append('<circle cx="%.1f" cy="%.1f" r="11" fill="%s" stroke="#fff" stroke-width="1.5"/>' % (x, y, c))
+        o.append(text(x, y + 4.5, s, 12, '#fff', 'bold', halo=False))
+
+    red, blk = '#d62728', '#111'
+    # the test-point row near end B: labels run out to the right on their own line
+    lx = MX + 112 * S
+    for ref, n, name in (('TP5', 'B', 'TP5  GND: black probe'), ('TP4', '5', 'TP4  PWR'),
+                         ('TP3', '4', 'TP3  3V3'), ('TP2', '3', 'TP2  5V')):
+        x, y = pad(ref)
+        c = blk if ref == 'TP5' else red
+        ring(x, y, c)
+        o.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1.6"/>' % (x + 13, y, lx - 14, y, c))
+        badge(lx, y, n, c)
+        o.append(text(lx + 18, y + 5, name, 13, c, 'bold', 'start'))
+    # TP1 (battery +) by the jacks
+    x, y = pad('TP1')
+    ring(x, y, red)
+    badge(x + 26, y - 22, '2', red)
+    o.append(text(x + 42, y - 17, 'TP1  BAT+', 13, red, 'bold', 'start'))
+    # each fuse's jack-side leg = that jack's pin 1 (battery + after the fuse)
+    for ref, n in (('F3', '6'), ('F2', '7'), ('F1', '8')):
+        x, y = pad(ref, '2')
+        ring(x, y, red, 11)
+        badge(x + 24, y + 2, n, red)
+        o.append(text(x + 12, y + 32, '%s leg = port %s pin 1' % (ref, ref[1]), 12, red, 'bold', 'start'))
+    # legend in the empty corner over the narrow part of the board
+    gx, gy = MX + 52 * S, MY + 18
+    rows = [('B', blk, 'Black probe on TP5 (GND) for every check'),
+            ('2–8', red, 'Beep mode: red probe on each. Expect NO beep (a short chirp at 2 and 3 is the caps charging)'),
+            ('D', '#7a3fb0', 'Diode mode: red on TP4, black on TP5. "OL" is right; 0.7–0.9 V means D4 is backwards'),
+            ('', '#555', 'Then flip the board: look for solder bridges, leads trimmed to 1.8 mm or less')]
+    for i, (n, c, s_) in enumerate(rows):
+        yy = gy + i * 26
+        if n:
+            o.append('<rect x="%.1f" y="%.1f" width="34" height="20" rx="10" fill="%s"/>' % (gx, yy - 14, c))
+            o.append(text(gx + 17, yy + 1, n, 12, '#fff', 'bold', halo=False))
+        o.append(text(gx + 44, yy + 1, s_, 12, '#222', anchor='start', halo=False))
+    x4, y4 = pad('TP4')
+    x5, y5 = pad('TP5')
+    o.append('<path d="M%.1f %.1f C %.1f %.1f, %.1f %.1f, %.1f %.1f" fill="none" stroke="#7a3fb0" stroke-width="2" stroke-dasharray="4 3"/>'
+             % (x4 - 13, y4, x4 - 45, y4, x5 - 45, y5, x5 - 13, y5))
+    badge(x4 - 52, (y4 + y5) / 2, 'D', '#7a3fb0')
+    o.append('</svg>')
+    open(os.path.join(OUT, 'pcb-build-meter.svg'), 'w').write('\n'.join(o))
+    return 'pcb-build-meter.svg'
+
+
 def charger_picture():
     """The Comimark MCP73871 module (front, as in the owner's photo; positions scaled from it, about +/-0.5 mm) and where
     each of its wires goes on the PCB: the 4-wire J5 harness, the NTC pair, the capacitor."""
@@ -419,6 +489,7 @@ def md():
     o.append('</svg>')
     open(os.path.join(OUT, 'pcb-build-done.svg'), 'w').write('\n'.join(o))
     pics.append('pcb-build-done.svg')
+    pics.append(meter_picture())
     pics.append(charger_picture())
     pics.append(usb_picture())
 
@@ -624,17 +695,20 @@ def md():
     # ---- step 10
     a('## Step 10: Meter checks, nothing plugged in')
     a('')
-    a('Set the meter to beep (continuity). Black probe on **TP5 (GND)**:')
+    a('![where the probes go](renders/pcb-build-meter.png)')
     a('')
-    a('| Red probe on | Expect | If it beeps |')
-    a('|---|---|---|')
-    a('| TP1 BAT+ | no beep (a short chirp is the 470 µF charging, fine) | short on battery +: look at C9, the fuses, D3 |')
-    a('| TP2 5V | no beep (the 10 µF may chirp) | short on the ESP\'s 5V: C1, D3, the sockets |')
-    a('| TP3 3V3 | no beep | short on the ESP\'s 3V3: the sockets |')
-    a('| TP4 PWR | no beep | short on the charger input: D1, D2, **D4 backwards** |')
-    a('| each jack\'s pin 1 (battery +, after the fuse) | no beep | solder bridge at the jack |')
+    a('Set the meter to beep (continuity). Black probe on **TP5 (GND)** (black ring "B" in the picture) for every check;')
+    a('the red probe goes on each numbered point in turn:')
     a('')
-    a('Then **diode mode**, red on TP4 (PWR), black on TP5 (GND): about 0.7–0.9 V is wrong (D4 is in backwards: its band must')
+    a('| # | Red probe on | Expect | If it beeps |')
+    a('|---|---|---|---|')
+    a('| 2 | TP1 BAT+ | no beep (a short chirp is the 470 µF charging, fine) | short on battery +: look at C9, the fuses, D3 |')
+    a('| 3 | TP2 5V | no beep (the 10 µF may chirp) | short on the ESP\'s 5V: C1, D3, the sockets |')
+    a('| 4 | TP3 3V3 | no beep | short on the ESP\'s 3V3: the sockets |')
+    a('| 5 | TP4 PWR | no beep | short on the charger input: D1, D2, **D4 backwards** |')
+    a('| 6–8 | each fuse\'s jack-side leg (same as that jack\'s pin 1: battery + after the fuse) | no beep | solder bridge at that jack or fuse |')
+    a('')
+    a('Then **diode mode** ("D" in the picture), red on TP4 (PWR), black on TP5 (GND): about 0.7–0.9 V is wrong (D4 is in backwards: its band must')
     a('be on the square pad); open ("OL") is right.')
     a('')
     a('Finally, look at the underside in good light for bridges between neighboring pads, especially the sockets and')
@@ -733,9 +807,9 @@ def md():
     a('| Pad | Expect |')
     a('|---|---|')
     a('| TP1 BAT+ | about the cell\'s voltage (3.0–4.2 V) |')
-    a('| TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |')
-    a('| TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |')
-    a('| TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger\'s LEDs light |')
+    a('| 3 | TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |')
+    a('| 4 | TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |')
+    a('| 5 | TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger\'s LEDs light |')
     a('')
     a('If TP1 reads 0, check the J5 harness (pins 2 and 4) and that the cell isn\'t flat.')
     a('')
