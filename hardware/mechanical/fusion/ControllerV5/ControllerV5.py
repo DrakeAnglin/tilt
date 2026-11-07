@@ -33,7 +33,7 @@ import math
 import os
 
 C = dict(
-    room_out=-27.7, back_in=22.8, top=25.8, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=1.6, corner_r=4.0, edge_r=1.5,
+    room_out=-27.7, back_in=22.8, top=25.8, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=2.0, corner_r=4.0, edge_r=1.5,
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0, rod_z=24.0, rod=4.0,
     # height: with the three fuses folded, the tallest part outside the groove is the charger's capacitor lying on its
     # module (top 23.3), so the lid's underside is at 23.8 and its top at 25.8 (was 33.3 with the fuses upright)
@@ -57,9 +57,12 @@ C = dict(
     # RJ12 Amphenol 87180-066LF (drawing 87180 sheet 1-3): 13.2 W x 11.5 H, front face 0.55 behind the board edge
     rj_w=13.2, rj_h=11.5, rj_front=0.55, rj_back=17.32, rj_x=(7.825, 23.325, 38.825), rj_mouth_w=9.65,
     rj_mouth=(1.73, 8.50),          # the jack's plug opening, above the board (87180 drawing); latch tab-down
-    # end wall A aperture (print 2): the plug's outline, measured on the user's phone cord: body 9.55 x 6.55, latch 6.0 wide
-    # standing 1.5 under it; + 0.35 a side (FDM holes print small). Centered on the jack's mouth; no view into the box
-    plug_w=9.55, plug_h=6.55, plug_latch_w=6.0, plug_latch_h=1.5, ap_clear=0.35, ap_r=0.6,
+    # end wall A (rev M): the PCB's jack edge is trimmed 3-4 mm (by hand, so anywhere in that range) and the jacks come
+    # forward through the wall: their front faces sit jack_recess behind the outer face, each in an opening that is the
+    # jack's own outline + jack_clear (the jack fills it: no recess, no view into the box). The board is located by its
+    # three screws, not its trimmed edge, so the cut's accuracy doesn't matter; the edge ends up 0.75-1.75 off the wall.
+    # (print 2's plug-shaped openings, from the measured plug 9.55 x 6.55 with a 6.0 x 1.5 latch, are gone)
+    pcb_trim=(3.0, 4.0), jack_recess=0.3, jack_clear=0.25, jack_clear_bot=0.1, ap_r=0.6,
     rj_tail=2.1, rj_peg=1.9,
     # ESP32-C6 SuperMini (26 x 18) on 8.5 mm sockets + 2.5 mm header spacers, USB toward end B
     esp_l=26.0, esp_w=18.0, esp_t=1.0, esp_xc=12.12, esp_y0=47.57, sock_h=8.59, spacer=2.5, esp_tip=1.9,
@@ -99,6 +102,9 @@ C['chg_x0'] = C['pcb_end'] + 2.0                       # charger bay: room for i
 C['bat_x0'] = c['pcb_x'] + c['pcb_bar'] + 0.3 + c['stop_t'] + c['bat_gap']   # end-A plate starts clear of the H2 post
 C['in_b'] = C['chg_x0'] + c['cap_holes'][0][1] + c['cap_end'] + c['cap_h'] + 0.4    # end wall B inner face: past the capacitor
 C['L'] = C['in_b'] + c['end_t']
+C['a0'] = c['pcb_x'] + c['rj_front'] - c['jack_recess']     # end wall A's outer face (the box starts here, not at X 0)
+C['ia'] = C['a0'] + c['end_a']                             # end wall A's inner face
+C['box_l'] = C['L'] - C['a0']
 C['bat_y'] = C['iw_hi'] - 0.3 - c['bat_d'] / 2        # against the back wall: leaves a channel for the cell's lead along its PCB-side shoulder
 C['bat_zc'] = C['fz'] + 0.5 + c['bat_d'] / 2
 C['esp_z0'] = C['zt'] + c['sock_h'] + c['spacer']    # ESP underside
@@ -148,17 +154,18 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
 
     # ================================================================ tray
     F0 = c['floor_z'] + 0.3                              # floor-standing features start inside the floor
-    tray = cut(rbox(0, L, olo, ohi, c['floor_z'], zl, c['corner_r']),
-               rbox(c['end_a'], in_b, ilo, ihi, fz, zl + 1, c['corner_r'] - c['wall']))
+    a0, ia = C['a0'], C['ia']
+    tray = cut(rbox(a0, L, olo, ohi, c['floor_z'], zl, c['corner_r']),
+               rbox(ia, in_b, ilo, ihi, fz, zl + 1, c['corner_r'] - c['wall']))
     # rail bumpers on the back wall: rounded vertical fins out to 1.0 short of the rail's wall
     ry = c['rail_w'] / 2 - c['bumper_gap'] - c['bumper_w'] / 2
     for bxx in c['bumper_x']:
         tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], c['bumper_h']),
                    cyl((bxx, ry, c['floor_z']), (bxx, ry, c['bumper_h']), c['bumper_w'] / 2))
     # reliefs in end A's inner corner fillets for the PCB's corners (the board sits 0.2 off end wall A)
-    tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + 0.3))
-    tray = cut(tray, bx(c['end_a'] - 0.01, c['end_a'] + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + 0.3))   # and the back one
-    for xa, xb in ((-1, c['end_a'] + 0.01), (in_b - 0.01, L + 1)):        # the lid's groove channel crosses both ends
+    tray = cut(tray, bx(ia - 0.01, ia + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + 0.3))
+    tray = cut(tray, bx(ia - 0.01, ia + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + 0.3))   # and the back one
+    for xa, xb in ((a0 - 1, ia + 0.01), (in_b - 0.01, L + 1)):        # the lid's groove channel crosses both ends
         tray = cut(tray, groove(c['groove_t'] + 0.05, xa, xb))   # print 2: 0.05 round the channel (was 0.15, a visible gap)
     # --- floor recessed 0.4 under the PCB's outline (+0.2): room for its leads without raising the ESP
     fr = fz - c['floor_recess']
@@ -166,9 +173,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # (+0.2, not +0.5: the 8 mm bosses reach 0.5 (H2: 0.7) past the board, so at +0.5 they only touched the recess wall along a
     # line, which made the STL non-manifold. At +0.2 they all overlap it and merge)
     if c['floor_recess'] > 0:   # (print 1: none now - the raised PCB's header tails clear the full floor)
-        tray = cut(tray, bx(c['end_a'] - 0.01, bar_x1 + 0.2, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.2, ihi + 0.01), fr, fz + 0.01),
+        tray = cut(tray, bx(ia - 0.01, bar_x1 + 0.2, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.2, ihi + 0.01), fr, fz + 0.01),
                    bx(bar_x1 - 0.01, C['pcb_end'] + 0.2, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.2, fr, fz + 0.01))
-    # --- PCB nest: it drops in and is located before the lid goes on: end wall A (0.2), the room-side wall (0.7) and
+    # --- PCB nest: it drops in and is located before the lid goes on: lengthwise by its three screws and the jacks in
+    # their openings (rev M: its trimmed edge stays 0.75-1.75 off end wall A), across by the room-side wall (0.7) and
     # free-standing ribs along the bar's and the body's back edges (0.2); all below the board's top face
     # the ribs' tops are level with the cell cradles' PCB-side horns (they run through them)
     _rc = c['bat_d'] / 2 + 0.2
@@ -181,28 +189,25 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         tray = uni(tray, cyl((hx, hy, F0), (hx, hy, zb), c['boss_d'] / 2))
     # --- jacks: plug-shaped apertures in end wall A, pockets under their tails and pegs, port marks (1, 2, 3 dots)
     def aperture(y, grow, xa, xb):
-        """The plug's outline + ap_clear (print 2: measured plug). Body centered on the jack's mouth, latch notch under it
-        (the jack is latch-down). The first print's 5 mm notch was narrower than the 6 mm latch."""
-        k = c['ap_clear'] + grow
-        zm = zt + sum(c['rj_mouth']) / 2                          # the mouth's center
-        w, r = c['plug_w'] / 2 + k, c['ap_r'] + grow
-        z0, z1 = zm - c['plug_h'] / 2 - k, zm + c['plug_h'] / 2 + k
+        """rev M: the jack's own front outline (13.2 x 11.5 on the PCB) + jack_clear a side and on top, jack_clear_bot
+        under it; corners r ap_r (small enough to clear the jack's square corners). The jack comes through it."""
+        w, r = c['rj_w'] / 2 + c['jack_clear'] + grow, c['ap_r'] + grow
+        z0, z1 = zt - c['jack_clear_bot'] - grow, zt + c['rj_h'] + c['jack_clear'] + grow
         a = uni(bx(xa, xb, y - w + r, y + w - r, z0, z1), bx(xa, xb, y - w, y + w, z0 + r, z1 - r))
         for yy in (y - w + r, y + w - r):
             for zz in (z0 + r, z1 - r):
                 a = uni(a, cyl((xa, yy, zz), (xb, yy, zz), r))
-        lw = c['plug_latch_w'] / 2 + k
-        return uni(a, bx(xa, xb, y - lw, y + lw, max(zm - c['plug_h'] / 2 - c['plug_latch_h'] - k, zt), z0 + r))
+        return a
 
     for n, xk in enumerate(c['rj_x']):
         _, y = K(xk, 0)
-        tray = cut(tray, aperture(y, 0.0, -1, c['end_a'] + 0.01))   # plain opening, no bezel (0.4 nozzle)
+        tray = cut(tray, aperture(y, 0.0, a0 - 1, ia + 0.01))   # the jack comes through it; no bezel (0.4 nozzle)
         x0, _ = K(0, 7.0)
         x1, _ = K(0, c['rj_back'] + 1.0)
         # (print 1: no pocket in the floor under the jack any more: the PCB is 0.7 higher, so its tails clear the full floor)
         for k in range(n + 1):
             dy = (k - n / 2.0) * 2.4
-            tray = cut(tray, cyl((-1, y + dy, 2.6), (0.5, y + dy, 2.6), 0.6))
+            tray = cut(tray, cyl((a0 - 1, y + dy, 2.6), (a0 + 0.5, y + dy, 2.6), 0.6))
     # --- 18650: two saddles and two end stops (the end-B stop is low: the lead leaves that end)
     by, bc = C['bat_y'], C['bat_zc']
     rc = c['bat_d'] / 2 + 0.2                                   # cradle bore
@@ -292,15 +297,15 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     out['Tray'] = [('Tray', tray)]
 
     # ================================================================ lid
-    lid = rbox(0, L, olo, ohi, zl, c['top'], c['corner_r'])
-    reg = cut(rbox(c['end_a'] + 0.2, in_b - 0.2, ilo + 0.2, ihi - 0.2, zl - 1.4, zl + 0.01, c['corner_r'] - c['wall'] - 0.2),
-              rbox(c['end_a'] + 1.6, in_b - 1.6, ilo + 1.6, ihi - 1.6, zl - 2, zl + 1, max(c['corner_r'] - c['wall'] - 1.6, 0.3)))
+    lid = rbox(C['a0'], L, olo, ohi, zl, c['top'], c['corner_r'])
+    reg = cut(rbox(C['ia'] + 0.2, in_b - 0.2, ilo + 0.2, ihi - 0.2, zl - 1.4, zl + 0.01, c['corner_r'] - c['wall'] - 0.2),
+              rbox(C['ia'] + 1.6, in_b - 1.6, ilo + 1.6, ihi - 1.6, zl - 2, zl + 1, max(c['corner_r'] - c['wall'] - 1.6, 0.3)))
     # no lip along end wall B: the capacitor's end and the USB-C board's top edge come up to within 1 mm of the lid there;
     # the lid locates on the other three sides and its three posts
     reg = cut(reg, bx(in_b - 2.0, in_b + 1, ilo - 1, ihi + 1, zl - 2, zl))
     lid = uni(lid, reg)
     # the channel under the groove (the groove itself is cut last, so it also trims every feature that reaches it)
-    lid = uni(lid, cut(groove(c['groove_t'], 0, L), bx(-1, L + 1, -20, 20, c['top'], c['top'] + 30)))
+    lid = uni(lid, cut(groove(c['groove_t'], C['a0'], L), bx(C['a0'] - 1, L + 1, -20, 20, c['top'], c['top'] + 30)))
     # posts with inserts: three on the PCB's holes (they clamp it)
     def root(px, py, r, top, want=2.0):
         """A 45 deg root fillet (cone) where a post meets the lid, as big as the room to the wall / groove allows."""

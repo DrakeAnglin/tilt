@@ -10,7 +10,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C 
 
 | | |
 |---|---|
-| Size | **164.6 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
+| Size | **162.6 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head** (one screw size for the whole box) |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
@@ -79,7 +79,7 @@ Nothing presses on the capacitor's legs.
 
 ## Assembly
 1. Press the 3 inserts into the lid's 3 posts (lid upside down, soldering iron).
-2. Drop the PCB into its nest: it sits on its 3 floor bosses, located 0.2 mm all round by stops on end wall A and ribs along its edges, so it can't go in crooked.
+2. **Trim the PCB's jack edge by 3–4 mm first** (rev M; see below). Drop the PCB into its nest, jacks first through their openings in end wall A. It sits on its 3 floor bosses, located across by the room-side wall and the ribs along its back edge, and lengthwise by its 3 screws, not by its trimmed edge.
 3. Cell into its two saddles along the back wall, lead at end B. Plug it into J4.
 4. Charger subassembly into its bay: capacitor end toward end wall B (its free end drops into the saddle), module onto its corner pads between the guides. Plug the harness into J5.
 5. USB-C board: component side toward the room-side wall, socket into the window with the back end tipped up, then push the back end down until it snaps in over the floor channel's rounded back end. The lid's channel locks it.
@@ -226,6 +226,26 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
 ## RJ12 ports (rev D)
 ![ports](renders/ctrl-v5-port.png)
 
+**Rev M (2026-11-07): the PCB's jack edge is trimmed, and the jacks come through the wall.** Each opening in end wall A
+is now the **jack's own outline**: the jacks pass through, and their fronts sit **0.3 mm behind the outer face**. No
+plug-shaped hole, no recess: the plug goes straight into the jack, and its latch is right at the surface.
+- **Trim:** cut **3–4 mm** off the PCB's jack edge (score and snap, or a fine saw; cut damp or wear a mask: fiberglass
+  dust). Within 6 mm of that edge there's no copper except the ground fill, so the cut can't break anything. A 3 mm cut
+  leaves 3.8 mm of board in front of the jacks' peg holes, a 4 mm cut 2.8 mm.
+- **Any cut in that range fits.** The board is located lengthwise by its 3 screws, not its edge, so the jacks always end
+  up in the same place. The trimmed edge sits **0.75 mm (3 mm cut) to 1.75 mm (4 mm cut)** off the inside of the wall.
+  The check models the 3 mm cut, the worst case.
+- **Openings:** 13.7 × 11.85 mm (the jack's 13.2 × 11.5 + 0.25 a side and on top, 0.1 underneath), corners r 0.6, which
+  is small enough to clear the jack's square corners. The jack fills its opening, so there's no view into the box.
+- **End wall A is 2.0 mm** (was 1.6). Walls left: 1.8 mm between openings, 3.7 / 4.1 mm at the sides, and 1.75 mm under
+  the groove's notch over the middle jack. Each opening's top is a flat 13.7 mm bridge (prints without support).
+- **The box is 2.0 mm shorter** (162.6 mm): the wall moved in to meet the jacks.
+- **Fit coupon:** `controller_v5_end_a_coupon.stl` is end wall A plus 10 mm. Push a trimmed board with its jacks soldered
+  through it: each jack should slide into its opening with a little play, front face just inside the wall.
+- Sizes: `pcb_trim`, `jack_recess`, `jack_clear`, `jack_clear_bot`, `end_a`.
+
+**Before rev M** (for the record):
+
 - **Openings (rev L, print 2):** the plug's outline, from your phone cord's plug: body **9.55 × 6.55**, latch **6.0 wide,
   1.5 under the body**. Each gets **0.35 mm a side** (FDM prints holes small): body opening 10.25 × 7.25 mm (corners
   r 0.6) at 1.49–8.74 mm above the PCB, centered on the jack's mouth (1.73–8.50). The latch notch is 6.7 mm wide, down to
@@ -233,12 +253,8 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
   inside of the box.
 - **What went wrong on print 1:** the latch notch was 5.0 mm wide. Your plug's latch is 6.0. (A middle version opened
   the whole jack face, 13.8 × 13.3. Too open: you could see the PCB.)
-- **Depth:** the jack's face sits **2.35 mm** behind the outer face. End wall A is 1.6 mm, and the PCB sits 0.2 mm off it,
+- **Depth (before rev M):** the jack's face sat **2.35 mm** behind the outer face. End wall A was 1.6 mm, and the PCB sat 0.2 mm off it,
   with a small relief in the corner fillet for the board's corner. No bezel (0.4 nozzle).
-- **Fit coupon:** `controller_v5_end_a_coupon.stl` is the 12 mm end of the tray. Print it and push your phone cord's plug
-  through all three openings. It should slide through with a little play, latch and all. When the jacks arrive, check that
-  it clicks into a soldered jack and releases with the latch pressed. Sizes: `plug_w`, `plug_h`, `plug_latch_w`,
-  `plug_latch_h`, `ap_clear`.
 - **Openings before (rev D–K):** the plug's outline + 0.25 a side, 10.15 × 7.35 mm, with a 5 mm notch for the latch.
 
 ## Mount review (rev E)

@@ -165,6 +165,13 @@ def base():
         for g in fp.GraphicalItems():
             if isinstance(g, pcbnew.PCB_SHAPE) and g.GetLayer() == pcbnew.F_SilkS:
                 o.append(shape_svg(g, '#cfdccf', 1.0))
+    # the trim band at the jack edge (step 0): 3-4 mm comes off for the V5 box
+    (tx0, ty0), (tx1, ty1) = V(BW, 0), V(0, 4.0)
+    o.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#d62728" opacity="0.25"/>' % (tx0, ty0, tx1 - tx0, ty1 - ty0))
+    for yy in (3.0, 4.0):
+        (lx0, ly0), (lx1, ly1) = V(BW, yy), V(0, yy)
+        o.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#d62728" stroke-width="1.2" stroke-dasharray="5 3"/>' % (lx0, ly0, lx1, ly1))
+    o.append(text(tx0 + 18, ty0 - 6, 'trim 3–4 mm', 11, '#d62728', 'bold', halo=False))
     o.append(text(MX - 10, MY + BW * S / 2, 'END A: ports', 13, '#333', 'bold', rot=-90, halo=False))
     o.append(text(MX + BL * S + 24, MY + (BW - 13.5) * S, 'END B: USB-C', 13, '#333', 'bold', rot=-90, halo=False))
     return o
@@ -477,6 +484,19 @@ def md():
     a('')
 
     # ---- step 1
+    a('## Step 0: Trim the jack edge (for the V5 box)')
+    a('')
+    a('Cut **3 to 4 mm** off the board\'s jack edge (end A, the 47 mm wide end), straight across. The V5 box (rev M) has the')
+    a('jacks come through its end wall, which needs that edge out of the way. Any cut between 3 and 4 mm fits: the box locates')
+    a('the board by its three screws, not by this edge.')
+    a('')
+    a('- Draw the line 3.5 mm in from the edge on both sides, then score it deeply along a straightedge on both faces and snap')
+    a('  it over the edge of a bench, or cut with a fine-tooth saw. Sand the edge flat.')
+    a('- Fiberglass dust is an irritant: cut it damp, or wear a mask, and wipe up afterward.')
+    a('- Only the ground copper fill reaches that edge, no traces, so the cut can\'t break a connection. The jacks\' peg holes')
+    a('  stay 2.8–3.8 mm in from the new edge.')
+    a('- Do it **before** soldering anything, so the board lies flat and nothing gets knocked.')
+    a('')
     a('## Step 1: Resistors under the ESP and in the power section (7)')
     a('')
     a('![step 1](renders/pcb-build-01.png)')
@@ -574,9 +594,10 @@ def md():
     a('')
     a('![step 7](renders/pcb-build-07.png)')
     a('')
-    a('Amphenol 87180-066LF, opening out over end A. Their two pegs only fit one way. **Press each one fully down and')
-    a('square to the board edge** before soldering the six pins: the box\'s openings in end wall A are cut to the plug\'s')
-    a('outline with 0.35 mm to spare, so a tilted jack shows. Solder the two outer pins, check from the front, then the rest.')
+    a('Amphenol 87180-066LF, opening out over end A (past the trimmed edge). Their two pegs only fit one way. **Press each one')
+    a('fully down and square** before soldering the six pins: in the box each jack slides through an opening cut to its own')
+    a('outline with 0.25 mm to spare, so a tilted jack won\'t go in. Solder the two outer pins, check from the front, then the')
+    a('rest.')
     a('')
     # ---- step 8
     a('## Step 8: 470 µF capacitor (1)')

@@ -66,6 +66,19 @@ A reversed diode just won't conduct. A reversed electrolytic, battery or charger
 
 ![board](renders/pcb-build-done.png)
 
+## Step 0: Trim the jack edge (for the V5 box)
+
+Cut **3 to 4 mm** off the board's jack edge (end A, the 47 mm wide end), straight across. The V5 box (rev M) has the
+jacks come through its end wall, which needs that edge out of the way. Any cut between 3 and 4 mm fits: the box locates
+the board by its three screws, not by this edge.
+
+- Draw the line 3.5 mm in from the edge on both sides, then score it deeply along a straightedge on both faces and snap
+  it over the edge of a bench, or cut with a fine-tooth saw. Sand the edge flat.
+- Fiberglass dust is an irritant: cut it damp, or wear a mask, and wipe up afterward.
+- Only the ground copper fill reaches that edge, no traces, so the cut can't break a connection. The jacks' peg holes
+  stay 2.8–3.8 mm in from the new edge.
+- Do it **before** soldering anything, so the board lies flat and nothing gets knocked.
+
 ## Step 1: Resistors under the ESP and in the power section (7)
 
 ![step 1](renders/pcb-build-01.png)
@@ -165,9 +178,10 @@ then the rest.
 
 ![step 7](renders/pcb-build-07.png)
 
-Amphenol 87180-066LF, opening out over end A. Their two pegs only fit one way. **Press each one fully down and
-square to the board edge** before soldering the six pins: the box's openings in end wall A are cut to the plug's
-outline with 0.35 mm to spare, so a tilted jack shows. Solder the two outer pins, check from the front, then the rest.
+Amphenol 87180-066LF, opening out over end A (past the trimmed edge). Their two pegs only fit one way. **Press each one
+fully down and square** before soldering the six pins: in the box each jack slides through an opening cut to its own
+outline with 0.25 mm to spare, so a tilted jack won't go in. Solder the two outer pins, check from the front, then the
+rest.
 
 ## Step 8: 470 µF capacitor (1)
 

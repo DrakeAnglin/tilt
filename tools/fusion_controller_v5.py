@@ -139,6 +139,10 @@ for o in proxies(pcb_occ):
         b = o.bRepBodies.item(j)
         if b.isVisible:
             step_bodies.append(('PCB:' + o.name, tbm.copy(b)))
+# rev M: the board's jack edge is trimmed by hand, 3-4 mm. Check the worst case for end wall A: the shortest trim
+for n, b in step_bodies:
+    if 'controller_PCB' in n or n == 'PCB:board':
+        tbm.booleanOperation(b, bx(C['pcb_x'] - 5, C['pcb_x'] + C['pcb_trim'][0], -40, 40, -5, 40), B.DifferenceBooleanType)
 board_bb = [b for n, b in step_bodies if 'controller_PCB' in n or n == 'PCB:board']
 bb0 = board_bb[0].boundingBox if board_bb else None
 
@@ -254,11 +258,12 @@ occs['PCB'] = pcb_occ
 
 def on_outline(x, y):
     L_, ylo, yhi, r = C['L'] / 10, C['room_out'] / 10, C['out_hi'] / 10, C['corner_r'] / 10
-    if (abs(y - ylo) < 0.003 or abs(y - yhi) < 0.003) and r - 0.003 <= x <= L_ - r + 0.003:
+    a0_ = C['a0'] / 10
+    if (abs(y - ylo) < 0.003 or abs(y - yhi) < 0.003) and a0_ + r - 0.003 <= x <= L_ - r + 0.003:
         return True
-    if (abs(x) < 0.003 or abs(x - L_) < 0.003) and ylo + r - 0.003 <= y <= yhi - r + 0.003:
+    if (abs(x - a0_) < 0.003 or abs(x - L_) < 0.003) and ylo + r - 0.003 <= y <= yhi - r + 0.003:
         return True
-    for cx in (r, L_ - r):
+    for cx in (a0_ + r, L_ - r):
         for cy in (yhi - r, ylo + r):
             if abs(math.hypot(x - cx, y - cy) - r) < 0.003 and ((x < cx) == (cx < L_ / 2)) and ((y > cy) == (cy > (ylo + yhi) / 2)):
                 return True
@@ -356,7 +361,7 @@ for g, nm in (('Tray', 'controller_v5_tray'), ('Lid', 'controller_v5_lid')):
     files.append(path)
 # fit coupon: just end wall A (first 12 mm of the tray), to check the plug fit against a real jack before the full print
 cb = tbm.copy(comps['Tray'].bRepBodies.item(0))
-tbm.booleanOperation(cb, bx(-1, 12, -30, 30, -1, 40), B.IntersectionBooleanType)
+tbm.booleanOperation(cb, bx(C['a0'] - 1, C['ia'] + 10, -30, 30, -1, 40), B.IntersectionBooleanType)
 main_doc = app.activeDocument
 cdoc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)      # its own throwaway document
 cdes = adsk.fusion.Design.cast(app.activeProduct)
@@ -480,7 +485,7 @@ for i in range(root.occurrences.count):
         o.component.bRepBodies.item(j).isLightBulbOn = True
 vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('ctrl-v5-bay-top.png', (146, 0, 260), (146, 0, 0)))
 vis(hide=('Rail', 'Wires'))
-result = {'box': 'L %.1f x W %.1f x H %.1f' % (L, C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
+result = {'box': 'L %.1f x W %.1f x H %.1f' % (C['box_l'], C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,
           'step bodies': len(step_bodies), 'interference': hits or 'none', 'room above (mm, first contact with lid)': gaps,
           'wire lengths (mm)': C.get('wire_lengths'), 'fillets': fil, 'engraving': eng, 'exported': files, 'renders': [r for r in res if r]}
