@@ -235,14 +235,16 @@ plug-shaped hole, no recess: the plug goes straight into the jack, and its latch
 - **Any cut in that range fits.** The board is located lengthwise by its 3 screws, not its edge, so the jacks always end
   up in the same place. The trimmed edge sits **0.75 mm (3 mm cut) to 1.75 mm (4 mm cut)** off the inside of the wall.
   The check models the 3 mm cut, the worst case.
-- **Openings:** 13.7 × 11.85 mm (the jack's 13.2 × 11.5 + 0.25 a side and on top, 0.1 underneath), corners r 0.6, which
-  is small enough to clear the jack's square corners. The jack fills its opening, so there's no view into the box.
-- **End wall A is 2.0 mm** (was 1.6). Walls left: 1.8 mm between openings, 3.7 / 4.1 mm at the sides, and 1.75 mm under
-  the groove's notch over the middle jack. Each opening's top is a flat 13.7 mm bridge (prints without support).
+- **Openings:** 13.85 × 11.95 mm, sized for your **measured jack, 13.25 × 11.5**: 0.3 mm a side (FDM prints holes
+  0.1–0.2 mm small), 0.35 on top (the top is a bridge and sags a little), 0.1 underneath (the jack sits on the board).
+  Corners r 0.6, small enough to clear the jack's square corners. The jack fills its opening, so there's no view into the box.
+- **End wall A is 2.0 mm** (was 1.6). Walls left (measured on the STL): 1.65 mm between openings, 3.6 / 4.05 mm at the
+  sides, and 1.85 mm under the groove's notch over the middle jack. Each opening's top is a flat 13.85 mm bridge (prints
+  without support).
 - **The box is 2.0 mm shorter** (162.6 mm): the wall moved in to meet the jacks.
 - **Fit coupon:** `controller_v5_end_a_coupon.stl` is end wall A plus 10 mm. Push a trimmed board with its jacks soldered
   through it: each jack should slide into its opening with a little play, front face just inside the wall.
-- Sizes: `pcb_trim`, `jack_recess`, `jack_clear`, `jack_clear_bot`, `end_a`.
+- Sizes: `rj_w`, `rj_h` (measured), `pcb_trim`, `jack_recess`, `jack_clear`, `jack_clear_top`, `jack_clear_bot`, `end_a`.
 
 **Before rev M** (for the record):
 

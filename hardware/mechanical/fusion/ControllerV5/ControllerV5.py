@@ -55,14 +55,17 @@ C = dict(
     holes=((3.5, 41.0), (43.5, 43.3), (23.8, 121.5)),            # H1, H2, H3 (KiCad x, y)
     boss_d=8.0, post_d=8.0, ins_d=4.0, ins_depth=6.7, screw_l=10.0,            # M3 x 5.7 heat-set inserts, Ø4.0 hole
     # RJ12 Amphenol 87180-066LF (drawing 87180 sheet 1-3): 13.2 W x 11.5 H, front face 0.55 behind the board edge
-    rj_w=13.2, rj_h=11.5, rj_front=0.55, rj_back=17.32, rj_x=(7.825, 23.325, 38.825), rj_mouth_w=9.65,
+    rj_w=13.25, rj_h=11.5,   # measured on the real jack (2026-11-07): 13.25 W x 11.5 H (drawing: 13.2)
+    rj_front=0.55, rj_back=17.32, rj_x=(7.825, 23.325, 38.825), rj_mouth_w=9.65,
     rj_mouth=(1.73, 8.50),          # the jack's plug opening, above the board (87180 drawing); latch tab-down
     # end wall A (rev M): the PCB's jack edge is trimmed 3-4 mm (by hand, so anywhere in that range) and the jacks come
     # forward through the wall: their front faces sit jack_recess behind the outer face, each in an opening that is the
     # jack's own outline + jack_clear (the jack fills it: no recess, no view into the box). The board is located by its
     # three screws, not its trimmed edge, so the cut's accuracy doesn't matter; the edge ends up 0.75-1.75 off the wall.
     # (print 2's plug-shaped openings, from the measured plug 9.55 x 6.55 with a 6.0 x 1.5 latch, are gone)
-    pcb_trim=(3.0, 4.0), jack_recess=0.3, jack_clear=0.25, jack_clear_bot=0.1, ap_r=0.6,
+    # clearances: 0.3 a side (FDM prints holes ~0.1-0.2 small), 0.35 on top (the opening's top is a bridge: it sags a
+    # little), 0.1 under (the jack sits on the board, which the screws locate)
+    pcb_trim=(3.0, 4.0), jack_recess=0.3, jack_clear=0.3, jack_clear_top=0.35, jack_clear_bot=0.1, ap_r=0.6,
     rj_tail=2.1, rj_peg=1.9,
     # ESP32-C6 SuperMini (26 x 18) on 8.5 mm sockets + 2.5 mm header spacers, USB toward end B
     esp_l=26.0, esp_w=18.0, esp_t=1.0, esp_xc=12.12, esp_y0=47.57, sock_h=8.59, spacer=2.5, esp_tip=1.9,
@@ -192,7 +195,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         """rev M: the jack's own front outline (13.2 x 11.5 on the PCB) + jack_clear a side and on top, jack_clear_bot
         under it; corners r ap_r (small enough to clear the jack's square corners). The jack comes through it."""
         w, r = c['rj_w'] / 2 + c['jack_clear'] + grow, c['ap_r'] + grow
-        z0, z1 = zt - c['jack_clear_bot'] - grow, zt + c['rj_h'] + c['jack_clear'] + grow
+        z0, z1 = zt - c['jack_clear_bot'] - grow, zt + c['rj_h'] + c['jack_clear_top'] + grow
         a = uni(bx(xa, xb, y - w + r, y + w - r, z0, z1), bx(xa, xb, y - w, y + w, z0 + r, z1 - r))
         for yy in (y - w + r, y + w - r):
             for zz in (z0 + r, z1 - r):

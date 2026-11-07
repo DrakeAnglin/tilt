@@ -180,7 +180,7 @@ then the rest.
 
 Amphenol 87180-066LF, opening out over end A (past the trimmed edge). Their two pegs only fit one way. **Press each one
 fully down and square** before soldering the six pins: in the box each jack slides through an opening cut to its own
-outline with 0.25 mm to spare, so a tilted jack won't go in. Solder the two outer pins, check from the front, then the
+outline with 0.3 mm to spare, so a tilted jack won't go in. Solder the two outer pins, check from the front, then the
 rest.
 
 ## Step 8: 470 µF capacitor (1)

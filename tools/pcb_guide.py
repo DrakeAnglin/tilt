@@ -596,7 +596,7 @@ def md():
     a('')
     a('Amphenol 87180-066LF, opening out over end A (past the trimmed edge). Their two pegs only fit one way. **Press each one')
     a('fully down and square** before soldering the six pins: in the box each jack slides through an opening cut to its own')
-    a('outline with 0.25 mm to spare, so a tilted jack won\'t go in. Solder the two outer pins, check from the front, then the')
+    a('outline with 0.3 mm to spare, so a tilted jack won\'t go in. Solder the two outer pins, check from the front, then the')
     a('rest.')
     a('')
     # ---- step 8
