@@ -137,13 +137,32 @@ kept below as the starting point.
 - Solar: 3.5 × 1.35 mm barrel jack.
 - Port split: doesn't matter. 1 + USB-C + solar at end A; 2 + lifter at end B.
 
+## Must test on the v2 board before ordering v3
+Found on the first v2 board (2026-11-07). **v3 is not ordered until each of these is tested on the real board.**
+
+1. **The ESP browns out on USB power.** With USB in and the ESP in, the charger module's LOAD falls to the battery
+   voltage (TP4 4.8 V, TP1 3.5 V; 4.4 V with the ESP out). With a low cell, the ESP gets about 3.0 V on 3V3 and keeps
+   resetting. The module's SEL and PROG2 (pads on the back) both read high (1.65 A setting), so the input-current
+   limit isn't the cause. Most likely: the module's solar input-voltage control (VPCC) backs off when USB arrives at only
+   about 4.7 V after D1 and the harness.
+   - **Fix to test:** a 1N5819 from TP4 (PWR) to TP2 (5V), band toward TP2, so the ESP runs straight from USB/solar and
+     only falls back to the battery through D3. Check TP3 stays at 3.3 V with Wi-Fi running, on USB and on battery.
+   - **Check with solar:** the ESP's 5V pin would then see up to the zener clamp (about 6.2 V) minus 0.3 V. Confirm
+     that's within the ESP regulator's limit, or pick a lower clamp.
+   - **For v3:** build this diode path into the board, or pick a charger module whose LOAD output doesn't drop on a
+     5 V input.
+2. **The ESP on a low battery.** D3 drops about 0.3 V, so below about 3.8 V on the cell the ESP's 3V3 sags below
+   3.3 V. Measure the lowest cell voltage where Wi-Fi still runs without resets. v3 may need a lower-drop path, such as
+   an ideal-diode module.
+3. **The J5 PWR crimp lost contact once** (pushed back in, fixed). Check every crimp is clicked in, and tug-test it.
+
 ## Next
 1. Pick the charger module: ideally one with power path that takes the panel's ~7 V directly (no zener); otherwise the
    MCP73871 module you have, with the zener. Pick an INA3221 module. Measure both.
 2. Your OK on the 18650 recommendation and the lifter port.
 3. Schematic, then a KiCad board generated like v2 (netlist → placement → routing → DRC / ERC / parity), then the PCB's 3D
    export into the Fusion fit check, then the V6 case around it.
-4. Bare PCB order.
+4. Bare PCB order, **only after every item in "Must test on the v2 board" passes.**
 
 ## Rev 2 parts that are out (needed factory assembly)
 | Part | Why it was there | Replaced by |
