@@ -156,8 +156,10 @@ Three different headers, so no plug fits the wrong one:
 | J8 | JST-ZH 2-pin (B2B-ZR), the small one | solar (optional) | **−  +** |
 
 **Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the
-battery in backwards. Match each header to its silkscreen outline. Then, before soldering, push the actual plug in and
-hold it over the board: the cell's **red wire must sit over +**. Solder one pin, check it sits flat, then the rest.
+battery in backwards. On the two XH headers (J4, J5) **the wall with the two slots faces end A** (toward the ESP); the
+silkscreen outline shows those slots. That's the side the plug's lock ramp clicks into. Then, before soldering, push the
+actual plug in and hold it over the board: the cell's **red wire must sit over +**. Solder one pin, check it sits flat,
+then the rest.
 
 ## Step 7: RJ12 jacks (3)
 
@@ -244,7 +246,10 @@ The order matters, because the capacitor lies over the LOAD pad and the THERM pa
 5. **Check:** the capacitor's + leg beeps to the PWR pad, its − leg to GND.
 6. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a
    pre-made 6-wire lead, pull the pin 3 and 5 wires out (lift the tab over each crimp with a pin) or cut them flush.
-7. Hold the housing over J5: **G over the silkscreen G, P+ over P+**.
+7. **Which end is pin 1:** from the wire side with the housing's **lock ramp up**, pin 1 is on the **left** (JST's XH
+   drawing). To be sure, do it before crimping: push the **empty** housing into the soldered J5 (it only fits one way, lock
+   ramp toward the header's slotted wall, which faces end A), look down, and mark the cavity over the silkscreen **G** with
+   a dot. That's pin 1.
 
 The dev board wired all six pads (three − wires onto one GND rail). That's the same circuit: the PCB's J5 has room for one
 GND, and the heavy motor current returns to the battery through the PCB, not through this wire.

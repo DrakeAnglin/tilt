@@ -253,7 +253,7 @@ def charger_picture():
 
     def P(x, y):
         return ox + k * x, oy + k * y
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="900" font-family="Helvetica,Arial">',
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1010" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
          text(20, 32, 'Charger module (MCP73871, 30.5 × 31.5 mm): wiring it for the PCB', 20, '#111', 'bold', 'start', halo=False),
          text(20, 56, 'Front side. Drawn from the listing photo, so positions are approximate. 4 wires to J5, 2 NTC wires, the capacitor.',
@@ -308,22 +308,36 @@ def charger_picture():
     call(ex - 10, ey, 300, 330, ['Small edge pads: leave empty', '(CE, TE, PROG2, SEL)'], '#666', 'end')
     # the J5 housing
     by = oy + bh * k + 150
-    o.append(text(40, by - 24, 'J5 plug: one 6-pin JST-XH housing, 4 wires (pins 3 and 5 empty). Seen from the wire side, latch up.',
-                  15, '#111', 'bold', 'start', halo=False))
+    # JST XH drawing (eXH.pdf p.2, PCB layout "viewed from the connector mounting surface"): with the LOCK SIDE toward
+    # you, circuit 1 is on the right; so from the wire side with the lock side UP, pin 1 is on the LEFT. On this board
+    # the header's lock wall (the one with the two slots, KiCad's -y side) faces end A.
+    o.append(text(40, by - 34, 'J5 plug: one 6-pin JST-XH housing (XHP-6), 4 wires, pins 3 and 5 empty', 15, '#111', 'bold', 'start', halo=False))
+    o.append(text(40, by - 14, 'Seen from the WIRE side, with the LOCK side up: pin 1 is on the LEFT (JST\'s XH drawing).', 13, '#d62728', 'bold', 'start', halo=False))
     cav = [('1', 'G', 'GND', '#222', '76 mm'), ('2', 'B+', 'BATT', '#d62728', '76 mm'), ('3', '·', 'empty', '#999', ''),
            ('4', 'L+', 'LOAD', '#d62728', '100 mm'), ('5', '·', 'empty', '#999', ''), ('6', 'P+', 'PWR', '#d62728', '52 mm')]
-    hx0 = 60
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="86" rx="6" fill="#f4f1e8" stroke="#777" stroke-width="2"/>' % (hx0, by, 110 * 6 + 16))
+    hx0, hy0 = 60, by + 30
+    hw = 110 * 6 + 16
+    # the lock: a raised ramp along one long face, between the end walls
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="14" fill="#e3dccb" stroke="#555" stroke-width="2"/>' % (hx0 + 40, hy0 - 14, hw - 80))
+    o.append(text(hx0 + hw / 2, hy0 - 20, 'LOCK side: the raised ramp along this face (it clicks into the header\'s slotted wall)', 12, '#555', 'bold', halo=False))
+    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="86" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx0, hy0, hw))
     for q, (pin, silk, pad, c, cut) in enumerate(cav):
         x_ = hx0 + 8 + 110 * q
-        o.append('<rect x="%.0f" y="%.0f" width="100" height="70" rx="4" fill="#fff" stroke="#bbb"/>' % (x_, by + 8))
-        o.append(text(x_ + 50, by + 28, 'pin %s (%s)' % (pin, silk), 12, '#444', halo=False))
-        o.append(text(x_ + 50, by + 50, pad, 15, c, 'bold', halo=False))
-        o.append(text(x_ + 50, by + 68, cut, 12, '#444', halo=False))
-    o.append(text(40, by + 116, 'Lengths are the pre-crimped 152 mm JST leads cut to length (crimp end on J5, bare end on the module): '
-                  'one lead and a half per box.', 12, '#444', anchor='start', halo=False))
-    o.append(text(40, by + 134, 'Hold the housing over J5 before plugging in: G over the silkscreen G, P+ over P+. '
-                  'The module\'s GND pads are all one connection.', 12, '#444', anchor='start', halo=False))
+        o.append('<rect x="%.0f" y="%.0f" width="100" height="70" rx="4" fill="#fff" stroke="#bbb"/>' % (x_, hy0 + 8))
+        o.append(text(x_ + 50, hy0 + 28, 'pin %s (%s)' % (pin, silk), 12, '#444', halo=False))
+        o.append(text(x_ + 50, hy0 + 50, pad, 15, c, 'bold', halo=False))
+        o.append(text(x_ + 50, hy0 + 68, cut, 12, '#444', halo=False))
+    # pin 1 arrow
+    o.append('<polygon points="%.0f,%.0f %.0f,%.0f %.0f,%.0f" fill="#d62728"/>' % (hx0 + 58, hy0 + 100, hx0 + 48, hy0 + 116, hx0 + 68, hy0 + 116))
+    o.append(text(hx0 + 58, hy0 + 134, 'PIN 1', 13, '#d62728', 'bold', halo=False))
+    o.append(text(hx0 + 8 + 110 * 5 + 50, hy0 + 108, 'flat side (no ramp) down', 12, '#555', halo=False))
+    ty0 = hy0 + 160
+    for i, t in enumerate([
+            'How to tell pin 1 for sure: before crimping anything in, push the EMPTY housing into the soldered J5. It only goes in one way:',
+            'its lock ramp faces the header wall with the two slots, which on this board is the wall toward end A (the ESP side).',
+            'Now look straight down: the cavity over the silkscreen G is pin 1. Put a marker dot on the housing beside it, pull it out, crimp.',
+            'Lengths: the pre-crimped 152 mm JST leads cut to length (crimp end in the housing, bare end on the module), 1.5 leads per box.']):
+        o.append(text(40, ty0 + 20 * i, t, 12, '#222' if i < 3 else '#444', 'bold' if i == 2 else 'normal', 'start', halo=False))
     o.append('</svg>')
     open(os.path.join(OUT, 'pcb-build-charger.svg'), 'w').write('\n'.join(o))
     return 'pcb-build-charger.svg'
@@ -550,8 +564,10 @@ def md():
     a('| J8 | JST-ZH 2-pin (B2B-ZR), the small one | solar (optional) | **−  +** |')
     a('')
     a('**Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the')
-    a('battery in backwards. Match each header to its silkscreen outline. Then, before soldering, push the actual plug in and')
-    a('hold it over the board: the cell\'s **red wire must sit over +**. Solder one pin, check it sits flat, then the rest.')
+    a('battery in backwards. On the two XH headers (J4, J5) **the wall with the two slots faces end A** (toward the ESP); the')
+    a('silkscreen outline shows those slots. That\'s the side the plug\'s lock ramp clicks into. Then, before soldering, push the')
+    a('actual plug in and hold it over the board: the cell\'s **red wire must sit over +**. Solder one pin, check it sits flat,')
+    a('then the rest.')
     a('')
     # ---- step 7
     a('## Step 7: RJ12 jacks (3)')
@@ -643,7 +659,10 @@ def md():
     a('5. **Check:** the capacitor\'s + leg beeps to the PWR pad, its − leg to GND.')
     a('6. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a')
     a('   pre-made 6-wire lead, pull the pin 3 and 5 wires out (lift the tab over each crimp with a pin) or cut them flush.')
-    a('7. Hold the housing over J5: **G over the silkscreen G, P+ over P+**.')
+    a('7. **Which end is pin 1:** from the wire side with the housing\'s **lock ramp up**, pin 1 is on the **left** (JST\'s XH')
+    a('   drawing). To be sure, do it before crimping: push the **empty** housing into the soldered J5 (it only fits one way, lock')
+    a('   ramp toward the header\'s slotted wall, which faces end A), look down, and mark the cavity over the silkscreen **G** with')
+    a('   a dot. That\'s pin 1.')
     a('')
     a('The dev board wired all six pads (three − wires onto one GND rail). That\'s the same circuit: the PCB\'s J5 has room for one')
     a('GND, and the heavy motor current returns to the battery through the PCB, not through this wire.')
