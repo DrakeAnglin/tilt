@@ -1,4 +1,11 @@
-# Controller PCB (v2, carrier board)
+# Controller PCB (v2.2, carrier board)
+
+**v2.2 (2026-11-07): the jack edge is 3.5 mm shorter.** For the V5 box's rev M end wall, the RJ12 jacks come through
+the wall, so the board's jack edge moves 3.5 mm in and the jacks overhang it by 2.95 mm. Everything else is v2.1:
+same parts, same copper, same holes. Only the outline moved, the ground fill pulled back with it, and the 11 ground
+stitching vias that sat 2 mm from the old edge are gone. Back silkscreen reads "v2.2". The v2.1 boards already
+made get the same edge cut by hand, 3–4 mm (see [the build guide, step 0](../../docs/pcb-build.md)). v2.1 as ordered
+is tagged `pcb-v2.1-ordered` in git.
 
 Replaces the hand-wired perfboard. Same core circuit as the dev board, on a 2-layer PCB: the **ESP32-C6 SuperMini** and
 the **USB-C breakout** plug into female header sockets; the **18650**, the **MCP73871 charger module** and the optional
@@ -9,10 +16,10 @@ protection resistors behind each. Everything is through-hole and hand-soldered; 
 
 | | |
 |---|---|
-| Size | 47 × 125 mm, T-shaped: a 47 mm strip at the port end carries the jacks and their fuses / resistors, the 27 mm body runs alongside the 18650 |
+| Size | 47 × 121.5 mm (v2.2; v2.1 was 125), T-shaped: a 47 mm strip at the port end carries the jacks and their fuses / resistors, the 27 mm body runs alongside the 18650 |
 | Layers | 2, GND poured on both and stitched with ~80 vias; 1 mm motor-return GND track from the jacks to the battery / charger GND |
 | Tracks | 0.3 mm signals, 0.6–0.8 mm power; 0.2 mm clearance; vias 0.7 / 0.35 mm |
-| Checks | KiCad 10: **DRC 0 violations, 0 unconnected; ERC 0 violations; schematic ↔ board parity 0 differences** (re-run 2026-11-02, v2.1) |
+| Checks | KiCad 10: **DRC 0 violations, 0 unconnected; ERC 0 violations; schematic ↔ board parity 0 differences** (re-run 2026-11-07, v2.2) |
 | Files | [schematic (PDF)](controller/controller-schematic.pdf), [controller.kicad_pro](controller/controller.kicad_pro) (open in KiCad), [parts list (CSV)](controller/controller-bom.csv), [controller-pcbway.zip](controller/controller-pcbway.zip) (Gerbers + drill: upload this) |
 
 Generated, not drawn: [netlist.py](netlist.py) holds the parts and connections; [schematic.py](schematic.py) writes the

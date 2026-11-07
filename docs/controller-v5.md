@@ -229,7 +229,7 @@ top. The lid has no locating lip along end wall B, where the capacitor and USB-C
 **Rev M (2026-11-07): the PCB's jack edge is trimmed, and the jacks come through the wall.** Each opening in end wall A
 is now the **jack's own outline**: the jacks pass through, and their fronts sit **0.3 mm behind the outer face**. No
 plug-shaped hole, no recess: the plug goes straight into the jack, and its latch is right at the surface.
-- **Trim:** cut **3–4 mm** off the PCB's jack edge (score and snap, or a fine saw; cut damp or wear a mask: fiberglass
+- **Trim (v2.1 boards; v2.2 boards come with the edge 3.5 mm in, already done):** cut **3–4 mm** off the PCB's jack edge (score and snap, or a fine saw; cut damp or wear a mask: fiberglass
   dust). Within 6 mm of that edge there's no copper except the ground fill, so the cut can't break anything. A 3 mm cut
   leaves 3.8 mm of board in front of the jacks' peg holes, a 4 mm cut 2.8 mm.
 - **Any cut in that range fits.** The board is located lengthwise by its 3 screws, not its edge, so the jacks always end

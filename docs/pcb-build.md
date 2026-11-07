@@ -68,6 +68,8 @@ A reversed diode just won't conduct. A reversed electrolytic, battery or charger
 
 ## Step 0: Trim the jack edge (for the V5 box)
 
+**v2.1 boards only** (back silkscreen "controller v2"). v2.2 boards come with this edge already in place: skip this step.
+
 Cut **3 to 4 mm** off the board's jack edge (end A, the 47 mm wide end), straight across. The V5 box (rev M) has the
 jacks come through its end wall, which needs that edge out of the way. Any cut between 3 and 4 mm fits: the box locates
 the board by its three screws, not by this edge.

@@ -21,6 +21,8 @@ OUT = os.path.join(HERE, 'controller')
 PCB = os.path.join(OUT, 'controller.kicad_pcb')
 
 W_BAR, D_BAR = 47.0, 47.0          # jack strip across end A (jacks, then each port's fuse and resistors behind it)
+TRIM = 3.5                         # v2.2: the jack edge sits 3.5 mm in (v2.1 boards get cut 3-4 mm by hand); the jacks
+                                   # overhang it by 2.95 mm and come through the V5 box's end wall (rev M)
 W_BODY, L = 27.0, 125.0            # body width (beside the cell) and total board length
 MM = pcbnew.FromMM
 
@@ -33,7 +35,7 @@ def P(x, y):
 JACK_X = (11.0, 26.5, 42.0)
 FILTER_Y = (50.6, 56.8, 63.0)        # the 1 k of each angle filter (its 100 n sits 3.1 mm below)
 PLACE = {
-    # RJ12 jacks, opening out of end A (footprint front is +y, so turned 180 deg); fronts flush with the edge
+    # RJ12 jacks, opening out of end A (footprint front is +y, so turned 180 deg); fronts 2.95 mm past the edge (TRIM)
     'J9': (JACK_X[0], 17.32, 180), 'J10': (JACK_X[1], 17.32, 180), 'J11': (JACK_X[2], 17.32, 180),
     # ESP32-C6 sockets, turned so the ESP's USB faces end B (over low parts: a cable fits with the ESP plugged in):
     # 5V row on the left, TX row on the right, pin 1 of each at the bottom
@@ -68,7 +70,7 @@ for _k, _ox in enumerate(JACK_X):
 
 
 def outline(board):
-    pts = [(0, 0), (W_BAR, 0), (W_BAR, D_BAR), (W_BODY, D_BAR), (W_BODY, L), (0, L)]
+    pts = [(0, TRIM), (W_BAR, TRIM), (W_BAR, D_BAR), (W_BODY, D_BAR), (W_BODY, L), (0, L)]
     for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]):
         s = pcbnew.PCB_SHAPE(board)
         s.SetShape(pcbnew.SHAPE_T_SEGMENT)
@@ -179,7 +181,7 @@ def silk(board):
         t.SetPosition(P(x, y))
         t.SetTextAngleDegrees(ang)
         board.Add(t)
-    for text, x, y, size in (('Automated blinds controller v2', 13.5, 76.0, 0.9), ('ESP32-C6 + MCP73871 carrier', 13.5, 77.4, 0.8)):
+    for text, x, y, size in (('Automated blinds controller v2.2', 13.5, 76.0, 0.9), ('ESP32-C6 + MCP73871 carrier', 13.5, 77.4, 0.8)):
         t = pcbnew.PCB_TEXT(board)
         t.SetText(text)
         t.SetLayer(pcbnew.B_SilkS)
@@ -233,7 +235,7 @@ def gnd_zones(board, pts):
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     b = build()
-    pts = [(0, 0), (W_BAR, 0), (W_BAR, D_BAR), (W_BODY, D_BAR), (W_BODY, L), (0, L)]
+    pts = [(0, TRIM), (W_BAR, TRIM), (W_BAR, D_BAR), (W_BODY, D_BAR), (W_BODY, L), (0, L)]
     # wide power nets first, then the signals; GND last (the zones also join it)
     # the short hops from each jack to its resistors first (the jack pins are tightly packed), then power, then the rest
     jack_side = ['P%d_%s' % (k, sig) for k in (1, 2, 3) for sig in ('IN1', 'IN2', 'EN', 'ANG')]
