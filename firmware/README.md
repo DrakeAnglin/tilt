@@ -19,5 +19,11 @@ ESP32-C6 (SuperMini), Arduino-ESP32 3.x or ESP-IDF with esp-matter. **Not starte
 port; Power Source cluster for battery level), `power` (Thread sleepy end device, battery voltage on GPIO 3,
 input-power voltage on GPIO 6 (1 M / 1 M; charging = input present and the cell below 4.2 V)), `ota`.
 
+## PCB test
+[pcb_test](pcb_test/pcb_test.ino): the bench test with the carrier PCB's pin map (hardware/pcb/netlist.py) and a port
+selector (one port runs at a time). Web page http://blinds-pcb.local; serial / telnet keys as bench_test plus `p` (next
+port) and `v` (battery, input and all three angles). Needs its own `secrets.h` (copy of bench_test's).
+`cd firmware && bin/arduino-cli compile --upload --fqbn esp32:esp32:esp32c6:CDCOnBoot=cdc -p <USB port or blinds-pcb.local> pcb_test`
+
 ## First milestone
 [bench_test](bench_test/bench_test.ino) (wiring in [docs/bench-test.md](../docs/bench-test.md)): drive one tilter from the battery, read the angle, find out why the motor stalls under load, measure sleep current.
