@@ -154,7 +154,14 @@ Found on the first v2 board (2026-11-07). **v3 is not ordered until each of thes
 2. **The ESP on a low battery.** D3 drops about 0.3 V, so below about 3.8 V on the cell the ESP's 3V3 sags below
    3.3 V. Measure the lowest cell voltage where Wi-Fi still runs without resets. v3 may need a lower-drop path, such as
    an ideal-diode module.
-3. **The J5 PWR crimp lost contact once** (pushed back in, fixed). Check every crimp is clicked in, and tug-test it.
+3. **Charging from USB is only a trickle.** With the cell at 3.45 V, a USB power meter read 0.05 A (it should be
+   about 0.35 A: PROG resistor 282 = 2.8 kΩ). SEL/PROG2 high, THERM 10 kΩ, both fine. A wire across D1 (5.02 V at
+   TP4) didn't help: overnight the cell rose only from 3.45 V to 3.57 V. Either the module wants more than 5 V on its
+   input (set up for solar), or it's faulty. Test: a known-good module, and the panel at the window in daylight.
+4. **Solar behind a window (the real use: keep the cell topped up).** Measure TP4 and the charge current in daylight
+   at the window. The charger needs the panel at about 5 V or more; a dark-room test read 1 V. The panel's plug was
+   wired backwards once: D2 blocked it, nothing damaged.
+5. **The J5 PWR crimp lost contact once** (pushed back in, fixed). Check every crimp is clicked in, and tug-test it.
 
 ## Next
 1. Pick the charger module: ideally one with power path that takes the panel's ~7 V directly (no zener); otherwise the
