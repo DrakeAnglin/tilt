@@ -34,7 +34,9 @@ import math
 import os
 
 C = dict(
-    room_out=-27.7, back_in=22.8, top=25.8, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=2.0, corner_r=4.0, edge_r=1.5,
+    # rev O: 0.4 play round the PCB (was 0.7 / 0.8; at 0.5 the H1 / H2 bosses only touched the walls along a line: non-
+    # manifold, so 0.4 makes them merge); lid 2.8 lower (the old capacitor set 25.8; now the cell, top 20.7)
+    room_out=-27.4, back_in=22.4, top=23.0, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=2.0, corner_r=4.0, edge_r=1.5,
     rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0, rod_z=24.0, rod=4.0,
     # height: with the three fuses folded, the tallest part outside the groove is the charger's capacitor lying on its
     # module (top 23.3), so the lid's underside is at 23.8 and its top at 25.8 (was 33.3 with the fuses upright)
@@ -46,7 +48,8 @@ C = dict(
     # strip (the widest thing in the box) and 0.3 past the H2 screw post, so the box no longer fills the rail: two rounded
     # bumpers on the back wall stop 1.0 short of the rail's wall - an easy fit that still keeps the rod off the groove's
     # sides (1.9 clear each side)
-    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=1.0, bumper_h=6.0,   # low: wires can run along the rail above them
+    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=0.4, bumper_h=6.0,   # rev O: 0.4 short of the rail's wall (was 1.0);
+    # the room side is 0.35 off it. Low: wires can run along the rail above them
     # rod groove: a circle, r 5, its center 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
     # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 2.0 thick, like the lid
     groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=2.0,   # print 2: as thick as the lid (was 1.0)
@@ -118,7 +121,7 @@ C['bat_zc'] = C['fz'] + 0.5 + c['bat_d'] / 2
 C['esp_z0'] = C['zt'] + c['sock_h'] + c['spacer']    # ESP underside
 C['c6_z0'] = C['fz'] + c['c6_post']                    # the charger board's underside
 C['c6_zt'] = C['c6_z0'] + c['c6_t']                     # its top
-C['solar_y'] = -21.2                                   # rev N: the solar lead runs along the room-side wall (was -13.4)
+C['solar_y'] = -20.9                                   # rev N: the solar lead runs along the room-side wall (was -13.4)
 L = C['L']
 
 
@@ -173,8 +176,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], c['bumper_h']),
                    cyl((bxx, ry, c['floor_z']), (bxx, ry, c['bumper_h']), c['bumper_w'] / 2))
     # reliefs in end A's inner corner fillets for the PCB's corners (the board sits 0.2 off end wall A)
-    tray = cut(tray, bx(ia - 0.01, ia + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + 0.3))
-    tray = cut(tray, bx(ia - 0.01, ia + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + 0.3))   # and the back one
+    # rev O: up to the jacks' tops too (the walls are 0.4 off the PCB now, so jacks 1 and 3 reach into the fillets)
+    tray = cut(tray, bx(ia - 0.01, ia + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + c['rj_h'] + 0.4))
+    tray = cut(tray, bx(ia - 0.01, ia + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + c['rj_h'] + 0.4))   # and the back one
     for xa, xb in ((a0 - 1, ia + 0.01), (in_b - 0.01, L + 1)):        # the lid's groove channel crosses both ends
         tray = cut(tray, groove(c['groove_t'] + 0.05, xa, xb))   # print 2: 0.05 round the channel (was 0.15, a visible gap)
     # --- floor recessed 0.4 under the PCB's outline (+0.2): room for its leads without raising the ESP
@@ -291,6 +295,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         f = root(px, py, pr, top)
         if f:
             lid = uni(lid, f)
+        lid = cut(lid, bx(px - 5, px + 5, ihi - 0.2, ihi + 5, zbot - 1, zl - 0.01), bx(px - 5, px + 5, ilo - 5, ilo + 0.2, zbot - 1, zl - 0.01))   # rev O: flats 0.2 off the walls
         lid = cut(lid, cyl((px, py, zbot - 0.01), (px, py, zbot + c['ins_depth']), c['ins_d'] / 2),
                   cone((px, py, zbot - 0.01), c['ins_d'] / 2 + 0.4, (px, py, zbot + 0.4), c['ins_d'] / 2),   # lead-in
                   cyl((px, py, zbot), (px, py, c['floor_z'] + c['screw_l'] + 0.8), 1.7))      # room past the insert
@@ -417,15 +422,18 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     R = {}
     # rev N harness, over the top to the 6092's pad row, each on its own level where they cross (G 17.7, BAT 19.4,
     # PWR 21.1); B+ and L+ join in one splice 9 mm past the plug, and go on as one wire to BAT
+    # rev O (lid 2.8 lower): G and BAT leave the plug at 17.7 (over the plug and the solar cable), drop to 14.0 past
+    # X 132 (over the 6092's screw terminal and JST socket) and come in from the room side; PWR stays at 19.4 over them
     px_, py_ = pad['G']
-    R['Harness G (G)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 17.7), (px_, j5[1], 17.7), (px_, py_ - 0.01, 17.7), (px_, py_, ptop)]
+    R['Harness G (G)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 17.7), (130.0, j5[1], 17.7), (132.5, j5[1], 14.0), (px_, j5[1], 14.0),
+                          (px_, py_ - 1.6, 14.0), (px_, py_, ptop)]
     px_, py_ = pad['BAT']
     sx_, sy_ = 124.0, -17.0
-    bat_main = [(sx_, sy_, 19.4), (px_, sy_, 19.4), (px_, py_ - 4.0, 19.4), (px_, py_, ptop)]
-    R['Harness BAT (B+ / L+ splice)'] = [(jx5, j5[2], PLUG), (jx5, j5[2], 19.4), (sx_, sy_, 19.4)] + bat_main[1:]
-    R['Harness BAT leg (L+)'] = [(jx5, j5[4], PLUG), (jx5, j5[4], 19.4), (sx_, sy_, 19.4)]
+    R['Harness BAT (B+ / L+ splice)'] = [(jx5, j5[2], PLUG), (jx5, j5[2], 17.7), (sx_, sy_, 17.7), (130.0, sy_, 17.7), (132.5, sy_, 14.0),
+                                         (px_, sy_, 14.0), (px_, py_ - 1.6, 14.0), (px_, py_, ptop)]
+    R['Harness BAT leg (L+)'] = [(jx5, j5[4], PLUG), (jx5, j5[4], 17.7), (sx_, sy_, 17.7)]
     px_, py_ = pad['VIN']
-    R['Harness PWR (P+)'] = [(jx5, j5[6], PLUG), (jx5, j5[6], 21.1), (px_, j5[6], 21.1), (px_, py_ - 1.6, 17.0), (px_, py_, ptop)]
+    R['Harness PWR (P+)'] = [(jx5, j5[6], PLUG), (jx5, j5[6], 19.4), (px_, j5[6], 19.4), (px_, py_ - 3.0, 15.0), (px_, py_, ptop)]
     # cell lead (both wires out of the cell's end-B face): down the end face's PCB side, past the H3 post's back, along the
     # channel between the cell's PCB-side shoulder and the PCB's back edge (the two wires one above the other), into J4
     ce = C['bat_x0'] + c['bat_l'] + 0.05

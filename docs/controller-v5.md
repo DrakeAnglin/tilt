@@ -10,7 +10,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell and the charger.
 
 | | |
 |---|---|
-| Size | **157.4 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
+| Size | **157.4 × 51.8 × 23.0 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head**; the charger: **2 × M2 × 6 self-tapping** screws |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
@@ -45,6 +45,15 @@ Soldering the PCB itself: [PCB build guide](pcb-build.md), step by step.
    other end to a 2-pin piece of male header that plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Use red for VBUS and black for GND,
    or the white flat 2-core cable with the VBUS side marked.
 3. **Charger subassembly**: build it on the bench first. It goes into the box as one piece.
+
+## Smaller box (rev O, 2026-11-08)
+
+| | |
+|---|---|
+| Height | **23.0 mm** (was 25.8): the old charger's capacitor set the height; now the cell does (top 20.7, lid underside 21.0). The charger harness was rerouted lower (G and BAT drop to 14.0 past the solar cable; P+ at 19.4) |
+| Width | **51.8 mm** (was 52.5): **0.4 mm** play round the PCB on both sides (was 0.7 / 0.8). At 0.5 the H1 / H2 screw bosses only touched the walls along a line (a non-manifold print), so 0.4 lets them merge. The lid posts over H1 and H2 have flats 0.2 off the walls; the end-A corner reliefs run up to the jacks' tops |
+| In the rail | the room-side wall is 0.35 mm off the rail's wall; the back-wall bumpers stop **0.4 mm** short of it (was 1.0), so the box can't shift more than 0.4 and the rod's groove stays on the rail's center line |
+| Check | interference: **none**; tray, lid and coupon manifold, edges rounded |
 
 ## Charger: Adafruit 6092 (rev N, 2026-11-08)
 
