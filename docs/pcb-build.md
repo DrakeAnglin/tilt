@@ -57,7 +57,7 @@ one by the 470 µF). They're for the meter. The three big holes (H1–H3) take t
 | **1N5819 diodes (D1–D3), 6.2 V zener (D4)** | **YES** | the **band** on the part goes over the **square pad**, where the silkscreen has its thick band line (red **K** in the pictures) |
 | **470 µF capacitor (C9)** | **YES** | **long leg (+) in the square pad**, by the silkscreen's **+**; the can's stripe (−) on the shaded half of the circle |
 | **Sockets J1, J2, J3** | fit either way, but **solder them straight** | pin 1 is the square pad |
-| **JST headers J4, J5, J8** | **YES** | match the silkscreen outline. Before soldering, push the plug in and hold it over the board: the wires must land on the pads named on the silkscreen (J4: **−  +**, J5: **G  B+  ·  L+  ·  P+**, J8: **−  +**) |
+| **JST headers J4, J5, J8** | **YES** | match the silkscreen outline. Before soldering, push the plug in and hold it over the board: the wires must land on the pads named on the silkscreen (J4: **−  +**, J5: **G  B+  (blank)  L+  (blank)  P+**, J8: **−  +**) |
 | **RJ12 jacks** | fit only one way | two plastic pegs |
 | **ESP32-C6** | **YES** | **chip up, its USB toward end B** (silkscreen: "ESP32-C6: chip up, USB this way"); its 5V pin in J1 pin 1 |
 | **Battery** | **YES** | **red wire on +** of J4. Check with the meter before plugging in |
@@ -173,7 +173,7 @@ Three different headers, so no plug fits the wrong one:
 | Ref | Header | For | Pins (silkscreen) |
 |---|---|---|---|
 | J4 | JST-XH 2-pin (B2B-XH-A) | the 18650 | **−  +** (red wire on +) |
-| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty; with the 6092, pins 2 and 4 both get the battery wire: step 11) |
+| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  (blank)  L+  (blank)  P+** (pins 3 and 5 empty; with the 6092, pins 2 and 4 both get the battery wire: step 11) |
 | J8 | JST-ZH 2-pin (B2B-ZR), the small one | solar (optional) | **−  +** |
 
 **Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the
@@ -278,10 +278,24 @@ wire in **both** slots joins them, so the battery feeds the board directly.
    - J5 **pin 6 (PWR)** → **VIN** (the DC / solar pads)
 2. **Leave empty:** the **4.5V** and **3V** screw terminals, the JST-PH battery socket, and EN.
 3. No temperature probe and no big capacitor: this module doesn't use them.
-4. **Crimp the three ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 6 PWR. Pins 3, 4, 5 empty.
-5. **Which end is pin 1:** hold the plug with the **wires toward you**, the **long flat side down** and the **two little
-   hooks up**: pins run **1 to 6 from left to right** (as in the pictures). To be sure, push the **empty** housing into
-   the soldered J5 first (it only fits one way), look down, and mark the cavity over the silkscreen **G**. That's pin 1.
+4. **Which wire goes in which slot: go by the letters printed on the board**, not by pin numbers. Push the **empty**
+   plug into the board's charger socket first (it only fits one way), look straight down, and mark each slot with the
+   letter printed beside it:
+
+   ![charger plug on the board](renders/pcb-build-plug.png)
+
+   | Letter on the board | Wire |
+   |---|---|
+   | **G** | the wire to the charger's **G** |
+   | **B+** | a BAT splice wire |
+   | (no letter) | empty |
+   | **L+** | the other BAT splice wire |
+   | (no letter) | empty |
+   | **P+** | the wire to the charger's **VIN** |
+
+5. **Check before the battery goes in** (meter on beep, battery and USB unplugged, plug in the board): charger **G**
+   to the **GND** test pad beeps, charger **BAT** to **BAT+** beeps, charger **VIN** to **PWR** beeps, and charger
+   **BAT** to **GND** does **not** beep.
 6. **Tug-test every crimp.** On the first board the PWR crimp lost contact twice: TP4 read 4.8 V while the module's
    input read 0 V.
 
