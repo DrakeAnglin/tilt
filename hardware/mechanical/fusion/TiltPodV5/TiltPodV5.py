@@ -33,8 +33,8 @@ import math
 
 P = dict(
     lid_x=-8.33, half_w=27.7, floor_z=0.2, step_z=33.3, plateau_hw=21.7, plateau_z=38.9, edge_r=1.0,
-    wall=1.8, floor=1.8, ceil=1.8, end_x=-74.0, end_t=2.0,    # v0.5: the RJ12 behind the N20 (its tabs end at X -46.03)
-    rod_z=24.0, rod=4.0, rod_clear=0.65, tube_wall=1.2, tube_x1=-16.3,   # v0.5: ends before the clutch's idlers     # tube ends level with the pin column, under the board's back
+    wall=1.8, floor=1.8, ceil=1.8, end_x=-77.0, end_t=2.0,    # v0.5: the RJ12 behind the N20 (6 mm past its tabs for the solder leads)
+    rod_z=24.0, rod=4.0, rod_clear=0.65, tube_wall=1.2, tube_x1=-19.6,   # v0.5: ends before the clutch plate     # tube ends level with the pin column, under the board's back
     # 4 bolts from the main half; inserts (Ø4.0 x 6.7, M3 x 5.7 ruthex) in the module
     bolts_board=((6.45, 11.58), (22.45, 27.58)), bolts_rim=((-23.0, 27.0),),
     ins_d=4.0, ins_hole=8.0, ins_wall=1.5,
@@ -42,10 +42,9 @@ P = dict(
     board=(2.75, 26.15, 7.88, 31.28), board_t=1.6, chip=(14.45, 19.58), hole_off=8.0, board_hole=3.7,
     pin_holes=((6.45, 27.58),), pin_d=3.75,     # one pin; the board's other spare hole stays free
     # N20
-    n20_axis=(-14.365, 17.764), n20_w=12.0, n20_h=10.0, gbx=(-18.53, -27.53), can=(-27.53, -42.53), cap_end=-43.53,
-    tab_end=-46.03, motor_clear=0.4, mclear=0.15,
-    tun_wall=1.6, tun_x1=-44.0, tun_top_x1=-30.0,      # tunnel: U from X -44 (can end), closed top over the gearbox from X -30
-    stop_c=(-11.906, 24.532), stop_d=3.0, stop_x=(-18.53, -15.95),   # the arm's stop post (TiltPartsV5 stop_dir 70 deg, r 7.2)
+    n20_axis=(-14.164, 18.640), n20_w=12.0, n20_h=10.0, gbx=(-18.6, -27.6), can=(-27.6, -42.6), cap_end=-43.6,
+    tab_end=-46.1, motor_clear=0.4, mclear=0.4,       # loose: the clutch plate (not the tunnel) sets where the motor sits
+    tun_wall=1.6, tun_x1=-44.2, tun_top_x1=-30.0, tun_front=-19.5,   # tunnel front just behind the clutch plate
     # RJ12 breakout (listing photo): board 19.4 W x 19.9 D x 1.6, jack 13.5 W x 14.7 L x 13.0 H overhanging 4.5
     rj_bw=19.4, rj_bd=19.9, rj_jw=13.5, rj_jl=14.7, rj_jh=13.0, rj_over=4.5, rj_y=-11.85, rj_z=17.0,
     rj_mouth_w=9.9, rj_mouth_h=8.6,
@@ -156,7 +155,7 @@ def build(tbm, bx, cyl, cone, uni, cut):
     mc, tw = p['mclear'], p['tun_wall']
     hw_m, hh_m = p['n20_w'] / 2 + mc, p['n20_h'] / 2 + mc
     ty0, ty1 = ay - hw_m - tw, ay + hw_m + tw
-    fx = p['gbx'][0]                                          # gearbox face plane = the holder's front
+    fx = p['tun_front']                                       # the holder's front: just behind the clutch plate
     cup = uni(cup, bx(xin, fx, ty0, ty1, fz - 0.5, az - hh_m))                         # block under the motor
     for wy0, wy1 in ((ty0, ty0 + tw), (ty1 - tw, ty1)):
         cup = uni(cup, bx(p['tun_x1'], fx, wy0, wy1, az - hh_m - 0.01, az))            # U sides to the axis
@@ -164,16 +163,10 @@ def build(tbm, bx, cyl, cone, uni, cut):
         cup = uni(cup, bx(p['tun_top_x1'], fx, wy0, wy1, az - 0.01, az + hh_m))        # sides above the axis (gearbox)
         cup = uni(cup, gusset(p['tun_top_x1'], wy0, wy1, az - 0.01, az + hh_m, 'floor'))
     cup = uni(cup, bx(p['tun_top_x1'], fx, ty0, ty1, az + hh_m - 0.01, az + hh_m + tw))  # top
-    sy, sz = p['stop_c']
-    sr = p['stop_d'] / 2
-    pz0, pz1 = az + hh_m + tw - 0.01, sz + sr + 0.6
-    cup = uni(cup, bx(p['tun_top_x1'], fx, sy - sr - 0.8, sy + sr + 0.8, pz0, pz1))   # under the post
-    cup = uni(cup, gusset(p['tun_top_x1'], sy - sr - 0.8, sy + sr + 0.8, pz0, pz1, 'floor'))
-    cup = uni(cup, cyl((fx - 0.3, sy, sz), (p['stop_x'][1], sy, sz), sr))                # the stop post
     for ly0, ly1 in ((ay - hw_m, ay - 4.8), (ay + 4.8, ay + hw_m)):                   # can-end ledges (clear of the tabs)
         cup = uni(cup, bx(p['can'][1] - 0.6, p['can'][1] - 0.1, ly0 - 0.01, ly1 + 0.01, az - 1.5, az + 1.5))
-    gb = bx(fx - 0.01 - 9.0, fx + 0.01, ay - hw_m, ay + hw_m, az - hh_m, az + hh_m)    # gearbox (open front: it slides in)
-    cup = cut(cup, uni(gb, n20_section(bx, cyl, cut, uni, p['can'][1] - 0.1, fx - 8.9, mc)))
+    gb = bx(p['gbx'][1] - 0.01, fx + 0.01, ay - hw_m, ay + hw_m, az - hh_m, az + hh_m)  # gearbox (open front: it slides in)
+    cup = cut(cup, uni(gb, n20_section(bx, cyl, cut, uni, p['can'][1] - 0.1, p['gbx'][1] + 0.1, mc)))
     # RJ12 breakout (v0.5: behind the motor, same height and side as v0.4). That is the one channel from the open face to the end wall that every
     # boss, rib and the rod tube stay out of, so the board (with its leads soldered) slides straight in on two grooved
     # rails until the jack sits flush in the end wall. A spring latch in the room-side rail snaps behind the board's back

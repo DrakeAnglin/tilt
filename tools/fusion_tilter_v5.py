@@ -162,7 +162,7 @@ def mated(a, b):
     return {a, b} in MATES
 
 
-CLUTCH = ('Clutch shaft', 'Clutch 12T', 'Clutch pinion', 'Idler A', 'Idler B', 'Clutch arm')
+CLUTCH = ('Clutch shaft', 'Clutch 12T', 'Clutch pinion', 'Idler A', 'Idler B', 'Clutch arm', 'Clutch plate')
 
 
 def check(tilter_bodies, label, skip=()):
@@ -223,11 +223,11 @@ for sgn, eng in ((1, 'Idler B'), (-1, 'Idler A')):
         moved.append((nm, b2))
     # the engaged idler meshes the 12T (tooth phase not modeled): judged by its center distance below, not by volume
     lab = 'stop (%s engaged)' % eng
-    stop_hits[lab] = check(moved, lab, skip=[{eng, 'Clutch 12T'}])
+    stop_hits[lab] = check(moved, lab, skip=[{eng, 'Clutch 12T'}, {'Clutch arm', 'Clutch plate'}])
     # contact with the stop post: should be ~0 (touching)
-    post = [b for g, nm, b in own if g == 'Module'][0]
+    post = [b for nm, b in moved if nm == 'Clutch plate'][0]
     arm2 = [b for nm, b in moved if nm == 'Clutch arm'][0]
-    stop_hits[lab].append('arm vs module (stop contact) %.3f mm3' % vol(arm2, post))
+    stop_hits[lab].append('arm vs clutch plate stop post (contact) %.3f mm3' % vol(arm2, post))
 
 # center distances (analytic)
 dist = lambda p, q: math.hypot(p[0] - q[0], p[1] - q[1])
