@@ -42,7 +42,8 @@ the box floor.
 | 0.75A PTC | 3 | F1, F2, F3 | 9 |
 | ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |
 | USB-C breakout (Cermant) + its 2-wire lead to J3 | 1 | | 11 |
-| MCP73871 charger module + 4-wire harness (6-pin XH housing) | 1 | J5 | 11 |
+| Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |
+| Short insulated wire for the J5 pin 2 to pin 4 jumper | 1 | J5 underside | 11 |
 | 18650 cell with its JST-XH plug | 1 | J4 | 12 |
 | Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |
 
@@ -138,6 +139,12 @@ Bands: 220 **red red brown** (5-band: red red black black), 10 **brown black bla
 Either way round, pushed down to the board. **C1 is the 10 µF ("106")**, the other five are 100 nF ("104"). C3–C5
 sit under the ESP, beside the 1k resistors from step 1.
 
+**Out of 100 nF?** Any **ceramic** capacitor from 47 nF to 1 µF works in C2–C6 ("473", "104", "224", "474", "105"),
+and they can be mixed: each one works on its own. They only smooth a reading; the value changes how fast a reading
+settles, never the number it settles to. Use the same value on C3–C5 if you can, so the three ports respond alike. A
+missing C2–C6 doesn't stop anything working (the readings are just noisier). **Not** an electrolytic like 100 µF, and
+**C1 must be the 10 µF.**
+
 | Ref | Value | Marking | What it does |
 |---|---|---|---|
 | C1 | 10uF | 106 | ESP 5V |
@@ -167,7 +174,7 @@ Three different headers, so no plug fits the wrong one:
 | Ref | Header | For | Pins (silkscreen) |
 |---|---|---|---|
 | J4 | JST-XH 2-pin (B2B-XH-A) | the 18650 | **−  +** (red wire on +) |
-| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty) |
+| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty; pin 4 gets jumpered to pin 2 in step 11) |
 | J8 | JST-ZH 2-pin (B2B-ZR), the small one | solar (optional) | **−  +** |
 
 **Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the
@@ -224,111 +231,152 @@ be on the square pad); open ("OL") is right.
 Finally, look at the underside in good light for bridges between neighboring pads, especially the sockets and
 jacks, and check every lead is trimmed to 1.8 mm or less.
 
-## Step 11: Wiring the charger module, the USB-C board, the battery and solar
+## Step 11: The charger, the USB-C board, the battery and solar
 
-Everything off the PCB connects by a plug. Build these leads on the bench; nothing is soldered to the PCB itself.
+**Charger: Adafruit 6092 (bq25185), used as a charger only.** The battery feeds the whole board directly (motors and
+ESP), and the charger just keeps it topped up. A charger's own load output can only supply about 1 A, not enough for
+three motors at once; an 18650 supplies 3 A or more. (The first build used a no-name MCP73871 module. It charged at
+only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on USB: see
+[the v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)
 
 **Cut list (one box):**
 
 | Lead | Wire | Cut | From → to |
 |---|---|---|---|
-| Charger LOAD | 22 AWG, pre-crimped JST lead | **100 mm** | J5 pin 4 → LOAD pad (from underneath) |
-| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 2 → BATT pad |
-| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 1 → the GND pad next to PWR |
-| Charger PWR | 22 AWG, pre-crimped JST lead | 52 mm (the LOAD lead's leftover) | J5 pin 6 → PWR pad |
-| NTC | its own leads (9 cm) | as is, or trimmed to ~50 mm | THERM pads → NTC bead on the cell |
+| J5 jumper | 22 AWG insulated | about 8 mm | J5 pin 2 → J5 pin 4, under the PCB |
+| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 2 → **BAT** pad |
+| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |
+| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad |
 | USB-C lead | 22 AWG, red + black | 2 × 65 mm | USB-C board VBUS / GND → 2-pin male header in J3 pins 1–2 |
 | Battery | the cell's own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |
 | Solar (optional) | the panel's flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |
 
 The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.
-One lead and a half makes a harness.
 
-### 11a: Charger module (build it as one piece)
+### 11a: The J5 jumper (pin 2 to pin 4)
+
+![J5 jumper](renders/pcb-build-jumper.png)
+
+1. Turn the board over. Find J5's six pins; **pin 1 is the square pad** (from either side).
+2. Solder a short insulated wire from **pin 2** (battery) to **pin 4** (board supply), clear of pin 3. Keep it flat.
+3. **Check:** meter on beep, J5 pin 2 to **TP1** beeps.
+4. If your J5 plug still has a wire in **slot 4** (the old LOAD wire), pull it out: lift the plastic tab over its crimp
+   with a pin and slide it back out.
+
+### 11b: Charger (Adafruit 6092)
 
 ![charger wiring](renders/pcb-build-charger.png)
 
-The order matters, because the capacitor lies over the LOAD pad and the THERM pads once it's on:
+1. **Three wires, soldered to the pads by their printed names:**
+   - J5 **pin 1 (GND)** → **G** (or the **−** screw terminal)
+   - J5 **pin 2 (BATT)** → **BAT** (bottom edge)
+   - J5 **pin 6 (PWR)** → **VIN** (the DC / solar pads)
+2. **Leave empty:** the **4.5V** and **3V** screw terminals, the JST-PH battery socket, and EN.
+3. No temperature probe and no big capacitor: this module doesn't use them.
+4. **Crimp the three ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 6 PWR. Pins 3, 4, 5 empty.
+5. **Which end is pin 1:** from the wire side with the housing's **lock ramp up**, pin 1 is on the **left** (JST's XH
+   drawing). To be sure, push the **empty** housing into the soldered J5 first (it only fits one way), look down, and
+   mark the cavity over the silkscreen **G**. That's pin 1.
+6. **Tug-test every crimp.** On the first board the PWR crimp lost contact twice: TP4 read 4.8 V while the module's
+   input read 0 V.
 
-1. **LOAD (J5 pin 4) first, from underneath:** push the bare end up through the LOAD hole from the back, solder it on
-   top with a low joint (the capacitor will lie 2.1 mm over it), and lay the wire flat along the underside. In the box the
-   module stands 2.4 mm off the floor and this wire runs under it.
-2. **PWR (pin 6), BATT (pin 2), GND (pin 1, the GND next to PWR)** from the top. The module's GND pads are all one
-   connection, so any GND works; the one next to PWR keeps the wire short.
-3. **NTC:** remove the small **103** resistor beside the THERM label (it reads 10 kΩ before you take it off). Solder the
-   NTC's own two leads (they come 9 cm long) straight to its two pads, either way round, joints sleeved. No extra wire.
-   Lay the pair flat along the module toward the capacitor's leg end; they leave from under the capacitor there. The
-   route to the cell's top is about 40 mm: trim the leads to ~50 mm, or coil the spare beside the cell.
-4. **Capacitor, last:** bend both legs 90° about 1.5 mm from the body, so it lies over the LOAD / BATT edge. **Long leg
-   (+) in the hole by the "+" mark** (the stripe on the can is −). Hold it 2 mm up on a spacer (a scrap of 1.6 mm board
-   plus a business card) while you solder, so it sits clear of the parts on its legs.
-5. **Check:** the capacitor's + leg beeps to the PWR pad, its − leg to GND.
-6. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a
-   pre-made 6-wire lead, pull the pin 3 and 5 wires out (lift the tab over each crimp with a pin) or cut them flush.
-7. **Which end is pin 1:** from the wire side with the housing's **lock ramp up**, pin 1 is on the **left** (JST's XH
-   drawing). To be sure, do it before crimping: push the **empty** housing into the soldered J5 (it only fits one way, lock
-   ramp toward the header's slotted wall, which faces end A), look down, and mark the cavity over the silkscreen **G** with
-   a dot. That's pin 1.
+**The lights:** orange **C** on = charging, off = full. Red **F** = a fault: unplug and check the wiring. The chip stops
+charging after **6 hours** nonstop; unplugging and replugging the power restarts it (for solar, the sun going down does).
 
-The dev board wired all six pads (three − wires onto one GND rail). That's the same circuit: the PCB's J5 has room for one
-GND, and the heavy motor current returns to the battery through the PCB, not through this wire.
+**USB input, to check on the first build:** USB through the PCB reaches VIN at about 4.7 V (after D1), and the module
+is rated 5–18 V there. If it won't charge that way, plug USB-C into the **module's own socket** instead (the ESP then
+can't see that USB is present). Don't plug the module's USB-C in together with the solar panel until we've checked
+how the module joins its two inputs.
 
-### 11b: USB-C board lead
+### 11c: USB-C board lead
 
 ![USB-C lead](renders/pcb-build-usb.png)
 
-1. **Clip the USB-C board's six header pins to 3 mm** past their plastic (in the box the charger sits beside them).
+1. **Clip the USB-C board's six header pins to 3 mm** past their plastic.
 2. **Two 22 AWG wires, 65 mm each:** red soldered to **VBUS**, black to **GND**. Go by the names printed beside the pins on
-   your board. The dev board used the order VBUS, GND, CC1, D−, D+, CC2. Sleeve both joints.
+   your board. Sleeve both joints.
 3. Other ends onto a **2-pin piece of male header**: VBUS on one pin, GND on the other. Mark the VBUS end.
 4. It plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Pin 1 is J3's square pad, at the room-side edge.
 5. CC1 / D− / D+ / CC2 stay unwired: the board has its own 5.1 kΩ CC resistors ("512"), so USB-C chargers give it 5 V.
 
-In the box the lead runs from those pins low along the room side, along the room-side wall, and up into J3.
-
-### 11c: Battery
+### 11d: Battery
 
 The 18650 plugs into **J4** with its own JST-XH lead: nothing to make. Before it ever goes in:
 
 1. Hold its plug against J4: the **red wire must sit over the silkscreen +**.
-2. Meter on volts, red probe on the plug's red wire: **+3.0 to +4.2 V**. A minus sign means the plug is wired backwards:
-   don't plug it in.
-3. In the box, its lead leaves the cell's end-B face, goes down the PCB side and along the channel between the cell and
-   the PCB's back edge to J4 (the two wires one above the other). It needs at least 45 mm.
-4. **The NTC** from 11a gets taped onto the top of the cell, about 4 mm from its end-B end (Kapton tape or a dab of
-   thermal glue).
+2. Meter on **DC volts**, red probe on the plug's red wire: **+3.0 to +4.2 V**. A minus sign means the plug is wired
+   backwards: don't plug it in.
+3. **Charge it first** (see "Charging the battery on the bench" below): the ESP needs the cell above about 3.8 V.
 
-### 11d: Solar (optional)
+### 11e: Solar (optional)
 
 The panel's flat 2-core cable comes in through the slot in end wall B and gets a **JST-ZH 2-pin plug**: **− on pin 1**
-(silk −), **+ on pin 2** (silk +). Check the panel's polarity with the meter in sun before crimping.
+(silk −), **+ on pin 2** (silk +). **Check the panel's polarity with the meter in sun before crimping**: on the first
+board the panel was wired backwards (D2 blocked it, nothing was damaged). Behind a window it needs daylight: a 6 V panel
+in a dim room reads about 1 V and charges nothing.
+
+### Charging the battery on the bench
+
+The fastest way to fill a flat cell, without the PCB:
+
+1. Unplug the battery from J4.
+2. Two clip leads: battery **red → BAT**, battery **black → the − screw terminal** of the 6092.
+3. USB-C straight into the 6092. Orange **C** lights.
+4. About 2 hours from 3.6 V at 1 A. Done when **C** goes out. Unplug, wait a minute, measure: **4.1–4.2 V** = full.
+
+**Never connect USB straight to the battery:** 5 V pushes a lithium cell past 4.2 V and it can swell or catch fire.
+
+| Cell reads (resting) | Charge |
+|---|---|
+| 4.2 V | full |
+| 3.9 V | about 75% |
+| 3.7 V | about 50% (the "3.7 V" on the label is the average, not full) |
+| 3.6 V | about 25–30% |
+| 3.0 V | empty |
 
 ## Step 12: First power (no ESP yet)
 
-1. **Battery polarity:** before the cell goes on, hold its plug against J4 and check the red wire is over **+**. Then
-   with the meter on volts, measure the plug: red probe on its red wire should read **+3.0 to +4.2 V**. A minus sign
-   means the plug is wired backwards. Don't plug it in.
-2. Plug the **charger harness into J5**, then the **battery into J4**. The battery reaches the board only through the
-   charger, so J5 goes first.
-3. Measure against **TP5 (GND)**:
+Meter on **DC volts** (V with a straight line, "V⎓" or "DCV", not the wavy V~; range 20 if it has ranges). Black probe
+on **TP5 (GND)** for every reading.
+
+1. **Battery polarity:** hold its plug against J4: red wire over **+**, and the plug reads **+3.0 to +4.2 V**.
+2. Plug the **charger harness into J5**, then the **battery into J4**. With the J5 jumper, the battery reaches the board
+   directly.
+3. Measure:
 
 | Pad | Expect |
 |---|---|
-| TP1 BAT+ | about the cell's voltage (3.0–4.2 V) |
-| 3 | TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |
-| 4 | TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |
-| 5 | TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger's LEDs light |
+| TP1 BAT+ | the cell's voltage (3.0–4.2 V) |
+| TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |
+| TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |
+| TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger's orange light comes on |
 
-If TP1 reads 0, check the J5 harness (pins 2 and 4) and that the cell isn't flat.
+**TP1 is the cell** (through the J5 jumper); TP2 is always 0.1–0.4 V lower, so don't read the battery off TP2. While
+it charges the cell reads a little high: for a true reading, unplug USB for a minute first.
+
+If TP1 reads 0, check the J5 jumper (pin 2 to pin 4) and that the cell isn't flat.
 
 ## Step 13: Plug in the ESP
 
 1. **Unplug the battery** (J4).
 2. Flash the ESP32-C6 on the bench first (through its own USB-C). In the box there's no room for a cable.
 3. Plug it into J1 / J2: **chip up, its USB toward end B**, its 5V pin in J1's square pad. Push it fully down.
-4. Battery back in. **TP3 should read 3.3 V**, and the ESP boots.
+4. Battery back in. **TP3 should read 3.3 V**, and the ESP boots. With the cell below about 3.8 V, TP3 sags toward
+   3.0 V (D3 and the ESP's regulator each take a little) and the ESP resets whenever Wi-Fi transmits: charge the cell first.
+   (v3 fixes this with a 3.3 V converter: [v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)
 
 Then it goes into the box: [V5 assembly](controller-v5.md#assembly).
+
+## If something reads wrong
+
+| Symptom | Likely cause | Check |
+|---|---|---|
+| Readings make no sense | meter on the wrong setting (AC, mV, or Ω) | dial on **DC volts**, range 20 |
+| Minus sign on a reading | probes swapped, or a plug wired backwards | black on TP5; measure the plug by itself |
+| TP4 has 4.8 V but the charger's VIN reads 0 V | PWR crimp not making contact | push the crimp in until it clicks, tug-test it |
+| TP1 and TP2 fine, TP3 about 3.0 V, ESP keeps resetting | cell too low (below about 3.8 V) | charge it (bench charging above) |
+| Cell barely rises after hours | charger not charging properly | USB power meter between charger and cable: about **1 A** while charging (6092) |
+| ESP not on Wi-Fi | not powered, or browning out | TP3 = 3.3 V? Unplug power 5 s to restart it |
 
 ## Regenerate this guide
 

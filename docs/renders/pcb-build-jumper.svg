@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="440" font-family="Helvetica,Arial">
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="20.0" y="32.0" font-size="20.0" fill="#111" font-weight="bold" text-anchor="start">J5 jumper: pin 2 to pin 4, on the underside</text>
+<text x="20.0" y="56.0" font-size="13.0" fill="#444" font-weight="normal" text-anchor="start">The battery then feeds the whole board directly; the charger only charges it.</text>
+<rect x="60" y="100" width="780" height="200" rx="10" fill="#2f6b3a" stroke="#1d4426" stroke-width="2"/>
+<text x="450.0" y="125.0" font-size="13.0" fill="#e9efe9" font-weight="bold" text-anchor="middle">UNDERSIDE of the PCB at J5 (near end B, the USB-C end)</text>
+<rect x="128" y="182" width="44" height="44" rx="4" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>
+<circle cx="150" cy="204" r="8" fill="#777"/>
+<text x="150.0" y="262.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">pin 1</text>
+<circle cx="260" cy="204" r="22" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>
+<circle cx="260" cy="204" r="8" fill="#777"/>
+<text x="260.0" y="262.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">pin 2</text>
+<circle cx="370" cy="204" r="22" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>
+<circle cx="370" cy="204" r="8" fill="#777"/>
+<text x="370.0" y="262.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">pin 3</text>
+<circle cx="480" cy="204" r="22" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>
+<circle cx="480" cy="204" r="8" fill="#777"/>
+<text x="480.0" y="262.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">pin 4</text>
+<circle cx="590" cy="204" r="22" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>
+<circle cx="590" cy="204" r="8" fill="#777"/>
+<text x="590.0" y="262.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">pin 5</text>
+<circle cx="700" cy="204" r="22" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>
+<circle cx="700" cy="204" r="8" fill="#777"/>
+<text x="700.0" y="262.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">pin 6</text>
+<text x="150.0" y="285.0" font-size="12.0" fill="#e9efe9" font-weight="normal" text-anchor="middle">square pad</text>
+<text x="260.0" y="285.0" font-size="12.0" fill="#ffd" font-weight="bold" text-anchor="middle">battery</text>
+<text x="480.0" y="285.0" font-size="12.0" fill="#ffd" font-weight="bold" text-anchor="middle">board supply</text>
+<path d="M260 190 C 290 140, 450 140, 480 190" fill="none" stroke="#d62728" stroke-width="6"/>
+<text x="370.0" y="148.0" font-size="13.0" fill="#fff" font-weight="bold" text-anchor="middle">insulated wire</text>
+<text x="370.0" y="230.0" font-size="12.0" fill="#ffd" font-weight="normal" text-anchor="middle">pin 3 NOT touched</text>
+<text x="40.0" y="340.0" font-size="13.0" fill="#222" font-weight="bold" text-anchor="start">Count from the SQUARE pad (pin 1): the 2nd and the 4th pin. The square pad is pin 1 from either side of the board.</text>
+<text x="40.0" y="364.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Use a short piece of insulated wire (22 AWG), stripped 2 mm at each end, soldered to the two pin joints.</text>
+<text x="40.0" y="388.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">It must clear pin 3. Keep it flat: the board sits 2.4 mm off the box floor.</text>
+<text x="40.0" y="412.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Check: meter on beep, pin 2 to TP1 should beep. Then pull the old LOAD wire out of slot 4 of the J5 plug.</text>
+</svg>

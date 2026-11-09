@@ -323,101 +323,105 @@ def meter_picture():
 
 
 def charger_picture():
-    """The Comimark MCP73871 module (front, as in the owner's photo; positions scaled from it, about +/-0.5 mm) and where
-    each of its wires goes on the PCB: the 4-wire J5 harness, the NTC pair, the capacitor."""
-    k, ox, oy = 14.0, 330, 110
-    bw, bh = 30.5, 31.5
-
-    def P(x, y):
-        return ox + k * x, oy + k * y
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1010" font-family="Helvetica,Arial">',
+    """The Adafruit 6092 (bq25185) charger, used as a charger ONLY, and its 3-wire J5 harness. Drawn as a wiring diagram:
+    the pad names are the ones printed on the board (Adafruit's guide); positions on the real board differ, so go by the
+    printed labels."""
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="900" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
-         text(20, 32, 'Charger module (MCP73871, 30.5 × 31.5 mm): wiring it for the PCB', 20, '#111', 'bold', 'start', halo=False),
-         text(20, 56, 'Front side. Drawn from the listing photo, so positions are approximate. 4 wires to J5, 2 NTC wires, the capacitor.',
-              13, '#444', anchor='start', halo=False)]
-    x0, y0 = P(0, 0)
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="10" fill="#1a1a1a"/>' % (x0, y0, bw * k, bh * k))
-    chip = P(13.0, 13.0)
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#333" stroke="#666"/>' % (chip[0], chip[1], 4.5 * k, 4.5 * k))
-    o.append(text(chip[0] + 2.25 * k, chip[1] + 2.5 * k, 'MCP73871', 11, '#aaa', halo=False))
-    for i in range(3):
-        lx, ly = P(5.5, 9.0 + 1.6 * i)
-        o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#c33"/>' % (lx, ly, 3.5 * k, 0.9 * k))
-    for i in range(5):
-        ex, ey = P(1.6, 7.6 + 2.54 * i)
-        o.append('<circle cx="%.0f" cy="%.0f" r="9" fill="#c9a400"/><circle cx="%.0f" cy="%.0f" r="4" fill="#1a1a1a"/>' % (ex, ey, ex, ey))
-    cx, cy = P(22.4, 3.1)
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="none" stroke="#fff" stroke-width="2"/>' % (cx, cy, 3.8 * k, 5.0 * k))
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#fff"/>' % (cx + 2.6 * k, cy, 1.2 * k, 5.0 * k))
-    o.append(text(cx + 0.9 * k, cy + 3.0 * k, '+', 18, '#fff', 'bold', halo=False))
-    tx, ty = P(23.2, 19.3)
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#555" stroke="#0a7a3a" stroke-width="3"/>' % (tx - 0.8 * k, ty - 0.5 * k, 1.6 * k, 1.0 * k))
-    holes = [('GND', 4.2, 3.5, 'pin 1  G', '#222'), ('PWR', 8.8, 3.5, 'pin 6  P+', '#d62728'),
-             ('GND', 3.8, 27.9, 'empty', '#999'), ('BATT', 8.8, 27.9, 'pin 2  B+', '#d62728'),
-             ('LOAD', 20.8, 27.9, 'pin 4  L+', '#d62728'), ('GND', 25.6, 27.9, 'empty', '#999')]
-    for name, x, y, to, c in holes:
-        px, py = P(x, y)
-        up = -1 if y < 15 else 1
-        o.append('<circle cx="%.0f" cy="%.0f" r="24" fill="#c9a400"/><circle cx="%.0f" cy="%.0f" r="12" fill="#fff"/>' % (px, py, px, py))
-        ty_ = py + up * 66
-        o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="3"%s/>' % (
-            px, py + up * 24, px, ty_ - up * 12, c, ' stroke-dasharray="4 4"' if c == '#999' else ''))
-        # the pad's name beside its wire, not across it
-        o.append('<text x="%.0f" y="%.0f" font-size="11" fill="#fff" font-weight="bold" text-anchor="end">%s</text>' % (
-            px - 6, py + (-30 if up < 0 else 40), name))
-        o.append('<rect x="%.0f" y="%.0f" width="74" height="22" rx="4" fill="#fff" stroke="%s" stroke-width="2"/>' % (px - 37, ty_ - 11, c))
-        o.append(text(px, ty_ + 4, to, 12, c, 'bold', halo=False))
-
-    def call(px, py, tx_, ty_, lines, c='#0a7a3a', anchor='start'):
-        o.append('<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="2"/>' % (px, py, tx_, ty_, c))
-        o.append('<circle cx="%.0f" cy="%.0f" r="4" fill="%s"/>' % (px, py, c))
-        for i, t in enumerate(lines):
-            o.append(text(tx_ + (6 if anchor == 'start' else -6), ty_ + 4 + 17 * i, t, 14 if i == 0 else 12,
-                          c if i == 0 else '#333', 'bold' if i == 0 else 'normal', anchor, halo=False))
-    call(cx + 1.9 * k, cy, 790, 110, ['Capacitor: LAST', 'long leg (+) in the hole on the + side,', 'legs bent 90° 1.5 mm from the body,',
-                                     'lying over the LOAD / BATT edge,', 'held 2 mm up on a spacer while soldering'])
-    call(tx + 0.8 * k, ty, 790, 300, ['THERM: remove the 103 (10 kΩ)', 'solder the NTC\'s own two leads (9 cm)', 'one to each pad, joints sleeved;',
-                                     'the NTC bead gets taped on the cell'])
-    lx, ly = P(20.8, 27.9)
-    call(lx + 18, ly - 18, 790, 470, ['LOAD: soldered from UNDERNEATH', 'wire up through the hole from the back,', 'joint on top kept low (the capacitor',
-                                     'lies 2.1 mm over it); wire flat under', 'the module'], '#d62728')
-    ex, ey = P(1.6, 12.7)
-    call(ex - 10, ey, 300, 330, ['Small edge pads: leave empty', '(CE, TE, PROG2, SEL)'], '#666', 'end')
-    # the J5 housing
-    by = oy + bh * k + 150
-    # JST XH drawing (eXH.pdf p.2, PCB layout "viewed from the connector mounting surface"): with the LOCK SIDE toward
-    # you, circuit 1 is on the right; so from the wire side with the lock side UP, pin 1 is on the LEFT. On this board
-    # the header's lock wall (the one with the two slots, KiCad's -y side) faces end A.
-    o.append(text(40, by - 34, 'J5 plug: one 6-pin JST-XH housing (XHP-6), 4 wires, pins 3 and 5 empty', 15, '#111', 'bold', 'start', halo=False))
-    o.append(text(40, by - 14, 'Seen from the WIRE side, with the LOCK side up: pin 1 is on the LEFT (JST\'s XH drawing).', 13, '#d62728', 'bold', 'start', halo=False))
-    cav = [('1', 'G', 'GND', '#222', '76 mm'), ('2', 'B+', 'BATT', '#d62728', '76 mm'), ('3', '·', 'empty', '#999', ''),
-           ('4', 'L+', 'LOAD', '#d62728', '100 mm'), ('5', '·', 'empty', '#999', ''), ('6', 'P+', 'PWR', '#d62728', '52 mm')]
-    hx0, hy0 = 60, by + 30
-    hw = 110 * 6 + 16
-    # the lock: a raised ramp along one long face, between the end walls
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="14" fill="#e3dccb" stroke="#555" stroke-width="2"/>' % (hx0 + 40, hy0 - 14, hw - 80))
-    o.append(text(hx0 + hw / 2, hy0 - 20, 'LOCK side: the raised ramp along this face (it clicks into the header\'s slotted wall)', 12, '#555', 'bold', halo=False))
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="86" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx0, hy0, hw))
-    for q, (pin, silk, pad, c, cut) in enumerate(cav):
-        x_ = hx0 + 8 + 110 * q
-        o.append('<rect x="%.0f" y="%.0f" width="100" height="70" rx="4" fill="#fff" stroke="#bbb"/>' % (x_, hy0 + 8))
-        o.append(text(x_ + 50, hy0 + 28, 'pin %s (%s)' % (pin, silk), 12, '#444', halo=False))
-        o.append(text(x_ + 50, hy0 + 50, pad, 15, c, 'bold', halo=False))
-        o.append(text(x_ + 50, hy0 + 68, cut, 12, '#444', halo=False))
-    # pin 1 arrow
-    o.append('<polygon points="%.0f,%.0f %.0f,%.0f %.0f,%.0f" fill="#d62728"/>' % (hx0 + 58, hy0 + 100, hx0 + 48, hy0 + 116, hx0 + 68, hy0 + 116))
-    o.append(text(hx0 + 58, hy0 + 134, 'PIN 1', 13, '#d62728', 'bold', halo=False))
-    o.append(text(hx0 + 8 + 110 * 5 + 50, hy0 + 108, 'flat side (no ramp) down', 12, '#555', halo=False))
-    ty0 = hy0 + 160
-    for i, t in enumerate([
-            'How to tell pin 1 for sure: before crimping anything in, push the EMPTY housing into the soldered J5. It only goes in one way:',
-            'its lock ramp faces the header wall with the two slots, which on this board is the wall toward end A (the ESP side).',
-            'Now look straight down: the cavity over the silkscreen G is pin 1. Put a marker dot on the housing beside it, pull it out, crimp.',
-            'Lengths: the pre-crimped 152 mm JST leads cut to length (crimp end in the housing, bare end on the module), 1.5 leads per box.']):
-        o.append(text(40, ty0 + 20 * i, t, 12, '#222' if i < 3 else '#444', 'bold' if i == 2 else 'normal', 'start', halo=False))
+         text(20, 32, 'Charger: Adafruit 6092 (bq25185), wired as a charger only', 20, '#111', 'bold', 'start', halo=False),
+         text(20, 56, 'Wiring diagram, not to scale: find each pad by the name printed beside it on the board.', 13, '#444', anchor='start', halo=False)]
+    # the module
+    mx0, my0, mw, mh = 600, 110, 300, 400
+    o.append('<rect x="%d" y="%d" width="%d" height="%d" rx="12" fill="#1a1a1a"/>' % (mx0, my0, mw, mh))
+    o.append(text(mx0 + mw / 2, my0 + 40, 'Adafruit 6092', 18, '#fff', 'bold', halo=False))
+    o.append(text(mx0 + mw / 2, my0 + 62, 'bq25185 charger + 3.3 V buck', 13, '#bbb', halo=False))
+    # USB-C on the right edge
+    o.append('<rect x="%d" y="%d" width="40" height="70" rx="8" fill="#bbb" stroke="#666" stroke-width="2"/>' % (mx0 + mw - 20, my0 + 90))
+    o.append(text(mx0 + mw + 30, my0 + 120, 'USB-C', 14, '#333', 'bold', 'start', halo=False))
+    o.append(text(mx0 + mw + 30, my0 + 140, 'bench charging only', 12, '#666', anchor='start', halo=False))
+    # JST PH battery socket at the top (not used)
+    o.append('<rect x="%d" y="%d" width="60" height="26" rx="3" fill="#f4f1e8" stroke="#999" stroke-width="2"/>' % (mx0 + 40, my0 - 13))
+    o.append(text(mx0 + 70, my0 - 22, 'JST-PH battery socket: not used', 12, '#888', halo=False))
+    # LEDs
+    for k_, (lab, col, what) in enumerate((('C', '#ff8c00', 'orange C: charging'), ('F', '#d62728', 'red F: fault, unplug'))):
+        o.append('<circle cx="%d" cy="%d" r="9" fill="%s"/>' % (mx0 + 40, my0 + 100 + 32 * k_, col))
+        o.append(text(mx0 + 58, my0 + 105 + 32 * k_, what, 12, '#ddd', anchor='start', halo=False))
+    # pads used (left edge) and pads left empty (bottom: the terminal block)
+    pads = [('G', '#222', 230, 'pin 1  GND'), ('BAT', '#d62728', 300, 'pin 2  BATT'), ('VIN', '#d62728', 370, 'pin 6  PWR')]
+    for name, col, y, _ in pads:
+        o.append('<circle cx="%d" cy="%d" r="16" fill="#c9a400"/><circle cx="%d" cy="%d" r="7" fill="#fff"/>' % (mx0, my0 + y, mx0, my0 + y))
+        o.append(text(mx0 + 26, my0 + y + 5, name, 15, '#fff', 'bold', 'start', halo=False))
+    for k_, name in enumerate(('4.5V', '−', '3V')):
+        x_ = mx0 + 80 + 70 * k_
+        o.append('<rect x="%d" y="%d" width="50" height="40" fill="#2a7ab0" stroke="#145" stroke-width="2"/>' % (x_, my0 + mh - 30))
+        o.append(text(x_ + 25, my0 + mh - 5, name, 14, '#fff', 'bold', halo=False))
+    o.append(text(mx0 + mw / 2, my0 + mh + 34, 'Screw terminal: 4.5V and 3V stay EMPTY', 13, '#2a7ab0', 'bold', halo=False))
+    o.append(text(mx0 + mw / 2, my0 + mh + 52, '(the battery feeds the board directly; see the J5 jumper)', 12, '#555', halo=False))
+    # the J5 housing on the left, wires to the pads
+    hx, hy = 70, 200
+    cav = [('1', 'G', 'GND', '#222'), ('2', 'B+', 'BATT', '#d62728'), ('3', '·', 'empty', '#999'),
+           ('4', 'L+', 'empty', '#999'), ('5', '·', 'empty', '#999'), ('6', 'P+', 'PWR', '#d62728')]
+    o.append(text(hx, hy - 50, 'J5 plug (6-pin JST-XH)', 15, '#111', 'bold', 'start', halo=False))
+    o.append(text(hx, hy - 30, 'wire side toward you, lock ramp up: pin 1 on top here', 12, '#d62728', anchor='start', halo=False))
+    o.append('<rect x="%d" y="%d" width="150" height="%d" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx, hy, 6 * 50 + 10))
+    wire_y = {}
+    for q, (pin, silk, what, c) in enumerate(cav):
+        y_ = hy + 5 + 50 * q
+        o.append('<rect x="%d" y="%d" width="140" height="44" rx="4" fill="#fff" stroke="#bbb"/>' % (hx + 5, y_))
+        o.append(text(hx + 15, y_ + 18, 'pin %s (%s)' % (pin, silk), 12, '#444', anchor='start', halo=False))
+        o.append(text(hx + 15, y_ + 36, what, 14, c, 'bold', 'start', halo=False))
+        wire_y[pin] = y_ + 22
+    for (name, col, y, _), pin in zip(pads, ('1', '2', '6')):
+        y0 = wire_y[pin]
+        o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
+            hx + 150, y0, hx + 330, y0, mx0 - 180, my0 + y, mx0 - 16, my0 + y, col))
+    o.append(text(hx, hy + 6 * 50 + 34, 'pin 4 stays empty: it\'s jumpered to pin 2 on the PCB (11a)', 12, '#666', anchor='start', halo=False))
+    ty0 = 640
+    for k_, t in enumerate([
+            '3 wires: GND (pin 1) to G, BATT (pin 2) to BAT, PWR (pin 6) to VIN. Nothing else on the module is wired.',
+            'No temperature probe and no big capacitor with this module (the old one needed both).',
+            'Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).',
+            'Red F = fault: unplug and check the wiring.',
+            'USB through the PCB arrives at VIN at about 4.7 V (after D1); the module is rated 5-18 V on VIN.',
+            'If it won\'t charge that way: plug USB-C into the module\'s own socket instead (the ESP then can\'t see "USB present").',
+            'Do not plug the module\'s USB-C and the solar panel in at the same time (not yet checked how it joins them).']):
+        o.append(text(40, ty0 + 24 * k_, t, 13, '#d62728' if k_ >= 4 else '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
     o.append('</svg>')
     open(os.path.join(OUT, 'pcb-build-charger.svg'), 'w').write('\n'.join(o))
     return 'pcb-build-charger.svg'
+
+
+def jumper_picture():
+    """Close-up of J5's six pins from UNDER the board: the wire that joins pin 2 (battery) to pin 4 (board supply)."""
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="900" height="440" font-family="Helvetica,Arial">',
+         '<rect width="100%" height="100%" fill="#fff"/>',
+         text(20, 32, 'J5 jumper: pin 2 to pin 4, on the underside', 20, '#111', 'bold', 'start', halo=False),
+         text(20, 56, 'The battery then feeds the whole board directly; the charger only charges it.', 13, '#444', anchor='start', halo=False)]
+    o.append('<rect x="60" y="100" width="780" height="200" rx="10" fill="#2f6b3a" stroke="#1d4426" stroke-width="2"/>')
+    o.append(text(450, 125, 'UNDERSIDE of the PCB at J5 (near end B, the USB-C end)', 13, '#e9efe9', 'bold', halo=False))
+    xs = [150 + 110 * k for k in range(6)]
+    for k, x in enumerate(xs):
+        if k == 0:
+            o.append('<rect x="%d" y="182" width="44" height="44" rx="4" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>' % (x - 22))
+        else:
+            o.append('<circle cx="%d" cy="204" r="22" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>' % x)
+        o.append('<circle cx="%d" cy="204" r="8" fill="#777"/>' % x)
+        o.append(text(x, 262, 'pin %d' % (k + 1), 14, '#fff', 'bold', halo=False))
+    o.append(text(xs[0], 285, 'square pad', 12, '#e9efe9', halo=False))
+    for k, lab in ((1, 'battery'), (3, 'board supply')):
+        o.append(text(xs[k], 285, lab, 12, '#ffd', 'bold', halo=False))
+    o.append('<path d="M%d 190 C %d 140, %d 140, %d 190" fill="none" stroke="#d62728" stroke-width="6"/>' % (xs[1], xs[1] + 30, xs[3] - 30, xs[3]))
+    o.append(text((xs[1] + xs[3]) / 2, 148, 'insulated wire', 13, '#fff', 'bold', halo=False))
+    o.append(text((xs[1] + xs[3]) / 2, 230, 'pin 3 NOT touched', 12, '#ffd', halo=False))
+    for k_, t in enumerate([
+            'Count from the SQUARE pad (pin 1): the 2nd and the 4th pin. The square pad is pin 1 from either side of the board.',
+            'Use a short piece of insulated wire (22 AWG), stripped 2 mm at each end, soldered to the two pin joints.',
+            'It must clear pin 3. Keep it flat: the board sits 2.4 mm off the box floor.',
+            'Check: meter on beep, pin 2 to TP1 should beep. Then pull the old LOAD wire out of slot 4 of the J5 plug.']):
+        o.append(text(40, 340 + 24 * k_, t, 13, '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
+    o.append('</svg>')
+    open(os.path.join(OUT, 'pcb-build-jumper.svg'), 'w').write('\n'.join(o))
+    return 'pcb-build-jumper.svg'
 
 
 def usb_picture():
@@ -490,6 +494,7 @@ def md():
     open(os.path.join(OUT, 'pcb-build-done.svg'), 'w').write('\n'.join(o))
     pics.append('pcb-build-done.svg')
     pics.append(meter_picture())
+    pics.append(jumper_picture())
     pics.append(charger_picture())
     pics.append(usb_picture())
 
@@ -529,7 +534,8 @@ def md():
         a('| %s | %d | %s | %s |' % (v, len(lst), ', '.join(r for r, _ in lst), ', '.join(sorted({str(k) for _, k in lst}))))
     a('| ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |')
     a('| USB-C breakout (Cermant) + its 2-wire lead to J3 | 1 | | 11 |')
-    a('| MCP73871 charger module + 4-wire harness (6-pin XH housing) | 1 | J5 | 11 |')
+    a('| Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |')
+    a('| Short insulated wire for the J5 pin 2 to pin 4 jumper | 1 | J5 underside | 11 |')
     a('| 18650 cell with its JST-XH plug | 1 | J4 | 12 |')
     a('| Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |')
     a('')
@@ -626,6 +632,12 @@ def md():
     a('Either way round, pushed down to the board. **C1 is the 10 µF ("106")**, the other five are 100 nF ("104"). C3–C5')
     a('sit under the ESP, beside the 1k resistors from step 1.')
     a('')
+    a('**Out of 100 nF?** Any **ceramic** capacitor from 47 nF to 1 µF works in C2–C6 ("473", "104", "224", "474", "105"),')
+    a('and they can be mixed: each one works on its own. They only smooth a reading; the value changes how fast a reading')
+    a('settles, never the number it settles to. Use the same value on C3–C5 if you can, so the three ports respond alike. A')
+    a('missing C2–C6 doesn\'t stop anything working (the readings are just noisier). **Not** an electrolytic like 100 µF, and')
+    a('**C1 must be the 10 µF.**')
+    a('')
     a('| Ref | Value | Marking | What it does |')
     a('|---|---|---|---|')
     for r in STEPS[3][1]:
@@ -653,7 +665,7 @@ def md():
     a('| Ref | Header | For | Pins (silkscreen) |')
     a('|---|---|---|---|')
     a('| J4 | JST-XH 2-pin (B2B-XH-A) | the 18650 | **−  +** (red wire on +) |')
-    a('| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty) |')
+    a('| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty; pin 4 gets jumpered to pin 2 in step 11) |')
     a('| J8 | JST-ZH 2-pin (B2B-ZR), the small one | solar (optional) | **−  +** |')
     a('')
     a('**Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the')
@@ -715,103 +727,131 @@ def md():
     a('jacks, and check every lead is trimmed to 1.8 mm or less.')
     a('')
     # ---- step 11
-    a('## Step 11: Wiring the charger module, the USB-C board, the battery and solar')
+    a('## Step 11: The charger, the USB-C board, the battery and solar')
     a('')
-    a('Everything off the PCB connects by a plug. Build these leads on the bench; nothing is soldered to the PCB itself.')
+    a('**Charger: Adafruit 6092 (bq25185), used as a charger only.** The battery feeds the whole board directly (motors and')
+    a('ESP), and the charger just keeps it topped up. A charger\'s own load output can only supply about 1 A, not enough for')
+    a('three motors at once; an 18650 supplies 3 A or more. (The first build used a no-name MCP73871 module. It charged at')
+    a('only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on USB: see')
+    a('[the v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)')
     a('')
     a('**Cut list (one box):**')
     a('')
     a('| Lead | Wire | Cut | From → to |')
     a('|---|---|---|---|')
-    a('| Charger LOAD | 22 AWG, pre-crimped JST lead | **100 mm** | J5 pin 4 → LOAD pad (from underneath) |')
-    a('| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 2 → BATT pad |')
-    a('| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm (half a lead) | J5 pin 1 → the GND pad next to PWR |')
-    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 52 mm (the LOAD lead\'s leftover) | J5 pin 6 → PWR pad |')
-    a('| NTC | its own leads (9 cm) | as is, or trimmed to ~50 mm | THERM pads → NTC bead on the cell |')
+    a('| J5 jumper | 22 AWG insulated | about 8 mm | J5 pin 2 → J5 pin 4, under the PCB |')
+    a('| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 2 → **BAT** pad |')
+    a('| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |')
+    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad |')
     a('| USB-C lead | 22 AWG, red + black | 2 × 65 mm | USB-C board VBUS / GND → 2-pin male header in J3 pins 1–2 |')
     a('| Battery | the cell\'s own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |')
     a('| Solar (optional) | the panel\'s flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |')
     a('')
     a('The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.')
-    a('One lead and a half makes a harness.')
     a('')
-    a('### 11a: Charger module (build it as one piece)')
+    a('### 11a: The J5 jumper (pin 2 to pin 4)')
+    a('')
+    a('![J5 jumper](renders/pcb-build-jumper.png)')
+    a('')
+    a('1. Turn the board over. Find J5\'s six pins; **pin 1 is the square pad** (from either side).')
+    a('2. Solder a short insulated wire from **pin 2** (battery) to **pin 4** (board supply), clear of pin 3. Keep it flat.')
+    a('3. **Check:** meter on beep, J5 pin 2 to **TP1** beeps.')
+    a('4. If your J5 plug still has a wire in **slot 4** (the old LOAD wire), pull it out: lift the plastic tab over its crimp')
+    a('   with a pin and slide it back out.')
+    a('')
+    a('### 11b: Charger (Adafruit 6092)')
     a('')
     a('![charger wiring](renders/pcb-build-charger.png)')
     a('')
-    a('The order matters, because the capacitor lies over the LOAD pad and the THERM pads once it\'s on:')
+    a('1. **Three wires, soldered to the pads by their printed names:**')
+    a('   - J5 **pin 1 (GND)** → **G** (or the **−** screw terminal)')
+    a('   - J5 **pin 2 (BATT)** → **BAT** (bottom edge)')
+    a('   - J5 **pin 6 (PWR)** → **VIN** (the DC / solar pads)')
+    a('2. **Leave empty:** the **4.5V** and **3V** screw terminals, the JST-PH battery socket, and EN.')
+    a('3. No temperature probe and no big capacitor: this module doesn\'t use them.')
+    a('4. **Crimp the three ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 6 PWR. Pins 3, 4, 5 empty.')
+    a('5. **Which end is pin 1:** from the wire side with the housing\'s **lock ramp up**, pin 1 is on the **left** (JST\'s XH')
+    a('   drawing). To be sure, push the **empty** housing into the soldered J5 first (it only fits one way), look down, and')
+    a('   mark the cavity over the silkscreen **G**. That\'s pin 1.')
+    a('6. **Tug-test every crimp.** On the first board the PWR crimp lost contact twice: TP4 read 4.8 V while the module\'s')
+    a('   input read 0 V.')
     a('')
-    a('1. **LOAD (J5 pin 4) first, from underneath:** push the bare end up through the LOAD hole from the back, solder it on')
-    a('   top with a low joint (the capacitor will lie 2.1 mm over it), and lay the wire flat along the underside. In the box the')
-    a('   module stands 2.4 mm off the floor and this wire runs under it.')
-    a('2. **PWR (pin 6), BATT (pin 2), GND (pin 1, the GND next to PWR)** from the top. The module\'s GND pads are all one')
-    a('   connection, so any GND works; the one next to PWR keeps the wire short.')
-    a('3. **NTC:** remove the small **103** resistor beside the THERM label (it reads 10 kΩ before you take it off). Solder the')
-    a('   NTC\'s own two leads (they come 9 cm long) straight to its two pads, either way round, joints sleeved. No extra wire.')
-    a('   Lay the pair flat along the module toward the capacitor\'s leg end; they leave from under the capacitor there. The')
-    a('   route to the cell\'s top is about 40 mm: trim the leads to ~50 mm, or coil the spare beside the cell.')
-    a('4. **Capacitor, last:** bend both legs 90° about 1.5 mm from the body, so it lies over the LOAD / BATT edge. **Long leg')
-    a('   (+) in the hole by the "+" mark** (the stripe on the can is −). Hold it 2 mm up on a spacer (a scrap of 1.6 mm board')
-    a('   plus a business card) while you solder, so it sits clear of the parts on its legs.')
-    a('5. **Check:** the capacitor\'s + leg beeps to the PWR pad, its − leg to GND.')
-    a('6. **Crimp ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 4 LOAD, pin 6 PWR; 3 and 5 empty. If you have a')
-    a('   pre-made 6-wire lead, pull the pin 3 and 5 wires out (lift the tab over each crimp with a pin) or cut them flush.')
-    a('7. **Which end is pin 1:** from the wire side with the housing\'s **lock ramp up**, pin 1 is on the **left** (JST\'s XH')
-    a('   drawing). To be sure, do it before crimping: push the **empty** housing into the soldered J5 (it only fits one way, lock')
-    a('   ramp toward the header\'s slotted wall, which faces end A), look down, and mark the cavity over the silkscreen **G** with')
-    a('   a dot. That\'s pin 1.')
+    a('**The lights:** orange **C** on = charging, off = full. Red **F** = a fault: unplug and check the wiring. The chip stops')
+    a('charging after **6 hours** nonstop; unplugging and replugging the power restarts it (for solar, the sun going down does).')
     a('')
-    a('The dev board wired all six pads (three − wires onto one GND rail). That\'s the same circuit: the PCB\'s J5 has room for one')
-    a('GND, and the heavy motor current returns to the battery through the PCB, not through this wire.')
+    a('**USB input, to check on the first build:** USB through the PCB reaches VIN at about 4.7 V (after D1), and the module')
+    a('is rated 5–18 V there. If it won\'t charge that way, plug USB-C into the **module\'s own socket** instead (the ESP then')
+    a('can\'t see that USB is present). Don\'t plug the module\'s USB-C in together with the solar panel until we\'ve checked')
+    a('how the module joins its two inputs.')
     a('')
-    a('### 11b: USB-C board lead')
+    a('### 11c: USB-C board lead')
     a('')
     a('![USB-C lead](renders/pcb-build-usb.png)')
     a('')
-    a('1. **Clip the USB-C board\'s six header pins to 3 mm** past their plastic (in the box the charger sits beside them).')
+    a('1. **Clip the USB-C board\'s six header pins to 3 mm** past their plastic.')
     a('2. **Two 22 AWG wires, 65 mm each:** red soldered to **VBUS**, black to **GND**. Go by the names printed beside the pins on')
-    a('   your board. The dev board used the order VBUS, GND, CC1, D−, D+, CC2. Sleeve both joints.')
+    a('   your board. Sleeve both joints.')
     a('3. Other ends onto a **2-pin piece of male header**: VBUS on one pin, GND on the other. Mark the VBUS end.')
     a('4. It plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Pin 1 is J3\'s square pad, at the room-side edge.')
     a('5. CC1 / D− / D+ / CC2 stay unwired: the board has its own 5.1 kΩ CC resistors ("512"), so USB-C chargers give it 5 V.')
     a('')
-    a('In the box the lead runs from those pins low along the room side, along the room-side wall, and up into J3.')
-    a('')
-    a('### 11c: Battery')
+    a('### 11d: Battery')
     a('')
     a('The 18650 plugs into **J4** with its own JST-XH lead: nothing to make. Before it ever goes in:')
     a('')
     a('1. Hold its plug against J4: the **red wire must sit over the silkscreen +**.')
-    a('2. Meter on volts, red probe on the plug\'s red wire: **+3.0 to +4.2 V**. A minus sign means the plug is wired backwards:')
-    a('   don\'t plug it in.')
-    a('3. In the box, its lead leaves the cell\'s end-B face, goes down the PCB side and along the channel between the cell and')
-    a('   the PCB\'s back edge to J4 (the two wires one above the other). It needs at least 45 mm.')
-    a('4. **The NTC** from 11a gets taped onto the top of the cell, about 4 mm from its end-B end (Kapton tape or a dab of')
-    a('   thermal glue).')
+    a('2. Meter on **DC volts**, red probe on the plug\'s red wire: **+3.0 to +4.2 V**. A minus sign means the plug is wired')
+    a('   backwards: don\'t plug it in.')
+    a('3. **Charge it first** (see "Charging the battery on the bench" below): the ESP needs the cell above about 3.8 V.')
     a('')
-    a('### 11d: Solar (optional)')
+    a('### 11e: Solar (optional)')
     a('')
     a('The panel\'s flat 2-core cable comes in through the slot in end wall B and gets a **JST-ZH 2-pin plug**: **− on pin 1**')
-    a('(silk −), **+ on pin 2** (silk +). Check the panel\'s polarity with the meter in sun before crimping.')
+    a('(silk −), **+ on pin 2** (silk +). **Check the panel\'s polarity with the meter in sun before crimping**: on the first')
+    a('board the panel was wired backwards (D2 blocked it, nothing was damaged). Behind a window it needs daylight: a 6 V panel')
+    a('in a dim room reads about 1 V and charges nothing.')
+    a('')
+    a('### Charging the battery on the bench')
+    a('')
+    a('The fastest way to fill a flat cell, without the PCB:')
+    a('')
+    a('1. Unplug the battery from J4.')
+    a('2. Two clip leads: battery **red → BAT**, battery **black → the − screw terminal** of the 6092.')
+    a('3. USB-C straight into the 6092. Orange **C** lights.')
+    a('4. About 2 hours from 3.6 V at 1 A. Done when **C** goes out. Unplug, wait a minute, measure: **4.1–4.2 V** = full.')
+    a('')
+    a('**Never connect USB straight to the battery:** 5 V pushes a lithium cell past 4.2 V and it can swell or catch fire.')
+    a('')
+    a('| Cell reads (resting) | Charge |')
+    a('|---|---|')
+    a('| 4.2 V | full |')
+    a('| 3.9 V | about 75% |')
+    a('| 3.7 V | about 50% (the "3.7 V" on the label is the average, not full) |')
+    a('| 3.6 V | about 25–30% |')
+    a('| 3.0 V | empty |')
     a('')
     # ---- step 12
     a('## Step 12: First power (no ESP yet)')
     a('')
-    a('1. **Battery polarity:** before the cell goes on, hold its plug against J4 and check the red wire is over **+**. Then')
-    a('   with the meter on volts, measure the plug: red probe on its red wire should read **+3.0 to +4.2 V**. A minus sign')
-    a('   means the plug is wired backwards. Don\'t plug it in.')
-    a('2. Plug the **charger harness into J5**, then the **battery into J4**. The battery reaches the board only through the')
-    a('   charger, so J5 goes first.')
-    a('3. Measure against **TP5 (GND)**:')
+    a('Meter on **DC volts** (V with a straight line, "V⎓" or "DCV", not the wavy V~; range 20 if it has ranges). Black probe')
+    a('on **TP5 (GND)** for every reading.')
+    a('')
+    a('1. **Battery polarity:** hold its plug against J4: red wire over **+**, and the plug reads **+3.0 to +4.2 V**.')
+    a('2. Plug the **charger harness into J5**, then the **battery into J4**. With the J5 jumper, the battery reaches the board')
+    a('   directly.')
+    a('3. Measure:')
     a('')
     a('| Pad | Expect |')
     a('|---|---|')
-    a('| TP1 BAT+ | about the cell\'s voltage (3.0–4.2 V) |')
-    a('| 3 | TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |')
-    a('| 4 | TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |')
-    a('| 5 | TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger\'s LEDs light |')
+    a('| TP1 BAT+ | the cell\'s voltage (3.0–4.2 V) |')
+    a('| TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |')
+    a('| TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |')
+    a('| TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger\'s orange light comes on |')
     a('')
-    a('If TP1 reads 0, check the J5 harness (pins 2 and 4) and that the cell isn\'t flat.')
+    a('**TP1 is the cell** (through the J5 jumper); TP2 is always 0.1–0.4 V lower, so don\'t read the battery off TP2. While')
+    a('it charges the cell reads a little high: for a true reading, unplug USB for a minute first.')
+    a('')
+    a('If TP1 reads 0, check the J5 jumper (pin 2 to pin 4) and that the cell isn\'t flat.')
     a('')
     # ---- step 13
     a('## Step 13: Plug in the ESP')
@@ -819,9 +859,22 @@ def md():
     a('1. **Unplug the battery** (J4).')
     a('2. Flash the ESP32-C6 on the bench first (through its own USB-C). In the box there\'s no room for a cable.')
     a('3. Plug it into J1 / J2: **chip up, its USB toward end B**, its 5V pin in J1\'s square pad. Push it fully down.')
-    a('4. Battery back in. **TP3 should read 3.3 V**, and the ESP boots.')
+    a('4. Battery back in. **TP3 should read 3.3 V**, and the ESP boots. With the cell below about 3.8 V, TP3 sags toward')
+    a('   3.0 V (D3 and the ESP\'s regulator each take a little) and the ESP resets whenever Wi-Fi transmits: charge the cell first.')
+    a('   (v3 fixes this with a 3.3 V converter: [v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)')
     a('')
     a('Then it goes into the box: [V5 assembly](controller-v5.md#assembly).')
+    a('')
+    a('## If something reads wrong')
+    a('')
+    a('| Symptom | Likely cause | Check |')
+    a('|---|---|---|')
+    a('| Readings make no sense | meter on the wrong setting (AC, mV, or Ω) | dial on **DC volts**, range 20 |')
+    a('| Minus sign on a reading | probes swapped, or a plug wired backwards | black on TP5; measure the plug by itself |')
+    a('| TP4 has 4.8 V but the charger\'s VIN reads 0 V | PWR crimp not making contact | push the crimp in until it clicks, tug-test it |')
+    a('| TP1 and TP2 fine, TP3 about 3.0 V, ESP keeps resetting | cell too low (below about 3.8 V) | charge it (bench charging above) |')
+    a('| Cell barely rises after hours | charger not charging properly | USB power meter between charger and cable: about **1 A** while charging (6092) |')
+    a('| ESP not on Wi-Fi | not powered, or browning out | TP3 = 3.3 V? Unplug power 5 s to restart it |')
     a('')
     a('## Regenerate this guide')
     a('')
