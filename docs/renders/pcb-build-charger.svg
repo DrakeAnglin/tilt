@@ -87,6 +87,6 @@
 <text x="40.0" y="1008.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).</text>
 <text x="40.0" y="1032.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Red F = fault: unplug and check the wiring.</text>
 <text x="40.0" y="1056.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">USB plugs into this module&#x27;s USB-C. The PCB&#x27;s USB-C board and J3 are not used.</text>
-<text x="40.0" y="1080.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">VIN carries solar only (J8 → D2 → J5 pin 6). The ESP can&#x27;t see USB is plugged in (GPIO0 sees solar only).</text>
+<text x="40.0" y="1080.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">USB in the module also shows on VIN (about 4.35 V, measured), so the ESP can see USB is plugged in.</text>
 <text x="40.0" y="1104.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">Do not plug in USB-C and the solar panel at the same time (not yet checked how the module joins them).</text>
 </svg>

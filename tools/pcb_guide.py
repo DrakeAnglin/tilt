@@ -491,7 +491,7 @@ def charger_picture():
             'Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).',
             'Red F = fault: unplug and check the wiring.',
             'USB plugs into this module\'s USB-C. The PCB\'s USB-C board and J3 are not used.',
-            'VIN carries solar only (J8 → D2 → J5 pin 6). The ESP can\'t see USB is plugged in (GPIO0 sees solar only).',
+            'USB in the module also shows on VIN (about 4.35 V, measured), so the ESP can see USB is plugged in.',
             'Do not plug in USB-C and the solar panel at the same time (not yet checked how the module joins them).']):
         o.append(text(40, ty0 + 24 * k_, t, 13, '#d62728' if k_ >= 4 else '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
     o.append('</svg>')
@@ -813,7 +813,7 @@ def md():
     a('| Splice leg B | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 4 → the splice |')
     a('| Charger BATT | 22 AWG | about 50 mm | the splice → **BAT** pad |')
     a('| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |')
-    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (carries solar) |')
+    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (solar in; USB shows here too) |')
     a('| Battery | the cell\'s own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |')
     a('| Solar (optional) | the panel\'s flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |')
     a('')
@@ -872,10 +872,11 @@ def md():
     a('**USB:** plug USB power into the **6092\'s own USB-C** (full 5 V, straight into the charger). The PCB\'s USB-C board,')
     a('its lead and J3 are no longer used; D1 just sits idle. Two things to know:')
     a('')
-    a('- **The ESP can\'t tell USB is plugged in.** GPIO0 (PSENSE) watches the PWR line, which now only carries solar.')
-    a('  Charging works the same; only the firmware\'s "USB present" reading is lost. One wire from the 6092\'s **VU** pad could')
-    a('  bring it back, once we\'ve checked how VU connects inside the module.')
-    a('- **Don\'t plug in USB-C and the solar panel at the same time** until we\'ve checked how the 6092 joins its USB-C and VIN.')
+    a('- **The ESP can still tell USB is plugged in.** With USB in the 6092, its VIN pad (and so the PCB\'s PWR line and GPIO0)')
+    a('  reads about **4.35 V**, about 0.6 V under USB, so the module joins USB to VIN, most likely through a diode (measured')
+    a('  on the first board, 2026-11-08).')
+    a('- **Don\'t plug in USB-C and the solar panel at the same time** until we\'ve confirmed that diode, so the panel can\'t')
+    a('  push back into the USB charger.')
     a('')
     a('### 11c: Battery')
     a('')
@@ -928,7 +929,7 @@ def md():
     a('| TP1 BAT+ | the cell\'s voltage (3.0–4.2 V) |')
     a('| TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |')
     a('| TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |')
-    a('| TP4 PWR | 0 V. Plug USB into the 6092: TP4 **stays 0 V** (it only sees solar) and the orange light comes on. With the solar panel in daylight: about 5.5–6 V |')
+    a('| TP4 PWR | 0 V. Plug USB into the 6092: about **4.35 V**, and the orange light comes on. With the solar panel in daylight instead: about 5.5–6 V |')
     a('')
     a('**TP1 is the cell** (through the J5 splice); TP2 is always 0.1–0.4 V lower, so don\'t read the battery off TP2. While')
     a('it charges the cell reads a little high: for a true reading, unplug USB for a minute first.')

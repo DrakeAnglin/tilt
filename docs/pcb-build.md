@@ -246,7 +246,7 @@ only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on U
 | Splice leg B | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 4 → the splice |
 | Charger BATT | 22 AWG | about 50 mm | the splice → **BAT** pad |
 | Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |
-| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (carries solar) |
+| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (solar in; USB shows here too) |
 | Battery | the cell's own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |
 | Solar (optional) | the panel's flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |
 
@@ -305,10 +305,11 @@ charging after **6 hours** nonstop; unplugging and replugging the power restarts
 **USB:** plug USB power into the **6092's own USB-C** (full 5 V, straight into the charger). The PCB's USB-C board,
 its lead and J3 are no longer used; D1 just sits idle. Two things to know:
 
-- **The ESP can't tell USB is plugged in.** GPIO0 (PSENSE) watches the PWR line, which now only carries solar.
-  Charging works the same; only the firmware's "USB present" reading is lost. One wire from the 6092's **VU** pad could
-  bring it back, once we've checked how VU connects inside the module.
-- **Don't plug in USB-C and the solar panel at the same time** until we've checked how the 6092 joins its USB-C and VIN.
+- **The ESP can still tell USB is plugged in.** With USB in the 6092, its VIN pad (and so the PCB's PWR line and GPIO0)
+  reads about **4.35 V**, about 0.6 V under USB, so the module joins USB to VIN, most likely through a diode (measured
+  on the first board, 2026-11-08).
+- **Don't plug in USB-C and the solar panel at the same time** until we've confirmed that diode, so the panel can't
+  push back into the USB charger.
 
 ### 11c: Battery
 
@@ -360,7 +361,7 @@ on **TP5 (GND)** for every reading.
 | TP1 BAT+ | the cell's voltage (3.0–4.2 V) |
 | TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |
 | TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |
-| TP4 PWR | 0 V. Plug USB into the 6092: TP4 **stays 0 V** (it only sees solar) and the orange light comes on. With the solar panel in daylight: about 5.5–6 V |
+| TP4 PWR | 0 V. Plug USB into the 6092: about **4.35 V**, and the orange light comes on. With the solar panel in daylight instead: about 5.5–6 V |
 
 **TP1 is the cell** (through the J5 splice); TP2 is always 0.1–0.4 V lower, so don't read the battery off TP2. While
 it charges the cell reads a little high: for a true reading, unplug USB for a minute first.
