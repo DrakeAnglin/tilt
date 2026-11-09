@@ -15,10 +15,10 @@ Layout, end A (ports) to end B (USB-C):
     box, through the bosses and the PCB's holes, into heat-set inserts in three lid posts: the screws clamp the PCB
     between the floor and the lid, and hold the lid on.
   * 18650 in two saddles along the back wall, beside the PCB body; the lid presses it down.
-  * Charger bay (rev N2): the Adafruit 6092 flat on four 4.4 mm posts (3 mm tall): two M2 self-tapping screws at its
-    far end, two studs up through its holes by the wall. It drops straight down, its USB-C end into a pocket in end wall
-    B's inner face (open at the top, closed by the lid), the socket behind a stadium window, its mouth 0.4 mm inside the
-    outer face. The 3-wire harness from the
+  * Charger bay (rev N3): the Adafruit 6092 flat on four 4.4 mm posts (3 mm tall): two M2 self-tapping screws at its
+    far end, two short indexing studs by the wall. It goes in USB-C end first, angled down into a slot in end wall B
+    (45 deg lead-in on the slot's top inner edge), then drops onto the studs; the socket sits behind a stadium window,
+    its mouth 0.4 mm inside the outer face. The 3-wire harness from the
     PCB's charger socket (G, the B+/L+ battery splice, P+) comes over the top to its pad row. The solar lead's floor
     route runs along the room-side wall, beside the charger.
 
@@ -83,7 +83,9 @@ C = dict(
     # the pad-row edge.
     c6_l=29.21, c6_w=19.05, c6_t=1.6, c6_holes=((2.54, 2.54), (26.67, 2.54), (2.54, 16.51), (26.67, 16.51)),
     c6_post=3.0, c6_post_d=4.4, c6_pilot=1.6,     # posts 3 tall (room under the board for the pads' solder); pilot for M2 self-tapping screws
-    c6_stud_d=2.1, c6_stud_up=0.8,                # rev N2: the two holes by end wall B get studs (a driver can't reach a screw there)
+    c6_stud_d=2.1, c6_stud_up=0.8,                # rev N2: the two holes by end wall B get studs (a driver can't reach a screw there);
+    #                                               rev N3: short, only for indexing (0.8 up from the post: half the board)
+    c6_bevel=1.0,                                 # rev N3: 45 deg lead-in on the slot's top inner edge, so the board angles down and in
     c6_usb=(3.94, 9.525), c6_usb_w=8.94, c6_usb_h=3.26, c6_usb_len=7.35, c6_usb_over=1.0,
     c6_edge_in=1.4,      # the board's USB-C edge sits 1.4 inside end B's outer face (so the socket's mouth is 0.4 inside)
     c6_yc=-9.4,          # board center across the box: room for the solar lead along the room-side wall, its slot clear of the corner's round
@@ -232,19 +234,24 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
                bx(C['bat_x0'] + c['bat_l'] + g, C['bat_x0'] + c['bat_l'] + g + t, by - hw, min(by + hw, ihi + 0.01), F0, bc - 4.0))
     # --- charger (rev N): Adafruit 6092 on four posts, screwed down (self-tapping, from above through its holes); its
     # USB-C end goes into a pocket in end wall B's inner face, the socket behind a stadium window
-    # rev N2: the two posts away from the wall take M2 screws; the two by end wall B carry studs up through the board's
-    # holes (a screw there would sit 1.5 mm off the wall: no room for its head or a driver). The board drops straight
-    # down over the studs, its USB-C end into the wall's pocket, which is open at the top (the lid closes it).
+    # rev N2: the two posts away from the wall take M2 screws; the two by end wall B carry studs into the board's holes
+    # (a screw there would sit 1.5 mm off the wall: no room for its head or a driver). rev N3: the wall stays full
+    # thickness with just a slot for the board's end and the USB-C; the studs are short (indexing only) and the slot's
+    # top inner edge has a 45 deg lead-in, so the board goes in USB-C end first, angled down, then drops onto the studs.
     for hx_, hy_ in c['c6_holes']:
         px, py = E(hx_, hy_)
         tray = uni(tray, cyl((px, py, F0), (px, py, C['c6_z0']), c['c6_post_d'] / 2))
-        if hx_ < c['c6_l'] / 2:                                   # by the wall: a stud
-            tray = uni(tray, cyl((px, py, C['c6_z0'] - 0.01), (px, py, C['c6_zt'] + c['c6_stud_up']), c['c6_stud_d'] / 2))
+        if hx_ < c['c6_l'] / 2:                                   # by the wall: a short stud with a chamfered top
+            sr, sz = c['c6_stud_d'] / 2, C['c6_z0'] + c['c6_stud_up']
+            tray = uni(tray, cyl((px, py, C['c6_z0'] - 0.01), (px, py, sz - 0.4), sr), cone((px, py, sz - 0.41), sr, (px, py, sz), sr - 0.4))
         else:                                                     # a screw
             tray = cut(tray, cyl((px, py, c['floor_z'] + 0.6), (px, py, C['c6_z0'] + 0.01), c['c6_pilot'] / 2))
     ex1, ey0, ey1 = C['c6_x1'], C['c6_y0'], C['c6_y1']
     uz1 = C['c6_zt'] + c['c6_usb_h']
-    tray = cut(tray, bx(in_b - 0.01, ex1 + 0.3, ey0 - 0.3, ey1 + 0.3, C['c6_z0'], zl + 0.01))     # pocket: board end + socket, open at the top
+    stop = uz1 + 0.3
+    tray = cut(tray, bx(in_b - 0.01, ex1 + 0.3, ey0 - 0.3, ey1 + 0.3, C['c6_z0'], stop))         # slot: board end + socket
+    bv = c['c6_bevel'] * math.sqrt(2)
+    tray = cut(tray, obox((in_b, c['c6_yc'], stop), (math.sqrt(0.5), 0, math.sqrt(0.5)), (0, 1, 0), bv, ey1 - ey0 + 0.6, bv))   # 45 deg lead-in
     _, uy = E(*c['c6_usb'])
     ur = c['c6_usb_h'] / 2 + 0.3
     uhw = c['c6_usb_w'] / 2 + 0.3 - ur
