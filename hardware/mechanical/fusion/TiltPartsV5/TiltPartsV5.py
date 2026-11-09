@@ -485,6 +485,7 @@ def build(design, export_dir=None):
             opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
             em.execute(opt)
             files.append(path)
+    arm_pp_occ.deleteMe()                                # the printed-pin arm is a print file only, not part of the assembly
     return dict(CL={k: (tuple(round(x, 3) for x in v) if isinstance(v, tuple) else (round(v, 4) if isinstance(v, float) else None))
                     for k, v in CL.items() if k in ('O', 'M', 'A', 'B', 'A_on', 'B_on', 'A_far', 'B_far', 'a', 'b', 'd', 'neu', 'swing', 'base', 'phi', 'psi')},
                 bosses=bosses, pegs=pegs, files=files)
