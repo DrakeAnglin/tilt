@@ -12,7 +12,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell and the charger.
 |---|---|
 | Size | **157.4 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
-| Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head**; the charger: **4 × M2 × 6 self-tapping** screws |
+| Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head**; the charger: **2 × M2 × 6 self-tapping** screws |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
 
 ## Why it is longer than V4
@@ -56,8 +56,9 @@ clamp pins, the separate USB-C board's holders and lid channel, the NTC and the 
 | | |
 |---|---|
 | Board | 29.21 × 19.05 × 1.6 mm, four 2.5 mm holes 2.54 in from the corners (from Adafruit's own board file) |
-| Mount | flat on **4 posts** (4.4 mm round, 3 mm tall: room for the pads' solder underneath), **4 × M2 self-tapping screws** from above (1.6 mm pilots). M2.5 also fits the board's holes: then the pilots go to 2.1 mm |
-| USB-C | out of **end wall B** as before: the board's last 1 mm sits in a pocket in the wall's inner face, the socket behind a stadium window, its mouth 0.4 mm inside the outer face |
+| Mount | flat on **4 posts** (4.4 mm round, 3 mm tall: room for the pads' solder underneath). The two at the far end take **2 × M2 self-tapping screws** from above (1.6 mm pilots; M2.5 also fits the board's holes, then the pilots go to 2.1 mm). The two by end wall B have **studs** (2.1 mm, 0.8 mm above the board) up through its holes: a screw there would sit 1.5 mm off the wall, with no room for its head or a driver |
+| USB-C | out of **end wall B** as before: the board drops straight down over the studs, its last 1 mm into a pocket in the wall's inner face (open at the top, closed by the lid), the socket behind a stadium window, its mouth 0.4 mm inside the outer face |
+| Vents | the old module's vent slots in end wall B are gone (the 6092 doesn't need them) |
 | Place | X 128.8–158.0 (2 mm past the PCB's end), Y −18.9 to 0.1; board top 5.8 mm, screw terminal top 14.2 mm |
 | Harness | over the top to the pad row: G → **G** (58.8 mm), the B+ / L+ splice → **BAT** (51.6 + an 11.6 mm leg), P+ → **VIN** (59.0 mm) |
 | Solar lead | its slot and floor route moved to the room-side wall (Y −21.2), beside the charger |
