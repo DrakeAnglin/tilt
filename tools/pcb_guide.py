@@ -322,27 +322,40 @@ def meter_picture():
     return 'pcb-build-meter.svg'
 
 
-def housing_marks(o, hx, hy, rows=6, pitch=50):
-    """The J5 housing drawn upright (pin 1 at the top): JST's XH drawing says that from the wire side with the lock ramp
-    up, pin 1 is on the left; turned a quarter turn clockwise, the ramp is on the RIGHT and pin 1 at the TOP."""
-    h = rows * pitch + 10
-    o.append('<rect x="%d" y="%d" width="26" height="%d" rx="3" fill="#e3dccb" stroke="#555" stroke-width="2"/>' % (hx + 151, hy + 22, h - 44))
-    o.append(text(hx + 164, hy + h / 2, 'LOCK RAMP', 13, '#444', 'bold', rot=90, halo=False))
-    o.append('<polygon points="%d,%d %d,%d %d,%d" fill="#d62728"/>' % (hx - 8, hy + 27, hx - 26, hy + 17, hx - 26, hy + 37))
-    o.append(text(hx - 30, hy + 50, 'PIN 1', 12, '#d62728', 'bold', 'end', halo=False))
+def housing_h(o, hx, hy, cav, w=80):
+    """The J5 plug as you hold it: seen from the WIRE side, the long flat face at the bottom and the two little hooks on
+    top; pins 1 to 6 run left to right (the owner's plug, and JST's XH drawing). Returns each slot's wire exit point."""
+    n = len(cav)
+    W, H = n * w + 10, 78
+    o.append('<rect x="%d" y="%d" width="%d" height="%d" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx, hy, W, H))
+    for hk in (hx + W * 0.3, hx + W * 0.7):            # the two little hooks on the top face
+        o.append('<path d="M%d %d l 0 -16 l 22 0 l 0 7 l -12 0 l 0 9 z" fill="#e3dccb" stroke="#555" stroke-width="2"/>' % (hk - 11, hy))
+    o.append(text(hx + W + 12, hy + 4, '← two little hooks UP', 12, '#555', 'bold', 'start', halo=False))
+    o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#555" stroke-width="5"/>' % (hx + 4, hy + H, hx + W - 4, hy + H))
+    o.append(text(hx + W + 12, hy + H + 4, '← long flat side DOWN', 12, '#555', 'bold', 'start', halo=False))
+    out = {}
+    for q, (pin, what, c) in enumerate(cav):
+        x_ = hx + 5 + w * q
+        o.append('<rect x="%d" y="%d" width="%d" height="%d" rx="4" fill="#fff" stroke="#bbb"/>' % (x_, hy + 6, w - 6, H - 12))
+        o.append(text(x_ + (w - 6) / 2, hy + 28, 'pin %s' % pin, 13, '#444', 'bold', halo=False))
+        o.append(text(x_ + (w - 6) / 2, hy + 50, what, 12, c, 'bold', halo=False))
+        out[pin] = (x_ + (w - 6) / 2, hy + H)
+    o.append('<polygon points="%d,%d %d,%d %d,%d" fill="#d62728"/>' % (hx - 6, hy + H / 2, hx - 22, hy + H / 2 - 9, hx - 22, hy + H / 2 + 9))
+    o.append(text(hx - 26, hy + H / 2 + 5, 'PIN 1', 12, '#d62728', 'bold', 'end', halo=False))
+    return out
 
 
 def charger_picture():
     """The Adafruit 6092 (bq25185) charger, used as a charger ONLY, and its 3-wire J5 harness. Drawn as a wiring diagram:
     the pad names are the ones printed on the board (Adafruit's guide); positions on the real board differ, so go by the
     printed labels."""
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="980" font-family="Helvetica,Arial">',
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1260" height="1200" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
          text(20, 32, 'Charger: Adafruit 6092 (bq25185), wired as a charger only', 20, '#111', 'bold', 'start', halo=False),
          text(20, 56, 'Top view, drawn from Adafruit\'s photo (not to scale). Go by the name printed beside each pad.', 13, '#444', anchor='start', halo=False)]
     # the module, top view, drawn from Adafruit's photo: USB-C at the top end, the screw terminal at the bottom end, the
     # JST-PH socket just below the USB-C, and the row of 8 pads down the left edge (VIN at the USB end, EN at the terminal end)
-    mx0, my0, mw, mh = 620, 120, 300, 470
+    mx0, my0, mw, mh = 700, 330, 300, 470
     o.append('<rect x="%d" y="%d" width="%d" height="%d" rx="16" fill="#1a1a1a" stroke="#c9c9a0" stroke-width="3"/>' % (mx0, my0, mw, mh))
     for hx_, hy_ in ((mx0 + 30, my0 + 30), (mx0 + mw - 30, my0 + 30), (mx0 + 30, my0 + mh - 30), (mx0 + mw - 30, my0 + mh - 30)):
         o.append('<circle cx="%d" cy="%d" r="18" fill="#c9a400"/><circle cx="%d" cy="%d" r="11" fill="#fff"/>' % (hx_, hy_, hx_, hy_))
@@ -384,37 +397,31 @@ def charger_picture():
         o.append(text(x_ + 25, my0 + mh + 22, name, 14, '#2e7a3f', 'bold', halo=False))
     o.append(text(mx0 + mw / 2, my0 + mh + 46, 'Screw terminal (bottom end): all three stay EMPTY', 13, '#2e7a3f', 'bold', halo=False))
     o.append(text(mx0 + mw / 2, my0 + mh + 64, '(the battery feeds the board directly; see the J5 splice)', 12, '#555', halo=False))
-    # the J5 housing on the left, wires to the pads
-    hx, hy = 70, 200
-    cav = [('1', 'G', 'GND', '#222'), ('2', 'B+', 'BATT', '#d62728'), ('3', '·', 'empty', '#999'),
-           ('4', 'L+', 'BATT (splice)', '#d62728'), ('5', '·', 'empty', '#999'), ('6', 'P+', 'PWR', '#d62728')]
-    o.append(text(hx, hy - 50, 'J5 plug (6-pin JST-XH)', 15, '#111', 'bold', 'start', halo=False))
-    o.append(text(hx, hy - 30, 'wires toward you, LOCK RAMP on the RIGHT: pin 1 is at the TOP', 12, '#d62728', 'bold', 'start', halo=False))
-    o.append('<rect x="%d" y="%d" width="150" height="%d" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx, hy, 6 * 50 + 10))
-    wire_y = {}
-    for q, (pin, silk, what, c) in enumerate(cav):
-        y_ = hy + 5 + 50 * q
-        o.append('<rect x="%d" y="%d" width="140" height="44" rx="4" fill="#fff" stroke="#bbb"/>' % (hx + 5, y_))
-        o.append(text(hx + 15, y_ + 18, 'pin %s (%s)' % (pin, silk), 12, '#444', anchor='start', halo=False))
-        o.append(text(hx + 15, y_ + 36, what, 14, c, 'bold', 'start', halo=False))
-        wire_y[pin] = y_ + 22
-    housing_marks(o, hx, hy)
-    sx, sy = hx + 250, (wire_y['2'] + wire_y['4']) / 2          # the splice: slots 2 and 4 joined, one wire on to BAT
+    # the J5 plug, as you hold it, wires down to the module's pads
+    hx, hy = 110, 170
+    cav = [('1', 'GND', '#222'), ('2', 'BATT', '#d62728'), ('3', 'empty', '#999'),
+           ('4', 'BATT', '#d62728'), ('5', 'empty', '#999'), ('6', 'PWR', '#d62728')]
+    o.append(text(40, hy - 70, 'J5 plug (6-pin JST-XH), seen from the WIRE side:', 15, '#111', 'bold', 'start', halo=False))
+    o.append(text(40, hy - 50, 'flat side down, two hooks up: pins 1 to 6 left to right', 13, '#d62728', 'bold', 'start', halo=False))
+    ex = housing_h(o, hx, hy, cav, w=70)
+    sx, sy = (ex['2'][0] + ex['4'][0]) / 2, hy + 190            # the splice: slots 2 and 4 joined, one wire on to BAT
     for name, col, y, lab in pads:
+        ty = my0 + y
         if name == 'BAT':
             for pin in ('2', '4'):
+                x0, y0 = ex[pin]
                 o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
-                    hx + 178, wire_y[pin], hx + 210, wire_y[pin], sx - 50, sy, sx, sy, col))
+                    x0, y0, x0, y0 + 60, sx, sy - 60, sx, sy, col))
             o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
-                sx, sy, sx + 150, sy, mx0 - 180, my0 + y, mx0 - 16, my0 + y, col))
-            o.append('<rect x="%d" y="%d" width="34" height="16" rx="6" fill="#333"/>' % (sx - 17, sy - 8))
-            o.append(text(sx, sy - 14, 'splice', 12, '#333', 'bold', halo=True))
+                sx, sy, sx, sy + 120, mx0 - 200, ty, mx0 - 16, ty, col))
+            o.append('<rect x="%d" y="%d" width="18" height="34" rx="6" fill="#333"/>' % (sx - 9, sy - 17))
+            o.append(text(sx + 16, sy + 5, 'splice', 12, '#333', 'bold', 'start'))
             continue
-        y0 = wire_y[{'G': '1', 'VIN': '6'}[name]]
+        x0, y0 = ex[{'G': '1', 'VIN': '6'}[name]]
         o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
-            hx + 178, y0, hx + 330, y0, mx0 - 180, my0 + y, mx0 - 16, my0 + y, col))
-    o.append(text(hx, hy + 6 * 50 + 34, 'pins 2 and 4 both carry BATT: one splice, two crimps (11a)', 12, '#666', anchor='start', halo=False))
-    ty0 = 740
+            x0, y0, x0, y0 + 160, mx0 - 220, ty, mx0 - 16, ty, col))
+    o.append(text(40, hy + 560, 'pins 2 and 4 both carry BATT: one splice, two crimps (11a)', 12, '#666', anchor='start', halo=False))
+    ty0 = 960
     for k_, t in enumerate([
             '3 pads wired: GND (pin 1) to G, BATT (pins 2 + 4, spliced) to BAT, PWR (pin 6) to VIN. Nothing else is wired.',
             'No temperature probe and no big capacitor with this module (the old one needed both).',
@@ -433,41 +440,34 @@ def splice_picture():
     """The J5 plug's battery splice: slot 2 and slot 4 both carry BATT, joined in one splice that goes on to the 6092's BAT.
     The battery then feeds the board directly (J4 -> J5 pin 2 -> splice -> J5 pin 4 -> the board supply), with no change
     to the PCB."""
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" font-family="Helvetica,Arial">',
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
          text(20, 32, 'J5 splice: slots 2 and 4 joined (no change to the PCB)', 20, '#111', 'bold', 'start', halo=False),
          text(20, 56, 'The battery then feeds the whole board directly; the charger only charges it.', 13, '#444', anchor='start', halo=False)]
-    hx, hy = 70, 110
+    hx, hy = 90, 140
     cav = [('1', 'GND', '#222'), ('2', 'BATT', '#d62728'), ('3', 'empty', '#999'), ('4', 'BATT', '#d62728'),
            ('5', 'empty', '#999'), ('6', 'PWR', '#d62728')]
-    o.append(text(hx, hy - 12, 'J5 plug: wires toward you, LOCK RAMP on the RIGHT: pin 1 is at the TOP', 13, '#d62728', 'bold', 'start', halo=False))
-    o.append('<rect x="%d" y="%d" width="150" height="%d" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx, hy, 6 * 50 + 10))
-    wy = {}
-    for q, (pin, what, c) in enumerate(cav):
-        y_ = hy + 5 + 50 * q
-        o.append('<rect x="%d" y="%d" width="140" height="44" rx="4" fill="#fff" stroke="#bbb"/>' % (hx + 5, y_))
-        o.append(text(hx + 15, y_ + 18, 'slot %s' % pin, 12, '#444', anchor='start', halo=False))
-        o.append(text(hx + 15, y_ + 36, what, 14, c, 'bold', 'start', halo=False))
-        wy[pin] = y_ + 22
-    housing_marks(o, hx, hy)
-    sx, sy = 400, (wy['2'] + wy['4']) / 2
+    o.append(text(40, hy - 50, 'J5 plug, seen from the WIRE side: flat side down, two hooks up, pins 1 to 6 left to right', 13, '#d62728', 'bold', 'start', halo=False))
+    ex = housing_h(o, hx, hy, cav, w=80)
+    sx, sy = (ex['2'][0] + ex['4'][0]) / 2, hy + 190
     for pin in ('2', '4'):
-        o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="#d62728" stroke-width="5"/>' % (
-            hx + 178, wy[pin], hx + 230, wy[pin], sx - 90, sy, sx - 20, sy))
-    o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#d62728" stroke-width="5"/>' % (sx + 20, sy, 760, sy))
-    o.append('<rect x="%d" y="%d" width="60" height="22" rx="8" fill="#333"/>' % (sx - 30, sy - 11))
-    o.append(text(sx, sy - 22, 'splice: soldered, heat-shrink over it', 13, '#333', 'bold'))
-    o.append(text(770, sy + 5, 'to the 6092\'s BAT pad', 14, '#d62728', 'bold', 'start', halo=False))
-    for pin, lab in (('1', 'to G'), ('6', 'to VIN')):
-        o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="4"/>' % (hx + 178, wy[pin], 760, wy[pin], '#222' if pin == '1' else '#d62728'))
-        o.append(text(770, wy[pin] + 5, lab, 14, '#222' if pin == '1' else '#d62728', 'bold', 'start', halo=False))
+        x0, y0 = ex[pin]
+        o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="#d62728" stroke-width="5"/>' % (x0, y0, x0, y0 + 60, sx, sy - 60, sx, sy - 14))
+    o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#d62728" stroke-width="5"/>' % (sx, sy + 14, sx, sy + 90))
+    o.append('<rect x="%d" y="%d" width="22" height="40" rx="8" fill="#333"/>' % (sx - 11, sy - 20))
+    o.append(text(sx - 22, sy + 5, 'splice: soldered, heat-shrink over it', 13, '#333', 'bold', 'end'))
+    o.append(text(sx, sy + 110, 'to the 6092\'s BAT', 14, '#d62728', 'bold'))
+    for pin, lab, c in (('1', 'to G', '#222'), ('6', 'to VIN', '#d62728')):
+        x0, y0 = ex[pin]
+        o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="4"/>' % (x0, y0, x0, sy + 90, c))
+        o.append(text(x0, sy + 110, lab, 14, c, 'bold'))
     for k_, t in enumerate([
             'Two pre-crimped JST leads (crimp ends in slots 2 and 4) and the wire to BAT, all 22 AWG, joined in one soldered splice.',
             'Keep the two crimped legs short (about 30 mm), so the motor current\'s loop through the plug is short.',
             'Push both crimps in until they click, then tug-test each one. A loose crimp here cuts power to the whole board.',
             'With the J5 plug out, the board has no power: the battery reaches it only through this plug.',
             'Check: battery in J4, J5 plugged in, TP1 reads the battery voltage.']):
-        o.append(text(40, 440 + 22 * k_, t, 13, '#d62728' if k_ in (2, 3) else '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
+        o.append(text(40, 480 + 22 * k_, t, 13, '#d62728' if k_ in (2, 3) else '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
     o.append('</svg>')
     open(os.path.join(OUT, 'pcb-build-splice.svg'), 'w').write('\n'.join(o))
     return 'pcb-build-splice.svg'
@@ -676,7 +676,7 @@ def md():
     a('')
     a('**Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the')
     a('battery in backwards. On the two XH headers (J4, J5) **the wall with the two slots faces end A** (toward the ESP); the')
-    a('silkscreen outline shows those slots. That\'s the side the plug\'s lock ramp clicks into. Then, before soldering, push the')
+    a('silkscreen outline shows those slots. That\'s the side the plug\'s two little hooks click into. Then, before soldering, push the')
     a('actual plug in and hold it over the board: the cell\'s **red wire must sit over +**. Solder one pin, check it sits flat,')
     a('then the rest.')
     a('')
@@ -782,10 +782,9 @@ def md():
     a('2. **Leave empty:** the **4.5V** and **3V** screw terminals, the JST-PH battery socket, and EN.')
     a('3. No temperature probe and no big capacitor: this module doesn\'t use them.')
     a('4. **Crimp the three ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 6 PWR. Pins 3, 4, 5 empty.')
-    a('5. **Which end is pin 1:** hold the plug with the **wires toward you** and the **lock ramp up**: pin 1 is on the')
-    a('   **left** (as drawn upright in the pictures: lock ramp on the right, pin 1 at the top). That\'s JST\'s XH')
-    a('   drawing). To be sure, push the **empty** housing into the soldered J5 first (it only fits one way), look down, and')
-    a('   mark the cavity over the silkscreen **G**. That\'s pin 1.')
+    a('5. **Which end is pin 1:** hold the plug with the **wires toward you**, the **long flat side down** and the **two little')
+    a('   hooks up**: pins run **1 to 6 from left to right** (as in the pictures). To be sure, push the **empty** housing into')
+    a('   the soldered J5 first (it only fits one way), look down, and mark the cavity over the silkscreen **G**. That\'s pin 1.')
     a('6. **Tug-test every crimp.** On the first board the PWR crimp lost contact twice: TP4 read 4.8 V while the module\'s')
     a('   input read 0 V.')
     a('')

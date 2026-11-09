@@ -178,7 +178,7 @@ Three different headers, so no plug fits the wrong one:
 
 **Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the
 battery in backwards. On the two XH headers (J4, J5) **the wall with the two slots faces end A** (toward the ESP); the
-silkscreen outline shows those slots. That's the side the plug's lock ramp clicks into. Then, before soldering, push the
+silkscreen outline shows those slots. That's the side the plug's two little hooks click into. Then, before soldering, push the
 actual plug in and hold it over the board: the cell's **red wire must sit over +**. Solder one pin, check it sits flat,
 then the rest.
 
@@ -279,10 +279,9 @@ wire in **both** slots joins them, so the battery feeds the board directly.
 2. **Leave empty:** the **4.5V** and **3V** screw terminals, the JST-PH battery socket, and EN.
 3. No temperature probe and no big capacitor: this module doesn't use them.
 4. **Crimp the three ends into the 6-pin housing:** pin 1 GND, pin 2 BATT, pin 6 PWR. Pins 3, 4, 5 empty.
-5. **Which end is pin 1:** hold the plug with the **wires toward you** and the **lock ramp up**: pin 1 is on the
-   **left** (as drawn upright in the pictures: lock ramp on the right, pin 1 at the top). That's JST's XH
-   drawing). To be sure, push the **empty** housing into the soldered J5 first (it only fits one way), look down, and
-   mark the cavity over the silkscreen **G**. That's pin 1.
+5. **Which end is pin 1:** hold the plug with the **wires toward you**, the **long flat side down** and the **two little
+   hooks up**: pins run **1 to 6 from left to right** (as in the pictures). To be sure, push the **empty** housing into
+   the soldered J5 first (it only fits one way), look down, and mark the cavity over the silkscreen **G**. That's pin 1.
 6. **Tug-test every crimp.** On the first board the PWR crimp lost contact twice: TP4 read 4.8 V while the module's
    input read 0 V.
 
