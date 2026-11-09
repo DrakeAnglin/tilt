@@ -79,7 +79,7 @@ for i in range(root.occurrences.count):
     o = root.occurrences.item(i)
     for j in range(o.bRepBodies.count):
         b = o.bRepBodies.item(j)
-        if b.name in ('Rod', 'Magnet', 'AS5600 board', 'AS5600 chip') or b.name.startswith('Rail'):
+        if b.name in ('Rod', 'Magnet', 'AS5600 board', 'AS5600 chip', 'Clutch arm printed pins') or b.name.startswith('Rail'):
             continue
         tilter.append((b.name, tbm.copy(b)))
 own = [(g, nm, b) for g in ('Module', 'Inside', 'Screws', 'Plug') for nm, b in groups[g]]
@@ -153,7 +153,7 @@ notes.append('7T mesh: contact-free window %.1f deg of shaft rotation (backlash)
 
 
 # pairs that touch by design (fits / meshes)
-MATES = [{'Clutch pinion', 'N20 shaft'}, {'Clutch shaft', 'Clutch 12T'}, {'Clutch pinion', 'Clutch arm'},          # pads grip the hub (0.15 interference)
+MATES = [{'Clutch pinion', 'N20 shaft'}, {'Clutch shaft', 'Clutch 12T'}, {'Pin A', 'Clutch arm'}, {'Pin B', 'Clutch arm'}, {'Clutch pinion', 'Clutch arm'},          # pads grip the hub (0.15 interference)
          {'RJ12 board', 'RJ12 jack'}, {'RJ12 board', 'RJ12 pins'}, {'RJ12 jack', 'RJ12 plug'}, {'RJ12 plug', 'White cord'},
          {'DRV8833', 'DRV8833 chip'}, {'DRV8833', 'C 10uF'}, {'AS5600 board', 'AS5600 chip'}, {'N20', 'N20 shaft'}]
 
@@ -162,7 +162,7 @@ def mated(a, b):
     return {a, b} in MATES
 
 
-CLUTCH = ('Clutch shaft', 'Clutch 12T', 'Clutch pinion', 'Idler A', 'Idler B', 'Clutch arm', 'Clutch plate')
+CLUTCH = ('Clutch shaft', 'Clutch 12T', 'Clutch pinion', 'Idler A', 'Idler B', 'Clutch arm', 'Clutch plate', 'Pin A', 'Pin B')
 
 
 def check(tilter_bodies, label, skip=()):
@@ -218,7 +218,7 @@ for sgn, eng in ((1, 'Idler B'), (-1, 'Idler A')):
             p = CL['A'] if nm == 'Idler A' else CL['B']
             rot(b2, alpha * zr, p[0], p[1])
             rot(b2, alpha, M[0], M[1])
-        elif nm == 'Clutch arm':
+        elif nm in ('Clutch arm', 'Pin A', 'Pin B'):
             rot(b2, alpha, M[0], M[1])
         moved.append((nm, b2))
     # the engaged idler meshes the 12T (tooth phase not modeled): judged by its center distance below, not by volume
@@ -285,3 +285,21 @@ files.append(path)
 result = {'clutch': rep['CL'], 'center distances (mm)': cd, 'module': POD.summary(), 'notes': notes,
           'interference (neutral)': hits, 'interference at the stops': stop_hits, 'rod sweep': rod_hits,
           'exported': [os.path.basename(f) for f in files]}
+
+# ---------------- tidy the view: sketches, construction planes, origins and joints hidden (they were left on)
+for k in range(design.allComponents.count):
+    cc = design.allComponents.item(k)
+    for attr in ('isSketchFolderLightBulbOn', 'isConstructionFolderLightBulbOn', 'isOriginFolderLightBulbOn',
+                 'isJointsFolderLightBulbOn'):
+        try:
+            setattr(cc, attr, False)
+        except Exception:
+            pass
+    for s_ in range(cc.sketches.count):
+        cc.sketches.item(s_).isLightBulbOn = False
+    for s_ in range(cc.constructionPlanes.count):
+        cc.constructionPlanes.item(s_).isLightBulbOn = False
+try:
+    app.activeViewport.refresh()
+except Exception:
+    pass

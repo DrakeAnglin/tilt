@@ -41,27 +41,30 @@ C = dict(
     # cantilever fingers instead of the stiff pads, a full-length pinion hub under the arm, a real shoulder for the 12T
     m=0.8, z_pin=9, z_idl=9, z_out=12, addendum=1.0, dedendum=1.25,
     face=5.8,
-    cd_extra=0.1,                            # added to every clutch center distance (printed teeth)
+    cd_extra=0.0,                            # rev 3: standard spacing (contact ratio ~1.29; the profile already has 0.15 backlash)
     out_gap=0.6,                             # pinion tips to the 12T's tips (they never mesh)
     neutral_gap=1.0,                         # idler tips to the 12T's tips with the arm in the middle
     theta=338.0,                             # direction of the motor axis from the 12T's axis (deg, from +Z toward +Y)
     motor_face_x=-18.6,                      # N20 gearbox face (seated 0.8 deep in the clutch plate)
-    plate_x=(-19.4, -16.6), plate_pocket=0.8, plate_fit=0.1, plate_wall=1.2,
+    plate_x=(-19.4, -16.6), plate_pocket=0.8, plate_fit=0.3, plate_wall=1.2,   # rev 3: pocket loose (anti-rotation only)
+    plate_hub_clear=0.1,                     # rev 3: the plate locates on the pinion's hub (the shaft's true axis)
     gear_x=(-14.4, -8.6),                    # clutch gear plane (lid face -8.33: idlers can float only 0.3)
     arm_x=(-16.4, -14.6),                    # arm plate, between the clutch plate and the gears
-    pin_hub_d=5.5, pin_hub_x0=-16.4,         # pinion hub (round shaft section), full length under the arm
+    pin_hub_d=5.5, pin_hub_x0=-17.8,         # pinion hub: through the clutch plate (0.8 off the gearbox face) and the arm
     arm_bore_clear=0.1,
     arm_hub_r=6.0, finger_t=0.8, finger_slot=0.8, finger_span=120.0, finger_interf=0.3, finger_bump_r=0.5,
     finger_roots=(150.0, 330.0),             # each finger runs CCW from its root; free end + bump at root + span
-    lobe_w=4.6, pin_d=3.0, pin_tip_x=-8.45, pin_boss_d=4.6, pin_boss_x=-14.45, idler_bore_clear=0.15,
+    lobe_w=4.6, pin_d=3.0, pin_tip_x=-8.45, pin_boss_d=4.6, pin_boss_x=-14.45, idler_bore_clear=0.1,
+    pin_press=0.05,                          # rev 3: steel Ø3 x 8 dowels pressed into the arm (Ø2.95 holes)
     stop_dir=62.0, stop_r=7.2, stop_d=3.0, stop_clear=0.15, slot_wall=1.2, stop_tip_x=-14.7,
     tail_span=(22.0, 100.0),
     avoid=(((-23.0, 27.0), 3.8),),          # module bolt C's boss (TiltPodV5 bolts_rim): the plate keeps clear of it
-    shaft_d=5.0, shaft_bore_clear=0.2,
+    shaft_d=6.0, shaft_bore_clear=0.15,      # rev 3: Ø6 through the lid, so the 12T's Ø5 D-section has a real shoulder
     pin7_d=4.0, pin7_x=(4.1, 0.0), pin7_bore_clear=0.15, pin7_depth=3.4,
-    thrust_ring=(2.5, 3.0, 0.25),            # lid-side thrust ring on the 7T (r_in, r_out, height); main-half ring on the case
-    hex_r=2.3, hex_fit=0.05,                 # 12T on a hex (smaller than the Ø5 shaft: a real shoulder), glued
-    journal_d=4.0, journal_x=(-14.3, -19.3), journal_clear=0.15,   # the shaft's end runs in the clutch plate
+    thrust_ring=(3.0, 3.65, 0.15),           # lid-side thrust ring (bears on the lid outside its Ø6.3 bore); 0.35 total end float
+    boss_face_gap=0.2,                       # main-half thrust boss face 0.2 off the 7T
+    d_r=2.5, d_flat=1.8, d_fit=0.05,         # rev 3: 12T on a Ø5 D-section (flat 1.8 from the axis), glued
+    journal_d=3.6, journal_x=(-14.3, -19.3), journal_clear=0.1,    # rev 3: Ø3.6 so the 12T's bore passes over it
 )
 c = C
 
@@ -128,7 +131,7 @@ def case_plan_v5(L):
     x0, x1 = c['pin7_x']                    # grows up from the main half's pinion pocket floor (prints split face up)
     plan['pin_solids'].append(T4.Prim('cyl', p1=(x0, oy, oz), p2=(x1, oy, oz), r=c['pin7_d'] / 2))
     pf = P['pinion_face']                   # thrust boss round the pin: the 7T's main-half face bears only near its axis
-    plan['pin_solids'].append(T4.Prim('cyl', p1=(pf / 2 + 0.3 + 0.8, oy, oz), p2=(pf / 2 + 0.05, oy, oz), r=c['pin7_d'] / 2 + 0.7))
+    plan['pin_solids'].append(T4.Prim('cyl', p1=(pf / 2 + 0.3 + 0.8, oy, oz), p2=(pf / 2 + c['boss_face_gap'], oy, oz), r=c['pin7_d'] / 2 + 0.7))
     return plan
 
 
@@ -142,6 +145,16 @@ def _spur_body(comp, g, z0, face, backlash=None):
     sk = comp.sketches.add(T4.offset_plane(comp, z0))
     T4.polyline(sk, T4.gear_profile(g, backlash))
     return T4.extrude(comp, T4.largest_profile(sk), face, T4.NEW)
+
+
+def _d_profile(comp, z0, R, flat):
+    """A D: circle of radius R with a flat at distance flat from the center (on +x)."""
+    sk = comp.sketches.add(T4.offset_plane(comp, z0))
+    fy = math.sqrt(R * R - flat * flat)
+    pt = lambda x, y: adsk.core.Point3D.create(x / 10.0, y / 10.0, 0)
+    arc = sk.sketchCurves.sketchArcs.addByThreePoints(pt(flat, fy), pt(-R, 0), pt(flat, -fy))
+    sk.sketchCurves.sketchLines.addByTwoPoints(arc.startSketchPoint, arc.endSketchPoint)
+    return sk.profiles.item(0)
 
 
 def _hex_profile(comp, z0, R):
@@ -163,7 +176,7 @@ def build_clutch_shaft(root, L):
     z_hex0 = (pf / 2) - gx1                                                                       # X -8.6
     T4.extrude(comp, T4.circle_profile(comp, pf - 0.3, c['shaft_d'] / 2), z_hex0 - pf + 0.3 + 0.01, T4.JOIN)
     z_j0 = (pf / 2) - c['journal_x'][0]                                                           # X -14.3
-    T4.extrude(comp, _hex_profile(comp, z_hex0, c['hex_r']), z_j0 - z_hex0 + 0.01, T4.JOIN)
+    T4.extrude(comp, _d_profile(comp, z_hex0, c['d_r'], c['d_flat']), z_j0 - z_hex0 + 0.01, T4.JOIN)
     z_j1 = (pf / 2) - c['journal_x'][1]
     T4.extrude(comp, T4.circle_profile(comp, z_j0, c['journal_d'] / 2), z_j1 - z_j0, T4.JOIN)
     T4.merge_bodies(comp)
@@ -180,10 +193,11 @@ def build_clutch_shaft(root, L):
 
 
 def build_gear12(root):
-    """12T spur with a hex bore (pressed onto the shaft's end). Local z = +X, origin at its motor-side face. Prints flat."""
+    """12T spur with a D-bore (slides over the journal onto the shaft's D-section, stops on its Ø6 shoulder, glued).
+    Local z = +X, origin at its motor-side face. Prints flat."""
     occ, comp = T4.new_component(root, 'Clutch 12T')
     _spur_body(comp, spur_c(c['z_out']), 0.0, c['gear_x'][1] - c['gear_x'][0])
-    T4.extrude(comp, _hex_profile(comp, 0.0, c['hex_r'] + c['hex_fit']), c['face'], T4.CUT)
+    T4.extrude(comp, _d_profile(comp, 0.0, c['d_r'] + c['d_fit'], c['d_flat'] + c['d_fit']), c['face'], T4.CUT)
     comp.bRepBodies.item(0).name = 'Clutch 12T'
     return occ, comp
 
@@ -224,7 +238,7 @@ def build_idler(root, name):
     return occ, comp
 
 
-def arm_body(tbm, CL):
+def arm_body(tbm, CL, printed_pins=False):
     """The swing arm in global coordinates at neutral: plate (hub ring with three flexure pads that grip the pinion's
     hub, two lobes out to the idler pins, a tail carrying the stop slot) + the two Ø3 idler pins."""
     B = adsk.fusion.BooleanTypes
@@ -299,8 +313,11 @@ def arm_body(tbm, CL):
         U(arm, cyl(M[0] + rr * math.cos(t), M[1] + rr * math.sin(t), c['finger_bump_r']))
     # idler pins (printed with the arm: the arm prints flat on its motor-side face, pins standing up)
     for p in (A, Bp):
-        U(arm, cyl(p[0], p[1], c['pin_boss_d'] / 2, x1 - 0.01, c['pin_boss_x']),       # boss: the idler rides on it
-            cyl(p[0], p[1], c['pin_d'] / 2, x1 - 0.01, c['pin_tip_x']))
+        U(arm, cyl(p[0], p[1], c['pin_boss_d'] / 2, x1 - 0.01, c['pin_boss_x']))       # boss: the idler rides on it
+        if printed_pins:                                                               # bench-test variant
+            U(arm, cyl(p[0], p[1], c['pin_d'] / 2, x1 - 0.01, c['pin_tip_x']))
+        else:                                                                          # Ø3 x 8 steel dowels press in
+            D(arm, cyl(p[0], p[1], c['pin_d'] / 2 - c['pin_press'], x0 - 1, c['pin_boss_x'] + 1))
     return arm
 
 
@@ -337,7 +354,7 @@ def plate_body(tbm, CL):
         Ln = math.hypot(dy, dz)
         U(plate, box((M[0] + q[0]) / 2, (M[1] + q[1]) / 2, dy / Ln, dz / Ln, Ln, 2 * rq), cyl(q[0], q[1], rq))
     D(plate, box(M[0], M[1], 1, 0, gw, gh, x0 - 1, x0 + c['plate_pocket']))                # gearbox pocket
-    D(plate, cyl(M[0], M[1], 2.6, x0 - 1, x1 + 1))                                         # motor shaft + bushing
+    D(plate, cyl(M[0], M[1], c['pin_hub_d'] / 2 + c['plate_hub_clear'], x0 - 1, x1 + 1))     # runs on the pinion's hub
     rj = c['journal_d'] / 2 + c['journal_clear']
     D(plate, cyl(O[0], O[1], rj, x0 - 1, x1 + 1),
       tbm.createCylinderOrCone(P3(O[0], O[1], x1 - 0.5), rj / 10, P3(O[0], O[1], x1 + 0.01), (rj + 0.5) / 10))  # lead-in
@@ -354,10 +371,23 @@ def build_plate(root, CL):
     return occ, comp
 
 
-def build_arm(root, CL):
+def build_arm(root, CL, printed_pins=False):
     tbm = adsk.fusion.TemporaryBRepManager.get()
-    occ, comp = T4.new_component(root, 'Clutch arm')
-    T4.add_bodies(comp, [('Clutch arm', arm_body(tbm, CL))])
+    occ, comp = T4.new_component(root, 'Clutch arm printed pins' if printed_pins else 'Clutch arm')
+    T4.add_bodies(comp, [('Clutch arm printed pins' if printed_pins else 'Clutch arm', arm_body(tbm, CL, printed_pins))])
+    return occ, comp
+
+
+def build_pins_ref(root, CL):
+    """The two Ø3 x 8 steel dowels (reference bodies, checked like parts)."""
+    tbm = adsk.fusion.TemporaryBRepManager.get()
+    occ, comp = T4.new_component(root, 'Idler pins (steel)')
+    x0 = c['arm_x'][0]
+    P3 = lambda y, z, x: adsk.core.Point3D.create(x / 10, y / 10, z / 10)
+    bodies = []
+    for nm, p in (('Pin A', CL['A']), ('Pin B', CL['B'])):
+        bodies.append((nm, tbm.createCylinderOrCone(P3(p[0], p[1], x0 + 0.05), c['pin_d'] / 20, P3(p[0], p[1], x0 + 0.05 + 8.0), c['pin_d'] / 20)))
+    T4.add_bodies(comp, bodies)
     return occ, comp
 
 
@@ -396,6 +426,13 @@ def build(design, export_dir=None):
     _, idA = build_idler(root, 'Idler A')
     _, idB = build_idler(root, 'Idler B')
     _, arm = build_arm(root, CL)
+    _, arm_pp = build_arm(root, CL, printed_pins=True)
+    arm_pp_occ = next(root.occurrences.item(i) for i in range(root.occurrences.count)
+                      if root.occurrences.item(i).component.name == PREFIX + 'Clutch arm printed pins')
+    mv = adsk.core.Matrix3D.create()                     # bench-test variant: set beside the tilter (not in the checks)
+    mv.translation = adsk.core.Vector3D.create(0, -8.0, 0)
+    arm_pp_occ.transform2 = mv
+    _, pins = build_pins_ref(root, CL)
     _, plate = build_plate(root, CL)
     SL = T4.sensor_layout()
 
@@ -441,7 +478,7 @@ def build(design, export_dir=None):
         os.makedirs(export_dir, exist_ok=True)
         em = design.exportManager
         for nm, comp in (('worm', worm), ('worm_wheel', wheel), ('sensor_gear', sgear), ('clutch_shaft', shaft), ('clutch_12t', g12),
-                         ('clutch_pinion', pin8), ('clutch_idler', idA), ('clutch_arm', arm), ('clutch_plate', plate),
+                         ('clutch_pinion', pin8), ('clutch_idler', idA), ('clutch_arm', arm), ('clutch_arm_printed_pins', arm_pp), ('clutch_plate', plate),
                          ('case_left', cases['Case left'][1]), ('case_right', cases['Case right'][1])):
             path = os.path.join(export_dir, nm + '.stl')
             opt = em.createSTLExportOptions(comp, path)
