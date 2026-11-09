@@ -396,7 +396,11 @@ def build_refs_v5(root, L, mo_len, CL):
     M = CL['M']
     face = (c['motor_face_x'], M[0], M[1])
     L2 = dict(L, face=face, pin_c=(c['motor_face_x'] + P['n20_shaft_len'], M[0], M[1]), t_face=P['n20_shaft_len'])
-    return T4.build_refs(root, L2, mo_len)
+    occ, comp = T4.build_refs(root, L2, mo_len)
+    for b in [comp.bRepBodies.item(i) for i in range(comp.bRepBodies.count)]:
+        if b.name in ('AS5600 board', 'AS5600 chip'):      # the module (TiltPodV5, "Inside") carries the real board
+            b.deleteMe()
+    return occ, comp
 
 
 # ------------------------------------------------------------------ build
