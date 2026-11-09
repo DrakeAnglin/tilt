@@ -54,8 +54,9 @@ C = dict(
     arm_bore_clear=0.1,
     arm_hub_r=6.0, finger_t=0.8, finger_slot=0.8, finger_span=120.0, finger_interf=0.3, finger_bump_r=0.5,
     finger_roots=(150.0, 330.0),             # each finger runs CCW from its root; free end + bump at root + span
-    lobe_w=4.6, pin_d=3.0, pin_tip_x=-8.45, pin_boss_d=4.6, pin_boss_x=-14.45, idler_bore_clear=0.1,
-    pin_press=0.05,                          # rev 3: steel Ø3 x 8 dowels pressed into the arm (Ø2.95 holes)
+    lobe_w=4.6, pin_d=2.0, pin_len=5.9, pin_tip_x=-8.45, pin_boss_d=4.6, pin_boss_x=-14.45, idler_bore_clear=0.1,
+    pin_press=0.025,                         # steel Ø2 x 5.9 dowels (the worm's top-pin kind) pressed into the arm (Ø1.95 holes):
+                                             # 1.95 in the arm and boss, ~3.9 of the idler's 5.8
     stop_dir=62.0, stop_r=7.2, stop_d=3.0, stop_clear=0.15, slot_wall=1.2, stop_tip_x=-14.7,
     tail_span=(22.0, 100.0),
     avoid=(((-23.0, 27.0), 3.8),),          # module bolt C's boss (TiltPodV5 bolts_rim): the plate keeps clear of it
@@ -316,7 +317,7 @@ def arm_body(tbm, CL, printed_pins=False):
         U(arm, cyl(p[0], p[1], c['pin_boss_d'] / 2, x1 - 0.01, c['pin_boss_x']))       # boss: the idler rides on it
         if printed_pins:                                                               # bench-test variant
             U(arm, cyl(p[0], p[1], c['pin_d'] / 2, x1 - 0.01, c['pin_tip_x']))
-        else:                                                                          # Ø3 x 8 steel dowels press in
+        else:                                                                          # Ø2 x 5.9 steel dowels press in
             D(arm, cyl(p[0], p[1], c['pin_d'] / 2 - c['pin_press'], x0 - 1, c['pin_boss_x'] + 1))
     return arm
 
@@ -379,14 +380,14 @@ def build_arm(root, CL, printed_pins=False):
 
 
 def build_pins_ref(root, CL):
-    """The two Ø3 x 8 steel dowels (reference bodies, checked like parts)."""
+    """The two Ø2 x 5.9 steel dowels (reference bodies, checked like parts)."""
     tbm = adsk.fusion.TemporaryBRepManager.get()
     occ, comp = T4.new_component(root, 'Idler pins (steel)')
     x0 = c['arm_x'][0]
     P3 = lambda y, z, x: adsk.core.Point3D.create(x / 10, y / 10, z / 10)
     bodies = []
     for nm, p in (('Pin A', CL['A']), ('Pin B', CL['B'])):
-        bodies.append((nm, tbm.createCylinderOrCone(P3(p[0], p[1], x0 + 0.05), c['pin_d'] / 20, P3(p[0], p[1], x0 + 0.05 + 8.0), c['pin_d'] / 20)))
+        bodies.append((nm, tbm.createCylinderOrCone(P3(p[0], p[1], x0 + 0.05), c['pin_d'] / 20, P3(p[0], p[1], x0 + 0.05 + c['pin_len']), c['pin_d'] / 20)))
     T4.add_bodies(comp, bodies)
     return occ, comp
 
@@ -430,15 +431,6 @@ def build(design, export_dir=None):
     _, idA = build_idler(root, 'Idler A')
     _, idB = build_idler(root, 'Idler B')
     _, arm = build_arm(root, CL)
-    # bench-test arm (printed pins): exported, then removed BEFORE anything is placed (deleting an occurrence in a
-    # direct design resets the placements made before it)
-    arm_pp_occ, arm_pp = build_arm(root, CL, printed_pins=True)
-    if export_dir:
-        os.makedirs(export_dir, exist_ok=True)
-        opt = design.exportManager.createSTLExportOptions(arm_pp, os.path.join(export_dir, 'clutch_arm_printed_pins.stl'))
-        opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
-        design.exportManager.execute(opt)
-    arm_pp_occ.deleteMe()
     _, pins = build_pins_ref(root, CL)
     _, plate = build_plate(root, CL)
     SL = T4.sensor_layout()
@@ -480,7 +472,7 @@ def build(design, export_dir=None):
     T4.color(design, cases['Case right'][1], 'Plastic - Matte (Blue)')
     T4.color(design, refs, 'Plastic - Matte (White)')
 
-    files = [os.path.join(export_dir, 'clutch_arm_printed_pins.stl')] if export_dir else []
+    files = []
     if export_dir:
         os.makedirs(export_dir, exist_ok=True)
         em = design.exportManager

@@ -25,7 +25,7 @@ N20 ── 9T pinion ── 9T idler A or B (on a swing arm) ── 12T ── (
 - Journal Ø3.6, so the 12T's bore passes over it.
 - 0.35 mm end float for the 7T shaft, with a wider thrust ring.
 - The 12T sits on a Ø5 D-section with a Ø6 shoulder (stronger than the hex).
-- **Steel Ø3 × 8 idler pins** (a printed-pin arm is included for bench tests on the 150 RPM motor).
+- **Steel Ø2 × 5.9 idler pins**, the same dowels as the worm's top pin (they sit 1.95 mm in the arm, carrying about 3.9 of the idler's 5.8 mm).
 
 - **Motor on:** two soft spring fingers in the arm's hub grip the pinion's hub lightly (about 1 N·mm), so the arm
   swings with the pinion (20.4°) until one idler meshes the 12T. A printed stop post sets the exact mesh depth. While it drives, the tooth
@@ -46,11 +46,14 @@ and main half come from v0.4's code), [`TiltPodV5`](../../fusion/TiltPodV5/TiltP
 ![clutch layout](../../../../docs/renders/clutch-layout.png)
 
 ## Files
+**One-plate Bambu Studio project:** `tilter_v05_H2D_white_PLA.3mf` holds every printed part (both idlers), already in
+the orientations below, with v0.4's settings (H2D 0.4 nozzle, 0.12 mm Fine, PLA, 4 walls, 40% infill, 8 mm brim).
+Rebuild it with `python3 tools/orient_v05.py && python3 tools/bambu_v05.py`.
+
 | File | What | Print |
 |---|---|---|
 | `clutch_pinion.stl` | 9T (m 0.8, tall teeth), D-bore on the N20's flat, full-length round hub the arm pivots on | teeth down |
-| `clutch_arm.stl` | swing arm: hub with 2 spring fingers, holes for 2 × Ø3 × 8 steel pins, bosses, tail with the stop slot | flat |
-| `clutch_arm_printed_pins.stl` | the same arm with printed Ø3 pins: **bench tests on the 150 RPM motor only** (they won't survive a slower, stronger motor) | arm plate flat, pins up |
+| `clutch_arm.stl` | swing arm: hub with 2 spring fingers, holes for 2 × Ø2 × 5.9 steel dowels, bosses, tail with the stop slot | flat |
 | `clutch_plate.stl` | runs on the pinion's hub and the shaft's Ø3.6 journal; loose square pocket on the gearbox nose; Ø3 stop post | post up (the pocket's ceiling is a 10 mm bridge) |
 | `clutch_idler.stl` | 9T idler (**print 2**) | flat |
 | `clutch_12t.stl` | 12T, D-bore (slides over the journal onto the D-section, stops on the Ø6 shoulder; a drop of CA glue) | flat |
@@ -64,9 +67,8 @@ and main half come from v0.4's code), [`TiltPodV5`](../../fusion/TiltPodV5/TiltP
 (the same tooth size class as the 7T). Cases and module 0.16–0.2 mm.
 
 ## Hardware
-Same as v0.4, minus the M1.6 motor screw, plus **2 × Ø3 × 8 mm steel dowel pins** per tilter (idler axles, pressed
-into the arm). For real torque: **a slower N20 (100 or 60 RPM, 6 V)**. The printed-pin arm lets you test the clutch
-before the dowels arrive.
+Same as v0.4, minus the M1.6 motor screw, plus **2 more Ø2 × 5.9 mm steel dowels** per tilter (the worm's top-pin
+kind, 3 in all): the idler axles, pressed into the arm. For real torque: **a slower N20 (100 or 60 RPM, 6 V)**.
 
 ## Assembly
 1. **Main half:** worm wheel, Ø2 dowel and worm as v0.4. Drop the **clutch shaft** onto the Ø4 pin (7T meshing the
@@ -79,7 +81,7 @@ before the dowels arrive.
    the tunnel's back toward the DRV8833), until its can stops on the two ledges.
 5. **Clutch, in the module, in this order** (the pinion's teeth are bigger than the arm's bore):
    1. **Clutch plate** onto the gearbox nose (square pocket), stop post toward you.
-   2. **Press the two steel pins** into the arm from its flat side (flush), then the **idlers** onto them (a little
+   2. **Press the two Ø2 dowels** into the arm from its flat side (flush), then the **idlers** onto them (a little
       grease on the pins).
    3. **Arm** flat against the plate, its slot over the stop post, hub over the motor shaft. Turn it to the middle of
       its slot.
