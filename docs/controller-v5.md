@@ -1,18 +1,18 @@
 # Controller box V5 (for the carrier PCB)
 
-The box for the controller PCB (`hardware/pcb`, v2.1), the 18650, the MCP73871 charger module with its big capacitor,
-and the USB-C charge port. It is built by [ControllerV5.py](../hardware/mechanical/fusion/ControllerV5/ControllerV5.py)
+The box for the controller PCB (`hardware/pcb`, v2.1), the 18650 and the **Adafruit 6092** charger, whose own USB-C is
+the charge port (rev N). It is built by [ControllerV5.py](../hardware/mechanical/fusion/ControllerV5/ControllerV5.py)
 and checked in Fusion by [fusion_controller_v5.py](../tools/fusion_controller_v5.py). The PCB in the model is KiCad's own
 3D export of the real board, with every part on it. Everything the export lacks is mocked up from its datasheet or the
-listing photos: RJ12 jacks, ESP32-C6, plugs, cell, charger, capacitor and USB-C board.
+listing photos: RJ12 jacks, ESP32-C6, plugs, cell and the charger.
 
 ![open](renders/ctrl-v5-open-b.png)
 
 | | |
 |---|---|
-| Size | **162.6 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
+| Size | **157.4 × 52.5 × 25.8 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
 | Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
-| Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head** (one screw size for the whole box) |
+| Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head**; the charger: **4 × M2 × 6 self-tapping** screws |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
 
 ## Why it is longer than V4
@@ -46,7 +46,27 @@ Soldering the PCB itself: [PCB build guide](pcb-build.md), step by step.
    or the white flat 2-core cable with the VBUS side marked.
 3. **Charger subassembly**: build it on the bench first. It goes into the box as one piece.
 
-## The charger subassembly
+## Charger: Adafruit 6092 (rev N, 2026-11-08)
+
+The no-name MCP73871 module charged at 0.05–0.15 A instead of 0.35 A (even off the PCB) and is replaced by the
+**Adafruit 6092** (bq25185), used as a **charger only**: the battery feeds the board directly through the battery
+splice in the charger plug ([PCB build, step 11](pcb-build.md)). The old module's bay, its capacitor saddle, the lid's
+clamp pins, the separate USB-C board's holders and lid channel, the NTC and the USB lead are all gone.
+
+| | |
+|---|---|
+| Board | 29.21 × 19.05 × 1.6 mm, four 2.5 mm holes 2.54 in from the corners (from Adafruit's own board file) |
+| Mount | flat on **4 posts** (4.4 mm round, 3 mm tall: room for the pads' solder underneath), **4 × M2 self-tapping screws** from above (1.6 mm pilots). M2.5 also fits the board's holes: then the pilots go to 2.1 mm |
+| USB-C | out of **end wall B** as before: the board's last 1 mm sits in a pocket in the wall's inner face, the socket behind a stadium window, its mouth 0.4 mm inside the outer face |
+| Place | X 128.8–158.0 (2 mm past the PCB's end), Y −18.9 to 0.1; board top 5.8 mm, screw terminal top 14.2 mm |
+| Harness | over the top to the pad row: G → **G** (58.8 mm), the B+ / L+ splice → **BAT** (51.6 + an 11.6 mm leg), P+ → **VIN** (59.0 mm) |
+| Solar lead | its slot and floor route moved to the room-side wall (Y −21.2), beside the charger |
+| Length | 157.4 mm (was 162.6): the bay no longer has to hold the old module's capacitor |
+| Check | interference: **none**; tray and lid manifold, edges rounded |
+
+The sections below on the old charger subassembly and the USB-C board are kept as history.
+
+## The charger subassembly (old MCP73871 module, replaced in rev N)
 ![charger subassembly](renders/ctrl-v5-charger-sub.png)
 
 The capacitor belongs to the module: its footprint is the pair of holes **7 mm apart** in the module's corner, with
@@ -91,7 +111,7 @@ Nothing presses on the capacitor's legs.
 
 The top stays clean (no screw heads) and the screw heads sit flush with the bottom, so it still slides into the rail.
 
-## Print 2: USB-C board held by its edges (rev L)
+## Print 2: USB-C board held by its edges (rev L, replaced in rev N)
 The board didn't stay in well, and the supports at its back edge (the component-side rib, over the header's solder joints) could foul the joints. Now nothing touches its faces:
 - **Bottom edge:** in a U-channel on the floor (walls 2.5 mm tall, 1.2 mm thick, 0.25 mm clear a side). Its back end is as tall as the sides, only 0.15 mm behind the board's back edge, its top edge on the board's side rounded (r 0.8), so the board's corner rolls over it and snaps in. The board stands on the floor (0.05 mm gap); the old floor groove is gone, so the floor is a full 1.2 mm. The board is 0.55 mm higher than before, and its wires moved up with it.
 - **Top edge:** in a U-channel on the lid, 2 mm deep, from the board's back edge to 1 mm short of the wall.

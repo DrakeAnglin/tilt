@@ -1,5 +1,5 @@
 """ControllerV5 in a fresh document: the PCB's own 3D export (KiCad STEP, every part on it), tray, lid, mock-ups of the
-parts the export doesn't have (RJ12 jacks, ESP32-C6, plugs, 18650, charger + capacitor, USB-C breakout), rail + rod;
+parts the export doesn't have (RJ12 jacks, ESP32-C6, plugs, 18650, the Adafruit 6092 charger), rail + rod;
 exact interference check; STL export of tray + lid; renders with sketches hidden.
 
   K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli
@@ -164,9 +164,9 @@ def vol(a, b):
         return 0.0
 
 
-MATES = [('NTC wire', 'NTC on the cell'), ('NTC on the cell', '18650'), ('Harness LOAD', 'Charger pad LOAD'), ('USB lead', 'USB-C pins'), ('USB lead', 'USB-C header'), ('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F1 folded', 'controller_PCB'), ('F2 folded', 'controller_PCB'), ('F3 folded', 'controller_PCB'), ('J3 USB lead plug', 'PinSocket_1x06'),
+MATES = [('Harness', 'Charger pad'), ('Charger screw', 'Tray'), ('J4 battery plug', 'B2B_XH'), ('J5 charger plug', 'B6B_XH'), ('F1 folded', 'controller_PCB'), ('F2 folded', 'controller_PCB'), ('F3 folded', 'controller_PCB'),
          ('ESP32-C6 spacer', 'PinSocket_1x10'), ('RJ12', 'controller_PCB'), ('RJ12', 'PCB:board'),
-         ('Screws', 'controller_PCB'), ('Charger cap leg', 'Charger'), ('USB-C', 'USB-C'), ('ESP32-C6', 'ESP32-C6'),
+         ('Screws', 'controller_PCB'), ('ESP32-C6', 'ESP32-C6'),
          ('Charger', 'Charger'), ('J8', 'J8'), ('RJ12 1', 'RJ12 1'), ('RJ12 2', 'RJ12 2'), ('RJ12 3', 'RJ12 3'),
          ('J4 battery plug', 'J4 battery plug'), ('J5 charger plug', 'J5 charger plug')]
 
@@ -217,7 +217,7 @@ def gap_up(name_part):
     return res
 
 
-gaps = gap_up('Harness') + gap_up('Cell lead') + gap_up('USB lead') + gap_up('ESP32-C6') + gap_up('RJ12 2 jack') + gap_up('C9') + gap_up(' folded') + gap_up('Charger capacitor') + gap_up('USB-C board') + gap_up('Charger board') + gap_up('J4') + gap_up('18650')
+gaps = gap_up('Harness') + gap_up('Cell lead') + gap_up('ESP32-C6') + gap_up('RJ12 2 jack') + gap_up('C9') + gap_up(' folded') + gap_up('Charger terminal') + gap_up('Charger screw') + gap_up('J4') + gap_up('18650')
 
 # ------------------------------------------------------------------ components
 APPEAR = {'Tray': 'Plastic - Matte (White)', 'Lid': 'Plastic - Matte (White)', 'Parts': 'Plastic - Matte (Black)',
@@ -237,8 +237,7 @@ def appearance(name):
             return design.appearances.addByCopy(src, name)
 
 
-COLOR = {'ESP32-C6 board': 'Plastic - Glossy (Blue)', '18650': 'Plastic - Glossy (Blue)', 'Charger board': 'Plastic - Glossy (Blue)',
-         'USB-C board': 'Plastic - Glossy (Green)', 'Charger capacitor': 'Plastic - Glossy (Blue)'}
+COLOR = {'ESP32-C6 board': 'Plastic - Glossy (Blue)', '18650': 'Plastic - Glossy (Blue)', 'Charger board': 'Plastic - Glossy (Blue)'}
 comps, occs = {}, {}
 for g, lst in groups.items():
     occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
