@@ -339,7 +339,7 @@ def charger_picture():
     # USB-C, sticking out of the top end
     o.append('<rect x="%d" y="%d" width="110" height="80" rx="14" fill="#c8c8c8" stroke="#777" stroke-width="2"/>' % (mx0 + 95, my0 - 18))
     o.append('<rect x="%d" y="%d" width="70" height="14" rx="7" fill="#555"/>' % (mx0 + 115, my0 - 8))
-    o.append(text(mx0 + mw / 2, my0 - 30, 'USB-C (top end): bench charging only', 13, '#333', 'bold', halo=False))
+    o.append(text(mx0 + mw / 2, my0 - 30, 'USB-C (top end): plug USB power in HERE', 13, '#333', 'bold', halo=False))
     # JST-PH socket below the USB-C, toward the right
     o.append('<rect x="%d" y="%d" width="90" height="62" rx="4" fill="#f1e2c8" stroke="#a89070" stroke-width="2"/>' % (mx0 + 175, my0 + 85))
     o.append(text(mx0 + 220, my0 + 121, 'JST-PH', 12, '#6b5a40', 'bold', halo=False))
@@ -399,9 +399,9 @@ def charger_picture():
             'No temperature probe and no big capacitor with this module (the old one needed both).',
             'Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).',
             'Red F = fault: unplug and check the wiring.',
-            'USB through the PCB arrives at VIN at about 4.7 V (after D1); the module is rated 5-18 V on VIN.',
-            'If it won\'t charge that way: plug USB-C into the module\'s own socket instead (the ESP then can\'t see "USB present").',
-            'Do not plug the module\'s USB-C and the solar panel in at the same time (not yet checked how it joins them).']):
+            'USB plugs into this module\'s USB-C. The PCB\'s USB-C board and J3 are not used.',
+            'VIN carries solar only (J8 → D2 → J5 pin 6). The ESP can\'t see USB is plugged in (GPIO0 sees solar only).',
+            'Do not plug in USB-C and the solar panel at the same time (not yet checked how the module joins them).']):
         o.append(text(40, ty0 + 24 * k_, t, 13, '#d62728' if k_ >= 4 else '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
     o.append('</svg>')
     open(os.path.join(OUT, 'pcb-build-charger.svg'), 'w').write('\n'.join(o))
@@ -441,48 +441,6 @@ def jumper_picture():
     return 'pcb-build-jumper.svg'
 
 
-def usb_picture():
-    """The Cermant USB-C breakout (22.1 x 13.05) seen from its component side, its 6 pins, and the 2-wire lead to J3."""
-    k, ox, oy = 18.0, 120, 230
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="660" font-family="Helvetica,Arial">',
-         '<rect width="100%" height="100%" fill="#fff"/>',
-         text(20, 32, 'USB-C board: the 2-wire lead to J3', 20, '#111', 'bold', 'start', halo=False),
-         text(20, 56, 'Component side. Only VBUS and GND are wired (the board has its 5.1 k CC resistors, the data pins aren\'t used).',
-              13, '#444', anchor='start', halo=False)]
-    bw, bd = 22.1, 13.05
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="6" fill="#1f4fa0"/>' % (ox, oy, bw * k, bd * k))
-    sx = ox + (bw - 9.1) / 2 * k                                   # the socket on the front edge, sticking out 1.45
-    o.append('<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" rx="18" fill="#c8c8c8" stroke="#888" stroke-width="2"/>' % (
-        sx, oy + (bd - 7.35 + 1.45) * k, 9.1 * k, 7.35 * k))
-    o.append(text(ox + bw * k / 2, oy + (bd + 1.45) * k + 18, 'USB-C socket (out through end wall B)', 12, '#333', halo=False))
-    names = ['VBUS', 'GND', 'CC1', 'D−', 'D+', 'CC2']
-    py = oy + 1.04 * k
-    for i, n in enumerate(names):
-        px = ox + (bw / 2 - 6.35 + 2.54 * i) * k
-        c = '#d62728' if n == 'VBUS' else '#222' if n == 'GND' else '#999'
-        o.append('<rect x="%.0f" y="%.0f" width="22" height="22" fill="#c9a400" stroke="#8a6d1f"/>' % (px - 11, py - 11))
-        o.append(text(px, py + 30, n, 12, '#fff', 'bold', halo=False))
-        if n in ('VBUS', 'GND'):
-            yy = oy - 50 - (0 if n == 'VBUS' else 30)
-            o.append('<polyline points="%.0f,%.0f %.0f,%.0f %.0f,%.0f" fill="none" stroke="%s" stroke-width="5"/>' % (
-                px, py - 11, px, yy, 620 + (0 if n == 'VBUS' else 0), yy, c))
-    # the 2-pin male header on the far end
-    o.append('<rect x="620" y="%.0f" width="30" height="60" fill="#222"/>' % (oy - 110))
-    o.append(text(660, oy - 76, 'pin 2  GND (black)', 13, '#222', 'bold', 'start', halo=False))
-    o.append(text(660, oy - 46, 'pin 1  VBUS (red)', 13, '#d62728', 'bold', 'start', halo=False))
-    o.append(text(660, oy - 20, '2-pin male header, into J3 pins 1-2', 12, '#444', anchor='start', halo=False))
-    o.append(text(660, oy - 4, '(J3 pin 1 = square pad, room-side edge)', 12, '#444', anchor='start', halo=False))
-    y2 = oy + bd * k + 70
-    for i, t in enumerate(['1. Clip the board\'s 6 header pins to 3 mm past their plastic (the charger sits beside them in the box).',
-                           '2. Two wires, 65 mm each (the route in the box is 50 / 57 mm): red to VBUS, black to GND. Sleeve both joints.',
-                           '3. Other ends: a 2-pin piece of male header, VBUS on pin 1, GND on pin 2. Mark the VBUS end.',
-                           '4. Check: the pin names are printed beside the pins on the board; go by those, not by this drawing\'s order.']):
-        o.append(text(40, y2 + 22 * i, t, 13, '#222', anchor='start', halo=False))
-    o.append('</svg>')
-    open(os.path.join(OUT, 'pcb-build-usb.svg'), 'w').write('\n'.join(o))
-    return 'pcb-build-usb.svg'
-
-
 def where(ref):
     x, y = mm(FPS[ref].GetPosition().x), mm(FPS[ref].GetPosition().y)
     return '%.0f mm from end A' % y
@@ -513,7 +471,6 @@ def md():
     pics.append(meter_picture())
     pics.append(jumper_picture())
     pics.append(charger_picture())
-    pics.append(usb_picture())
 
     def rows(refs, cols):
         return '\n'.join('| ' + ' | '.join(c(r) for c in cols) + ' |' for r in refs)
@@ -548,9 +505,9 @@ def md():
         for r in refs:
             groups.setdefault(val(r), []).append((r, k))
     for v, lst in groups.items():
-        a('| %s | %d | %s | %s |' % (v, len(lst), ', '.join(r for r, _ in lst), ', '.join(sorted({str(k) for _, k in lst}))))
+        a('| %s | %d | %s | %s |' % (v + (' (optional, not used with the 6092)' if any(r == 'J3' for r, _ in lst) else ''), len(lst),
+                                   ', '.join(r for r, _ in lst), ', '.join(sorted({str(k) for _, k in lst}))))
     a('| ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |')
-    a('| USB-C breakout (Cermant) + its 2-wire lead to J3 | 1 | | 11 |')
     a('| Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |')
     a('| Short insulated wire for the J5 pin 2 to pin 4 jumper | 1 | J5 underside | 11 |')
     a('| 18650 cell with its JST-XH plug | 1 | J4 | 12 |')
@@ -668,8 +625,8 @@ def md():
     a('1. **ESP sockets J1, J2 (10-way):** push both onto the ESP32-C6\'s pins, set the ESP and sockets into the board')
     a('   (chip up, USB toward end B), solder one pin at each end of each socket, check they sit flat and square, solder the')
     a('   rest, then lift the ESP back out. That way the two rows end up exactly the ESP\'s width apart.')
-    a('2. **USB-C socket J3 (6-way)**, at end B. In the V5 box the USB-C board sits on the end wall, and a 2-wire lead plugs')
-    a('   into **J3 pins 1 (VBUS) and 2 (GND)** (step 11), so only those two pins are used, but solder all six for strength.')
+    a('2. **USB-C socket J3 (6-way): optional, not used.** USB now plugs into the charger\'s own USB-C (step 11), so nothing')
+    a('   plugs into J3. Leave it empty, or solder it anyway (harmless; it keeps the option of the old USB-C board).')
     a('   Pin 1 is the square pad, at the room-side edge.')
     a('')
     # ---- step 6
@@ -744,7 +701,7 @@ def md():
     a('jacks, and check every lead is trimmed to 1.8 mm or less.')
     a('')
     # ---- step 11
-    a('## Step 11: The charger, the USB-C board, the battery and solar')
+    a('## Step 11: The charger, the battery and solar')
     a('')
     a('**Charger: Adafruit 6092 (bq25185), used as a charger only.** The battery feeds the whole board directly (motors and')
     a('ESP), and the charger just keeps it topped up. A charger\'s own load output can only supply about 1 A, not enough for')
@@ -759,8 +716,7 @@ def md():
     a('| J5 jumper | 22 AWG insulated | about 8 mm | J5 pin 2 → J5 pin 4, under the PCB |')
     a('| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 2 → **BAT** pad |')
     a('| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |')
-    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad |')
-    a('| USB-C lead | 22 AWG, red + black | 2 × 65 mm | USB-C board VBUS / GND → 2-pin male header in J3 pins 1–2 |')
+    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (carries solar) |')
     a('| Battery | the cell\'s own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |')
     a('| Solar (optional) | the panel\'s flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |')
     a('')
@@ -796,23 +752,15 @@ def md():
     a('**The lights:** orange **C** on = charging, off = full. Red **F** = a fault: unplug and check the wiring. The chip stops')
     a('charging after **6 hours** nonstop; unplugging and replugging the power restarts it (for solar, the sun going down does).')
     a('')
-    a('**USB input, to check on the first build:** USB through the PCB reaches VIN at about 4.7 V (after D1), and the module')
-    a('is rated 5–18 V there. If it won\'t charge that way, plug USB-C into the **module\'s own socket** instead (the ESP then')
-    a('can\'t see that USB is present). Don\'t plug the module\'s USB-C in together with the solar panel until we\'ve checked')
-    a('how the module joins its two inputs.')
+    a('**USB:** plug USB power into the **6092\'s own USB-C** (full 5 V, straight into the charger). The PCB\'s USB-C board,')
+    a('its lead and J3 are no longer used; D1 just sits idle. Two things to know:')
     a('')
-    a('### 11c: USB-C board lead')
+    a('- **The ESP can\'t tell USB is plugged in.** GPIO0 (PSENSE) watches the PWR line, which now only carries solar.')
+    a('  Charging works the same; only the firmware\'s "USB present" reading is lost. One wire from the 6092\'s **VU** pad could')
+    a('  bring it back, once we\'ve checked how VU connects inside the module.')
+    a('- **Don\'t plug in USB-C and the solar panel at the same time** until we\'ve checked how the 6092 joins its USB-C and VIN.')
     a('')
-    a('![USB-C lead](renders/pcb-build-usb.png)')
-    a('')
-    a('1. **Clip the USB-C board\'s six header pins to 3 mm** past their plastic.')
-    a('2. **Two 22 AWG wires, 65 mm each:** red soldered to **VBUS**, black to **GND**. Go by the names printed beside the pins on')
-    a('   your board. Sleeve both joints.')
-    a('3. Other ends onto a **2-pin piece of male header**: VBUS on one pin, GND on the other. Mark the VBUS end.')
-    a('4. It plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Pin 1 is J3\'s square pad, at the room-side edge.')
-    a('5. CC1 / D− / D+ / CC2 stay unwired: the board has its own 5.1 kΩ CC resistors ("512"), so USB-C chargers give it 5 V.')
-    a('')
-    a('### 11d: Battery')
+    a('### 11c: Battery')
     a('')
     a('The 18650 plugs into **J4** with its own JST-XH lead: nothing to make. Before it ever goes in:')
     a('')
@@ -821,7 +769,7 @@ def md():
     a('   backwards: don\'t plug it in.')
     a('3. **Charge it first** (see "Charging the battery on the bench" below): the ESP needs the cell above about 3.8 V.')
     a('')
-    a('### 11e: Solar (optional)')
+    a('### 11d: Solar (optional)')
     a('')
     a('The panel\'s flat 2-core cable comes in through the slot in end wall B and gets a **JST-ZH 2-pin plug**: **− on pin 1**')
     a('(silk −), **+ on pin 2** (silk +). **Check the panel\'s polarity with the meter in sun before crimping**: on the first')
@@ -863,7 +811,7 @@ def md():
     a('| TP1 BAT+ | the cell\'s voltage (3.0–4.2 V) |')
     a('| TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |')
     a('| TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |')
-    a('| TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger\'s orange light comes on |')
+    a('| TP4 PWR | 0 V. Plug USB into the 6092: TP4 **stays 0 V** (it only sees solar) and the orange light comes on. With the solar panel in daylight: about 5.5–6 V |')
     a('')
     a('**TP1 is the cell** (through the J5 jumper); TP2 is always 0.1–0.4 V lower, so don\'t read the battery off TP2. While')
     a('it charges the cell reads a little high: for a true reading, unplug USB for a minute first.')
@@ -888,7 +836,7 @@ def md():
     a('|---|---|---|')
     a('| Readings make no sense | meter on the wrong setting (AC, mV, or Ω) | dial on **DC volts**, range 20 |')
     a('| Minus sign on a reading | probes swapped, or a plug wired backwards | black on TP5; measure the plug by itself |')
-    a('| TP4 has 4.8 V but the charger\'s VIN reads 0 V | PWR crimp not making contact | push the crimp in until it clicks, tug-test it |')
+    a('| Solar in: TP4 has voltage but the charger\'s VIN reads 0 V | PWR crimp not making contact | push the crimp in until it clicks, tug-test it |')
     a('| TP1 and TP2 fine, TP3 about 3.0 V, ESP keeps resetting | cell too low (below about 3.8 V) | charge it (bench charging above) |')
     a('| Cell barely rises after hours | charger not charging properly | USB power meter between charger and cable: about **1 A** while charging (6092) |')
     a('| ESP not on Wi-Fi | not powered, or browning out | TP3 = 3.3 V? Unplug power 5 s to restart it |')

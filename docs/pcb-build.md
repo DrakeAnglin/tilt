@@ -31,7 +31,7 @@ the box floor.
 | 100nF | 5 | C2, C3, C4, C5, C6 | 4 |
 | ESP32-C6 SuperMini socket (5V row) | 1 | J1 | 5 |
 | ESP32-C6 SuperMini socket (TX row) | 1 | J2 | 5 |
-| USB-C breakout socket | 1 | J3 | 5 |
+| USB-C breakout socket (optional, not used with the 6092) | 1 | J3 | 5 |
 | Battery (18650, JST-XH 2-pin) | 1 | J4 | 6 |
 | Charger (JST-XH 6-pin) | 1 | J5 | 6 |
 | Solar (optional, JST-ZH 2-pin) | 1 | J8 | 6 |
@@ -41,7 +41,6 @@ the box floor.
 | 470uF 10V | 1 | C9 | 8 |
 | 0.75A PTC | 3 | F1, F2, F3 | 9 |
 | ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |
-| USB-C breakout (Cermant) + its 2-wire lead to J3 | 1 | | 11 |
 | Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |
 | Short insulated wire for the J5 pin 2 to pin 4 jumper | 1 | J5 underside | 11 |
 | 18650 cell with its JST-XH plug | 1 | J4 | 12 |
@@ -161,8 +160,8 @@ missing C2–C6 doesn't stop anything working (the readings are just noisier). *
 1. **ESP sockets J1, J2 (10-way):** push both onto the ESP32-C6's pins, set the ESP and sockets into the board
    (chip up, USB toward end B), solder one pin at each end of each socket, check they sit flat and square, solder the
    rest, then lift the ESP back out. That way the two rows end up exactly the ESP's width apart.
-2. **USB-C socket J3 (6-way)**, at end B. In the V5 box the USB-C board sits on the end wall, and a 2-wire lead plugs
-   into **J3 pins 1 (VBUS) and 2 (GND)** (step 11), so only those two pins are used, but solder all six for strength.
+2. **USB-C socket J3 (6-way): optional, not used.** USB now plugs into the charger's own USB-C (step 11), so nothing
+   plugs into J3. Leave it empty, or solder it anyway (harmless; it keeps the option of the old USB-C board).
    Pin 1 is the square pad, at the room-side edge.
 
 ## Step 6: JST headers (3)
@@ -231,7 +230,7 @@ be on the square pad); open ("OL") is right.
 Finally, look at the underside in good light for bridges between neighboring pads, especially the sockets and
 jacks, and check every lead is trimmed to 1.8 mm or less.
 
-## Step 11: The charger, the USB-C board, the battery and solar
+## Step 11: The charger, the battery and solar
 
 **Charger: Adafruit 6092 (bq25185), used as a charger only.** The battery feeds the whole board directly (motors and
 ESP), and the charger just keeps it topped up. A charger's own load output can only supply about 1 A, not enough for
@@ -246,8 +245,7 @@ only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on U
 | J5 jumper | 22 AWG insulated | about 8 mm | J5 pin 2 → J5 pin 4, under the PCB |
 | Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 2 → **BAT** pad |
 | Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |
-| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad |
-| USB-C lead | 22 AWG, red + black | 2 × 65 mm | USB-C board VBUS / GND → 2-pin male header in J3 pins 1–2 |
+| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (carries solar) |
 | Battery | the cell's own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |
 | Solar (optional) | the panel's flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |
 
@@ -283,23 +281,15 @@ The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the 
 **The lights:** orange **C** on = charging, off = full. Red **F** = a fault: unplug and check the wiring. The chip stops
 charging after **6 hours** nonstop; unplugging and replugging the power restarts it (for solar, the sun going down does).
 
-**USB input, to check on the first build:** USB through the PCB reaches VIN at about 4.7 V (after D1), and the module
-is rated 5–18 V there. If it won't charge that way, plug USB-C into the **module's own socket** instead (the ESP then
-can't see that USB is present). Don't plug the module's USB-C in together with the solar panel until we've checked
-how the module joins its two inputs.
+**USB:** plug USB power into the **6092's own USB-C** (full 5 V, straight into the charger). The PCB's USB-C board,
+its lead and J3 are no longer used; D1 just sits idle. Two things to know:
 
-### 11c: USB-C board lead
+- **The ESP can't tell USB is plugged in.** GPIO0 (PSENSE) watches the PWR line, which now only carries solar.
+  Charging works the same; only the firmware's "USB present" reading is lost. One wire from the 6092's **VU** pad could
+  bring it back, once we've checked how VU connects inside the module.
+- **Don't plug in USB-C and the solar panel at the same time** until we've checked how the 6092 joins its USB-C and VIN.
 
-![USB-C lead](renders/pcb-build-usb.png)
-
-1. **Clip the USB-C board's six header pins to 3 mm** past their plastic.
-2. **Two 22 AWG wires, 65 mm each:** red soldered to **VBUS**, black to **GND**. Go by the names printed beside the pins on
-   your board. Sleeve both joints.
-3. Other ends onto a **2-pin piece of male header**: VBUS on one pin, GND on the other. Mark the VBUS end.
-4. It plugs into **J3 pins 1 (VBUS) and 2 (GND)**. Pin 1 is J3's square pad, at the room-side edge.
-5. CC1 / D− / D+ / CC2 stay unwired: the board has its own 5.1 kΩ CC resistors ("512"), so USB-C chargers give it 5 V.
-
-### 11d: Battery
+### 11c: Battery
 
 The 18650 plugs into **J4** with its own JST-XH lead: nothing to make. Before it ever goes in:
 
@@ -308,7 +298,7 @@ The 18650 plugs into **J4** with its own JST-XH lead: nothing to make. Before it
    backwards: don't plug it in.
 3. **Charge it first** (see "Charging the battery on the bench" below): the ESP needs the cell above about 3.8 V.
 
-### 11e: Solar (optional)
+### 11d: Solar (optional)
 
 The panel's flat 2-core cable comes in through the slot in end wall B and gets a **JST-ZH 2-pin plug**: **− on pin 1**
 (silk −), **+ on pin 2** (silk +). **Check the panel's polarity with the meter in sun before crimping**: on the first
@@ -349,7 +339,7 @@ on **TP5 (GND)** for every reading.
 | TP1 BAT+ | the cell's voltage (3.0–4.2 V) |
 | TP2 5V | 0.1–0.4 V under TP1 (it comes through D3) |
 | TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |
-| TP4 PWR | 0 V. Plug USB-C into the USB-C board: **4.6–4.8 V**, and the charger's orange light comes on |
+| TP4 PWR | 0 V. Plug USB into the 6092: TP4 **stays 0 V** (it only sees solar) and the orange light comes on. With the solar panel in daylight: about 5.5–6 V |
 
 **TP1 is the cell** (through the J5 jumper); TP2 is always 0.1–0.4 V lower, so don't read the battery off TP2. While
 it charges the cell reads a little high: for a true reading, unplug USB for a minute first.
@@ -373,7 +363,7 @@ Then it goes into the box: [V5 assembly](controller-v5.md#assembly).
 |---|---|---|
 | Readings make no sense | meter on the wrong setting (AC, mV, or Ω) | dial on **DC volts**, range 20 |
 | Minus sign on a reading | probes swapped, or a plug wired backwards | black on TP5; measure the plug by itself |
-| TP4 has 4.8 V but the charger's VIN reads 0 V | PWR crimp not making contact | push the crimp in until it clicks, tug-test it |
+| Solar in: TP4 has voltage but the charger's VIN reads 0 V | PWR crimp not making contact | push the crimp in until it clicks, tug-test it |
 | TP1 and TP2 fine, TP3 about 3.0 V, ESP keeps resetting | cell too low (below about 3.8 V) | charge it (bench charging above) |
 | Cell barely rises after hours | charger not charging properly | USB power meter between charger and cable: about **1 A** while charging (6092) |
 | ESP not on Wi-Fi | not powered, or browning out | TP3 = 3.3 V? Unplug power 5 s to restart it |
