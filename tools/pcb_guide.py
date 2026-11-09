@@ -373,11 +373,11 @@ def charger_picture():
         o.append('<circle cx="%d" cy="%d" r="13" fill="#c8c8c8" stroke="#777"/>' % (x_ + 25, my0 + mh - 41))
         o.append(text(x_ + 25, my0 + mh + 22, name, 14, '#2e7a3f', 'bold', halo=False))
     o.append(text(mx0 + mw / 2, my0 + mh + 46, 'Screw terminal (bottom end): all three stay EMPTY', 13, '#2e7a3f', 'bold', halo=False))
-    o.append(text(mx0 + mw / 2, my0 + mh + 64, '(the battery feeds the board directly; see the J5 jumper)', 12, '#555', halo=False))
+    o.append(text(mx0 + mw / 2, my0 + mh + 64, '(the battery feeds the board directly; see the J5 splice)', 12, '#555', halo=False))
     # the J5 housing on the left, wires to the pads
     hx, hy = 70, 200
     cav = [('1', 'G', 'GND', '#222'), ('2', 'B+', 'BATT', '#d62728'), ('3', '·', 'empty', '#999'),
-           ('4', 'L+', 'empty', '#999'), ('5', '·', 'empty', '#999'), ('6', 'P+', 'PWR', '#d62728')]
+           ('4', 'L+', 'BATT (splice)', '#d62728'), ('5', '·', 'empty', '#999'), ('6', 'P+', 'PWR', '#d62728')]
     o.append(text(hx, hy - 50, 'J5 plug (6-pin JST-XH)', 15, '#111', 'bold', 'start', halo=False))
     o.append(text(hx, hy - 30, 'wire side toward you, lock ramp up: pin 1 on top here', 12, '#d62728', anchor='start', halo=False))
     o.append('<rect x="%d" y="%d" width="150" height="%d" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx, hy, 6 * 50 + 10))
@@ -388,14 +388,24 @@ def charger_picture():
         o.append(text(hx + 15, y_ + 18, 'pin %s (%s)' % (pin, silk), 12, '#444', anchor='start', halo=False))
         o.append(text(hx + 15, y_ + 36, what, 14, c, 'bold', 'start', halo=False))
         wire_y[pin] = y_ + 22
+    sx, sy = hx + 250, (wire_y['2'] + wire_y['4']) / 2          # the splice: slots 2 and 4 joined, one wire on to BAT
     for name, col, y, lab in pads:
-        y0 = wire_y[{'G': '1', 'BAT': '2', 'VIN': '6'}[name]]
+        if name == 'BAT':
+            for pin in ('2', '4'):
+                o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
+                    hx + 150, wire_y[pin], hx + 200, wire_y[pin], sx - 50, sy, sx, sy, col))
+            o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
+                sx, sy, sx + 150, sy, mx0 - 180, my0 + y, mx0 - 16, my0 + y, col))
+            o.append('<rect x="%d" y="%d" width="34" height="16" rx="6" fill="#333"/>' % (sx - 17, sy - 8))
+            o.append(text(sx, sy - 14, 'splice', 12, '#333', 'bold', halo=True))
+            continue
+        y0 = wire_y[{'G': '1', 'VIN': '6'}[name]]
         o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
             hx + 150, y0, hx + 330, y0, mx0 - 180, my0 + y, mx0 - 16, my0 + y, col))
-    o.append(text(hx, hy + 6 * 50 + 34, 'pin 4 stays empty: it\'s jumpered to pin 2 on the PCB (11a)', 12, '#666', anchor='start', halo=False))
+    o.append(text(hx, hy + 6 * 50 + 34, 'pins 2 and 4 both carry BATT: one splice, two crimps (11a)', 12, '#666', anchor='start', halo=False))
     ty0 = 740
     for k_, t in enumerate([
-            '3 wires, all on the pad row: GND (pin 1) to G, BATT (pin 2) to BAT, PWR (pin 6) to VIN. Nothing else is wired.',
+            '3 pads wired: GND (pin 1) to G, BATT (pins 2 + 4, spliced) to BAT, PWR (pin 6) to VIN. Nothing else is wired.',
             'No temperature probe and no big capacitor with this module (the old one needed both).',
             'Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).',
             'Red F = fault: unplug and check the wiring.',
@@ -408,37 +418,47 @@ def charger_picture():
     return 'pcb-build-charger.svg'
 
 
-def jumper_picture():
-    """Close-up of J5's six pins from UNDER the board: the wire that joins pin 2 (battery) to pin 4 (board supply)."""
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="900" height="440" font-family="Helvetica,Arial">',
+def splice_picture():
+    """The J5 plug's battery splice: slot 2 and slot 4 both carry BATT, joined in one splice that goes on to the 6092's BAT.
+    The battery then feeds the board directly (J4 -> J5 pin 2 -> splice -> J5 pin 4 -> the board supply), with no change
+    to the PCB."""
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
-         text(20, 32, 'J5 jumper: pin 2 to pin 4, on the underside', 20, '#111', 'bold', 'start', halo=False),
+         text(20, 32, 'J5 splice: slots 2 and 4 joined (no change to the PCB)', 20, '#111', 'bold', 'start', halo=False),
          text(20, 56, 'The battery then feeds the whole board directly; the charger only charges it.', 13, '#444', anchor='start', halo=False)]
-    o.append('<rect x="60" y="100" width="780" height="200" rx="10" fill="#2f6b3a" stroke="#1d4426" stroke-width="2"/>')
-    o.append(text(450, 125, 'UNDERSIDE of the PCB at J5 (near end B, the USB-C end)', 13, '#e9efe9', 'bold', halo=False))
-    xs = [150 + 110 * k for k in range(6)]
-    for k, x in enumerate(xs):
-        if k == 0:
-            o.append('<rect x="%d" y="182" width="44" height="44" rx="4" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>' % (x - 22))
-        else:
-            o.append('<circle cx="%d" cy="204" r="22" fill="#d9b44a" stroke="#8a6d1f" stroke-width="2"/>' % x)
-        o.append('<circle cx="%d" cy="204" r="8" fill="#777"/>' % x)
-        o.append(text(x, 262, 'pin %d' % (k + 1), 14, '#fff', 'bold', halo=False))
-    o.append(text(xs[0], 285, 'square pad', 12, '#e9efe9', halo=False))
-    for k, lab in ((1, 'battery'), (3, 'board supply')):
-        o.append(text(xs[k], 285, lab, 12, '#ffd', 'bold', halo=False))
-    o.append('<path d="M%d 190 C %d 140, %d 140, %d 190" fill="none" stroke="#d62728" stroke-width="6"/>' % (xs[1], xs[1] + 30, xs[3] - 30, xs[3]))
-    o.append(text((xs[1] + xs[3]) / 2, 148, 'insulated wire', 13, '#fff', 'bold', halo=False))
-    o.append(text((xs[1] + xs[3]) / 2, 230, 'pin 3 NOT touched', 12, '#ffd', halo=False))
+    hx, hy = 70, 110
+    cav = [('1', 'GND', '#222'), ('2', 'BATT', '#d62728'), ('3', 'empty', '#999'), ('4', 'BATT', '#d62728'),
+           ('5', 'empty', '#999'), ('6', 'PWR', '#d62728')]
+    o.append(text(hx, hy - 12, 'J5 plug, wire side toward you, lock ramp up (pin 1 on top)', 13, '#d62728', 'bold', 'start', halo=False))
+    o.append('<rect x="%d" y="%d" width="150" height="%d" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>' % (hx, hy, 6 * 50 + 10))
+    wy = {}
+    for q, (pin, what, c) in enumerate(cav):
+        y_ = hy + 5 + 50 * q
+        o.append('<rect x="%d" y="%d" width="140" height="44" rx="4" fill="#fff" stroke="#bbb"/>' % (hx + 5, y_))
+        o.append(text(hx + 15, y_ + 18, 'slot %s' % pin, 12, '#444', anchor='start', halo=False))
+        o.append(text(hx + 15, y_ + 36, what, 14, c, 'bold', 'start', halo=False))
+        wy[pin] = y_ + 22
+    sx, sy = 400, (wy['2'] + wy['4']) / 2
+    for pin in ('2', '4'):
+        o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="#d62728" stroke-width="5"/>' % (
+            hx + 150, wy[pin], hx + 230, wy[pin], sx - 90, sy, sx - 20, sy))
+    o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#d62728" stroke-width="5"/>' % (sx + 20, sy, 760, sy))
+    o.append('<rect x="%d" y="%d" width="60" height="22" rx="8" fill="#333"/>' % (sx - 30, sy - 11))
+    o.append(text(sx, sy - 22, 'splice: soldered, heat-shrink over it', 13, '#333', 'bold'))
+    o.append(text(770, sy + 5, 'to the 6092\'s BAT pad', 14, '#d62728', 'bold', 'start', halo=False))
+    for pin, lab in (('1', 'to G'), ('6', 'to VIN')):
+        o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="4"/>' % (hx + 150, wy[pin], 760, wy[pin], '#222' if pin == '1' else '#d62728'))
+        o.append(text(770, wy[pin] + 5, lab, 14, '#222' if pin == '1' else '#d62728', 'bold', 'start', halo=False))
     for k_, t in enumerate([
-            'Count from the SQUARE pad (pin 1): the 2nd and the 4th pin. The square pad is pin 1 from either side of the board.',
-            'Use a short piece of insulated wire (22 AWG), stripped 2 mm at each end, soldered to the two pin joints.',
-            'It must clear pin 3. Keep it flat: the board sits 2.4 mm off the box floor.',
-            'Check: meter on beep, pin 2 to TP1 should beep. Then pull the old LOAD wire out of slot 4 of the J5 plug.']):
-        o.append(text(40, 340 + 24 * k_, t, 13, '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
+            'Two pre-crimped JST leads (crimp ends in slots 2 and 4) and the wire to BAT, all 22 AWG, joined in one soldered splice.',
+            'Keep the two crimped legs short (about 30 mm), so the motor current\'s loop through the plug is short.',
+            'Push both crimps in until they click, then tug-test each one. A loose crimp here cuts power to the whole board.',
+            'With the J5 plug out, the board has no power: the battery reaches it only through this plug.',
+            'Check: battery in J4, J5 plugged in, TP1 reads the battery voltage.']):
+        o.append(text(40, 440 + 22 * k_, t, 13, '#d62728' if k_ in (2, 3) else '#222', 'bold' if k_ == 0 else 'normal', 'start', halo=False))
     o.append('</svg>')
-    open(os.path.join(OUT, 'pcb-build-jumper.svg'), 'w').write('\n'.join(o))
-    return 'pcb-build-jumper.svg'
+    open(os.path.join(OUT, 'pcb-build-splice.svg'), 'w').write('\n'.join(o))
+    return 'pcb-build-splice.svg'
 
 
 def where(ref):
@@ -469,7 +489,7 @@ def md():
     open(os.path.join(OUT, 'pcb-build-done.svg'), 'w').write('\n'.join(o))
     pics.append('pcb-build-done.svg')
     pics.append(meter_picture())
-    pics.append(jumper_picture())
+    pics.append(splice_picture())
     pics.append(charger_picture())
 
     def rows(refs, cols):
@@ -509,7 +529,7 @@ def md():
                                    ', '.join(r for r, _ in lst), ', '.join(sorted({str(k) for _, k in lst}))))
     a('| ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |')
     a('| Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |')
-    a('| Short insulated wire for the J5 pin 2 to pin 4 jumper | 1 | J5 underside | 11 |')
+    a('| Extra pre-crimped JST lead for the J5 battery splice (slot 4) + heat-shrink | 1 | J5 plug | 11 |')
     a('| 18650 cell with its JST-XH plug | 1 | J4 | 12 |')
     a('| Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |')
     a('')
@@ -639,7 +659,7 @@ def md():
     a('| Ref | Header | For | Pins (silkscreen) |')
     a('|---|---|---|---|')
     a('| J4 | JST-XH 2-pin (B2B-XH-A) | the 18650 | **−  +** (red wire on +) |')
-    a('| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty; pin 4 gets jumpered to pin 2 in step 11) |')
+    a('| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty; with the 6092, pins 2 and 4 both get the battery wire: step 11) |')
     a('| J8 | JST-ZH 2-pin (B2B-ZR), the small one | solar (optional) | **−  +** |')
     a('')
     a('**Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the')
@@ -713,8 +733,9 @@ def md():
     a('')
     a('| Lead | Wire | Cut | From → to |')
     a('|---|---|---|---|')
-    a('| J5 jumper | 22 AWG insulated | about 8 mm | J5 pin 2 → J5 pin 4, under the PCB |')
-    a('| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 2 → **BAT** pad |')
+    a('| Splice leg A | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 2 → the splice |')
+    a('| Splice leg B | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 4 → the splice |')
+    a('| Charger BATT | 22 AWG | about 50 mm | the splice → **BAT** pad |')
     a('| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |')
     a('| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (carries solar) |')
     a('| Battery | the cell\'s own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |')
@@ -722,15 +743,21 @@ def md():
     a('')
     a('The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.')
     a('')
-    a('### 11a: The J5 jumper (pin 2 to pin 4)')
+    a('### 11a: The battery splice in the J5 plug (slots 2 and 4)')
     a('')
-    a('![J5 jumper](renders/pcb-build-jumper.png)')
+    a('![J5 splice](renders/pcb-build-splice.png)')
     a('')
-    a('1. Turn the board over. Find J5\'s six pins; **pin 1 is the square pad** (from either side).')
-    a('2. Solder a short insulated wire from **pin 2** (battery) to **pin 4** (board supply), clear of pin 3. Keep it flat.')
-    a('3. **Check:** meter on beep, J5 pin 2 to **TP1** beeps.')
-    a('4. If your J5 plug still has a wire in **slot 4** (the old LOAD wire), pull it out: lift the plastic tab over its crimp')
-    a('   with a pin and slide it back out.')
+    a('Nothing changes on the PCB. On the board, J5 pin 2 is the battery and pin 4 is the board supply; putting the battery')
+    a('wire in **both** slots joins them, so the battery feeds the board directly.')
+    a('')
+    a('1. Two pre-crimped leads, cut to about **30 mm**: their crimp ends go in **slot 2** and **slot 4**.')
+    a('2. Strip the two bare ends and the wire to the 6092\'s **BAT** pad, twist all three together, solder, and slide')
+    a('   heat-shrink over the joint.')
+    a('3. If your J5 plug still has the old LOAD wire in slot 4, pull it out first (lift the plastic tab over its crimp with a')
+    a('   pin and slide it back out).')
+    a('4. **Both crimps click in, then tug-test each one.** The motor current goes through these two crimps; a loose one cuts')
+    a('   power to the whole board.')
+    a('5. **With the J5 plug out, the board has no power.** The battery reaches it only through this plug.')
     a('')
     a('### 11b: Charger (Adafruit 6092)')
     a('')
@@ -802,8 +829,8 @@ def md():
     a('on **TP5 (GND)** for every reading.')
     a('')
     a('1. **Battery polarity:** hold its plug against J4: red wire over **+**, and the plug reads **+3.0 to +4.2 V**.')
-    a('2. Plug the **charger harness into J5**, then the **battery into J4**. With the J5 jumper, the battery reaches the board')
-    a('   directly.')
+    a('2. Plug the **charger harness into J5**, then the **battery into J4**. Through the splice in the J5 plug, the battery')
+    a('   reaches the board directly.')
     a('3. Measure:')
     a('')
     a('| Pad | Expect |')
@@ -813,10 +840,10 @@ def md():
     a('| TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |')
     a('| TP4 PWR | 0 V. Plug USB into the 6092: TP4 **stays 0 V** (it only sees solar) and the orange light comes on. With the solar panel in daylight: about 5.5–6 V |')
     a('')
-    a('**TP1 is the cell** (through the J5 jumper); TP2 is always 0.1–0.4 V lower, so don\'t read the battery off TP2. While')
+    a('**TP1 is the cell** (through the J5 splice); TP2 is always 0.1–0.4 V lower, so don\'t read the battery off TP2. While')
     a('it charges the cell reads a little high: for a true reading, unplug USB for a minute first.')
     a('')
-    a('If TP1 reads 0, check the J5 jumper (pin 2 to pin 4) and that the cell isn\'t flat.')
+    a('If TP1 reads 0, check the J5 plug is in and both splice crimps (slots 2 and 4) are clicked in, and that the cell isn\'t flat.')
     a('')
     # ---- step 13
     a('## Step 13: Plug in the ESP')

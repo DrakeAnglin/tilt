@@ -42,7 +42,7 @@ the box floor.
 | 0.75A PTC | 3 | F1, F2, F3 | 9 |
 | ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |
 | Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |
-| Short insulated wire for the J5 pin 2 to pin 4 jumper | 1 | J5 underside | 11 |
+| Extra pre-crimped JST lead for the J5 battery splice (slot 4) + heat-shrink | 1 | J5 plug | 11 |
 | 18650 cell with its JST-XH plug | 1 | J4 | 12 |
 | Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |
 
@@ -173,7 +173,7 @@ Three different headers, so no plug fits the wrong one:
 | Ref | Header | For | Pins (silkscreen) |
 |---|---|---|---|
 | J4 | JST-XH 2-pin (B2B-XH-A) | the 18650 | **−  +** (red wire on +) |
-| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty; pin 4 gets jumpered to pin 2 in step 11) |
+| J5 | JST-XH 6-pin (B6B-XH-A) | the charger harness | **G  B+  ·  L+  ·  P+** (pins 3 and 5 empty; with the 6092, pins 2 and 4 both get the battery wire: step 11) |
 | J8 | JST-ZH 2-pin (B2B-ZR), the small one | solar (optional) | **−  +** |
 
 **Orientation is everything here.** The headers only take a plug one way, so a header soldered backwards puts the
@@ -242,8 +242,9 @@ only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on U
 
 | Lead | Wire | Cut | From → to |
 |---|---|---|---|
-| J5 jumper | 22 AWG insulated | about 8 mm | J5 pin 2 → J5 pin 4, under the PCB |
-| Charger BATT | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 2 → **BAT** pad |
+| Splice leg A | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 2 → the splice |
+| Splice leg B | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 4 → the splice |
+| Charger BATT | 22 AWG | about 50 mm | the splice → **BAT** pad |
 | Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |
 | Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (carries solar) |
 | Battery | the cell's own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |
@@ -251,15 +252,21 @@ only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on U
 
 The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.
 
-### 11a: The J5 jumper (pin 2 to pin 4)
+### 11a: The battery splice in the J5 plug (slots 2 and 4)
 
-![J5 jumper](renders/pcb-build-jumper.png)
+![J5 splice](renders/pcb-build-splice.png)
 
-1. Turn the board over. Find J5's six pins; **pin 1 is the square pad** (from either side).
-2. Solder a short insulated wire from **pin 2** (battery) to **pin 4** (board supply), clear of pin 3. Keep it flat.
-3. **Check:** meter on beep, J5 pin 2 to **TP1** beeps.
-4. If your J5 plug still has a wire in **slot 4** (the old LOAD wire), pull it out: lift the plastic tab over its crimp
-   with a pin and slide it back out.
+Nothing changes on the PCB. On the board, J5 pin 2 is the battery and pin 4 is the board supply; putting the battery
+wire in **both** slots joins them, so the battery feeds the board directly.
+
+1. Two pre-crimped leads, cut to about **30 mm**: their crimp ends go in **slot 2** and **slot 4**.
+2. Strip the two bare ends and the wire to the 6092's **BAT** pad, twist all three together, solder, and slide
+   heat-shrink over the joint.
+3. If your J5 plug still has the old LOAD wire in slot 4, pull it out first (lift the plastic tab over its crimp with a
+   pin and slide it back out).
+4. **Both crimps click in, then tug-test each one.** The motor current goes through these two crimps; a loose one cuts
+   power to the whole board.
+5. **With the J5 plug out, the board has no power.** The battery reaches it only through this plug.
 
 ### 11b: Charger (Adafruit 6092)
 
@@ -330,8 +337,8 @@ Meter on **DC volts** (V with a straight line, "V⎓" or "DCV", not the wavy V~;
 on **TP5 (GND)** for every reading.
 
 1. **Battery polarity:** hold its plug against J4: red wire over **+**, and the plug reads **+3.0 to +4.2 V**.
-2. Plug the **charger harness into J5**, then the **battery into J4**. With the J5 jumper, the battery reaches the board
-   directly.
+2. Plug the **charger harness into J5**, then the **battery into J4**. Through the splice in the J5 plug, the battery
+   reaches the board directly.
 3. Measure:
 
 | Pad | Expect |
@@ -341,10 +348,10 @@ on **TP5 (GND)** for every reading.
 | TP3 3V3 | 0 V (it comes from the ESP, not plugged in yet) |
 | TP4 PWR | 0 V. Plug USB into the 6092: TP4 **stays 0 V** (it only sees solar) and the orange light comes on. With the solar panel in daylight: about 5.5–6 V |
 
-**TP1 is the cell** (through the J5 jumper); TP2 is always 0.1–0.4 V lower, so don't read the battery off TP2. While
+**TP1 is the cell** (through the J5 splice); TP2 is always 0.1–0.4 V lower, so don't read the battery off TP2. While
 it charges the cell reads a little high: for a true reading, unplug USB for a minute first.
 
-If TP1 reads 0, check the J5 jumper (pin 2 to pin 4) and that the cell isn't flat.
+If TP1 reads 0, check the J5 plug is in and both splice crimps (slots 2 and 4) are clicked in, and that the cell isn't flat.
 
 ## Step 13: Plug in the ESP
 
