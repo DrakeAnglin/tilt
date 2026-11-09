@@ -71,6 +71,13 @@ pm = POD.P['n20_axis']
 if math.hypot(pm[0] - M[0], pm[1] - M[1]) > 0.01:
     notes.append('MODULE MOTOR AXIS %s != CLUTCH %s' % (pm, M))
 
+# guard: every placed part is where the layout puts it (an occurrence reset once left the worm at the origin)
+_L = T5.T4.layout()
+for _nm, _exp in (('T5 Worm', _L['p0']), ('T5 Worm wheel', _L['rod_c'])):
+    _o = next(root.occurrences.item(i) for i in range(root.occurrences.count) if root.occurrences.item(i).component.name == _nm)
+    _org = _o.transform2.getAsCoordinateSystem()[0]
+    if math.dist((_org.x * 10, _org.y * 10, _org.z * 10), _exp) > 0.01:
+        notes.append('PLACEMENT: %s at (%.2f, %.2f, %.2f), expected %s' % (_nm, _org.x * 10, _org.y * 10, _org.z * 10, _exp))
 groups = POD.build(tbm, bx, cyl, cone, uni, cut)
 groups['Plug'].append(('Tilt rod (on through the module)', bx(-90, -8.33, -2, 2, POD.P['rod_z'] - 2, POD.P['rod_z'] + 2)))
 

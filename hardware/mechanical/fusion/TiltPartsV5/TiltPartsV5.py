@@ -426,12 +426,15 @@ def build(design, export_dir=None):
     _, idA = build_idler(root, 'Idler A')
     _, idB = build_idler(root, 'Idler B')
     _, arm = build_arm(root, CL)
-    _, arm_pp = build_arm(root, CL, printed_pins=True)
-    arm_pp_occ = next(root.occurrences.item(i) for i in range(root.occurrences.count)
-                      if root.occurrences.item(i).component.name == PREFIX + 'Clutch arm printed pins')
-    mv = adsk.core.Matrix3D.create()                     # bench-test variant: set beside the tilter (not in the checks)
-    mv.translation = adsk.core.Vector3D.create(0, -8.0, 0)
-    arm_pp_occ.transform2 = mv
+    # bench-test arm (printed pins): exported, then removed BEFORE anything is placed (deleting an occurrence in a
+    # direct design resets the placements made before it)
+    arm_pp_occ, arm_pp = build_arm(root, CL, printed_pins=True)
+    if export_dir:
+        os.makedirs(export_dir, exist_ok=True)
+        opt = design.exportManager.createSTLExportOptions(arm_pp, os.path.join(export_dir, 'clutch_arm_printed_pins.stl'))
+        opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
+        design.exportManager.execute(opt)
+    arm_pp_occ.deleteMe()
     _, pins = build_pins_ref(root, CL)
     _, plate = build_plate(root, CL)
     SL = T4.sensor_layout()
@@ -473,19 +476,18 @@ def build(design, export_dir=None):
     T4.color(design, cases['Case right'][1], 'Plastic - Matte (Blue)')
     T4.color(design, refs, 'Plastic - Matte (White)')
 
-    files = []
+    files = [os.path.join(export_dir, 'clutch_arm_printed_pins.stl')] if export_dir else []
     if export_dir:
         os.makedirs(export_dir, exist_ok=True)
         em = design.exportManager
         for nm, comp in (('worm', worm), ('worm_wheel', wheel), ('sensor_gear', sgear), ('clutch_shaft', shaft), ('clutch_12t', g12),
-                         ('clutch_pinion', pin8), ('clutch_idler', idA), ('clutch_arm', arm), ('clutch_arm_printed_pins', arm_pp), ('clutch_plate', plate),
+                         ('clutch_pinion', pin8), ('clutch_idler', idA), ('clutch_arm', arm), ('clutch_plate', plate),
                          ('case_left', cases['Case left'][1]), ('case_right', cases['Case right'][1])):
             path = os.path.join(export_dir, nm + '.stl')
             opt = em.createSTLExportOptions(comp, path)
             opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
             em.execute(opt)
             files.append(path)
-    arm_pp_occ.deleteMe()                                # the printed-pin arm is a print file only, not part of the assembly
     return dict(CL={k: (tuple(round(x, 3) for x in v) if isinstance(v, tuple) else (round(v, 4) if isinstance(v, float) else None))
                     for k, v in CL.items() if k in ('O', 'M', 'A', 'B', 'A_on', 'B_on', 'A_far', 'B_far', 'a', 'b', 'd', 'neu', 'swing', 'base', 'phi', 'psi')},
                 bosses=bosses, pegs=pegs, files=files)
