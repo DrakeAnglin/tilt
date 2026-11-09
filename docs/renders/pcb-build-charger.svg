@@ -1,33 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="900" font-family="Helvetica,Arial">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="980" font-family="Helvetica,Arial">
 <rect width="100%" height="100%" fill="#fff"/>
 <text x="20.0" y="32.0" font-size="20.0" fill="#111" font-weight="bold" text-anchor="start">Charger: Adafruit 6092 (bq25185), wired as a charger only</text>
-<text x="20.0" y="56.0" font-size="13.0" fill="#444" font-weight="normal" text-anchor="start">Wiring diagram, not to scale: find each pad by the name printed beside it on the board.</text>
-<rect x="600" y="110" width="300" height="400" rx="12" fill="#1a1a1a"/>
-<text x="750.0" y="150.0" font-size="18.0" fill="#fff" font-weight="bold" text-anchor="middle">Adafruit 6092</text>
-<text x="750.0" y="172.0" font-size="13.0" fill="#bbb" font-weight="normal" text-anchor="middle">bq25185 charger + 3.3 V buck</text>
-<rect x="880" y="200" width="40" height="70" rx="8" fill="#bbb" stroke="#666" stroke-width="2"/>
-<text x="930.0" y="230.0" font-size="14.0" fill="#333" font-weight="bold" text-anchor="start">USB-C</text>
-<text x="930.0" y="250.0" font-size="12.0" fill="#666" font-weight="normal" text-anchor="start">bench charging only</text>
-<rect x="640" y="97" width="60" height="26" rx="3" fill="#f4f1e8" stroke="#999" stroke-width="2"/>
-<text x="670.0" y="88.0" font-size="12.0" fill="#888" font-weight="normal" text-anchor="middle">JST-PH battery socket: not used</text>
-<circle cx="640" cy="210" r="9" fill="#ff8c00"/>
-<text x="658.0" y="215.0" font-size="12.0" fill="#ddd" font-weight="normal" text-anchor="start">orange C: charging</text>
-<circle cx="640" cy="242" r="9" fill="#d62728"/>
-<text x="658.0" y="247.0" font-size="12.0" fill="#ddd" font-weight="normal" text-anchor="start">red F: fault, unplug</text>
-<circle cx="600" cy="340" r="16" fill="#c9a400"/><circle cx="600" cy="340" r="7" fill="#fff"/>
-<text x="626.0" y="345.0" font-size="15.0" fill="#fff" font-weight="bold" text-anchor="start">G</text>
-<circle cx="600" cy="410" r="16" fill="#c9a400"/><circle cx="600" cy="410" r="7" fill="#fff"/>
-<text x="626.0" y="415.0" font-size="15.0" fill="#fff" font-weight="bold" text-anchor="start">BAT</text>
-<circle cx="600" cy="480" r="16" fill="#c9a400"/><circle cx="600" cy="480" r="7" fill="#fff"/>
-<text x="626.0" y="485.0" font-size="15.0" fill="#fff" font-weight="bold" text-anchor="start">VIN</text>
-<rect x="680" y="480" width="50" height="40" fill="#2a7ab0" stroke="#145" stroke-width="2"/>
-<text x="705.0" y="505.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">4.5V</text>
-<rect x="750" y="480" width="50" height="40" fill="#2a7ab0" stroke="#145" stroke-width="2"/>
-<text x="775.0" y="505.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">−</text>
-<rect x="820" y="480" width="50" height="40" fill="#2a7ab0" stroke="#145" stroke-width="2"/>
-<text x="845.0" y="505.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="middle">3V</text>
-<text x="750.0" y="544.0" font-size="13.0" fill="#2a7ab0" font-weight="bold" text-anchor="middle">Screw terminal: 4.5V and 3V stay EMPTY</text>
-<text x="750.0" y="562.0" font-size="12.0" fill="#555" font-weight="normal" text-anchor="middle">(the battery feeds the board directly; see the J5 jumper)</text>
+<text x="20.0" y="56.0" font-size="13.0" fill="#444" font-weight="normal" text-anchor="start">Top view, drawn from Adafruit&#x27;s photo (not to scale). Go by the name printed beside each pad.</text>
+<rect x="620" y="120" width="300" height="470" rx="16" fill="#1a1a1a" stroke="#c9c9a0" stroke-width="3"/>
+<circle cx="650" cy="150" r="18" fill="#c9a400"/><circle cx="650" cy="150" r="11" fill="#fff"/>
+<circle cx="890" cy="150" r="18" fill="#c9a400"/><circle cx="890" cy="150" r="11" fill="#fff"/>
+<circle cx="650" cy="560" r="18" fill="#c9a400"/><circle cx="650" cy="560" r="11" fill="#fff"/>
+<circle cx="890" cy="560" r="18" fill="#c9a400"/><circle cx="890" cy="560" r="11" fill="#fff"/>
+<rect x="715" y="102" width="110" height="80" rx="14" fill="#c8c8c8" stroke="#777" stroke-width="2"/>
+<rect x="735" y="112" width="70" height="14" rx="7" fill="#555"/>
+<text x="770.0" y="90.0" font-size="13.0" fill="#333" font-weight="bold" text-anchor="middle">USB-C (top end): bench charging only</text>
+<rect x="795" y="205" width="90" height="62" rx="4" fill="#f1e2c8" stroke="#a89070" stroke-width="2"/>
+<text x="840.0" y="241.0" font-size="12.0" fill="#6b5a40" font-weight="bold" text-anchor="middle">JST-PH</text>
+<text x="934.0" y="232.0" font-size="12.0" fill="#666" font-weight="bold" text-anchor="start">JST-PH battery socket:</text>
+<text x="934.0" y="248.0" font-size="12.0" fill="#666" font-weight="normal" text-anchor="start">not used (the battery is on J4)</text>
+<circle cx="770" cy="216" r="7" fill="#ff8c00"/>
+<text x="752.0" y="221.0" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="end">C</text>
+<circle cx="770" cy="240" r="7" fill="#d62728"/>
+<text x="752.0" y="245.0" font-size="12.0" fill="#fff" font-weight="bold" text-anchor="end">F</text>
+<text x="934.0" y="288.0" font-size="12.0" fill="#c06000" font-weight="bold" text-anchor="start">orange C = charging</text>
+<text x="934.0" y="304.0" font-size="12.0" fill="#d62728" font-weight="bold" text-anchor="start">red F = fault: unplug</text>
+<rect x="770" y="350" width="40" height="40" fill="#222" stroke="#444"/>
+<circle cx="648" cy="230" r="13" fill="#c9a400"/><circle cx="648" cy="230" r="6" fill="#fff"/>
+<text x="670.0" y="235.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="start">VIN</text>
+<circle cx="648" cy="230" r="18" fill="none" stroke="#ffd24a" stroke-width="3"/>
+<circle cx="648" cy="270" r="13" fill="#8a7a40"/><circle cx="648" cy="270" r="6" fill="#fff"/>
+<text x="670.0" y="275.0" font-size="14.0" fill="#999" font-weight="bold" text-anchor="start">VU</text>
+<circle cx="648" cy="310" r="13" fill="#8a7a40"/><circle cx="648" cy="310" r="6" fill="#fff"/>
+<text x="670.0" y="315.0" font-size="14.0" fill="#999" font-weight="bold" text-anchor="start">D−</text>
+<circle cx="648" cy="350" r="13" fill="#8a7a40"/><circle cx="648" cy="350" r="6" fill="#fff"/>
+<text x="670.0" y="355.0" font-size="14.0" fill="#999" font-weight="bold" text-anchor="start">D+</text>
+<circle cx="648" cy="390" r="13" fill="#c9a400"/><circle cx="648" cy="390" r="6" fill="#fff"/>
+<text x="670.0" y="395.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="start">G</text>
+<circle cx="648" cy="390" r="18" fill="none" stroke="#ffd24a" stroke-width="3"/>
+<circle cx="648" cy="430" r="13" fill="#c9a400"/><circle cx="648" cy="430" r="6" fill="#fff"/>
+<text x="670.0" y="435.0" font-size="14.0" fill="#fff" font-weight="bold" text-anchor="start">BAT</text>
+<circle cx="648" cy="430" r="18" fill="none" stroke="#ffd24a" stroke-width="3"/>
+<circle cx="648" cy="470" r="13" fill="#8a7a40"/><circle cx="648" cy="470" r="6" fill="#fff"/>
+<text x="670.0" y="475.0" font-size="14.0" fill="#999" font-weight="bold" text-anchor="start">3V</text>
+<circle cx="648" cy="510" r="13" fill="#8a7a40"/><circle cx="648" cy="510" r="6" fill="#fff"/>
+<text x="670.0" y="515.0" font-size="14.0" fill="#999" font-weight="bold" text-anchor="start">EN</text>
+<text x="720.0" y="325.0" font-size="11.0" fill="#aaa" font-weight="normal" text-anchor="start">VU, D−, D+: USB-C side, empty</text>
+<text x="720.0" y="495.0" font-size="11.0" fill="#aaa" font-weight="normal" text-anchor="start">3V, EN: empty</text>
+<rect x="692" y="524" width="50" height="50" fill="#2e9e4f" stroke="#145a2a" stroke-width="2"/>
+<circle cx="717" cy="549" r="13" fill="#c8c8c8" stroke="#777"/>
+<text x="717.0" y="612.0" font-size="14.0" fill="#2e7a3f" font-weight="bold" text-anchor="middle">4.5V</text>
+<rect x="746" y="524" width="50" height="50" fill="#2e9e4f" stroke="#145a2a" stroke-width="2"/>
+<circle cx="771" cy="549" r="13" fill="#c8c8c8" stroke="#777"/>
+<text x="771.0" y="612.0" font-size="14.0" fill="#2e7a3f" font-weight="bold" text-anchor="middle">−</text>
+<rect x="800" y="524" width="50" height="50" fill="#2e9e4f" stroke="#145a2a" stroke-width="2"/>
+<circle cx="825" cy="549" r="13" fill="#c8c8c8" stroke="#777"/>
+<text x="825.0" y="612.0" font-size="14.0" fill="#2e7a3f" font-weight="bold" text-anchor="middle">3V</text>
+<text x="770.0" y="636.0" font-size="13.0" fill="#2e7a3f" font-weight="bold" text-anchor="middle">Screw terminal (bottom end): all three stay EMPTY</text>
+<text x="770.0" y="654.0" font-size="12.0" fill="#555" font-weight="normal" text-anchor="middle">(the battery feeds the board directly; see the J5 jumper)</text>
 <text x="70.0" y="150.0" font-size="15.0" fill="#111" font-weight="bold" text-anchor="start">J5 plug (6-pin JST-XH)</text>
 <text x="70.0" y="170.0" font-size="12.0" fill="#d62728" font-weight="normal" text-anchor="start">wire side toward you, lock ramp up: pin 1 on top here</text>
 <rect x="70" y="200" width="150" height="310" rx="6" fill="#f4f1e8" stroke="#555" stroke-width="2"/>
@@ -49,15 +74,15 @@
 <rect x="75" y="455" width="140" height="44" rx="4" fill="#fff" stroke="#bbb"/>
 <text x="85.0" y="473.0" font-size="12.0" fill="#444" font-weight="normal" text-anchor="start">pin 6 (P+)</text>
 <text x="85.0" y="491.0" font-size="14.0" fill="#d62728" font-weight="bold" text-anchor="start">PWR</text>
-<path d="M220 227 C 400 227, 420 340, 584 340" fill="none" stroke="#222" stroke-width="4"/>
-<path d="M220 277 C 400 277, 420 410, 584 410" fill="none" stroke="#d62728" stroke-width="4"/>
-<path d="M220 477 C 400 477, 420 480, 584 480" fill="none" stroke="#d62728" stroke-width="4"/>
+<path d="M220 477 C 400 477, 440 230, 604 230" fill="none" stroke="#d62728" stroke-width="4"/>
+<path d="M220 227 C 400 227, 440 390, 604 390" fill="none" stroke="#222" stroke-width="4"/>
+<path d="M220 277 C 400 277, 440 430, 604 430" fill="none" stroke="#d62728" stroke-width="4"/>
 <text x="70.0" y="534.0" font-size="12.0" fill="#666" font-weight="normal" text-anchor="start">pin 4 stays empty: it&#x27;s jumpered to pin 2 on the PCB (11a)</text>
-<text x="40.0" y="640.0" font-size="13.0" fill="#222" font-weight="bold" text-anchor="start">3 wires: GND (pin 1) to G, BATT (pin 2) to BAT, PWR (pin 6) to VIN. Nothing else on the module is wired.</text>
-<text x="40.0" y="664.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">No temperature probe and no big capacitor with this module (the old one needed both).</text>
-<text x="40.0" y="688.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).</text>
-<text x="40.0" y="712.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Red F = fault: unplug and check the wiring.</text>
-<text x="40.0" y="736.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">USB through the PCB arrives at VIN at about 4.7 V (after D1); the module is rated 5-18 V on VIN.</text>
-<text x="40.0" y="760.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">If it won&#x27;t charge that way: plug USB-C into the module&#x27;s own socket instead (the ESP then can&#x27;t see &quot;USB present&quot;).</text>
-<text x="40.0" y="784.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">Do not plug the module&#x27;s USB-C and the solar panel in at the same time (not yet checked how it joins them).</text>
+<text x="40.0" y="740.0" font-size="13.0" fill="#222" font-weight="bold" text-anchor="start">3 wires, all on the pad row: GND (pin 1) to G, BATT (pin 2) to BAT, PWR (pin 6) to VIN. Nothing else is wired.</text>
+<text x="40.0" y="764.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">No temperature probe and no big capacitor with this module (the old one needed both).</text>
+<text x="40.0" y="788.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).</text>
+<text x="40.0" y="812.0" font-size="13.0" fill="#222" font-weight="normal" text-anchor="start">Red F = fault: unplug and check the wiring.</text>
+<text x="40.0" y="836.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">USB through the PCB arrives at VIN at about 4.7 V (after D1); the module is rated 5-18 V on VIN.</text>
+<text x="40.0" y="860.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">If it won&#x27;t charge that way: plug USB-C into the module&#x27;s own socket instead (the ESP then can&#x27;t see &quot;USB present&quot;).</text>
+<text x="40.0" y="884.0" font-size="13.0" fill="#d62728" font-weight="normal" text-anchor="start">Do not plug the module&#x27;s USB-C and the solar panel in at the same time (not yet checked how it joins them).</text>
 </svg>

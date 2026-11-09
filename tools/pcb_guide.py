@@ -326,37 +326,54 @@ def charger_picture():
     """The Adafruit 6092 (bq25185) charger, used as a charger ONLY, and its 3-wire J5 harness. Drawn as a wiring diagram:
     the pad names are the ones printed on the board (Adafruit's guide); positions on the real board differ, so go by the
     printed labels."""
-    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="900" font-family="Helvetica,Arial">',
+    o = ['<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="980" font-family="Helvetica,Arial">',
          '<rect width="100%" height="100%" fill="#fff"/>',
          text(20, 32, 'Charger: Adafruit 6092 (bq25185), wired as a charger only', 20, '#111', 'bold', 'start', halo=False),
-         text(20, 56, 'Wiring diagram, not to scale: find each pad by the name printed beside it on the board.', 13, '#444', anchor='start', halo=False)]
-    # the module
-    mx0, my0, mw, mh = 600, 110, 300, 400
-    o.append('<rect x="%d" y="%d" width="%d" height="%d" rx="12" fill="#1a1a1a"/>' % (mx0, my0, mw, mh))
-    o.append(text(mx0 + mw / 2, my0 + 40, 'Adafruit 6092', 18, '#fff', 'bold', halo=False))
-    o.append(text(mx0 + mw / 2, my0 + 62, 'bq25185 charger + 3.3 V buck', 13, '#bbb', halo=False))
-    # USB-C on the right edge
-    o.append('<rect x="%d" y="%d" width="40" height="70" rx="8" fill="#bbb" stroke="#666" stroke-width="2"/>' % (mx0 + mw - 20, my0 + 90))
-    o.append(text(mx0 + mw + 30, my0 + 120, 'USB-C', 14, '#333', 'bold', 'start', halo=False))
-    o.append(text(mx0 + mw + 30, my0 + 140, 'bench charging only', 12, '#666', anchor='start', halo=False))
-    # JST PH battery socket at the top (not used)
-    o.append('<rect x="%d" y="%d" width="60" height="26" rx="3" fill="#f4f1e8" stroke="#999" stroke-width="2"/>' % (mx0 + 40, my0 - 13))
-    o.append(text(mx0 + 70, my0 - 22, 'JST-PH battery socket: not used', 12, '#888', halo=False))
-    # LEDs
-    for k_, (lab, col, what) in enumerate((('C', '#ff8c00', 'orange C: charging'), ('F', '#d62728', 'red F: fault, unplug'))):
-        o.append('<circle cx="%d" cy="%d" r="9" fill="%s"/>' % (mx0 + 40, my0 + 100 + 32 * k_, col))
-        o.append(text(mx0 + 58, my0 + 105 + 32 * k_, what, 12, '#ddd', anchor='start', halo=False))
-    # pads used (left edge) and pads left empty (bottom: the terminal block)
-    pads = [('G', '#222', 230, 'pin 1  GND'), ('BAT', '#d62728', 300, 'pin 2  BATT'), ('VIN', '#d62728', 370, 'pin 6  PWR')]
-    for name, col, y, _ in pads:
-        o.append('<circle cx="%d" cy="%d" r="16" fill="#c9a400"/><circle cx="%d" cy="%d" r="7" fill="#fff"/>' % (mx0, my0 + y, mx0, my0 + y))
-        o.append(text(mx0 + 26, my0 + y + 5, name, 15, '#fff', 'bold', 'start', halo=False))
+         text(20, 56, 'Top view, drawn from Adafruit\'s photo (not to scale). Go by the name printed beside each pad.', 13, '#444', anchor='start', halo=False)]
+    # the module, top view, drawn from Adafruit's photo: USB-C at the top end, the screw terminal at the bottom end, the
+    # JST-PH socket just below the USB-C, and the row of 8 pads down the left edge (VIN at the USB end, EN at the terminal end)
+    mx0, my0, mw, mh = 620, 120, 300, 470
+    o.append('<rect x="%d" y="%d" width="%d" height="%d" rx="16" fill="#1a1a1a" stroke="#c9c9a0" stroke-width="3"/>' % (mx0, my0, mw, mh))
+    for hx_, hy_ in ((mx0 + 30, my0 + 30), (mx0 + mw - 30, my0 + 30), (mx0 + 30, my0 + mh - 30), (mx0 + mw - 30, my0 + mh - 30)):
+        o.append('<circle cx="%d" cy="%d" r="18" fill="#c9a400"/><circle cx="%d" cy="%d" r="11" fill="#fff"/>' % (hx_, hy_, hx_, hy_))
+    # USB-C, sticking out of the top end
+    o.append('<rect x="%d" y="%d" width="110" height="80" rx="14" fill="#c8c8c8" stroke="#777" stroke-width="2"/>' % (mx0 + 95, my0 - 18))
+    o.append('<rect x="%d" y="%d" width="70" height="14" rx="7" fill="#555"/>' % (mx0 + 115, my0 - 8))
+    o.append(text(mx0 + mw / 2, my0 - 30, 'USB-C (top end): bench charging only', 13, '#333', 'bold', halo=False))
+    # JST-PH socket below the USB-C, toward the right
+    o.append('<rect x="%d" y="%d" width="90" height="62" rx="4" fill="#f1e2c8" stroke="#a89070" stroke-width="2"/>' % (mx0 + 175, my0 + 85))
+    o.append(text(mx0 + 220, my0 + 121, 'JST-PH', 12, '#6b5a40', 'bold', halo=False))
+    o.append(text(mx0 + mw + 14, my0 + 112, 'JST-PH battery socket:', 12, '#666', 'bold', 'start', halo=False))
+    o.append(text(mx0 + mw + 14, my0 + 128, 'not used (the battery is on J4)', 12, '#666', anchor='start', halo=False))
+    # LEDs C and F, left of the socket
+    for k_, (lab, col) in enumerate((('C', '#ff8c00'), ('F', '#d62728'))):
+        o.append('<circle cx="%d" cy="%d" r="7" fill="%s"/>' % (mx0 + 150, my0 + 96 + 24 * k_, col))
+        o.append(text(mx0 + 132, my0 + 101 + 24 * k_, lab, 12, '#fff', 'bold', 'end', halo=False))
+    o.append(text(mx0 + mw + 14, my0 + 168, 'orange C = charging', 12, '#c06000', 'bold', 'start', halo=False))
+    o.append(text(mx0 + mw + 14, my0 + 184, 'red F = fault: unplug', 12, '#d62728', 'bold', 'start', halo=False))
+    o.append('<rect x="%d" y="%d" width="40" height="40" fill="#222" stroke="#444"/>' % (mx0 + 150, my0 + 230))   # the chip
+    # the 8-pad row down the left edge, names printed beside each pad
+    used = {'VIN': ('#d62728', 'pin 6 PWR'), 'G': ('#222', 'pin 1 GND'), 'BAT': ('#d62728', 'pin 2 BATT')}
+    pads = []
+    for k_, name in enumerate(('VIN', 'VU', 'D−', 'D+', 'G', 'BAT', '3V', 'EN')):
+        y = 110 + 40 * k_
+        on = name in used
+        o.append('<circle cx="%d" cy="%d" r="13" fill="%s"/><circle cx="%d" cy="%d" r="6" fill="#fff"/>' % (
+            mx0 + 28, my0 + y, '#c9a400' if on else '#8a7a40', mx0 + 28, my0 + y))
+        o.append(text(mx0 + 50, my0 + y + 5, name, 14, '#fff' if on else '#999', 'bold', 'start', halo=False))
+        if on:
+            o.append('<circle cx="%d" cy="%d" r="18" fill="none" stroke="%s" stroke-width="3"/>' % (mx0 + 28, my0 + y, '#ffd24a'))
+            pads.append((name, used[name][0], y, used[name][1]))
+    o.append(text(mx0 + 100, my0 + 205, 'VU, D−, D+: USB-C side, empty', 11, '#aaa', anchor='start', halo=False))
+    o.append(text(mx0 + 100, my0 + 375, '3V, EN: empty', 11, '#aaa', anchor='start', halo=False))
+    # screw terminal at the bottom end: 4.5V, −, 3V (4.5V on the pad-row side)
     for k_, name in enumerate(('4.5V', '−', '3V')):
-        x_ = mx0 + 80 + 70 * k_
-        o.append('<rect x="%d" y="%d" width="50" height="40" fill="#2a7ab0" stroke="#145" stroke-width="2"/>' % (x_, my0 + mh - 30))
-        o.append(text(x_ + 25, my0 + mh - 5, name, 14, '#fff', 'bold', halo=False))
-    o.append(text(mx0 + mw / 2, my0 + mh + 34, 'Screw terminal: 4.5V and 3V stay EMPTY', 13, '#2a7ab0', 'bold', halo=False))
-    o.append(text(mx0 + mw / 2, my0 + mh + 52, '(the battery feeds the board directly; see the J5 jumper)', 12, '#555', halo=False))
+        x_ = mx0 + 72 + 54 * k_
+        o.append('<rect x="%d" y="%d" width="50" height="50" fill="#2e9e4f" stroke="#145a2a" stroke-width="2"/>' % (x_, my0 + mh - 66))
+        o.append('<circle cx="%d" cy="%d" r="13" fill="#c8c8c8" stroke="#777"/>' % (x_ + 25, my0 + mh - 41))
+        o.append(text(x_ + 25, my0 + mh + 22, name, 14, '#2e7a3f', 'bold', halo=False))
+    o.append(text(mx0 + mw / 2, my0 + mh + 46, 'Screw terminal (bottom end): all three stay EMPTY', 13, '#2e7a3f', 'bold', halo=False))
+    o.append(text(mx0 + mw / 2, my0 + mh + 64, '(the battery feeds the board directly; see the J5 jumper)', 12, '#555', halo=False))
     # the J5 housing on the left, wires to the pads
     hx, hy = 70, 200
     cav = [('1', 'G', 'GND', '#222'), ('2', 'B+', 'BATT', '#d62728'), ('3', '·', 'empty', '#999'),
@@ -371,14 +388,14 @@ def charger_picture():
         o.append(text(hx + 15, y_ + 18, 'pin %s (%s)' % (pin, silk), 12, '#444', anchor='start', halo=False))
         o.append(text(hx + 15, y_ + 36, what, 14, c, 'bold', 'start', halo=False))
         wire_y[pin] = y_ + 22
-    for (name, col, y, _), pin in zip(pads, ('1', '2', '6')):
-        y0 = wire_y[pin]
+    for name, col, y, lab in pads:
+        y0 = wire_y[{'G': '1', 'BAT': '2', 'VIN': '6'}[name]]
         o.append('<path d="M%d %d C %d %d, %d %d, %d %d" fill="none" stroke="%s" stroke-width="4"/>' % (
             hx + 150, y0, hx + 330, y0, mx0 - 180, my0 + y, mx0 - 16, my0 + y, col))
     o.append(text(hx, hy + 6 * 50 + 34, 'pin 4 stays empty: it\'s jumpered to pin 2 on the PCB (11a)', 12, '#666', anchor='start', halo=False))
-    ty0 = 640
+    ty0 = 740
     for k_, t in enumerate([
-            '3 wires: GND (pin 1) to G, BATT (pin 2) to BAT, PWR (pin 6) to VIN. Nothing else on the module is wired.',
+            '3 wires, all on the pad row: GND (pin 1) to G, BATT (pin 2) to BAT, PWR (pin 6) to VIN. Nothing else is wired.',
             'No temperature probe and no big capacitor with this module (the old one needed both).',
             'Orange C on = charging; off = full (or its fixed 6-hour charge limit: unplug and replug power to restart).',
             'Red F = fault: unplug and check the wiring.',
