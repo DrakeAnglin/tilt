@@ -14,7 +14,6 @@
 #include "motion.h"
 #include "sec.h"
 #include "secrets.h"
-#include "ui.h"
 #include <mdns.h>
 
 #define FW_VERSION "2.2.0-dev3"
@@ -187,10 +186,8 @@ float tiltWord(int p, const std::string &to) {
 // ---- pages
 esp_err_t hRoot(httpd_req_t *r) {
   lastWeb = millis() ? millis() : 1;
-  httpd_resp_set_type(r, "text/html");
-  httpd_resp_set_hdr(r, "Content-Encoding", "gzip");
-  httpd_resp_set_hdr(r, "Cache-Control", "no-cache");
-  return httpd_resp_send(r, (const char *)UI_GZ, UI_GZ_LEN);
+  httpd_resp_set_type(r, "text/plain");           // the built-in web page is gone: the Tilt app is the way in
+  return httpd_resp_sendstr(r, "Tilt blinds controller. Use the Tilt app.");
 }
 esp_err_t hState(httpd_req_t *r) {
   Lock l;

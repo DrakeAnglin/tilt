@@ -1,12 +1,12 @@
-"""Tilter v0.9 (short-rod sensor sleeve, one motor stage): fresh document, build, checks, STLs to hardware/mechanical/stl/v0.9.
+"""Tilter: fresh document, build, checks, STLs to hardware/mechanical/stl/tilter.
 
-  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_tilter_v9.py --timeout 1800
+  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_tilter.py --timeout 1800
 """
 import os
 
 REPO = os.path.expanduser('~/Documents/automated-blinds/blinds')
-T9 = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/TiltPartsV9/TiltPartsV9.py'))
-STL = os.path.join(REPO, 'hardware/mechanical/stl/v0.9')
+T9 = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/Tilter/Tilter.py'))
+STL = os.path.join(REPO, 'hardware/mechanical/stl/tilter')
 
 old = []
 for i in range(app.documents.count):

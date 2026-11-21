@@ -4,7 +4,7 @@ exact interference check; STL export of tray + lid; renders with sketches hidden
 
   K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli
   $K pcb export step --subst-models -f -o hardware/pcb/controller/3d/controller.step hardware/pcb/controller/controller.kicad_pcb
-  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller_v5.py --timeout 1800
+  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller.py --timeout 1800
 """
 import math
 import os
@@ -13,7 +13,7 @@ REPO = os.path.expanduser('~/Documents/automated-blinds/blinds')
 M = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/ControllerV5/ControllerV5.py'))
 C = M.C
 STEP = os.path.join(REPO, 'hardware/pcb/controller/3d/controller.step')
-STL = os.path.join(REPO, 'hardware/mechanical/stl/v0.5')
+STL = os.path.join(REPO, 'hardware/mechanical/stl/controller')
 os.makedirs(STL, exist_ok=True)
 tbm = adsk.fusion.TemporaryBRepManager.get()
 B = adsk.fusion.BooleanTypes

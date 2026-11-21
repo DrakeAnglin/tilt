@@ -1,6 +1,6 @@
-"""Thin-wall scan of the built tilter (run after tools/fusion_tilter_v9.py, on the open document).
+"""Thin-wall scan of the built tilter (run after tools/fusion_tilter.py, on the open document).
 
-  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_thin_v9.py --timeout 1500
+  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_thin.py --timeout 1500
 
 For each housing part it takes points all over the surface (about every 2 mm), shoots a ray straight into the
 material from each and measures how far it is to the other side. Spots thinner than LIMIT are grouped by place and

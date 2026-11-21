@@ -24,7 +24,7 @@ Layout, end A (ports) to end B (USB-C):
 
 Height budget (the reason the PCB sits 2 mm off the floor): ESP pins on its sockets reach 18.7 mm under a 19.2 mm groove.
 
-  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller_v5.py --timeout 1800
+  python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller.py --timeout 1800
 
 Coordinates (mm): X along the rail from end A's outer face, Y across (-Y room side), Z up from the rail floor.
 The PCB's KiCad coordinates (x across, y down from the jack edge) map to X = y + PCB_X, Y = x + PCB_Y.

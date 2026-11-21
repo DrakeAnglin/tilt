@@ -1,13 +1,13 @@
 #!/bin/sh
 # Build the Apple Home (Matter) firmware and send it to the controller over Wi-Fi.
 #   tools/flash_matter.sh [address]      default address: 192.168.50.135
-# The update password is read from firmware/blinds/secrets.h. A firmware that cannot join Wi-Fi goes back by itself.
+# The update password is read from firmware/blinds_matter/main/secrets.h. A firmware that cannot join Wi-Fi goes back by itself.
 set -e
 cd "$(dirname "$0")/../firmware/blinds_matter"
 ADDR=${1:-192.168.50.135}
 ./build.sh build > build.log 2>&1 || { grep -n "error:" build.log | head; exit 1; }
 grep -o "blinds_matter.bin binary size.*" build.log
-PW=$(sed -n 's/^#define OTA_PASSWORD *"\(.*\)".*/\1/p' ../blinds/secrets.h)
+PW=$(sed -n 's/^#define OTA_PASSWORD *"\(.*\)".*/\1/p' main/secrets.h)
 # The controller's plain web page is locked, so talk to it the way the app does (as an owner).
 PY=${PY:-$HOME/.espressif/python_env/idf5.5_py3.9_env/bin/python}
 ask() { "$PY" ../../tools/blinds_client.py --ip "$ADDR" --as owner get "$1" 2>/dev/null | tail -1; }

@@ -1,4 +1,5 @@
-"""TiltPartsV9: the tilter redrawn round a short rod.
+"""Tilter: the motor drive that tilts one blind (the only version kept; history is in Git). Shared helpers and the worm
+case come from tilt_base.py beside this file.
 
 What is new against v0.8 (rev K):
   * The SENSOR SLEEVE. The sensor's gear tube now reaches forward through the motor plate and the sun piece to the
@@ -27,7 +28,7 @@ import math
 import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_spec = importlib.util.spec_from_file_location('tp4_for_v9', os.path.join(_HERE, '..', 'TiltPartsV4', 'TiltPartsV4.py'))
+_spec = importlib.util.spec_from_file_location('tilt_base', os.path.join(_HERE, 'tilt_base.py'))
 T4 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(T4)
 adsk = T4.adsk

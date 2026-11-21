@@ -1,19 +1,53 @@
-"""Rotate the v0.9 STLs into their print orientations (support-free) and drop them onto Z=0.
+"""Rotate the tilter's STLs into their print orientations (support-free) and drop them onto Z=0.
 
-  python3 tools/orient_v08.py        # writes hardware/mechanical/stl/v0.9/print/*.stl
+  python3 tools/orient.py        # writes hardware/mechanical/stl/tilter/print/*.stl
 """
-import importlib.util
 import os
 import shutil
+import struct
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_s = importlib.util.spec_from_file_location('o4', os.path.join(REPO, 'tools/orient_v04.py'))
-o4 = importlib.util.module_from_spec(_s)
-_s.loader.exec_module(o4)
-SRC = os.path.join(REPO, 'hardware/mechanical/stl/v0.9')
+SRC = os.path.join(REPO, 'hardware/mechanical/stl/tilter')
 OUT = os.path.join(SRC, 'print')
-ID, FLIP, X_UP, X_DOWN = o4.ID, o4.FLIP, o4.X_UP, o4.X_DOWN
-Y_DOWN = lambda x, y, z: (x, z, -y)         # 90° about X: +Y goes down onto the bed
+ID = lambda x, y, z: (x, y, z)
+FLIP = lambda x, y, z: (x, -y, -z)          # 180 deg about X
+X_UP = lambda x, y, z: (z, y, -x)           # 90 deg about Y: -X becomes up
+X_DOWN = lambda x, y, z: (-z, y, x)         # -90 deg about Y: -X goes down onto the bed
+
+
+def read(path):
+    b = open(path, 'rb').read()
+    n = struct.unpack('<I', b[80:84])[0]
+    return [struct.unpack('<12f', b[84 + 50 * i:84 + 50 * i + 48]) for i in range(n)]
+
+
+def write(path, tris):
+    with open(path, 'wb') as f:
+        f.write(b'oriented for printing'.ljust(80, b' '))
+        f.write(struct.pack('<I', len(tris)))
+        for t in tris:
+            f.write(struct.pack('<12fH', *t, 0))
+
+
+def orient(tris, rot):
+    out = []
+    for t in tris:
+        n = rot(*t[0:3])
+        vs = [rot(*t[3 + 3 * k:6 + 3 * k]) for k in range(3)]
+        out.append(n + vs[0] + vs[1] + vs[2])
+    lo = [min(t[3 + 3 * k + j] for t in out for k in range(3)) for j in range(3)]
+    hi = [max(t[3 + 3 * k + j] for t in out for k in range(3)) for j in range(3)]
+    shift = (-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2])     # centered, standing on Z=0
+    moved = []
+    for t in out:
+        v = list(t)
+        for k in range(1, 4):
+            for j in range(3):
+                v[3 * k + j] += shift[j]
+        moved.append(tuple(v))
+    return moved, [h - l for h, l in zip(hi, lo)]
+
+
 
 ORIENT = {
     # housing
@@ -40,8 +74,8 @@ ORIENT = {
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     for name, (rot, how) in ORIENT.items():
-        tris, size = o4.orient(o4.read(os.path.join(SRC, name + '.stl')), rot)
-        o4.write(os.path.join(OUT, name + '.stl'), tris)
+        tris, size = orient(read(os.path.join(SRC, name + '.stl')), rot)
+        write(os.path.join(OUT, name + '.stl'), tris)
         print('%-15s %5.1f x %5.1f x %5.1f mm  %s' % (name, size[0], size[1], size[2], how))
     for k in (2, 3, 4):
         shutil.copy(os.path.join(OUT, 'planet.stl'), os.path.join(OUT, 'planet_%d.stl' % k))
