@@ -7,12 +7,10 @@ Older decisions and findings are in [open-questions.md](open-questions.md).
 
 | # | What | Notes |
 |---|---|---|
-| 1 | **Commit everything to Git first** | The last commit is tilter v0.5. Everything since is NOT in Git: tilters v0.6 to v0.9, the Apple Home firmware, the whole iPhone app, the tools. Nothing can be safely deleted until this is committed. |
-| 2 | **Code cleanup** | Remove old versions so the repo (and the AI's working memory) is smaller. Keep: tilter v0.9 (and v0.8 for now), `firmware/blinds_matter`, the app, controller box V5, PCB v2. Candidates to remove: tilter v0.3 to v0.7 generators, STLs and tools; controller boxes V1 to V4; the old Arduino firmware `firmware/blinds` (its `secrets.h` and web UI are still used by the build: untangle first); bench and test sketches; build folders (about 1.3 GB, should be ignored, not tracked); archived docs. Also split the big firmware files and trim my memory notes. |
 | 3 | **Battery life** | Ran 3 to 4 days on a charge. Charged to 100 % and unplugged 2026-11-21: use this run as the baseline. Find what drains it idle. Suspects: (a) sensor look-round every 1 to 3 s for hand-twist following (added 2026-11-16); (b) battery and status polling too often, by the controller itself and by the app, the widget and Apple Home asking it; (c) Wi-Fi kept up for Apple Home; (d) the doze mode, never measured; (e) logging and stats writes. Then cut each one. |
-| 4 | **App: opening animation** | Quicker and more polished. Only on a cold start, not when the app comes back. |
 | 5 | **App on the new phone** | Developer Mode on, register the phone, install. It joins with a sharing code from the old phone. |
 | 6 | **App Store release prep** | Icon without see-through, screenshots, privacy answers, TestFlight first. Remove the Mac test client's owner key before release. |
+| 7a | **Docs refresh** | `architecture.md`, `tilter-wiring.md`, `BOM.md` and `requirements.md` still describe older parts in places. Bring them up to the current tilter, firmware and app. |
 
 ## 2. Next
 
@@ -38,6 +36,9 @@ Older decisions and findings are in [open-questions.md](open-questions.md).
 ## Done
 - Home Screen widget and Control Center buttons: confirmed working by the owner (2026-11-21).
 - Tilter v0.9 printed, looks good (owner, 2026-11-21). Full assembly of that unit still to come.
+- Everything committed to Git (2026-11-21).
+- Repo cleaned out (2026-11-21): one version of each thing; old tilters, boxes, Arduino firmware and test sketches removed (still in the Git history).
+- App opening animation: faster, cords and rails, cold start only.
 
 ## On hold
 - **Controller PCB v3**: not to be ordered until the "must test on the v2 board" list passes (USB brown-out diode test first).

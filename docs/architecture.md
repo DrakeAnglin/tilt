@@ -1,4 +1,4 @@
-# System architecture (v0.4: cordless, Matter over Thread)
+# System architecture (cordless, Matter over Wi-Fi)
 
 Decided 2026-10-28 with the owner: **ESP32-C6 SuperMini, Matter over Thread, controller inside a headrail, one 18650
 cell charged from USB-C or a small solar panel facing the window.** One controller drives up to 3 blinds.
@@ -64,7 +64,7 @@ gives maybe 80–250 mAh on a sunny day (less behind low-E glass), so in a windo
 the bench: USB meter for charge and motor current, a multimeter's µA/mA range for sleep current.
 
 ## Pin plan
-See [controller-v4.md](controller-v4.md#dev-board): port 1/2/3 IN1-IN2 on GPIO 14/18, 19/20, 16/17 (controller PCB v2); EN on 7/5/1;
+Port 1/2/3 IN1-IN2 on GPIO 14/18, 19/20, 16/17 (controller PCB v2); EN on 7/5/1;
 angle on ADC 6/4/2; battery voltage on 3; input-power (USB/solar) voltage on 0. Three 1N5819 diodes: USB-C and solar into the charger's
 single input, and charger LOAD to the ESP's 5V pin.
 
@@ -93,7 +93,7 @@ complete unit (motor + driver + sensor + plug). 8 drivers from the 10-pack.
 Motor wires: DRV8833 OUT1 / OUT2 → N20 tabs, inside the sensor module. Each tilter uses one channel of its DRV8833; the other
 is spare. A reversed cord would put VBAT on IN2 and EN on ANGLE's neighbor, so the continuity check matters.
 
-- On the tilter: the **sensor module** ([TiltPod.py](../hardware/mechanical/fusion/TiltPod/TiltPod.py)) carries the
+- On the tilter: the **sensor module** carries the
   AS5600 board, the DRV8833 and the RJ12 jack. It is wired on the bench with two loose motor leads, soldered to the
   N20 at final assembly, slid onto the lid face over the motor and held by 3 × M3 × 25 from the main half's back face.
   The tilt rod runs through a tube in the module and can stick out.

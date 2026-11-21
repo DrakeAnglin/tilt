@@ -44,7 +44,7 @@ left (VCC = square pad), **DIR, SCL, SDA, GPO** on the right (DIR = square pad).
 4. **R4** (bottom right, next to GPO) is a pull-up on the output on some versions. Leave it for now; if the angle
    later reads stuck near the top of its range, remove it.
 5. Mechanical: file ~1 mm off the board edge nearest the rod so it fits its seat (see the
-   [tilter build](../hardware/mechanical/stl/v0.4/README.md)).
+   [tilter build](../hardware/mechanical/stl/tilter/README.md)).
 
 **Check the cord** before you trust it: meter beep mode, plug end to plug end. **Pin 1 must beep to pin 1** (not
 pin 6) on every cord: "straight-wired" is used loosely in listings, and a reversed cord puts battery + on IN2.
@@ -72,7 +72,7 @@ sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Le
 the driver and **SCL, SDA** on the sensor empty.
 
 ## 3. Check before plugging in
-Full printable checklist: [tilter-check.md](tilter-check.md). The short version:
+The checks:
 Meter in beep mode, nothing connected:
 - RJ12 **pin 1 to pin 3** (battery + to GND): **no beep**.
 - Pin 5 (EN) to pin 3 (GND): no beep. Pin 4 (angle) to pin 3: no beep.
@@ -82,9 +82,8 @@ Meter in beep mode, nothing connected:
 
 ## 4. Final assembly
 At final assembly, solder the white pair's free ends to the N20's two tabs (either way round; swap them later if the
-motor turns the wrong way), route them as the [tilter build](../hardware/mechanical/stl/v0.4/README.md) step 4
+motor turns the wrong way), route them as the [tilter build](../hardware/mechanical/stl/tilter/README.md) step 4
 describes, and slide the module onto the lid.
 
 ## Next
-Test it on the bench before it goes on a blind: [bench-test.md](bench-test.md) plugs this tilter into an ESP on a
-breadboard through a real RJ12 cord.
+Plug it into a controller port with an RJ12 cord and run setup in the Tilt app before it goes on a blind.

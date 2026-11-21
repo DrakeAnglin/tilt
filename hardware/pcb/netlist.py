@@ -1,7 +1,7 @@
 """Controller carrier PCB: parts and connections. One source of truth for the KiCad board (board.py) and schematic
 (schematic.py).
 
-Same core circuit as the verified dev board (hardware/mechanical/fusion/ControllerV4/DevBoardR.py), with the modules kept:
+Same core circuit as the verified dev board, with the modules kept:
 the ESP32-C6 SuperMini and the USB-C breakout plug into female header sockets; the 18650, the MCP73871 charger module and
 the optional solar panel plug into three DIFFERENT JST headers (2-pin XH, 6-pin XH, 2-pin ZH) so no plug fits the wrong
 one; the three RJ12 jacks sit on the board edge. All parts through-hole, hand-soldered.

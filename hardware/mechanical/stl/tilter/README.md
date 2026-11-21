@@ -1,6 +1,6 @@
 # Tilter v0.9: the sensor follows the carrier
 
-Built by `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_tilter_v9.py --timeout 1800` (`TiltPartsV9`).
+Built by `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_tilter.py --timeout 1800` (`fusion/Tilter/Tilter.py`).
 Drawn 2026-11-15; rev B and rev C the same day from the owner's reviews (short floating sleeve, no front rib, plain back wall; then thin walls at every joint, narrower motor-side gears, shorter tray; rev D: the two walls round the motor gears are skins; rev E/F: motor land with screw wells, gear room filled in round the gears, roof hump to the front, two case bolts, bigger bevel, the cluster's axle bolt also holds the tray). **Not printed yet.**
 
 ![outside](v09_outside.png)
@@ -36,7 +36,7 @@ magnet gear, lid's gear cage, the wand, the motor's place.
 Housing (PLA): `case_right`, `case_left`, `bearing_shell`, `motor_shell`, `tray`, `tray_lid`.
 Drive: `worm`, `worm_wheel`, `ring_cup`, `carrier`, `planet` × 4, `sun_27t`, `cluster`, `motor_pinion`.
 Sensor: `sensor_sleeve`, `magnet_gear`.
-`print/` has every part turned to its print orientation (`python3 tools/orient_v09.py`).
+`print/` has every part turned to its print orientation (`python3 tools/orient.py`).
 
 Every part is new or changed except the worm. Reuse from a v0.8 tilter: worm, magnet gear, motor pinion, all hardware.
 

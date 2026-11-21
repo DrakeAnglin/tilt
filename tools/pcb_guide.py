@@ -578,7 +578,7 @@ def md():
     a('')
     a('For the carrier PCB, v2.1 ([hardware/pcb](../hardware/pcb/README.md)). Every picture, part list and position here is')
     a('generated from the real board file by [`tools/pcb_guide.py`](../tools/pcb_guide.py), so it matches the board you hold.')
-    a('It is the PCB counterpart of the [dev board guide](dev-board-build.md): the circuit is the same, but there is no hand')
+    a('The circuit was proven on a hand-wired dev board first. On the PCB there is no hand')
     a('wiring. Every part drops into its own holes, and the copper does the rest.')
     a('')
     a('**Order:** lowest parts first, so the board lies flat on the bench while you solder: resistors, diodes, small')

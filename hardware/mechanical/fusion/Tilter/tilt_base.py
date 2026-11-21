@@ -1,4 +1,4 @@
-"""TiltPartsV4: printable parts for the motorized tilter, version v0.4 (all printed, crossed-helical drive).
+"""Base for Tilter.py (the worm case, shared helpers and dimensions). Started as tilter v0.4 (all printed, crossed-helical drive).
 
 Every moving part is printed now; nothing is reused from the factory tilter. The layout keeps the factory geometry
 that matters: the 4 mm rod, a worm at 60° so the wand hangs from the same teardrop loop at the same angle and

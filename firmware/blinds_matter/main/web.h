@@ -1,5 +1,5 @@
-// The web app and its JSON interface, on ESP-IDF's HTTP server. Same addresses and answers as the Wi-Fi firmware
-// (firmware/blinds/api.h), so the page in ui/ is shared. Also: firmware update over Wi-Fi, schedules, the clock.
+// The JSON interface the Tilt app talks to, on ESP-IDF's HTTP server.
+// Also: firmware update over Wi-Fi, schedules, the clock.
 #pragma once
 #include <esp_http_server.h>
 #include <esp_ota_ops.h>

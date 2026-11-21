@@ -20,7 +20,7 @@ Along the rod, from the blind side (+X) to the rail's end (-X):
   tray                      open-topped: N20 body, sensor gears, AS5600, DRV8833, RJ12 breakout all drop in from above
   tray lid                  one bolt at each end; carries the magnet gear's cage
 
-Global coordinates as TiltPartsV4 (mm): X along the rod, Y across (-Y room side), Z up from the rail floor.
+Global coordinates (mm): X along the rod, Y across (-Y room side), Z up from the rail floor.
 """
 
 import importlib.util

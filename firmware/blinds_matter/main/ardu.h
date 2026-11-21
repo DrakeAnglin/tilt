@@ -1,5 +1,5 @@
 // The few Arduino calls the blinds code uses, written on ESP-IDF, so config.h / store.h / power.h / motion.h are shared
-// with the Wi-Fi firmware (firmware/blinds) nearly unchanged.
+// with the Wi-Fi firmware nearly unchanged.
 #pragma once
 #include <stdio.h>
 #include <stdarg.h>

@@ -5,7 +5,6 @@
   python3 fusion.py exec  file.py            # run a file inside Fusion (assign `result` to return data)
   python3 fusion.py exec  -c "result = design.rootComponent.name"
   python3 fusion.py shot  out.png [--view iso|front|top|right|home|current] [--size 1600x1000] [--no-fit]
-  python3 fusion.py layout                   # rebuild the TiltLayout study in the active design, print the fit report
 """
 
 import argparse
@@ -85,10 +84,6 @@ def main():
         w, h = (int(x) for x in a.size.lower().split('x'))
         show(call('/screenshot', {'path': os.path.abspath(a.path), 'width': w, 'height': h,
                                   'view': a.view, 'fit': not a.no_fit}))
-    elif a.cmd == 'layout':
-        path = os.path.join(HERE, 'TiltLayout', 'TiltLayout.py')
-        show(call('/exec', {'code': LAYOUT_CODE.format(path=path)}))
-
 
 if __name__ == '__main__':
     main()

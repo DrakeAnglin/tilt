@@ -11,7 +11,7 @@ listing photos: RJ12 jacks, ESP32-C6, plugs, cell and the charger.
 | | |
 |---|---|
 | Size | **157.4 × 51.8 × 23.0 mm** (+2 rail bumpers on the back wall): fits the rail with the rod in the lid's round groove |
-| Prints | `hardware/mechanical/stl/v0.5/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
+| Prints | `hardware/mechanical/stl/controller/controller_v5_tray.stl` (floor down), `controller_v5_lid.stl` (top face down), white PLA, no supports. **Print `controller_v5_end_a_coupon.stl` first** (just end wall A, ~10 min) and check the plug fit against a soldered jack |
 | Hardware | 3 × M3 heat-set inserts (the M3 × 5.7 ones you have), **3 × M3 × 10 flat-head**; the charger: **2 × M2 × 6 self-tapping** screws |
 | Check | Exact interference check of every part against the tray, lid and each other: **none** |
 
