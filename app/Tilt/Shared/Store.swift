@@ -1,0 +1,94 @@
+// What the app, Siri and the widget all need: the saved controllers, their keys, and the open / close actions.
+import AppIntents
+import CryptoKit
+import Foundation
+import Security
+import WidgetKit
+
+struct BlindState: Decodable, Equatable {
+    let name: String
+    let hid: Int, pres: Int, seen: Int, cal: Int
+    let tilt: Double?, tgt: Double?
+    let mov: Int, q: Int, fav: Int
+    let ang: Double?
+    let last: String
+    var ready: Bool { hid == 0 && cal == 1 && !(seen == 1 && pres == 0) }
+    /// The last move ran the motor but the sensor saw no turn.
+    var stuck: Bool { last.hasPrefix("blocked") && mov == 0 && q == 0 }
+    var moving: Bool { mov == 1 || q == 1 }
+}
+struct ControllerState: Decodable, Equatable {
+    struct Battery: Decodable, Equatable { let v: Double; let pct: Int; let st: String; let low: Int }
+    let v: String, name: String
+    let batt: Battery
+    let closeUp: Int, sync: Int, mv: Int
+    let hk: Int?
+    let b: [BlindState]
+}
+
+/// Saved on the phone (not secret). The key itself is in the Keychain under `id`.
+struct ControllerRecord: Codable, Identifiable, Equatable {
+    var id: String          // the controller's own id
+    var name: String
+    var host: String
+    var cid: String         // this phone's id on that controller
+    var owner: Bool
+}
+
+enum Keychain {
+    private static let service = "app.tilt.blinds.keys"
+    static func save(_ account: String, _ data: Data) {
+        delete(account)
+        SecItemAdd([kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: account, kSecValueData: data,
+                    kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary, nil)
+    }
+    static func load(_ account: String) -> Data? {
+        var out: CFTypeRef?
+        let q = [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: account, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne] as CFDictionary
+        return SecItemCopyMatching(q, &out) == errSecSuccess ? out as? Data : nil
+    }
+    static func delete(_ account: String) {
+        SecItemDelete([kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: account] as CFDictionary)
+    }
+}
+
+/// Talks to the paired controllers without the app's screens (Siri and the widget run these in the background).
+enum TiltActions {
+    /// The app keeps a copy of its controller list in the Keychain, where the widget can read it.
+    static func publish(_ records: [ControllerRecord]) {
+        if let d = try? JSONEncoder().encode(records) { Keychain.save("records", d) }
+    }
+    static func records() -> [ControllerRecord] {
+        let d = Keychain.load("records") ?? UserDefaults.standard.data(forKey: "controllers.v1")
+        return d.flatMap { try? JSONDecoder().decode([ControllerRecord].self, from: $0) } ?? []
+    }
+    static func links() -> [(ControllerRecord, Link)] {
+        records().compactMap { r in Keychain.load(r.id).map { (r, Link(host: r.host, cid: Data(hex: r.cid) ?? Data(), key: SymmetricKey(data: $0))) } }
+    }
+    /// Send one command to every controller. Throws if none could be reached.
+    static func all(_ command: String) async throws {
+        var reached = 0
+        for (_, link) in links() { if (try? await link.send(command)) != nil { reached += 1 } }
+        if reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+    /// One line for a room, for the widget.
+    static func words(_ s: ControllerState) -> String {
+        let tilts = s.b.filter(\.ready).compactMap(\.tilt)
+        if tilts.isEmpty { return "Needs setup" }
+        if s.mv >= 0 { return "Moving" }
+        let a = tilts.map { abs($0) }.reduce(0, +) / Double(tilts.count)
+        return a < 8 ? "Open" : a > 92 ? "Closed" : "\(Int(a.rounded()))% closed"
+    }
+}
+
+struct OpenBlindsIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open Blinds"
+    static var description = IntentDescription("Opens all your blinds (slats level).")
+    func perform() async throws -> some IntentResult { try await TiltActions.all("/api/go?b=all&to=open"); return .result() }
+}
+struct CloseBlindsIntent: AppIntent {
+    static var title: LocalizedStringResource = "Close Blinds"
+    static var description = IntentDescription("Closes all your blinds.")
+    func perform() async throws -> some IntentResult { try await TiltActions.all("/api/go?b=all&to=close"); return .result() }
+}

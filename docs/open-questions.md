@@ -45,3 +45,14 @@ with battery level reporting, battery temperature protection, modular plug-in wi
 - Tilt travel: 11–12 wand turns closed → closed ≈ 250–270° of rod. Tilt torque is low.
 - ~6.5 mm clearance above the installed headrail: nothing may stick up more than ~5 mm.
 - Lift is a separate module, not connected to the tilt rod ([lift-bonus.md](lift-bonus.md)).
+
+## To do (mechanical)
+- **Short tilt rod** (owner, 2026-11-15): the blind's rod stops about 21 mm into the tilter (a crimp on the rod), so it
+  never reached the sensor's rod gear. Rev K (sensor bar + long-hub carrier + wheel bore, `stl/v0.8/README.md`) is the
+  fix for the current tilter; drawn and checked in Fusion, not printed yet. **v0.9** (`stl/v0.9/README.md`,
+  `TiltPartsV9`) is the new revision: sensor sleeve driven by the carrier (rod still slides through), one motor stage,
+  79.1 mm long. Drawn and checked 2026-11-15, not printed.
+- **Redesign the gearbox housing for one reduction set, not two** (done in v0.9, to be proven in print) (owner, 2026-11-15). One of the two sets of
+  reduction ("torque") gears was taken out: the extra torque had been added to overcome binding that turned out to be
+  in the blinds themselves. With one set the blind moves much faster (about 19°/s at the rod, was 3 to 6) and still
+  reaches fully closed up and down. The motor shell and its gear stations should be redrawn for the shorter train.

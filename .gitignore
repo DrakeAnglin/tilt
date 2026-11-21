@@ -22,3 +22,4 @@ hardware/pcb/controller/*.svg
 firmware/**/secrets.h
 firmware/bin/
 firmware/build/
+tools/.blinds_client.json
