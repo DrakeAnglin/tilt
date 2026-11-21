@@ -75,7 +75,7 @@ struct ControllerSettingsView: View {
                     NavigationLink { DeveloperView(controller: controller) } label: { Label("Developer", systemImage: "chevron.left.forwardslash.chevron.right") }
                 } }
             } else if problem == nil {
-                ProgressView()
+                SlatLoader(label: "Loading settings…").frame(maxWidth: .infinity).padding(.vertical, 24).listRowBackground(Color.clear)
             }
             if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) } }
             Section {

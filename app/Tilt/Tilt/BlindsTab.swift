@@ -148,7 +148,7 @@ struct RoomView: View {
                             .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
                     }
                 } else {
-                    ProgressView().frame(maxWidth: .infinity).padding(40)
+                    SlatLoader(size: 52, label: "Connecting…").frame(maxWidth: .infinity).padding(40)
                 }
                 if let e = controller.lastError {
                     Label(e, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange).padding(12).frame(maxWidth: .infinity, alignment: .leading).card(radius: 16)
@@ -182,7 +182,7 @@ struct BlindCard: View {
                 SlatView(tilt: blind.tilt ?? 0, known: blind.tilt != nil, pane: pane, panes: panes).frame(height: 150).animation(.easeInOut(duration: 0.4), value: blind.tilt)
                 Text(blind.name).font(.headline).lineLimit(1)
                 HStack(spacing: 5) {
-                    if blind.moving { ProgressView().controlSize(.mini) }
+                    if blind.moving { SlatLoader(size: 13) }
                     if blind.stuck { Image(systemName: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange) }
                     Text(TiltWords.status(blind)).font(.subheadline).foregroundStyle(blind.stuck ? Color.orange : Color.secondary).lineLimit(1)
                 }

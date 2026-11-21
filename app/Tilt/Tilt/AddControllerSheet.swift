@@ -56,7 +56,7 @@ struct AddControllerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    if busy { ProgressView() } else { Button("Add") { add() }.disabled(host.isEmpty && link.isEmpty) }
+                    if busy { SlatLoader(size: 20) } else { Button("Add") { add() }.disabled(host.isEmpty && link.isEmpty) }
                 }
             }
         }

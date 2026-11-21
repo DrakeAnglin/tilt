@@ -23,3 +23,15 @@ firmware/**/secrets.h
 firmware/bin/
 firmware/build/
 tools/.blinds_client.json
+
+# Xcode / iOS app
+build-phone/
+build-phone.log
+install-phone.log
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Scratch / run artifacts (not source)
+/result.json
+firmware/blinds-settings-backup.json

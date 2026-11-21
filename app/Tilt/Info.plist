@@ -4,6 +4,11 @@
 <dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Tilt uses Bluetooth to set up a new blinds controller and put it on your Wi-Fi.</string>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBG</string>
+	</dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

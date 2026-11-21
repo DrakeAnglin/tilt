@@ -205,7 +205,7 @@ struct BluetoothSetupView: View {
         Form {
             switch step {
             case .connecting:
-                Section { if problem == nil { HStack(spacing: 12) { ProgressView(); Text("Connecting over Bluetooth…") } } }
+                Section { if problem == nil { HStack(spacing: 12) { SlatLoader(size: 22); Text("Connecting over Bluetooth…") } } }
             case .wifi:
                 if let net = chosen {
                     Section {
@@ -218,7 +218,7 @@ struct BluetoothSetupView: View {
                     }
                 } else {
                     Section {
-                        if scanning { HStack(spacing: 12) { ProgressView(); Text("Looking for networks…").foregroundStyle(.secondary) } }
+                        if scanning { HStack(spacing: 12) { SlatLoader(size: 22); Text("Looking for networks…").foregroundStyle(.secondary) } }
                         ForEach(nets) { n in
                             Button { pick(n.ssid, locked: n.locked) } label: {
                                 HStack {
@@ -239,7 +239,7 @@ struct BluetoothSetupView: View {
                     }
                 }
             case .joining:
-                Section { HStack(spacing: 12) { ProgressView(); Text("Joining “\(ssid)”… This can take half a minute.") } }
+                Section { HStack(spacing: 12) { SlatLoader(size: 22); Text("Joining “\(ssid)”… This can take half a minute.") } }
             case .done:
                 Section {
                     Label("\(hello?.name ?? "Your controller") is ready", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.headline)
