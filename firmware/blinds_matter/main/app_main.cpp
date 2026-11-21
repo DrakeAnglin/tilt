@@ -20,7 +20,6 @@
 #include <driver/usb_serial_jtag.h>
 #include "ardu.h"
 #include "web.h"
-#include "restore.h"
 #include "ble.h"
 #include <app/server/CommissioningWindowManager.h>
 
@@ -197,12 +196,8 @@ extern "C" void app_main()
     analogSetPinAttenuation(PIN_VBAT, ADC_11db);
     analogSetPinAttenuation(PIN_VIN, ADC_11db);
     motionBegin();
-    bool fresh = nvs.begin("blinds", false) && nvs.getBytes("cfg", &cfg, sizeof cfg) != sizeof cfg;
-    uint8_t macNow[6] = {0};
-    esp_read_mac(macNow, ESP_MAC_WIFI_STA);
-    if (macNow[4] != 0x06 || macNow[5] != 0x10) fresh = false;      // the saved marks belong to the development controller only
+    nvs.begin("blinds", false);
     storeBegin();
-    if (fresh) { restoreBackup(); cfgSave(); nvs.putUChar("angv", 2); ::event("settings restored from the backup"); }
     hkSeparate = nvs.getUChar("hksep", 0);
     pwmSaved = nvs.getUChar("pwm", 0);
     setenv("TZ", cfg.tz, 1);

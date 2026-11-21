@@ -33,7 +33,7 @@ with battery level reporting, battery temperature protection, modular plug-in wi
 ## Findings from the headrail (2026-10-25 / 26)
 | Photo | What it shows |
 |---|---|
-| [top view](reference/headrail-top-view.jpg) | Cordless **lift module**: two cord spools with gear rims and constant-force spring drums. Self-contained |
+| Top view | Cordless **lift module**: two cord spools with gear rims and constant-force spring drums. Self-contained |
 | [end, tilt drum](reference/headrail-end-tilt-drum.jpg) | Tilt drum in its cradle on the **4 mm square steel tilt rod** |
 | [end profile](reference/headrail-end-profile.jpg) | U-channel profile with inward lips |
 | [square rod](reference/headrail-square-tilt-rod.jpg) | Square rod runs the full length above the long lift/holding part |

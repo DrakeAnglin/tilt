@@ -1,4 +1,4 @@
-"""ControllerV5: the controller box for the carrier PCB (hardware/pcb, v2.1), with the 18650 and the Adafruit 6092
+"""The controller box for the carrier PCB (hardware/pcb, v2.1), with the 18650 and the Adafruit 6092
 (bq25185) charger, whose own USB-C is the charge port.
 
 rev N (2026-11-08): the no-name MCP73871 module (and its capacitor, NTC and the separate USB-C breakout) is replaced by

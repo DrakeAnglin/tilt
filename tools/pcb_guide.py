@@ -946,7 +946,7 @@ def md():
     a('   3.0 V (D3 and the ESP\'s regulator each take a little) and the ESP resets whenever Wi-Fi transmits: charge the cell first.')
     a('   (v3 fixes this with a 3.3 V converter: [v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)')
     a('')
-    a('Then it goes into the box: [V5 assembly](controller-v5.md#assembly).')
+    a('Then it goes into the box: [box assembly](controller-box.md#assembly).')
     a('')
     a('## If something reads wrong')
     a('')

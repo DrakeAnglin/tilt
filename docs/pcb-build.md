@@ -377,7 +377,7 @@ If TP1 reads 0, check the J5 plug is in and both splice crimps (slots 2 and 4) a
    3.0 V (D3 and the ESP's regulator each take a little) and the ESP resets whenever Wi-Fi transmits: charge the cell first.
    (v3 fixes this with a 3.3 V converter: [v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)
 
-Then it goes into the box: [V5 assembly](controller-v5.md#assembly).
+Then it goes into the box: [box assembly](controller-box.md#assembly).
 
 ## If something reads wrong
 

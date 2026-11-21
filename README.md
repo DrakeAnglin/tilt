@@ -21,7 +21,7 @@ Only the current version of each thing is kept here. Older versions are in the G
 ## Start here
 - **What to do next:** [docs/todo.md](docs/todo.md)
 - **Tilter** (parts, printing, assembly, checks): [hardware/mechanical/stl/tilter/README.md](hardware/mechanical/stl/tilter/README.md)
-- **Controller box:** [docs/controller-v5.md](docs/controller-v5.md). **PCB build:** [docs/pcb-build.md](docs/pcb-build.md)
+- **Controller box:** [docs/controller-box.md](docs/controller-box.md). **PCB build:** [docs/pcb-build.md](docs/pcb-build.md)
 - **Wiring a tilter:** [docs/tilter-wiring.md](docs/tilter-wiring.md)
 - **Firmware and updates:** [firmware/README.md](firmware/README.md)
 - Background: [architecture](docs/architecture.md), [requirements](docs/requirements.md), [decisions](docs/open-questions.md), [lift ideas](docs/lift-bonus.md)

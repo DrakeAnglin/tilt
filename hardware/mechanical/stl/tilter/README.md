@@ -1,11 +1,7 @@
-# Tilter v0.9: the sensor follows the carrier
+# Tilter: the sensor follows the carrier
 
 Built by `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_tilter.py --timeout 1800` (`fusion/Tilter/Tilter.py`).
 Drawn 2026-11-15; rev B and rev C the same day from the owner's reviews (short floating sleeve, no front rib, plain back wall; then thin walls at every joint, narrower motor-side gears, shorter tray; rev D: the two walls round the motor gears are skins; rev E/F: motor land with screw wells, gear room filled in round the gears, roof hump to the front, two case bolts, bigger bevel, the cluster's axle bolt also holds the tray). **Not printed yet.**
-
-![outside](v09_outside.png)
-
-![drive with the housing hidden (rev B)](v09_drive.png)
 
 ## Why
 The blinds' tilt rods are short: a crimp stops them about 21 mm into the tilter. In v0.8 the sensor's gear sat on the

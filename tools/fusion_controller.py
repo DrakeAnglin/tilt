@@ -1,4 +1,4 @@
-"""ControllerV5 in a fresh document: the PCB's own 3D export (KiCad STEP, every part on it), tray, lid, mock-ups of the
+"""The controller box in a fresh document: the PCB's own 3D export (KiCad STEP, every part on it), tray, lid, mock-ups of the
 parts the export doesn't have (RJ12 jacks, ESP32-C6, plugs, 18650, the Adafruit 6092 charger), rail + rod;
 exact interference check; STL export of tray + lid; renders with sketches hidden.
 
@@ -10,7 +10,7 @@ import math
 import os
 
 REPO = os.path.expanduser('~/Documents/automated-blinds/blinds')
-M = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/ControllerV5/ControllerV5.py'))
+M = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/Controller/Controller.py'))
 C = M.C
 STEP = os.path.join(REPO, 'hardware/pcb/controller/3d/controller.step')
 STL = os.path.join(REPO, 'hardware/mechanical/stl/controller')
@@ -352,7 +352,7 @@ eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER\nV5', L /
        'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID', 100, -17, 30, 10, 0.5)}
 files = []
 em = design.exportManager
-for g, nm in (('Tray', 'controller_v5_tray'), ('Lid', 'controller_v5_lid')):
+for g, nm in (('Tray', 'controller_tray'), ('Lid', 'controller_lid')):
     path = os.path.join(STL, nm + '.stl')
     opt = em.createSTLExportOptions(comps[g], path)
     opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
@@ -366,7 +366,7 @@ cdoc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)      
 cdes = adsk.fusion.Design.cast(app.activeProduct)
 cdes.designType = adsk.fusion.DesignTypes.DirectDesignType
 cdes.rootComponent.bRepBodies.add(cb)
-path = os.path.join(STL, 'controller_v5_end_a_coupon.stl')
+path = os.path.join(STL, 'controller_end_a_coupon.stl')
 opt = cdes.exportManager.createSTLExportOptions(cdes.rootComponent, path)
 opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
 cdes.exportManager.execute(opt)
@@ -428,16 +428,16 @@ def shot(name, eye, target=(L / 2, 0, 12), fit=True):
 
 
 res = []
-vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('ctrl-v5-open.png', (L / 2 - 170, -190, 200)))
-res.append(shot('ctrl-v5-open-b.png', (L / 2 + 180, 160, 200)))
-res.append(shot('ctrl-v5-top.png', (L / 2, 0, 320)))
-vis(hide=('Rail', 'Lid', 'Screws', 'Wires')); res.append(shot('ctrl-v5-bay.png', (L + 60, 90, 120), (145, 5, 8)))
+vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('controller-open.png', (L / 2 - 170, -190, 200)))
+res.append(shot('controller-open-b.png', (L / 2 + 180, 160, 200)))
+res.append(shot('controller-top.png', (L / 2, 0, 320)))
+vis(hide=('Rail', 'Lid', 'Screws', 'Wires')); res.append(shot('controller-bay.png', (L + 60, 90, 120), (145, 5, 8)))
 move('Lid', 45)
-vis(hide=('Rail', 'Wires')); res.append(shot('ctrl-v5-exploded.png', (L / 2 - 180, -200, 170)))
+vis(hide=('Rail', 'Wires')); res.append(shot('controller-exploded.png', (L / 2 - 180, -200, 170)))
 move('Lid', 0)
-vis(hide=('Rail', 'Wires')); res.append(shot('ctrl-v5-closed.png', (-130, -170, 120)))
-res.append(shot('ctrl-v5-end-b.png', (L + 150, -95, 70), (L - 25, 0, 14), fit=False))
-res.append(shot('ctrl-v5-under.png', (L / 2 - 120, -150, -160)))
+vis(hide=('Rail', 'Wires')); res.append(shot('controller-closed.png', (-130, -170, 120)))
+res.append(shot('controller-end-b.png', (L + 150, -95, 70), (L - 25, 0, 14), fit=False))
+res.append(shot('controller-under.png', (L / 2 - 120, -150, -160)))
 cam = vp.camera
 cam.cameraType = adsk.core.CameraTypes.OrthographicCameraType
 cam.eye = P3(92, 9, -300)
@@ -449,7 +449,7 @@ cam = vp.camera
 cam.viewExtents = 8.0
 vp.camera = cam
 if RENDERS:
-    res.append(os.path.join(out, 'ctrl-v5-bottom-text.png')); vp.saveAsImageFile(res[-1], 1400, 800)
+    res.append(os.path.join(out, 'controller-bottom-text.png')); vp.saveAsImageFile(res[-1], 1400, 800)
 cam.eye = P3(146, 0, 220)
 cam.target = P3(L, 0, 10)
 cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
@@ -459,12 +459,12 @@ cam.upVector = adsk.core.Vector3D.create(0, 0, 1)
 cam.viewExtents = 5.0
 vp.camera = cam
 if RENDERS:
-    res.append(os.path.join(out, 'ctrl-v5-end-b-flat.png')); vp.saveAsImageFile(res[-1], 1400, 800)
-res.append(shot('ctrl-v5-end-a.png', (-150, -95, 70), (25, 0, 14), fit=False))
-vis(hide=('Rail', 'Wires', 'Tray', 'PCB', 'Parts', 'Screws')); res.append(shot('ctrl-v5-lid-under.png', (L / 2 - 100, -140, -170)))
-vis(); res.append(shot('ctrl-v5-in-rail.png', (-140, -90, 90)))
-vis(hide=('Rail', 'Wires')); res.append(shot('ctrl-v5-port.png', (-45, -40, 22), (0, -10, 10), fit=False))
-vis(hide=('Lid', 'Rail', 'Wires', 'Screws', 'PCB', 'Parts')); res.append(shot('ctrl-v5-tray.png', (L / 2 - 150, -170, 200)))
+    res.append(os.path.join(out, 'controller-end-b-flat.png')); vp.saveAsImageFile(res[-1], 1400, 800)
+res.append(shot('controller-end-a.png', (-150, -95, 70), (25, 0, 14), fit=False))
+vis(hide=('Rail', 'Wires', 'Tray', 'PCB', 'Parts', 'Screws')); res.append(shot('controller-lid-under.png', (L / 2 - 100, -140, -170)))
+vis(); res.append(shot('controller-in-rail.png', (-140, -90, 90)))
+vis(hide=('Rail', 'Wires')); res.append(shot('controller-port.png', (-45, -40, 22), (0, -10, 10), fit=False))
+vis(hide=('Lid', 'Rail', 'Wires', 'Screws', 'PCB', 'Parts')); res.append(shot('controller-tray.png', (L / 2 - 150, -170, 200)))
 
 
 def only(prefixes):
@@ -477,12 +477,12 @@ def only(prefixes):
             b.isLightBulbOn = b.name.startswith(prefixes)
 
 
-only(('Charger', 'Harness')); res.append(shot('ctrl-v5-charger-sub.png', (L - 130, -150, 140), (146, 10, 8)))
+only(('Charger', 'Harness')); res.append(shot('controller-charger-sub.png', (L - 130, -150, 140), (146, 10, 8)))
 for i in range(root.occurrences.count):
     o = root.occurrences.item(i)
     for j in range(o.component.bRepBodies.count):
         o.component.bRepBodies.item(j).isLightBulbOn = True
-vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('ctrl-v5-bay-top.png', (146, 0, 260), (146, 0, 0)))
+vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('controller-bay-top.png', (146, 0, 260), (146, 0, 0)))
 vis(hide=('Rail', 'Wires'))
 result = {'box': 'L %.1f x W %.1f x H %.1f' % (C['box_l'], C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,

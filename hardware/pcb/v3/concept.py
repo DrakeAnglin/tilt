@@ -4,7 +4,7 @@ RJ12 ports, ESP32-C6 on sockets), so the case is just a shell.
   python3 hardware/pcb/v3/concept.py          # prints the fit numbers and writes docs/renders/pcb-v3-layout.svg
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_pcb_v3_concept.py --timeout 900
 
-Coordinates (mm), same frame as ControllerV5: X along the rail from end A's outer face, Y across the rail (0 = the
+Coordinates (mm), same frame as the controller box: X along the rail from end A's outer face, Y across the rail (0 = the
 tilt rod, -Y room side), Z up from the rail floor. The board lies flat; parts are boxes (x0, x1, y0, y1, z0, z1) or
 cylinders, sized from their datasheets / listings (noted beside each).
 """

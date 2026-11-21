@@ -3,7 +3,7 @@
 | Generator | Builds | Run |
 |---|---|---|
 | [`Tilter/Tilter.py`](Tilter/Tilter.py) | The tilter: every printed part, with collision, gear-mesh and assembly checks | `tools/fusion_tilter.py`, `tools/fusion_thin.py` |
-| [`ControllerV5`](ControllerV5/ControllerV5.py) | Controller box for the PCB | `tools/fusion_controller.py` |
+| [`Controller/Controller.py`](Controller/Controller.py) | Controller box for the PCB | `tools/fusion_controller.py` |
 
 Run through the bridge: `python3 hardware/mechanical/fusion/fusion.py exec tools/<script>.py --timeout 1800`.
 
