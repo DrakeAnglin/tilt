@@ -16,7 +16,7 @@
 #include "secrets.h"
 #include <mdns.h>
 
-#define FW_VERSION "2.2.0-dev3"
+#define FW_VERSION "2.2.0-dev8"
 SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
 uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
 bool otaPending = false, restartSoon = false;
@@ -69,6 +69,7 @@ uint32_t schedTime(int i, time_t now, int dayOff) {      // when slot i fires on
 // Gentle moves: a blind that is being taken to a tilt slowly, a little every 20 seconds.
 struct Ramp { bool on; float from, to; uint32_t t0, durMs, last; } ramp[PORTS];
 void rampCancel() { for (auto &r : ramp) r.on = false; }
+bool rampAny() { for (auto &r : ramp) if (r.on) return true; return false; }
 void rampTick() {
   uint32_t now = millis();
   for (int p = 0; p < PORTS; p++) {
@@ -195,7 +196,7 @@ esp_err_t hState(httpd_req_t *r) {
   j.reserve(1200);
   ap(j, "{\"v\":\"" FW_VERSION "\",\"name\":%s,\"t\":%lu,\"tok\":%d,\"up\":%lu", jq(cfg.name).c_str(), (unsigned long)time(nullptr), timeValid() ? 1 : 0, (unsigned long)(millis() / 1000));
   ap(j, ",\"batt\":{\"v\":%.2f,\"pct\":%d,\"st\":\"%s\",\"vin\":%.2f,\"low\":%d}", vbatRest, battPercent(vbatRest), chargeState(), vin, battOkToMove() ? 0 : 1);
-  ap(j, ",\"pw\":{\"mode\":1,\"sleepIn\":-1,\"checkin\":0},\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"ap\":0,\"mv\":%d,\"log\":%lu,\"hk\":%d,\"b\":[", cfg.closeUp, syncMode, parMode, firstMoving(), (unsigned long)logSeq, homesPaired());
+  ap(j, ",\"pw\":{\"mode\":1,\"sleepIn\":-1,\"checkin\":0},\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"ap\":0,\"mv\":%d,\"log\":%lu,\"hk\":%d,\"asks\":%d,\"me\":%d,\"gentle\":%d,\"topic\":\"%s\",\"b\":[", cfg.closeUp, syncMode, parMode, firstMoving(), (unsigned long)logSeq, homesPaired(), asksWaiting(), secClient >= 0 ? keys[secClient].role : 1, rampAny() ? 1 : 0, secClient >= 0 ? hexOf(cloudTopic, 16).c_str() : "");
   for (int i = 0; i < PORTS; i++) {
     BlindCfg &c = cfg.b[i];
     bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
@@ -334,10 +335,17 @@ esp_err_t hGo(httpd_req_t *r) {
   bool all = one < 0 || (syncMode && !argi(r, "solo"));
   float tOne = NAN;
   const char *err = nullptr;
+  // ramp=N: gently, taking N minutes (the same slow move a schedule can make), instead of going straight there
+  uint32_t rampMs = (uint32_t)constrain(argi(r, "ramp"), 0, 60) * 60000u;
+  auto start = [&](int p, float t) -> const char * {
+    if (!rampMs || isnan(bs[p].tilt) || !calibrated(p)) return startTilt(p, t);
+    ramp[p] = {true, bs[p].tilt, t, millis(), rampMs, 0};
+    return nullptr;
+  };
   if (one >= 0) {
     tOne = to.length() ? tiltWord(one, to) : (float)atof(arg(r, "t").c_str());
     if (isnan(tOne)) return fail(r, "unknown position");
-    const char *e = startTilt(one, tOne);
+    const char *e = start(one, tOne);
     if (e) return fail(r, e);
     started++;
   }
@@ -345,9 +353,10 @@ esp_err_t hGo(httpd_req_t *r) {
     if (p == one || cfg.b[p].hidden || !calibrated(p) || (bs[p].seen && !bs[p].present)) continue;
     float t = one >= 0 ? tOne : tiltWord(p, to);
     if (isnan(t)) return fail(r, "unknown position");
-    const char *e = startTilt(p, t);
+    const char *e = start(p, t);
     if (e) err = e; else started++;
   }
+  if (rampMs && started) event("gentle move started (%d min)", (int)(rampMs / 60000));
   return started ? ok(r) : fail(r, err ? err : "no blind is set up");
 }
 esp_err_t hStop(httpd_req_t *r) { Lock l; rampCancel(); stopAll("stopped"); return ok(r); }
@@ -511,35 +520,73 @@ esp_err_t hKeys(httpd_req_t *r) {
   Lock l;
   std::string j = "{\"keys\":[";
   bool any = false;
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used) { ap(j, "%s{\"cid\":\"%s\",\"name\":%s,\"owner\":%d,\"me\":%d}", any ? "," : "", hexOf(keys[i].id, 8).c_str(), jq(keys[i].name).c_str(), keys[i].role, i == secClient ? 1 : 0); any = true; }
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used) {
+    ap(j, "%s{\"cid\":\"%s\",\"name\":%s,\"owner\":%d,\"me\":%d,\"wait\":%d,\"code\":\"%s\"}", any ? "," : "", hexOf(keys[i].id, 8).c_str(), jq(keys[i].name).c_str(), keys[i].role,
+       i == secClient ? 1 : 0, keys[i].used == 2 ? 1 : 0, keys[i].used == 2 ? askCode(keys[i]).c_str() : "");
+    any = true;
+  }
   j += "]}";
   return sendJson(r, j);
-}
-esp_err_t hInvite(httpd_req_t *r) {              // owner: let one more phone pair in the next 10 minutes (shown as a QR code)
-  Lock l;
-  esp_fill_random(invite.id, 4);
-  esp_fill_random(invite.secret, 16);
-  invite.until = millis() + 600000;
-  invite.open = true;
-  event("invite made (10 minutes)");
-  return sendJson(r, std::string("{\"ok\":1,\"inv\":\"") + hexOf(invite.id, 4) + "\",\"secret\":\"" + hexOf(invite.secret, 16) + "\",\"id\":\"" + ctrlId() + "\"}");
 }
 esp_err_t hRevoke(httpd_req_t *r) {              // owner: remove a phone. "all" removes every phone (back to unpaired).
   Lock l;
   std::string c = arg(r, "cid");
   uint8_t id[8];
   int n = 0;
+  std::string proof;
   if (c != "all" && !unhex(c, id, 8)) return fail(r, "bad id");
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && (c == "all" || !memcmp(keys[i].id, id, 8))) { event("%s removed", keys[i].name); memset(&keys[i], 0, sizeof keys[i]); n++; }
+  if (c != "all" && secClient >= 0 && !memcmp(keys[secClient].id, id, 8)) return fail(r, "you cannot remove yourself");
+  if (c != "all") {                              // never remove the last owner: nobody could manage the controller
+    int others = 0;
+    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && keys[i].role && memcmp(keys[i].id, id, 8)) others++;
+    if (!others) return fail(r, "that is the only owner");
+  }
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && (c == "all" || !memcmp(keys[i].id, id, 8))) {
+    uint8_t h[32];                               // proof for the removed phone (made with its own key) that it really was removed here
+    hmac256(keys[i].key, 32, (const uint8_t *)"removed", 7, h);
+    proof = hexOf(h, 16);
+    event("%s removed", keys[i].name); memset(&keys[i], 0, sizeof keys[i]); n++;
+  }
   if (!n) return fail(r, "no such phone");
   keysSave();
-  return ok(r);
+  return sendJson(r, std::string("{\"ok\":1,\"proof\":\"") + proof + "\"}");
+}
+esp_err_t hKeyName(httpd_req_t *r) {             // rename a phone in the People list: your own, or any as an owner
+  Lock l;
+  uint8_t id[8];
+  if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, id, 8)) {
+    if (i != secClient && !(secClient >= 0 && keys[secClient].role)) return fail(r, "only the owner can do that");
+    char nm[sizeof keys[i].name];
+    cleanText(nm, sizeof nm, arg(r, "name"));
+    if (!nm[0]) return fail(r, "a name is needed");
+    strlcpy(keys[i].name, nm, sizeof keys[i].name);
+    keysSave();
+    return ok(r);
+  }
+  return fail(r, "no such phone");
+}
+esp_err_t hApprove(httpd_req_t *r) {             // owner: answer a phone that asked to join. ok=1 lets it in (owner=1: as an owner), ok=0 removes it.
+  Lock l;
+  uint8_t id[8];
+  if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) {
+    if (arg(r, "ok") == "1") { keys[i].used = 1; keys[i].role = arg(r, "owner") == "1" ? 1 : 0; lastCtr[i] = 0; event("%s approved (%s)", keys[i].name, keys[i].role ? "owner" : "user"); }
+    else { event("%s turned down", keys[i].name); memset(&keys[i], 0, sizeof keys[i]); }
+    keysSave();
+    return ok(r);
+  }
+  return fail(r, "no such request");
 }
 esp_err_t hMakeOwner(httpd_req_t *r) {           // owner: give another phone the owner's rights too
   Lock l;
   uint8_t id[8];
   if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, id, 8)) { keys[i].role = 1; keysSave(); event("%s is now an owner", keys[i].name); return ok(r); }
+  bool on = arg(r, "on") != "0";                 // on=0: back to a user
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && !memcmp(keys[i].id, id, 8)) {
+    if (!on && i == secClient) return fail(r, "you cannot change yourself");
+    keys[i].role = on ? 1 : 0; keysSave(); event("%s is now %s", keys[i].name, on ? "an owner" : "a user"); return ok(r);
+  }
   return fail(r, "no such phone");
 }
 uint32_t otaWindow = 0;                          // millis until which a firmware upload is accepted
@@ -577,7 +624,7 @@ const Route routes[] = {
   {"/api/scan", HTTP_GET, hScan, false}, {"/api/wifi", HTTP_POST, hNotYet, false}, {"/api/awake", HTTP_GET, hAwake, false}, {"/api/sleepnow", HTTP_GET, hNotYet, false}, {"/api/update", HTTP_POST, hUpdate, false},
   {"/api/keep", HTTP_GET, hKeep, false}, {"/api/watch", HTTP_GET, hWatch, false}, {"/api/trace", HTTP_GET, hTrace, false},
   {"/api/setwifi", HTTP_GET, hSetWifi, true}, {"/api/wifistate", HTTP_GET, hWifiState, false}, {"/api/homeopen", HTTP_GET, hHomeOpen, true},
-  {"/api/keys", HTTP_GET, hKeys, false}, {"/api/invite", HTTP_GET, hInvite, true}, {"/api/revoke", HTTP_GET, hRevoke, true}, {"/api/makeowner", HTTP_GET, hMakeOwner, true}, {"/api/openapi", HTTP_GET, hOpenApi, true}, {"/api/otaopen", HTTP_GET, hOtaOpen, true},
+  {"/api/keys", HTTP_GET, hKeys, false}, {"/api/revoke", HTTP_GET, hRevoke, true}, {"/api/approve", HTTP_GET, hApprove, true}, {"/api/keyname", HTTP_GET, hKeyName, false}, {"/api/makeowner", HTTP_GET, hMakeOwner, true}, {"/api/openapi", HTTP_GET, hOpenApi, true}, {"/api/otaopen", HTTP_GET, hOtaOpen, true},
 };
 const int routeCount = sizeof routes / sizeof routes[0];
 
@@ -606,7 +653,7 @@ void webBegin() {
     u.uri = routes[i].uri; u.method = routes[i].m; u.handler = hGuard; u.user_ctx = (void *)&routes[i];
     httpd_register_uri_handler(srv, &u);
   }
-  httpd_uri_t x[] = {{"/x/hello", HTTP_GET, hHello, nullptr}, {"/x/pair", HTTP_POST, hPair, nullptr}, {"/x", HTTP_POST, hSecure, nullptr}};
+  httpd_uri_t x[] = {{"/x/hello", HTTP_GET, hHello, nullptr}, {"/x/pair", HTTP_POST, hPair, nullptr}, {"/x/ask", HTTP_POST, hAsk, nullptr}, {"/x", HTTP_POST, hSecure, nullptr}};
   for (auto &u : x) httpd_register_uri_handler(srv, &u);
 }
 

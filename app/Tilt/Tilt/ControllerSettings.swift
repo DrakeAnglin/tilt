@@ -1,5 +1,6 @@
 // One controller's settings: its blinds, general options, Apple Home, sharing, developer.
 import CoreImage.CIFilterBuiltins
+import HomeKit
 import SwiftUI
 
 struct ControllerConfig: Decodable {
@@ -11,7 +12,7 @@ struct ControllerConfig: Decodable {
     var hksep: Int?
     var b: [Blind]
 }
-struct PhoneKey: Decodable, Identifiable { let cid: String; let name: String; let owner: Int; let me: Int; var id: String { cid } }
+struct PhoneKey: Decodable, Identifiable, Equatable { let cid: String; let name: String; let owner: Int; let me: Int; let wait: Int?; let code: String?; var id: String { cid } }
 
 struct ControllerSettingsView: View {
     @Environment(AppModel.self) private var model
@@ -20,17 +21,21 @@ struct ControllerSettingsView: View {
     @State private var cfg: ControllerConfig?
     @State private var phones: [PhoneKey] = []
     @State private var name = ""
-    @State private var share: ShareInfo?
+    @State private var removing: PhoneKey?
+    @State private var review: JoinAsk?
+    @State private var renaming: PhoneKey?
+    @State private var newName = ""
     @State private var home: HomeInfo?
     @State private var problem: String?
     @State private var confirmRemove = false
+    @State private var retried = false
     @AppStorage("devMode") private var devMode = false
 
-    struct ShareInfo: Identifiable { let link: String; var id: String { link } }
     struct HomeInfo: Identifiable { let code: String; let qr: String; var id: String { qr } }
 
     var body: some View {
         List {
+            if !controller.record.owner { Section { Label("You can open and close these blinds. Only an owner can change settings.", systemImage: "lock") } }
             if let cfg {
                 Section("Blinds") {
                     ForEach(Array(cfg.b.enumerated()), id: \.offset) { i, b in
@@ -64,12 +69,30 @@ struct ControllerSettingsView: View {
                 }
                 Section {
                     ForEach(phones) { p in
-                        LabeledContent(p.name + (p.me == 1 ? " (this phone)" : ""), value: p.owner == 1 ? "Owner" : "Shared")
-                            .swipeActions { if controller.record.owner && p.me == 0 { Button("Remove", role: .destructive) { revoke(p) } } }
+                        if p.wait == 1 {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("\(p.name) wants to join").font(.body.weight(.medium))
+                                Text("Their phone shows the code \(p.code ?? "").").font(.footnote).foregroundStyle(.secondary)
+                                if controller.record.owner { Button("Review") { review = JoinAsk(controller: controller, phone: p) }.buttonStyle(.borderedProminent) }
+                            }
+                        } else {
+                            Button { if p.me == 1 || controller.record.owner { newName = p.name; renaming = p } } label: {
+                                LabeledContent(p.name + (p.me == 1 ? " (this phone)" : ""), value: p.owner == 1 ? "Owner" : "User").contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)                // names in the normal text color, not as links
+                            .swipeActions {
+                                if controller.record.owner && p.me == 0 {
+                                    Button("Remove") { removing = p }.tint(.red)
+                                    Button(p.owner == 1 ? "Make User" : "Make Owner") { setRole(p, owner: p.owner != 1) }.tint(.blue)
+                                }
+                            }
+                            .confirmationDialog("Remove \(p.name)?", isPresented: Binding(get: { removing?.cid == p.cid }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
+                                Button("Remove", role: .destructive) { revoke(p) }
+                            } message: { Text("That phone will no longer control these blinds. It can ask to join again.") }
+                        }
                     }
-                    if controller.record.owner { Button("Share with Someone", systemImage: "qrcode") { invite() } }
                 } header: { Text("People") } footer: {
-                    Text(controller.record.owner ? "Sharing shows a code that works once, for 10 minutes." : "Only the owner can share or remove phones.")
+                    Text("Tap a name to change it. To add someone: on your Wi-Fi, they open Tilt, tap Add, and ask to join. You approve it here." + (controller.record.owner ? " Swipe left on someone to remove them or change their role." : ""))
                 }
                 if devMode { Section {
                     NavigationLink { DeveloperView(controller: controller) } label: { Label("Developer", systemImage: "chevron.left.forwardslash.chevron.right") }
@@ -77,6 +100,8 @@ struct ControllerSettingsView: View {
             } else if problem == nil {
                 SlatLoader(label: "Loading settings…").frame(maxWidth: .infinity).padding(.vertical, 24).listRowBackground(Color.clear)
             }
+            if let v = controller.state?.v { Section("About") { LabeledContent("Firmware", value: v) } }
+            if cfg == nil, problem == nil { Section { HStack(spacing: 10) { SlatLoader(size: 20); Text("Loading…").foregroundStyle(.secondary) } } }
             if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) } }
             Section {
                 Button("Remove from This Phone", role: .destructive) { confirmRemove = true }
@@ -96,10 +121,20 @@ struct ControllerSettingsView: View {
         .skyPage()
         .navigationTitle(controller.state?.name ?? controller.record.name)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        // Not `.task`: that is cancelled whenever the page is rebuilt (picking a room in the side-by-side layout does
+        // that), and the cancelled request used to be shown as an error with nothing else on the page.
+        .onAppear { Task { await load() } }
+        // Someone asked to join, or a request was answered (here or on the approve page): show it in People right away.
+        .onChange(of: controller.requests) { _, _ in Task { await load() } }
+        .onChange(of: controller.state?.asks) { _, _ in Task { await load() } }
         .refreshable { await load() }
-        .sheet(item: $share) { ShareSheet(info: $0).presentationDetents([.medium, .large]) }
-        .sheet(item: $home) { HomeSheet(info: $0).presentationDetents([.medium, .large]) }
+        .sheet(item: $review, onDismiss: { Task { await load() } }) { a in JoinSheet(ask: a) { review = nil }.presentationDetents([.height(480)]) }
+        .alert("Name", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }), presenting: renaming) { p in
+            TextField("Name", text: $newName)
+            Button("Save") { rename(p) }
+            Button("Cancel", role: .cancel) {}
+        } message: { p in Text(p.me == 1 ? "What other people see for this phone." : "What this phone is called in the list.") }
+        .sheet(item: $home) { HomeSheet(info: $0, roomName: controller.state?.name ?? controller.record.name).presentationDetents([.large]) }
     }
 
     private func remove(reset: Bool) {
@@ -122,26 +157,41 @@ struct ControllerSettingsView: View {
             let c: ControllerConfig = try await controller.link.json("/api/cfg")
             cfg = c; name = c.name; problem = nil
             struct K: Decodable { let keys: [PhoneKey] }
-            phones = (try? await controller.link.json("/api/keys", as: K.self).keys) ?? []
+            let list = ((try? await controller.link.json("/api/keys", as: K.self).keys) ?? []).sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
+            withAnimation { phones = list }
             if let me = phones.first(where: { $0.me == 1 }) { model.setOwner(controller, me.owner == 1) }      // the owner may have changed
-        } catch { problem = error.localizedDescription }
+        } catch {
+            // A request that was cancelled is not a fault: try once more instead of showing "cancelled".
+            let cancelled = error is CancellationError || (error as? URLError)?.code == .cancelled
+            if cancelled { if !retried { retried = true; try? await Task.sleep(for: .milliseconds(300)); await load() } }
+            else { problem = error.localizedDescription }
+        }
+        retried = false
     }
     private func set(_ key: String, _ value: String) {
         Task {
             do { try await controller.link.send("/api/set?k=\(key)&v=\(value.urlQuery)"); await load() } catch { problem = error.localizedDescription }
         }
     }
-    private func invite() {
-        Task {
-            struct I: Decodable { let inv: String; let secret: String; let id: String }
-            do {
-                let i: I = try await controller.link.json("/api/invite")
-                share = ShareInfo(link: "tilt://join?host=\(controller.record.host)&id=\(i.id)&inv=\(i.inv)&secret=\(i.secret)")
-            } catch { problem = error.localizedDescription }
-        }
+    private func setRole(_ p: PhoneKey, owner: Bool) {
+        Task { do { try await controller.link.send("/api/makeowner?cid=\(p.cid)&on=\(owner ? 1 : 0)"); await load() } catch { problem = error.localizedDescription } }
+    }
+    private func rename(_ p: PhoneKey) {
+        let n = newName.trimmingCharacters(in: .whitespaces)
+        guard !n.isEmpty else { return }
+        if p.me == 1 { AppModel.myName = n }
+        Task { do { try await controller.link.send("/api/keyname?cid=\(p.cid)&name=\(n.urlQuery)"); await load() } catch { problem = error.localizedDescription } }
     }
     private func revoke(_ p: PhoneKey) {
-        Task { do { try await controller.link.send("/api/revoke?cid=\(p.cid)"); await load() } catch { problem = error.localizedDescription } }
+        Task {
+            struct R: Decodable { let ok: Int; let err: String?; let proof: String? }
+            do {
+                let r: R = try await controller.link.json("/api/revoke?cid=\(p.cid)")
+                if r.ok != 1 { throw TiltError((r.err ?? "That did not work.").capitalizedFirst) }
+                await Cloud.postGone(cid: p.cid, proof: r.proof ?? "")        // so that phone drops these blinds even away from home
+                await load()
+            } catch { problem = error.localizedDescription }
+        }
     }
     private func openHome() {
         Task {
@@ -166,38 +216,59 @@ struct QRCode: View {
     }
 }
 
-struct ShareSheet: View {
-    let info: ControllerSettingsView.ShareInfo
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 18) {
-                QRCode(text: info.link).frame(maxWidth: 240)
-                Text("On the other phone, open the Camera and point it at this code. It works once, for the next 10 minutes.")
-                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                ShareLink("Send the Link Instead", item: info.link)
-                Spacer(minLength: 0)
-            }
-            .padding()
-            .skyPage()
-            .navigationTitle("Share These Blinds").navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
-
 struct HomeSheet: View {
     let info: ControllerSettingsView.HomeInfo
+    var roomName = "Blinds"
+    @Environment(\.openURL) private var openURL
+    @State private var copied = false
+    @State private var note: String?
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                QRCode(text: info.qr).frame(maxWidth: 220)
-                Text(info.code).font(.title2.monospacedDigit().weight(.semibold))
-                Text("In the Home app tap +, then Add Accessory, and scan this code. When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The controller accepts this for the next 10 minutes.")
-                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Spacer(minLength: 0)
+            ScrollView {
+                VStack(spacing: 18) {
+                    // The quick way: Apple's own add-accessory page, opened here with the code already filled in.
+                    Button { addHere() } label: { Label("Add to Apple Home", systemImage: "homekit").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 4) }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                    Text("When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The controller accepts this for the next 10 minutes.")
+                        .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    if let note { Label(note, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange) }
+
+                    VStack(spacing: 12) {
+                        Text("Or add it by hand").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(info.code).font(.title2.monospacedDigit().weight(.semibold)).textSelection(.enabled)
+                        HStack(spacing: 10) {
+                            Button { UIPasteboard.general.string = info.code.filter(\.isNumber); copied = true } label: { Label(copied ? "Copied" : "Copy Code", systemImage: copied ? "checkmark" : "doc.on.doc").frame(maxWidth: .infinity) }
+                            Button { if let u = URL(string: "com.apple.home://") { openURL(u) } } label: { Label("Open Home", systemImage: "arrow.up.forward.app").frame(maxWidth: .infinity) }
+                        }
+                        .buttonStyle(.bordered)
+                        Text("In Home tap +, Add Accessory, More Options. Pick this controller, or tap \u{201C}My Accessory Isn\u{2019}t Shown Here\u{201D} and paste the code.")
+                            .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(16).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                    VStack(spacing: 10) {
+                        Text("From another iPhone or iPad").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
+                        QRCode(text: info.qr).frame(maxWidth: 170)
+                        Text("Point its camera at this code.").font(.footnote).foregroundStyle(.secondary)
+                    }
+                    .padding(16).frame(maxWidth: .infinity).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .padding()
             }
-            .padding()
-            .skyPage()
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Add to Apple Home").navigationBarTitleDisplayMode(.inline)
+            .sensoryFeedback(.success, trigger: copied)
+        }
+    }
+    private func addHere() {
+        note = nil
+        Task {
+            let request = HMAccessorySetupRequest()
+            request.payload = URL(string: info.qr).flatMap { HMAccessorySetupPayload(url: $0) }
+            request.suggestedAccessoryName = roomName
+            guard request.payload != nil else { note = "Use the code below instead."; return }
+            do { try await HMAccessorySetupManager().performAccessorySetup(using: request) }
+            catch { if (error as? HMError)?.code != .operationCancelled { note = "Apple Home could not start from here. Use the code below instead." } }
         }
     }
 }
@@ -208,22 +279,12 @@ struct BlindSettingsView: View {
     @State var blind: ControllerConfig.Blind
     let reload: () async -> Void
     @State private var name = ""
-    @State private var fav = 0.0
     @State private var settingUp = false
 
     var body: some View {
         Form {
             Section("Name") {
                 TextField("Name", text: $name).onSubmit { set("name", name) }.submitLabel(.done)
-            }
-            Section("Favorite position") {
-                HStack(spacing: 14) {
-                    SlatView(tilt: fav).frame(width: 64, height: 80)
-                    VStack(alignment: .leading) {
-                        Text(TiltWords.long(fav))
-                        Slider(value: $fav, in: -100...100, step: 5) { editing in if !editing { set("fav", "\(Int(fav))") } }
-                    }
-                }
             }
             Section {
                 Toggle("Show this blind", isOn: Binding(get: { blind.hid == 0 }, set: { blind.hid = $0 ? 0 : 1; set("hid", $0 ? "0" : "1") }))
@@ -234,7 +295,7 @@ struct BlindSettingsView: View {
         }
         .skyPage()
         .navigationTitle(blind.name).navigationBarTitleDisplayMode(.inline)
-        .onAppear { name = blind.name; fav = Double(blind.fav) }
+        .onAppear { name = blind.name }
         .fullScreenCover(isPresented: $settingUp) { SetupWizard(controller: controller, index: index, name: blind.name) }
     }
     private func set(_ field: String, _ value: String) {

@@ -23,6 +23,14 @@ struct ControllerState: Decodable, Equatable {
     let batt: Battery
     let closeUp: Int, sync: Int, mv: Int
     let hk: Int?
+    /// Phones that asked to join and wait for an owner.
+    let asks: Int?
+    /// 1 if this phone is an owner of the controller, 0 if a user.
+    let me: Int?
+    /// 1 while a gentle (slow, over minutes) move is under way.
+    let gentle: Int?
+    /// The controller's name in iCloud notices (see Cloud.swift).
+    let topic: String?
     let b: [BlindState]
 }
 
@@ -33,6 +41,10 @@ struct ControllerRecord: Codable, Identifiable, Equatable {
     var host: String
     var cid: String         // this phone's id on that controller
     var owner: Bool
+    /// Asked to join, not approved yet; `code` is what both phones show.
+    var waiting: Bool?
+    var code: String?
+    var topic: String?
 }
 
 enum Keychain {
@@ -63,7 +75,7 @@ enum TiltActions {
         return d.flatMap { try? JSONDecoder().decode([ControllerRecord].self, from: $0) } ?? []
     }
     static func links() -> [(ControllerRecord, Link)] {
-        records().compactMap { r in Keychain.load(r.id).map { (r, Link(host: r.host, cid: Data(hex: r.cid) ?? Data(), key: SymmetricKey(data: $0))) } }
+        records().filter { $0.waiting != true }.compactMap { r in Keychain.load(r.id).map { (r, Link(host: r.host, cid: Data(hex: r.cid) ?? Data(), key: SymmetricKey(data: $0))) } }
     }
     /// Send one command to every controller. Throws if none could be reached.
     static func all(_ command: String) async throws {

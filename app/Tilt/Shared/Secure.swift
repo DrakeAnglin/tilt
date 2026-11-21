@@ -15,20 +15,20 @@ struct Hello: Decodable {
     let wifi: Int?, ip: String?, home: Int?
 }
 
-/// What an invite (the sharing QR code) carries.
-struct Invite {
-    let host: String, id: String, inv: String, secret: Data
-    /// tilt://join?host=…&id=…&inv=…&secret=…
-    init?(link: String) {
-        guard let c = URLComponents(string: link.trimmingCharacters(in: .whitespacesAndNewlines)), c.scheme == "tilt", c.host == "join" else { return nil }
-        func q(_ n: String) -> String? { c.queryItems?.first { $0.name == n }?.value }
-        guard let h = q("host"), let i = q("id"), let v = q("inv"), let s = q("secret").flatMap(Data.init(hex:)), s.count == 16 else { return nil }
-        host = h; id = i; inv = v; secret = s
-    }
-}
-
 struct Paired {
     let cid: Data, key: SymmetricKey, owner: Bool
+    /// Asked to join: the key works once an owner approves it.
+    var waiting = false
+    /// The controller's name in iCloud notices.
+    var topic = ""
+    /// The 4 digits both phones show for a request to join.
+    var code: String { String(format: "%04d", Data(HMAC<SHA256>.authenticationCode(for: Data("code".utf8), using: key)).prefix(2).reduce(0) { $0 << 8 | Int($1) } % 10000) }
+}
+
+/// Why a sealed command was turned away.
+enum LinkProblem: LocalizedError {
+    case waiting, notPaired
+    var errorDescription: String? { self == .waiting ? "Waiting for an owner to approve this phone." : "This phone is no longer paired with the controller." }
 }
 
 enum Secure {
@@ -53,28 +53,24 @@ enum Secure {
         return h
     }
 
-    /// Make this phone's key on a controller. The first phone becomes the owner; later ones need an invite.
-    static func pair(host: String, phoneName: String, invite: Invite?) async throws -> Paired {
-        try await pair(phoneName: phoneName, invite: invite) { try await http(host, "/x/pair", body: $0) }
+    /// Make this phone's key on a controller. The first phone becomes an owner; later ones ask to join and wait.
+    static func pair(host: String, phoneName: String, ask: Bool) async throws -> Paired {
+        try await pair(phoneName: phoneName) { try await http(host, ask ? "/x/ask" : "/x/pair", body: $0) }
     }
     /// The same, through any channel that carries the request and brings back (status, answer).
-    static func pair(phoneName: String, invite: Invite?, via: (Data) async throws -> (Int, Data)) async throws -> Paired {
+    static func pair(phoneName: String, via: (Data) async throws -> (Int, Data)) async throws -> Paired {
         let priv = P256.KeyAgreement.PrivateKey()
         let cpub = priv.publicKey.x963Representation
-        var body: [String: String] = ["pub": cpub.base64EncodedString(), "name": phoneName]
-        if let invite {
-            body["inv"] = invite.inv
-            body["mac"] = Data(HMAC<SHA256>.authenticationCode(for: cpub, using: SymmetricKey(data: invite.secret))).hex
-        }
+        let body: [String: String] = ["pub": cpub.base64EncodedString(), "name": phoneName]
         let (st, d) = try await via(try JSONSerialization.data(withJSONObject: body, options: [.withoutEscapingSlashes]))
         let j = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] ?? [:]
         guard st == 200, let pub = (j["pub"] as? String).flatMap({ Data(base64Encoded: $0) }), let cid = (j["cid"] as? String).flatMap(Data.init(hex:)),
               let check = j["check"] as? String else { throw TiltError((j["err"] as? String) ?? "Pairing was refused.") }
         let shared = try priv.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: pub))
-        let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: invite?.secret ?? Data(), sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
+        let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: Data(), sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
         let mine = Data(HMAC<SHA256>.authenticationCode(for: Data("confirm".utf8), using: key)).prefix(8).hex
         guard mine == check else { throw TiltError("The controller's key did not match. Pairing was cancelled.") }
-        return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1)
+        return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1, waiting: (j["wait"] as? Int) == 1, topic: (j["topic"] as? String) ?? "")
     }
 }
 
@@ -105,7 +101,8 @@ actor Link {
                 return try AES.GCM.open(back, using: key, authenticating: Data("blinds-v1r".utf8) + cid + nonce)
             }
             if st == 409, attempt == 0 { self.boot = nil; continue }          // the controller restarted: get its new number
-            if st == 401 { throw TiltError("This phone is no longer paired with the controller.") }
+            if st == 401 { throw LinkProblem.notPaired }
+            if st == 403 { throw LinkProblem.waiting }
             throw TiltError("The controller refused the command.")
         }
         throw TiltError("The controller did not answer.")

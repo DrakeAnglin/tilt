@@ -8,7 +8,10 @@ Older decisions and findings are in [open-questions.md](open-questions.md).
 | # | What | Notes |
 |---|---|---|
 | 3 | **Battery life** | Ran 3 to 4 days on a charge. Charged to 100 % and unplugged 2026-11-21: use this run as the baseline. Find what drains it idle. Suspects: (a) sensor look-round every 1 to 3 s for hand-twist following (added 2026-11-16); (b) battery and status polling too often, by the controller itself and by the app, the widget and Apple Home asking it; (c) Wi-Fi kept up for Apple Home; (d) the doze mode, never measured; (e) logging and stats writes. Then cut each one. |
-| 5 | **App on the new phone** | Developer Mode on, register the phone, install. It joins with a sharing code from the old phone. |
+| 5 | **App on the new phone** | Installed 2026-11-21. Left: give it access to the controller (sharing code from the old phone, or make it the owner), and trust the developer on the phone if it asks. |
+| 5a | **iCloud notices (CloudKit): test and finish** | Built 2026-11-21: push to owners when someone asks to join, and a removed phone drops its blinds away from home. Needs a test with two iCloud accounts signed in. Before TestFlight: copy the CloudKit layout from Development to Production and set the push entitlement to production. |
+| 5b | **Scenes shared between devices** | Scenes are saved only on the phone that made them. Rethink where they live (on the controllers like schedules, or synced through iCloud) so every phone and person sees the same scenes. |
+| 5c | **Quiet motor mode** | "Gently" moves in small steps over minutes; each step is as loud as a normal move. A slow, quiet motor speed needs firmware motor work and stall-detection testing. |
 | 6 | **App Store release prep** | Icon without see-through, screenshots, privacy answers, TestFlight first. Remove the Mac test client's owner key before release. |
 | 7a | **Docs refresh** | `architecture.md`, `tilter-wiring.md`, `BOM.md` and `requirements.md` still describe older parts in places. Bring them up to the current tilter, firmware and app. |
 

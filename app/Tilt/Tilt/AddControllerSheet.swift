@@ -1,12 +1,11 @@
-// Adding a controller: a brand-new one over Bluetooth, one already on Wi-Fi, or with a sharing link from the owner.
+// Adding a controller: a brand-new one over Bluetooth, or one already on Wi-Fi. A controller that has an owner is
+// asked to let this phone join; the owner approves it in their Tilt app.
 import SwiftUI
 
 struct AddControllerSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(Discovery.self) private var discovery
     @Environment(\.dismiss) private var dismiss
-    @State private var host = ""
-    @State private var link = ""
     @State private var busy = false
     @State private var problem: String?
     @State private var ble = BleSetup()
@@ -14,12 +13,12 @@ struct AddControllerSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                let fresh = discovery.found.filter { f in !model.controllers.contains { $0.id == f.id } }
+                let fresh = discovery.found.filter { f in !(model.controllers + model.waiting).contains { $0.id == f.id } }
                 Section {
                     if let p = ble.problem { Label(p, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
                     else if ble.found.isEmpty { Label("Looking for new controllers…", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(.secondary) }
                     ForEach(ble.found) { d in
-                        NavigationLink(value: d) { Label("New controller", systemImage: "blinds.horizontal.closed") }
+                        NavigationLink(value: d) { Label("Blinds Controller", systemImage: "blinds.horizontal.closed") }
                     }
                 } header: { Text("New, over Bluetooth") } footer: {
                     Text("A new controller shows up here for 15 minutes after it is powered on. If yours is not listed, unplug it and plug it back in.")
@@ -27,55 +26,36 @@ struct AddControllerSheet: View {
                 Section {
                     if fresh.isEmpty { Label("Looking on your Wi-Fi…", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(.secondary) }
                     ForEach(fresh) { f in
-                        Button { if !f.owned { host = f.host; link = ""; add() } } label: {
+                        Button { add(f) } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(f.name).foregroundStyle(.primary)
-                                    Text(f.owned ? "Has an owner: ask them to share it with you" : "New: tap to add").font(.footnote).foregroundStyle(.secondary)
+                                    Text(f.owned ? "Tap to ask its owner to let you in" : "New: tap to add").font(.footnote).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Image(systemName: f.owned ? "lock" : "plus.circle.fill")
+                                if busy { SlatLoader(size: 20) } else { Text(f.owned ? "Ask to Join" : "Add").fontWeight(.medium) }
                             }
                         }
-                        .disabled(f.owned || busy)
+                        .disabled(busy)
                     }
                 } header: { Text("Already on your Wi-Fi") }
-                Section {
-                    TextField("192.168.1.50", text: $host).keyboardType(.numbersAndPunctuation).textInputAutocapitalization(.never).autocorrectionDisabled()
-                } header: { Text("Controller address") } footer: { Text("For a controller nobody has paired yet. This phone becomes its owner.") }
-                Section {
-                    TextField("tilt://join?…", text: $link, axis: .vertical).textInputAutocapitalization(.never).autocorrectionDisabled()
-                } header: { Text("Or a sharing link") } footer: { Text("Paste the link the owner shared with you.") }
                 if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) } }
             }
             .skyPage()
             .navigationDestination(for: BleSetup.Found.self) { d in BluetoothSetupView(ble: ble, device: d) { dismiss() } }
             .onAppear { ble.start() }
-            .navigationTitle("Add a Controller")
+            .navigationTitle("Add a New Device")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    if busy { SlatLoader(size: 20) } else { Button("Add") { add() }.disabled(host.isEmpty && link.isEmpty) }
-                }
-            }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }
         .onDisappear { ble.stop() }                      // when the whole sheet closes
     }
 
-    private func add() {
+    private func add(_ f: FoundController) {
         busy = true; problem = nil
         Task {
             defer { busy = false }
-            do {
-                if !link.isEmpty {
-                    guard let inv = Invite(link: link) else { throw TiltError("That sharing link is not valid.") }
-                    try await model.add(host: inv.host, invite: inv)
-                } else {
-                    try await model.add(host: host.trimmingCharacters(in: .whitespaces), invite: nil)
-                }
-                dismiss()
-            } catch { problem = error.localizedDescription }
+            do { try await model.add(host: f.host); dismiss() } catch { problem = error.localizedDescription }
         }
     }
 }

@@ -1,0 +1,74 @@
+// Notices between phones, through iCloud (CloudKit's public database). Tilt has no server of its own, and a controller
+// only talks on its own Wi-Fi, so the phones tell each other two things this way:
+//   Join   a phone asked to join a controller: its owners get a push notification, wherever they are.
+//   Gone   an owner removed a phone: that phone drops the blinds the next time it opens, even away from home.
+// What is stored: a random name for the controller ("topic", known only to phones that have talked to it), the name the
+// asking person typed, the room's name, and a proof only the removed phone can check. No keys, no addresses.
+import CloudKit
+import CryptoKit
+import Foundation
+
+enum Cloud {
+    @MainActor private static var lastTry: [String: Date] = [:]
+    private static let db = CKContainer(identifier: "iCloud.app.tilt.blinds").publicCloudDatabase
+
+    /// Is this phone signed in to iCloud? (Needed to send and get these notices.)
+    static func signedIn() async -> Bool { (try? await CKContainer(identifier: "iCloud.app.tilt.blinds").accountStatus()) == .available }
+
+    /// The asking phone: tell the owners.
+    static func postJoin(topic: String, cid: String, who: String, room: String) async {
+        guard !topic.isEmpty else { return }
+        let r = CKRecord(recordType: "Join", recordID: CKRecord.ID(recordName: "join-\(cid)"))
+        r["topic"] = topic; r["who"] = who; r["room"] = room
+        do { _ = try await db.save(r) } catch { NSLog("cloud: join not sent: %@", "\(error)") }
+    }
+    /// The request was answered or taken back.
+    static func clearJoin(cid: String) async { _ = try? await db.deleteRecord(withID: CKRecord.ID(recordName: "join-\(cid)")) }
+
+    /// An owner's phone: get a push when someone asks to join this controller. Done once per controller.
+    @MainActor static func watch(topic: String) async {
+        let key = "cloud.watch.\(topic)"
+        guard !topic.isEmpty, !UserDefaults.standard.bool(forKey: key) else { return }
+        if let t = lastTry[topic], Date().timeIntervalSince(t) < 300 { return }      // it failed a moment ago (no iCloud account, no internet): try again in 5 minutes
+        lastTry[topic] = Date()
+        let sub = CKQuerySubscription(recordType: "Join", predicate: NSPredicate(format: "topic == %@", topic), subscriptionID: "join-\(topic)", options: [.firesOnRecordCreation])
+        let info = CKSubscription.NotificationInfo()
+        info.titleLocalizationKey = "JOIN_TITLE"; info.titleLocalizationArgs = ["who", "room"]
+        info.alertLocalizationKey = "JOIN_BODY"
+        info.soundName = "default"
+        sub.notificationInfo = info
+        for attempt in 0..<2 {
+            do { _ = try await db.save(sub); UserDefaults.standard.set(true, forKey: key); return }
+            catch {
+                NSLog("cloud: watch failed: %@", "\(error)")
+                guard attempt == 0 else { return }
+                // The very first time, iCloud does not know what a "Join" is yet: save one and take it away again.
+                let r = CKRecord(recordType: "Join", recordID: CKRecord.ID(recordName: "join-setup-\(UUID().uuidString)"))
+                r["topic"] = "setup"; r["who"] = ""; r["room"] = ""
+                if let saved = try? await db.save(r) { _ = try? await db.deleteRecord(withID: saved.recordID) }
+            }
+        }
+    }
+    /// No longer an owner (or the controller was removed from this phone).
+    static func unwatch(topic: String) async {
+        let key = "cloud.watch.\(topic)"
+        guard UserDefaults.standard.bool(forKey: key) else { return }
+        _ = try? await db.deleteSubscription(withID: "join-\(topic)")
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
+    /// An owner removed the phone `cid`. `proof` came from the controller, made with that phone's own key.
+    static func postGone(cid: String, proof: String) async {
+        guard !proof.isEmpty else { return }
+        let r = CKRecord(recordType: "Gone", recordID: CKRecord.ID(recordName: "gone-\(cid)"))
+        r["proof"] = proof
+        do { _ = try await db.save(r) } catch { NSLog("cloud: removal not sent: %@", "\(error)") }
+    }
+    /// Was this phone removed from the controller? True only with the controller's proof.
+    static func gone(cid: String, key: SymmetricKey) async -> Bool {
+        let id = CKRecord.ID(recordName: "gone-\(cid)")
+        guard let r = try? await db.record(for: id), let proof = r["proof"] as? String else { return false }
+        let mine = Data(HMAC<SHA256>.authenticationCode(for: Data("removed".utf8), using: key)).prefix(16).hex
+        return proof == mine
+    }
+}

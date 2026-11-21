@@ -135,7 +135,9 @@ struct AppBackground: View {
 extension View {
     /// A glass card.
     func card(radius: CGFloat = 26) -> some View {
-        glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        // The glass sits behind the content as its own layer, so it takes the content's size on every frame of a
+        // layout change (glass applied to the content itself resizes on its own clock and lags behind).
+        background { Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous)) }
     }
     /// A page with the sky behind it (for lists and forms too).
     func skyPage() -> some View {

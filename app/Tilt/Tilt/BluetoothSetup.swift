@@ -68,7 +68,7 @@ final class BleSetup: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         return h
     }
     func pair() async throws -> Paired {
-        try await Secure.pair(phoneName: UIDevice.current.name, invite: nil) { try await self.request(Data("P".utf8) + $0) }
+        try await Secure.pair(phoneName: AppModel.myName) { try await self.request(Data("P".utf8) + $0) }
     }
     /// A sealed command, as in Link.call, carried over Bluetooth.
     func sealed(_ command: String, as p: Paired, boot: Data) async throws -> [String: Any] {

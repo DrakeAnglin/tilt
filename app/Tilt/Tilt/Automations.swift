@@ -29,6 +29,10 @@ struct Schedule: Identifiable, Equatable {
         switch days { case 127: return "Every day"; case 62: return "Weekdays"; case 65: return "Weekends"; case 0: return "Never"
         default: return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated().filter { days >> $0.offset & 1 == 1 }.map(\.element).joined(separator: " ") }
     }
+    /// Every port of every controller: a schedule for "all blinds" also covers a blind that is plugged in later.
+    static func everyBlind(_ controllers: [Controller]) -> Set<BlindTarget> {
+        Set(controllers.flatMap { c in (0..<3).map { BlindTarget(controller: c.id, blind: $0) } })
+    }
     static func clock(_ m: Int) -> String {
         var c = DateComponents(); c.hour = m / 60; c.minute = m % 60
         return Calendar.current.date(from: c).map { $0.formatted(date: .omitted, time: .shortened) } ?? ""
@@ -42,17 +46,66 @@ struct BlindScene: Identifiable, Codable, Equatable {
     var tilts: [BlindTarget: Int] = [:]
 }
 
+/// The scenes, kept on this phone. One copy for every page that shows them.
+@MainActor @Observable
+final class SceneStore {
+    static let shared = SceneStore()
+    var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: "scenes.v1")).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
+    func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: "scenes.v1") }
+    func run(_ scene: BlindScene, controllers: [Controller]) {
+        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.run("/api/go?b=\(t.blind)&t=\(tilt)&solo=1") }
+    }
+}
+
+/// The scenes as a row of tiles: tap to run, hold to edit or delete, and a tile to make a new one.
+struct ScenesRow: View {
+    @Environment(AppModel.self) private var model
+    @State private var editing: BlindScene?
+    @State private var ran: UUID?
+    var body: some View {
+        let store = SceneStore.shared
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(store.scenes) { sc in
+                    Button { ran = sc.id; store.run(sc, controllers: model.controllers) } label: {
+                        VStack(spacing: 8) { Image(systemName: sc.symbol).font(.title2); Text(sc.name).font(.footnote.weight(.semibold)).lineLimit(1) }
+                            .frame(width: 104, height: 84)
+                            .card(radius: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("Edit", systemImage: "pencil") { editing = sc }
+                        Button("Delete", systemImage: "trash", role: .destructive) { store.scenes.removeAll { $0.id == sc.id }; store.save() }
+                    }
+                }
+                Button { editing = BlindScene() } label: {
+                    VStack(spacing: 8) { Image(systemName: "plus").font(.title2); Text("New Scene").font(.footnote.weight(.semibold)) }
+                        .frame(width: 104, height: 84).foregroundStyle(.tint)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.tint.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5])))
+                }
+                .buttonStyle(.plain)
+                .disabled(model.controllers.isEmpty)
+            }
+            .padding(.vertical, 2)
+        }
+        .sensoryFeedback(.impact, trigger: ran)
+        .sheet(item: $editing) { sc in
+            SceneEditor(scene: sc) { new in
+                if let i = store.scenes.firstIndex(where: { $0.id == new.id }) { store.scenes[i] = new } else { store.scenes.append(new) }
+                store.save()
+            }
+        }
+    }
+}
+
 @MainActor @Observable
 final class AutomationStore {
     var schedules: [Schedule] = []
-    var scenes: [BlindScene] = []
     var sun: (rise: Date, set: Date)?
     var hasPlace = false
     var loading = false
     private var slots: [String: [SchedSlot]] = [:]          // per controller, as last read
 
-    init() { scenes = (UserDefaults.standard.data(forKey: "scenes.v1")).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? [] }
-    func saveScenes() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: "scenes.v1") }
 
     func load(_ controllers: [Controller]) async {
         loading = true; defer { loading = false }
@@ -86,53 +139,28 @@ final class AutomationStore {
         }
         await load(controllers)
     }
-
-    func run(_ scene: BlindScene, controllers: [Controller]) {
-        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.run("/api/go?b=\(t.blind)&t=\(tilt)&solo=1") }
-    }
 }
 
 struct AutomationsTab: View {
     @Environment(AppModel.self) private var model
     @State private var store = AutomationStore()
     @State private var editing: Schedule?
-    @State private var editingScene: BlindScene?
     @State private var problem: String?
     @State private var locator = Locator()
+    @State private var ran: UInt32?
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Scenes") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(store.scenes) { sc in
-                                Button { store.run(sc, controllers: model.controllers) } label: {
-                                    VStack(spacing: 8) { Image(systemName: sc.symbol).font(.title2); Text(sc.name).font(.footnote.weight(.semibold)).lineLimit(1) }
-                                        .frame(width: 104, height: 84)
-                                        .card(radius: 20)
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button("Edit", systemImage: "pencil") { editingScene = sc }
-                                    Button("Delete", systemImage: "trash", role: .destructive) { store.scenes.removeAll { $0.id == sc.id }; store.saveScenes() }
-                                }
-                                .sensoryFeedback(.impact, trigger: sc.id)
-                            }
-                            Button { editingScene = BlindScene() } label: {
-                                VStack(spacing: 8) { Image(systemName: "plus").font(.title2); Text("New").font(.footnote.weight(.semibold)) }
-                                    .frame(width: 104, height: 84).foregroundStyle(.tint)
-                                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.tint.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5])))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 6, leading: 2, bottom: 6, trailing: 0))
-                    .listRowBackground(Color.clear)
+                    ScenesRow().listRowInsets(EdgeInsets(top: 6, leading: 2, bottom: 6, trailing: 0)).listRowBackground(Color.clear)
                 }
                 Section {
                     ForEach(store.schedules) { s in
-                        HStack {
+                        HStack(spacing: 12) {
+                            Button { ran = s.id; runNow(s) } label: { Image(systemName: "play.fill").frame(width: 34, height: 34).background(.tint.opacity(0.15), in: Circle()) }
+                                .buttonStyle(.borderless).accessibilityLabel("Run now")
+                                .sensoryFeedback(.impact, trigger: ran)
                             Button { editing = s } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack(spacing: 6) {
@@ -141,16 +169,16 @@ struct AutomationsTab: View {
                                     }
                                     Text("\(s.actionText) · \(s.daysText) · \(blindNames(s))").font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())      // the whole row opens it, not just the words
                             }
                             .buttonStyle(.plain)
-                            Spacer()
                             Toggle("On", isOn: Binding(get: { s.on }, set: { on in var c = s; c.on = on; save(c) })).labelsHidden()
                         }
                     }
-                    Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: allTargets()) }.disabled(model.controllers.isEmpty)
+                    Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: Schedule.everyBlind(model.controllers)) }.disabled(model.controllers.isEmpty)
                 } header: { Text("Schedules") } footer: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Schedules are kept on the controllers, so they run even when this phone is away.")
+                        Text("Schedules are kept on the controllers, so they run even when this phone is away. The play button runs one right now.")
                         if let sun = store.sun { Text("Today: sunrise \(sun.rise.formatted(date: .omitted, time: .shortened)), sunset \(sun.set.formatted(date: .omitted, time: .shortened)).") }
                         Button(store.hasPlace ? "Update Location for Sunrise and Sunset" : "Set Location for Sunrise and Sunset") { setPlace() }.font(.footnote)
                     }
@@ -162,12 +190,6 @@ struct AutomationsTab: View {
             .task { await store.load(model.controllers) }
             .refreshable { await store.load(model.controllers) }
             .sheet(item: $editing) { item in ScheduleEditor(schedule: item, isNew: !store.schedules.contains { $0.id == item.id }) { s, del in save(s, delete: del) } }
-            .sheet(item: $editingScene) { sc in
-                SceneEditor(scene: sc) { new in
-                    if let i = store.scenes.firstIndex(where: { $0.id == new.id }) { store.scenes[i] = new } else { store.scenes.append(new) }
-                    store.saveScenes()
-                }
-            }
         }
     }
 
@@ -181,6 +203,13 @@ struct AutomationsTab: View {
         if !all.isEmpty && s.targets.isSuperset(of: all) { return "All blinds" }
         let names = s.targets.sorted { ($0.controller, $0.blind) < ($1.controller, $1.blind) }.compactMap { t in model.controllers.first { $0.id == t.controller }?.state?.b[safe: t.blind]?.name }
         return names.isEmpty ? "No blinds" : names.joined(separator: ", ")
+    }
+    /// Do what the schedule does, right now.
+    private func runNow(_ s: Schedule) {
+        for t in s.targets {
+            guard let c = model.controllers.first(where: { $0.id == t.controller }), c.state?.b[safe: t.blind]?.ready == true else { continue }
+            c.run("/api/go?b=\(t.blind)&t=\(s.tilt)&solo=1")
+        }
     }
     private func save(_ s: Schedule, delete: Bool = false) {
         Task { do { try await store.save(s, delete: delete, controllers: model.controllers); problem = nil } catch { problem = error.localizedDescription } }
@@ -202,6 +231,7 @@ struct ScheduleEditor: View {
     let isNew: Bool
     let done: (Schedule, Bool) -> Void
     @State private var custom = false
+    @State private var all = true
 
     var body: some View {
         NavigationStack {
@@ -241,6 +271,10 @@ struct ScheduleEditor: View {
                     }
                     Picker("Gently, over", selection: $schedule.ramp) { Text("Off").tag(0); Text("5 min").tag(5); Text("10 min").tag(10); Text("20 min").tag(20); Text("30 min").tag(30) }
                 }
+                Section {
+                    Toggle("All Blinds", isOn: $all)
+                } header: { Text("Blinds") } footer: { Text(all ? "Every blind moves together, including any you add later." : "Pick the blinds this schedule moves.") }
+                if !all {
                 ForEach(model.controllers) { c in
                     Section(c.state?.name ?? c.record.name) {
                         ForEach(Array((c.state?.b ?? []).enumerated()), id: \.offset) { i, b in
@@ -253,14 +287,20 @@ struct ScheduleEditor: View {
                         }
                     }
                 }
+                }
                 if !isNew { Section { Button("Delete Schedule", role: .destructive) { done(schedule, true); dismiss() } } }
             }
             .skyPage().navigationTitle(isNew ? "New Schedule" : "Schedule").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { done(schedule, false); dismiss() }.disabled(schedule.days == 0 || schedule.targets.isEmpty) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { var s = schedule; if all { s.targets = Schedule.everyBlind(model.controllers) }; done(s, false); dismiss() }.disabled(schedule.days == 0 || (!all && schedule.targets.isEmpty)) }
             }
-            .onAppear { custom = ![0, 100, -100].contains(schedule.tilt) }
+            .onAppear {
+                custom = ![0, 100, -100].contains(schedule.tilt)
+                // "All" if it already covers every blind that is shown
+                let shown = Set(model.controllers.flatMap { c in (c.state?.b ?? []).enumerated().filter { $0.element.hid == 0 && !($0.element.seen == 1 && $0.element.pres == 0) }.map { BlindTarget(controller: c.id, blind: $0.offset) } })
+                all = isNew || schedule.targets.isSuperset(of: shown)
+            }
         }
     }
 }

@@ -3,9 +3,11 @@
 // the blinds' state or move them.
 //
 //   GET  /x/hello   who am I: id, name, firmware, this start's number ("boot"), is there an owner yet
-//   POST /x/pair    make a key. JSON {"pub": base64 P-256 public key, "name": "...", "inv": id, "mac": hex}
-//                   Allowed for the first phone (it becomes the owner), or with an invite made by the owner
-//                   (/api/invite, shown as a QR code). Both sides do ECDH; the key is HKDF-SHA256 of the result.
+//   POST /x/pair    make a key. JSON {"pub": base64 P-256 public key, "name": "..."}
+//                   Only for the first phone (it becomes an owner). Both sides do ECDH; the key is HKDF-SHA256 of the result.
+//   POST /x/ask     ask to join a controller that has an owner. Same JSON as /x/pair. The key is made
+//                   but does nothing until an owner approves it in the app (/api/approve). Both phones show the
+//                   same 4-digit code, made from the key, so the owner can tell it is the right phone.
 //   POST /x         a command. Bytes: client id (8) | nonce (12) | ciphertext | tag (16)
 //                   nonce = boot (4) | counter (8, must rise). Plain text inside: "/api/go?b=0&t=50".
 //                   The answer comes back the same way: nonce (12) | ciphertext | tag.
@@ -23,11 +25,13 @@
 #include "ardu.h"
 
 const int MAX_KEYS = 8;
-struct ClientKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // role 1 = owner
+struct ClientKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // used 1 = paired, 2 = asked to join, waiting for an owner; role 1 = owner
 ClientKey keys[MAX_KEYS];
 uint64_t lastCtr[MAX_KEYS];
 uint8_t bootId[4];
-struct Invite { uint8_t id[4], secret[16]; uint32_t until; bool open; } invite;
+// A random name for this controller in the iCloud notices the phones send each other (a request to join, a removal).
+// Only phones that have talked to the controller know it, so nobody else can send its owners a notice.
+uint8_t cloudTopic[16];
 int secClient = -1;                            // which key the command being handled came with (-1: not a secured one)
 const char *secQuery = nullptr;                // its "a=b&c=d" part, for arg()
 std::string *secOut = nullptr;                 // where its answer goes, for sendJson()
@@ -39,10 +43,12 @@ void keysSave() { nvs.putBytes("keys", keys, sizeof keys); }
 void secBegin() {
   if (nvs.getBytes("keys", keys, sizeof keys) != sizeof keys) memset(keys, 0, sizeof keys);
   esp_fill_random(bootId, sizeof bootId);
+  if (nvs.getBytes("topic", cloudTopic, sizeof cloudTopic) != sizeof cloudTopic) { esp_fill_random(cloudTopic, sizeof cloudTopic); nvs.putBytes("topic", cloudTopic, sizeof cloudTopic); }
   memset(lastCtr, 0, sizeof lastCtr);
   secMx = xSemaphoreCreateMutex();
 }
-bool owned() { for (auto &k : keys) if (k.used) return true; return false; }
+bool owned() { for (auto &k : keys) if (k.used == 1) return true; return false; }
+int asksWaiting() { int n = 0; for (auto &k : keys) if (k.used == 2) n++; return n; }
 std::string hexOf(const uint8_t *b, int n) { static const char *H = "0123456789abcdef"; std::string s; for (int i = 0; i < n; i++) { s += H[b[i] >> 4]; s += H[b[i] & 15]; } return s; }
 bool unhex(const std::string &s, uint8_t *out, size_t n) {
   if (s.length() != n * 2) return false;
@@ -98,24 +104,21 @@ esp_err_t plain(httpd_req_t *r, const char *status, const std::string &j) {
 
 // ---- pairing
 // Returns the HTTP-style status ("200 OK", ...) and fills out with the JSON answer. Used over Wi-Fi and Bluetooth.
-const char *pairDo(const std::string &b, std::string &out) {
-  std::string pubB64 = jsonStr(b, "pub"), inv = jsonStr(b, "inv"), mac = jsonStr(b, "mac");
+const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
+  std::string pubB64 = jsonStr(b, "pub");
   uint8_t cpub[65];
   size_t n = 0;
   if (mbedtls_base64_decode(cpub, sizeof cpub, &n, (const uint8_t *)pubB64.c_str(), pubB64.length()) != 0 || n != 65) { out = "{\"err\":\"bad key\"}"; return "400 Bad Request"; }
-  const uint8_t *salt = nullptr;
-  size_t saltN = 0;
   bool first = !owned();
-  if (!first) {                                // not the first phone: it must prove it holds the owner's invite
-    uint8_t id[4], want[32], got[32];
-    bool live = invite.open && (int32_t)(invite.until - millis()) > 0;
-    if (!live || !unhex(inv, id, 4) || memcmp(id, invite.id, 4) || !unhex(mac, got, 32) || !hmac256(invite.secret, 16, cpub, 65, want) || memcmp(want, got, 32))
-      { out = "{\"err\":\"pairing is closed. Ask the owner for an invite.\"}"; return "403 Forbidden"; }
-    salt = invite.secret;
-    saltN = 16;
-  }
+  if (ask) {
+    static uint32_t lastAsk = 0;               // each ask is written to flash: no more than one every 10 seconds
+    if (first) { out = "{\"err\":\"this controller has no owner yet\"}"; return "403 Forbidden"; }
+    if (lastAsk && millis() - lastAsk < 10000) { out = "{\"err\":\"try again in a few seconds\"}"; return "429 Too Many Requests"; }
+    lastAsk = millis();
+  } else if (!first) { out = "{\"err\":\"this controller has an owner. Ask to join from the app.\"}"; return "403 Forbidden"; }
   int slot = -1;
-  for (int i = 0; i < MAX_KEYS; i++) if (!keys[i].used) { slot = i; break; }
+  if (ask && asksWaiting() >= 2) { for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2) { slot = i; break; } }   // at most two waiting: a new ask takes the place of an old one
+  else for (int i = 0; i < MAX_KEYS; i++) if (!keys[i].used) { slot = i; break; }
   if (slot < 0) { out = "{\"err\":\"no room for another phone\"}"; return "403 Forbidden"; }
 
   mbedtls_ecp_group grp; mbedtls_mpi d, z; mbedtls_ecp_point Q, Qp;
@@ -128,36 +131,48 @@ const char *pairDo(const std::string &b, std::string &out) {
             mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &dn, dpub, sizeof dpub) == 0 && dn == 65;
   if (ok) {
     memcpy(info, "blinds-v1", 9); memcpy(info + 9, cpub, 65); memcpy(info + 74, dpub, 65);
-    ok = mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), salt, saltN, shared, 32, info, sizeof info, okm, 32) == 0;
+    ok = mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), nullptr, 0, shared, 32, info, sizeof info, okm, 32) == 0;
   }
   mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&d); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&Q); mbedtls_ecp_point_free(&Qp);
   if (!ok) { out = "{\"err\":\"key exchange failed\"}"; return "400 Bad Request"; }
 
   ClientKey &k = keys[slot];
   memset(&k, 0, sizeof k);
-  k.used = 1; k.role = first ? 1 : 0;
+  k.used = ask ? 2 : 1; k.role = first ? 1 : 0;
   esp_fill_random(k.id, 8);
   memcpy(k.key, okm, 32);
   cleanText(k.name, sizeof k.name, jsonStr(b, "name"));
   if (!k.name[0]) strlcpy(k.name, "iPhone", sizeof k.name);
   keysSave();
   lastCtr[slot] = 0;
-  if (!first) invite.open = false;             // an invite works once
-  event("%s paired%s", k.name, first ? " (owner)" : "");
+  event(ask ? "%s asked to join%s" : "%s paired%s", k.name, first ? " (owner)" : "");
   uint8_t chk[32], pb[100];
   hmac256(okm, 32, (const uint8_t *)"confirm", 7, chk);
   size_t pn = 0;
   mbedtls_base64_encode(pb, sizeof pb, &pn, dpub, 65);
-  out = std::string("{\"pub\":\"") + std::string((char *)pb, pn) + "\",\"cid\":\"" + hexOf(k.id, 8) + "\",\"check\":\"" + hexOf(chk, 8) + "\",\"owner\":" + (first ? "1" : "0") + "}";
+  out = std::string("{\"pub\":\"") + std::string((char *)pb, pn) + "\",\"cid\":\"" + hexOf(k.id, 8) + "\",\"check\":\"" + hexOf(chk, 8) + "\",\"owner\":" + (first ? "1" : "0") + ",\"wait\":" + (ask ? "1" : "0") + ",\"topic\":\"" + hexOf(cloudTopic, 16) + "\"}";
   return "200 OK";
 }
 esp_err_t hPair(httpd_req_t *r) { std::string out; const char *st = pairDo(body(r, 600), out); return plain(r, st, out); }
+esp_err_t hAsk(httpd_req_t *r) { std::string out; const char *st = pairDo(body(r, 600), out, true); return plain(r, st, out); }
+// The 4 digits both phones show for a request to join.
+std::string askCode(const ClientKey &k) {
+  uint8_t h[32]; char c[6];
+  hmac256(k.key, 32, (const uint8_t *)"code", 4, h);
+  snprintf(c, sizeof c, "%04u", (unsigned)(((h[0] << 8) | h[1]) % 10000));
+  return c;
+}
 
 
 // ---- commands
 struct Route { const char *uri; httpd_method_t m; esp_err_t (*fn)(httpd_req_t *); bool ownerOnly; };
 extern const Route routes[];
 extern const int routeCount;
+// What a user (not an owner) may do: see the blinds and move them. Settings, setup, schedules and people are the owners'.
+bool userMay(const std::string &p) {
+  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/keys", "/api/keyname", "/api/wifistate"}) if (p == ok) return true;
+  return false;
+}
 // The answer is sealed bytes when the status is "200 OK", plain JSON otherwise.
 const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
   if (b.size() < 8 + 12 + 16 + 1) { resp = "{\"err\":\"short\"}"; return "400 Bad Request"; }
@@ -175,13 +190,17 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
   std::string cmd(n, 0);
   if (!gcm(false, keys[slot].key, nonce, aad, 17, ct, n, (uint8_t *)&cmd[0], (uint8_t *)(ct + n))) { resp = "{\"err\":\"bad key\"}"; return "401 Unauthorized"; }
   lastCtr[slot] = ctr;
+  if (keys[slot].used != 1) {                    // still waiting for an owner: the only thing it may do is take its request back
+    if (cmd == "/api/leave") { event("%s took the request back", keys[slot].name); memset(&keys[slot], 0, sizeof keys[slot]); keysSave(); resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
+    resp = "{\"err\":\"waiting\"}"; return "403 Forbidden";
+  }
 
   size_t q = cmd.find('?');
   std::string path = cmd.substr(0, q), query = q == std::string::npos ? "" : cmd.substr(q + 1), out;
   const Route *rt = nullptr;
   for (int i = 0; i < routeCount; i++) if (path == routes[i].uri && routes[i].m == HTTP_GET && !path.compare(0, 5, "/api/")) rt = &routes[i];
   if (!rt) out = "{\"ok\":0,\"err\":\"unknown command\"}";
-  else if (rt->ownerOnly && !keys[slot].role) out = "{\"ok\":0,\"err\":\"only the owner can do that\"}";
+  else if ((rt->ownerOnly || !userMay(path)) && !keys[slot].role) out = "{\"ok\":0,\"err\":\"only the owner can do that\"}";
   else {
     xSemaphoreTake(secMx, portMAX_DELAY);
     secClient = slot; secQuery = query.c_str(); secOut = &out;

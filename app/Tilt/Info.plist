@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSHomeKitUsageDescription</key>
+	<string>Tilt uses Apple Home to add your blinds controller as an accessory.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Tilt uses Bluetooth to set up a new blinds controller and put it on your Wi-Fi.</string>
 	<key>UILaunchScreen</key>
@@ -25,6 +27,7 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
+		<string>remote-notification</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
