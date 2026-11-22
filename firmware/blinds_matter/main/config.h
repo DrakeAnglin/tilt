@@ -2,7 +2,6 @@
 #pragma once
 #include "ardu.h"
 
-#define FW_VERSION "1.0.0-dev1"
 #define FW_BUILD __DATE__ " " __TIME__
 
 // ---- pins (hardware/pcb/netlist.py): per port IN1, IN2, EN, angle

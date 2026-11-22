@@ -32,11 +32,17 @@ uint8_t bootId[4];
 // A random name for this controller in the iCloud notices the phones send each other (a request to join, a removal).
 // Only phones that have talked to the controller know it, so nobody else can send its owners a notice.
 uint8_t cloudTopic[16];
-int secClient = -1;                            // which key the command being handled came with (-1: not a secured one)
+// The command being handled. Only set and read while secMx is held: one secured command runs at a time, whether it
+// came over Wi-Fi or Bluetooth, so these never belong to two requests at once.
+int secClient = -1;                            // which key the command came with (-1: not a secured one)
 const char *secQuery = nullptr;                // its "a=b&c=d" part, for arg()
 std::string *secOut = nullptr;                 // where its answer goes, for sendJson()
 extern Preferences nvs;
-SemaphoreHandle_t secMx = nullptr;                // one secured command at a time (Wi-Fi and Bluetooth share the handlers)
+SemaphoreHandle_t secMx = nullptr;             // one secured command at a time (Wi-Fi and Bluetooth share the handlers)
+// keys[] and lastCtr[] are guarded by the controller's main lock (mx, web.h), the one every handler and the main loop
+// already hold when they touch shared state. Lock order: secMx, then mx; nothing holding mx may take secMx.
+extern SemaphoreHandle_t mx;
+struct KeysLock { KeysLock() { xSemaphoreTake(mx, portMAX_DELAY); } ~KeysLock() { xSemaphoreGive(mx); } };
 
 static int secRng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
 void keysSave() { nvs.putBytes("keys", keys, sizeof keys); }
@@ -109,17 +115,17 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
   uint8_t cpub[65];
   size_t n = 0;
   if (mbedtls_base64_decode(cpub, sizeof cpub, &n, (const uint8_t *)pubB64.c_str(), pubB64.length()) != 0 || n != 65) { out = "{\"err\":\"bad key\"}"; return "400 Bad Request"; }
-  bool first = !owned();
+  bool first;
+  {
+  KeysLock kl;
+  first = !owned();
   if (ask) {
     static uint32_t lastAsk = 0;               // each ask is written to flash: no more than one every 10 seconds
     if (first) { out = "{\"err\":\"this controller has no owner yet\"}"; return "403 Forbidden"; }
     if (lastAsk && millis() - lastAsk < 10000) { out = "{\"err\":\"try again in a few seconds\"}"; return "429 Too Many Requests"; }
     lastAsk = millis();
   } else if (!first) { out = "{\"err\":\"this controller has an owner. Ask to join from the app.\"}"; return "403 Forbidden"; }
-  int slot = -1;
-  if (ask && asksWaiting() >= 2) { for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2) { slot = i; break; } }   // at most two waiting: a new ask takes the place of an old one
-  else for (int i = 0; i < MAX_KEYS; i++) if (!keys[i].used) { slot = i; break; }
-  if (slot < 0) { out = "{\"err\":\"no room for another phone\"}"; return "403 Forbidden"; }
+  }
 
   mbedtls_ecp_group grp; mbedtls_mpi d, z; mbedtls_ecp_point Q, Qp;
   mbedtls_ecp_group_init(&grp); mbedtls_mpi_init(&d); mbedtls_mpi_init(&z); mbedtls_ecp_point_init(&Q); mbedtls_ecp_point_init(&Qp);
@@ -136,6 +142,12 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
   mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&d); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&Q); mbedtls_ecp_point_free(&Qp);
   if (!ok) { out = "{\"err\":\"key exchange failed\"}"; return "400 Bad Request"; }
 
+  KeysLock kl;                                 // the key is ready: claim a slot now (the slow part ran unlocked)
+  if (!first != owned()) { out = "{\"err\":\"another phone paired at the same moment. Try again.\"}"; return "409 Conflict"; }
+  int slot = -1;
+  if (ask && asksWaiting() >= 2) { for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2) { slot = i; break; } }   // at most two waiting: a new ask takes the place of an old one
+  else for (int i = 0; i < MAX_KEYS; i++) if (!keys[i].used) { slot = i; break; }
+  if (slot < 0) { out = "{\"err\":\"no room for another phone\"}"; return "403 Forbidden"; }
   ClientKey &k = keys[slot];
   memset(&k, 0, sizeof k);
   k.used = ask ? 2 : 1; k.role = first ? 1 : 0;
@@ -177,22 +189,31 @@ bool userMay(const std::string &p) {
 const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
   if (b.size() < 8 + 12 + 16 + 1) { resp = "{\"err\":\"short\"}"; return "400 Bad Request"; }
   const uint8_t *p = (const uint8_t *)b.data();
-  int slot = -1;
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, p, 8)) slot = i;
-  if (slot < 0) { resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
   const uint8_t *nonce = p + 8, *ct = p + 20;
   size_t n = b.size() - 36;
   uint64_t ctr = 0;
   for (int i = 4; i < 12; i++) ctr = (ctr << 8) | nonce[i];
-  if (memcmp(nonce, bootId, 4) || ctr <= lastCtr[slot]) { resp = std::string("{\"err\":\"stale\",\"boot\":\"") + hexOf(bootId, 4) + "\"}"; return "409 Conflict"; }
   uint8_t aad[17];
   memcpy(aad, "blinds-v1", 9); memcpy(aad + 9, p, 8);
   std::string cmd(n, 0);
-  if (!gcm(false, keys[slot].key, nonce, aad, 17, ct, n, (uint8_t *)&cmd[0], (uint8_t *)(ct + n))) { resp = "{\"err\":\"bad key\"}"; return "401 Unauthorized"; }
-  lastCtr[slot] = ctr;
-  if (keys[slot].used != 1) {                    // still waiting for an owner: the only thing it may do is take its request back
-    if (cmd == "/api/leave") { event("%s took the request back", keys[slot].name); memset(&keys[slot], 0, sizeof keys[slot]); keysSave(); resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
-    resp = "{\"err\":\"waiting\"}"; return "403 Forbidden";
+  int slot = -1;
+  uint8_t key[32];                               // a copy: the reply is sealed with it even if the phone is removed meanwhile
+  bool owner = false;
+  {
+    // Find the phone, check the counter, decrypt and record the counter in one step under the lock, so two requests
+    // carrying the same counter (a replay racing the original) cannot both get through.
+    KeysLock kl;
+    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, p, 8)) slot = i;
+    if (slot < 0) { resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
+    if (memcmp(nonce, bootId, 4) || ctr <= lastCtr[slot]) { resp = std::string("{\"err\":\"stale\",\"boot\":\"") + hexOf(bootId, 4) + "\"}"; return "409 Conflict"; }
+    memcpy(key, keys[slot].key, 32);
+    if (!gcm(false, key, nonce, aad, 17, ct, n, (uint8_t *)&cmd[0], (uint8_t *)(ct + n))) { resp = "{\"err\":\"bad key\"}"; return "401 Unauthorized"; }
+    lastCtr[slot] = ctr;
+    if (keys[slot].used != 1) {                  // still waiting for an owner: the only thing it may do is take its request back
+      if (cmd == "/api/leave") { event("%s took the request back", keys[slot].name); memset(&keys[slot], 0, sizeof keys[slot]); keysSave(); resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
+      resp = "{\"err\":\"waiting\"}"; return "403 Forbidden";
+    }
+    owner = keys[slot].role;
   }
 
   size_t q = cmd.find('?');
@@ -200,19 +221,23 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
   const Route *rt = nullptr;
   for (int i = 0; i < routeCount; i++) if (path == routes[i].uri && routes[i].m == HTTP_GET && !path.compare(0, 5, "/api/")) rt = &routes[i];
   if (!rt) out = "{\"ok\":0,\"err\":\"unknown command\"}";
-  else if ((rt->ownerOnly || !userMay(path)) && !keys[slot].role) out = "{\"ok\":0,\"err\":\"only the owner can do that\"}";
+  else if ((rt->ownerOnly || !userMay(path)) && !owner) out = "{\"ok\":0,\"err\":\"only the owner can do that\"}";
   else {
     xSemaphoreTake(secMx, portMAX_DELAY);
-    secClient = slot; secQuery = query.c_str(); secOut = &out;
-    rt->fn(r);
-    secClient = -1; secQuery = nullptr; secOut = nullptr;
+    bool still;                                  // removed by a command that ran just before this one?
+    { KeysLock kl; still = keys[slot].used == 1 && !memcmp(keys[slot].id, p, 8); }
+    if (still) {
+      secClient = slot; secQuery = query.c_str(); secOut = &out;
+      rt->fn(r);
+      secClient = -1; secQuery = nullptr; secOut = nullptr;
+    } else out = "{\"ok\":0,\"err\":\"not paired\"}";
     xSemaphoreGive(secMx);
   }
   resp.assign(12 + out.size() + 16, 0);
   uint8_t *o = (uint8_t *)&resp[0], aad2[30];
   esp_fill_random(o, 12);
   memcpy(aad2, "blinds-v1r", 10); memcpy(aad2 + 10, p, 8); memcpy(aad2 + 18, nonce, 12);
-  if (!gcm(true, keys[slot].key, o, aad2, 30, (const uint8_t *)out.data(), out.size(), o + 12, o + 12 + out.size())) { resp = "{\"err\":\"seal\"}"; return "500 Internal Server Error"; }
+  if (!gcm(true, key, o, aad2, 30, (const uint8_t *)out.data(), out.size(), o + 12, o + 12 + out.size())) { resp = "{\"err\":\"seal\"}"; return "500 Internal Server Error"; }
   return "200 OK";
 }
 esp_err_t hSecure(httpd_req_t *r) {

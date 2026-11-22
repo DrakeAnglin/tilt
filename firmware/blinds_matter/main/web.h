@@ -26,7 +26,7 @@
 #endif
 #include <mdns.h>
 
-#define FW_VERSION "2.2.0"
+#define FW_VERSION "2.2.1-dev1"
 SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
 uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
 bool otaPending = false, restartSoon = false;
@@ -665,9 +665,12 @@ esp_err_t hRecover(httpd_req_t *r) {             // POST /x/recover: the same JS
   if (strcmp(st, "200 OK")) return plain(r, st, out);
   uint8_t id[8];
   unhex(jsonStr(out, "cid"), id, 8);
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) recover.slot = i;
-  rampCancel();                                  // a gentle move would run the motor and end the attempt
-  recover.port = p; recover.step = 0; recover.until = millis() + 120000; recover.moves = movesEver();
+  {
+    KeysLock kl;                                 // recover, ramps and keys[] are also used by the main loop (recoverTick)
+    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) recover.slot = i;
+    rampCancel();                                // a gentle move would run the motor and end the attempt
+    recover.port = p; recover.step = 0; recover.until = millis() + 120000; recover.moves = movesEver();
+  }
   event("recovery started: turn blind %d", p + 1);
   out.pop_back();                                // the closing brace
   out += std::string(",\"recover\":1,\"blind\":") + std::to_string(p) + ",\"blindName\":" + jq(cfg.b[p].name) + "}";
