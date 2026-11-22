@@ -1,72 +1,59 @@
-"""The controller box for the carrier PCB (hardware/pcb, v2.1), with the 18650 and the Adafruit 6092
-(bq25185) charger, whose own USB-C is the charge port.
-
-rev N (2026-11-08): the no-name MCP73871 module (and its capacitor, NTC and the separate USB-C breakout) is replaced by
-the Adafruit 6092, used as a charger only. It sits flat on four posts in the bay past the PCB's end, screwed down with
-two small self-tapping screws at its far end and two studs by the wall, its USB-C pointing out of end wall B as before.
-
-Why it is longer than V4 (126 -> 165 mm): the rod's groove runs down the middle of the lid, and under it there is only
-19.2 mm of height. The PCB is 47 mm wide at the jacks and 27 mm beside the cell, so the cell takes the back side
-and the charger (30.5 x 31.5 mm) can only go in its own bay past the end of the PCB. The USB-C breakout therefore
-moves off the PCB's J3 socket onto end wall B, standing on edge in a card slot, joined to J3 by a 2-wire lead.
+"""The controller box: tray and lid for the carrier PCB (hardware/pcb), the 18650 cell and the Adafruit 6092 charger,
+plus mock-ups of the parts the PCB's 3D export doesn't have (jacks, ESP32-C6, plugs, cell, charger, wires).
 
 Layout, end A (ports) to end B (USB-C):
-  * PCB on three floor bosses, jacks behind windows in end wall A. Three M3 flat-head screws come up from under the
-    box, through the bosses and the PCB's holes, into heat-set inserts in three lid posts: the screws clamp the PCB
-    between the floor and the lid, and hold the lid on.
-  * 18650 in two saddles along the back wall, beside the PCB body; the lid presses it down.
-  * Charger bay (rev N3): the Adafruit 6092 flat on four 4.4 mm posts (3 mm tall): two M2 self-tapping screws at its
-    far end, two short indexing studs by the wall. It goes in USB-C end first, angled down into a slot in end wall B
-    (45 deg lead-in on the slot's top inner edge), then drops onto the studs; the socket sits behind a stadium window,
-    its mouth 0.4 mm inside the outer face. The 3-wire harness from the
-    PCB's charger socket (G, the B+/L+ battery splice, P+) comes over the top to its pad row. The solar lead's floor
-    route runs along the room-side wall, beside the charger.
-
-Height budget (the reason the PCB sits 2 mm off the floor): ESP pins on its sockets reach 18.7 mm under a 19.2 mm groove.
+  * PCB on three floor bosses, its RJ12 jacks through end wall A. Three M3 flat-head screws come up from under the
+    box, through the bosses and the PCB's holes, into heat-set inserts in three lid posts: they clamp the PCB between
+    floor and lid, and hold the lid on.
+  * 18650 in two saddles along the back wall, beside the PCB body; the lid's cradles press it down.
+  * Charger bay past the PCB's end: the 6092 flat on four posts, two M2 self-tapping screws at its far end, two short
+    indexing studs by end wall B. It goes in USB-C end first, angled down into a slot in end wall B, then drops onto
+    the studs; its USB-C (the charge port) sits behind a stadium window. A 3-wire harness from the PCB's J5 runs over
+    the top to its pad row; the solar lead runs along the room-side wall.
+  * The rod's groove runs down the middle of the lid.
 
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller.py --timeout 1800
 
 Coordinates (mm): X along the rail from end A's outer face, Y across (-Y room side), Z up from the rail floor.
-The PCB's KiCad coordinates (x across, y down from the jack edge) map to X = y + PCB_X, Y = x + PCB_Y.
+The PCB's KiCad coordinates (x across, y down from the jack edge) map to X = y + pcb_x, Y = x + pcb_y.
 """
 
+import importlib.util
 import math
 import os
 
+_spec = importlib.util.spec_from_file_location('fits', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fits.py'))
+FIT = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(FIT)
+
 C = dict(
-    # rev O: 0.4 play round the PCB (was 0.7 / 0.8; at 0.5 the H1 / H2 bosses only touched the walls along a line: non-
-    # manifold, so 0.4 makes them merge); lid 2.8 lower (the old capacitor set 25.8; now the cell, top 20.7)
+    # 0.4 play round the PCB (at 0.5 the H1 / H2 bosses only touched the walls along a line: non-manifold, so 0.4 makes
+    # them merge). Lid top 23.0: the tallest part under it is the cell (top 20.7)
     room_out=-27.4, back_in=22.4, top=23.0, wall=2.0, floor_z=0.0, floor=1.2, lid=2.0, end_t=2.4, end_a=2.0, corner_r=4.0, edge_r=1.5,
-    rail_w=55.5, rail_h=36.5, rail_wall=2.0, lip_in=4.5, lip_h=3.0, rod_z=24.0, rod=4.0,
-    # height: with the three fuses folded, the tallest part outside the groove is the charger's capacitor lying on its
-    # module (top 23.3), so the lid's underside is at 23.8 and its top at 25.8 (was 33.3 with the fuses upright)
+    rail_w=FIT.RAIL_W, rail_h=FIT.RAIL_H, rail_wall=FIT.RAIL_WALL, lip_in=FIT.LIP_IN, lip_h=FIT.LIP_H, rod_z=FIT.ROD_Z, rod=FIT.ROD,
     # PTC fuses (Bel 0ZRE0075FF, datasheet: A 11.5 wide, B 23.4 seated, E 4.8 thick, C 5.1 / F 1.9 lead offset): an
     # 11.5 disc on ~11.9 mm legs (KiCad's model; B - A). Each is folded toward the ESP, legs bent 1.6 below the body,
     # so the disc lies flat over its own four resistors
     fuse_leg=11.9, fuse_bend=1.6, fuse_w=11.5, fuse_t=4.8, fuse_body=11.5,
-    # width: the room-side wall stays put (the PCB is 0.7 off it); the back wall comes in to 0.4 past the PCB's 47 mm jack
-    # strip (the widest thing in the box) and 0.3 past the H2 screw post, so the box no longer fills the rail: two rounded
-    # bumpers on the back wall stop 1.0 short of the rail's wall - an easy fit that still keeps the rod off the groove's
-    # sides (1.9 clear each side)
-    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=0.4, bumper_h=6.0,   # rev O: 0.4 short of the rail's wall (was 1.0);
-    # the room side is 0.35 off it. Low: wires can run along the rail above them
+    # width: both walls 0.4 off the PCB's 47 mm jack strip (the widest thing in the box), so the box doesn't fill the
+    # rail: two low rounded bumpers on the back wall stop 0.4 short of the rail's wall (the room side is 0.35 off it),
+    # an easy fit that still keeps the rod off the groove's sides. Wires can run along the rail above the bumpers
+    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=0.4, bumper_h=6.0,
     # rod groove: a circle, r 5, its center 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
     # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 2.0 thick, like the lid
-    groove_r=5.0, groove_floor=24.0 - 2.0 * math.sqrt(2) - 0.5, groove_t=2.0,   # print 2: as thick as the lid (was 1.0)
-    # PCB: 2.4 mm above the floor (print 1: was 1.7; raised so the RJ12 tails clear a full 1.2 floor), which is recessed 0.4 under the PCB (2.1 mm for its leads: the XH headers' tails
-    # reach 1.8 below), board 1.52 (as exported)
-    pcb_gap=2.4, floor_recess=0.0, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
+    groove_r=5.0, groove_floor=FIT.ROD_Z - FIT.ROD_CORNER_R - 0.5, groove_t=2.0,     # channel as thick as the lid
+    # PCB: 2.4 mm above the full 1.2 floor (room for the RJ12 tails and the XH headers' tails), board 1.52 (as exported)
+    pcb_gap=2.4, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
     holes=((3.5, 41.0), (43.5, 43.3), (23.8, 121.5)),            # H1, H2, H3 (KiCad x, y)
-    boss_d=8.0, post_d=8.0, ins_d=4.0, ins_depth=6.7, screw_l=10.0,            # M3 x 5.7 heat-set inserts, Ø4.0 hole
+    boss_d=8.0, post_d=8.0, screw_l=10.0,            # M3 x 10 screws into M3 x 5.7 heat-set inserts (fits.INSERT_*)
     # RJ12 Amphenol 87180-066LF (drawing 87180 sheet 1-3): 13.2 W x 11.5 H, front face 0.55 behind the board edge
     rj_w=13.25, rj_h=11.5,   # measured on the real jack (2026-11-07): 13.25 W x 11.5 H (drawing: 13.2)
     rj_front=0.55, rj_back=17.32, rj_x=(7.825, 23.325, 38.825), rj_mouth_w=9.65,
     rj_mouth=(1.73, 8.50),          # the jack's plug opening, above the board (87180 drawing); latch tab-down
-    # end wall A (rev M): the PCB's jack edge is trimmed 3-4 mm (by hand, so anywhere in that range) and the jacks come
+    # end wall A: the PCB's jack edge is trimmed 3-4 mm (by hand, so anywhere in that range) and the jacks come
     # forward through the wall: their front faces sit jack_recess behind the outer face, each in an opening that is the
     # jack's own outline + jack_clear (the jack fills it: no recess, no view into the box). The board is located by its
     # three screws, not its trimmed edge, so the cut's accuracy doesn't matter; the edge ends up 0.75-1.75 off the wall.
-    # (print 2's plug-shaped openings, from the measured plug 9.55 x 6.55 with a 6.0 x 1.5 latch, are gone)
     # clearances: 0.3 a side (FDM prints holes ~0.1-0.2 small), 0.35 on top (the opening's top is a bridge: it sags a
     # little), 0.1 under (the jack sits on the board, which the screws locate)
     pcb_trim=(3.0, 4.0), jack_recess=0.3, jack_clear=0.3, jack_clear_top=0.35, jack_clear_bot=0.1, ap_r=0.6,
@@ -74,8 +61,8 @@ C = dict(
     # ESP32-C6 SuperMini (26 x 18) on 8.5 mm sockets + 2.5 mm header spacers, USB toward end B
     esp_l=26.0, esp_w=18.0, esp_t=1.0, esp_xc=12.12, esp_y0=47.57, sock_h=8.59, spacer=2.5, esp_tip=1.9,
     # 18650 (protected, JST-XH lead) along the back wall
-    bat_d=19.0, bat_l=65.7,                      # measured (print 1)
-    bat_gap=0.4, stop_t=2.5, stop_hw=5.0,        # end plates: 0.4 play each end, 2.5 thick, 10 wide (print 1: too loose, too thin)
+    bat_d=19.0, bat_l=65.7,                      # measured
+    bat_gap=0.4, stop_t=2.5, stop_hw=5.0,        # end plates: 0.4 play each end, 2.5 thick, 10 wide
     # cell cradles (tray saddles + matching lid cradles): 6 wide, never thinner than 1.5; the PCB-side face 0.6 off the
     # PCB's edge, so on that side each horn stops where its wall is still 1.5 thick; on the back side they run to the wall
     cradle_w=6.0, cradle_t=1.5, cradle_y0=2.6, cradle_lid_y0=4.6, cradle_at=(9.0, 54.0),   # lid cradles start clear of the lead's channel
@@ -86,9 +73,8 @@ C = dict(
     # the pad-row edge.
     c6_l=29.21, c6_w=19.05, c6_t=1.6, c6_holes=((2.54, 2.54), (26.67, 2.54), (2.54, 16.51), (26.67, 16.51)),
     c6_post=3.0, c6_post_d=4.4, c6_pilot=1.6,     # posts 3 tall (room under the board for the pads' solder); pilot for M2 self-tapping screws
-    c6_stud_d=2.1, c6_stud_up=0.8,                # rev N2: the two holes by end wall B get studs (a driver can't reach a screw there);
-    #                                               rev N3: short, only for indexing (0.8 up from the post: half the board)
-    c6_bevel=1.0,                                 # rev N3: 45 deg lead-in on the slot's top inner edge, so the board angles down and in
+    c6_stud_d=2.1, c6_stud_up=0.8,                # studs in the two holes by end wall B: short, only for indexing (half the board)
+    c6_bevel=1.0,                                 # 45 deg lead-in on the slot's top inner edge, so the board angles down and in
     c6_usb=(3.94, 9.525), c6_usb_w=8.94, c6_usb_h=3.26, c6_usb_len=7.35, c6_usb_over=1.0,
     c6_edge_in=1.4,      # the board's USB-C edge sits 1.4 inside end B's outer face (so the socket's mouth is 0.4 inside)
     c6_yc=-9.4,          # board center across the box: room for the solar lead along the room-side wall, its slot clear of the corner's round
@@ -121,7 +107,7 @@ C['bat_zc'] = C['fz'] + 0.5 + c['bat_d'] / 2
 C['esp_z0'] = C['zt'] + c['sock_h'] + c['spacer']    # ESP underside
 C['c6_z0'] = C['fz'] + c['c6_post']                    # the charger board's underside
 C['c6_zt'] = C['c6_z0'] + c['c6_t']                     # its top
-C['solar_y'] = -20.9                                   # rev N: the solar lead runs along the room-side wall (was -13.4)
+C['solar_y'] = -20.9                                   # the solar lead runs along the room-side wall
 L = C['L']
 
 
@@ -144,11 +130,10 @@ def E(x, y):
 
 
 HOLES = [K(*h) for h in c['holes']]
-# print 2: the fourth screw (a post in the charger bay, room side) is gone: wires crowd there and it was 24 mm from H3
-SCREWS = [(x, y, C['zb'], c['screw_l']) for x, y in HOLES]   # (x, y, boss top, length): one size, M3 x 10
+SCREWS = [(x, y, c['screw_l']) for x, y in HOLES]   # (x, y, length): one size, M3 x 10
 
 
-def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
+def build(bx, cyl, cone, uni, cut, rbox, obox):
     """{group: [(name, body)]}. rbox(x0, x1, y0, y1, z0, z1, r) = box with its four vertical edges rounded;
     obox(center, u, w, L, W, H) = box along unit vectors u, w."""
     ilo, ihi, fz, zl, zb, zt = C['iw_lo'], C['iw_hi'], C['fz'], C['zl'], C['zb'], C['zt']
@@ -161,41 +146,28 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         R, zc = c['groove_r'] + off, C['g_zc']
         return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20))
 
-    def ceiling(y, half=0.0):
-        """Lid features run up to the lid's underside; under the groove they are trimmed by the final groove cut."""
-        return zl
-
     # ================================================================ tray
     F0 = c['floor_z'] + 0.3                              # floor-standing features start inside the floor
     a0, ia = C['a0'], C['ia']
     tray = cut(rbox(a0, L, olo, ohi, c['floor_z'], zl, c['corner_r']),
                rbox(ia, in_b, ilo, ihi, fz, zl + 1, c['corner_r'] - c['wall']))
-    # rail bumpers on the back wall: rounded vertical fins out to 1.0 short of the rail's wall
+    # rail bumpers on the back wall: rounded vertical fins out to 0.4 short of the rail's wall
     ry = c['rail_w'] / 2 - c['bumper_gap'] - c['bumper_w'] / 2
     for bxx in c['bumper_x']:
         tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], c['bumper_h']),
                    cyl((bxx, ry, c['floor_z']), (bxx, ry, c['bumper_h']), c['bumper_w'] / 2))
-    # reliefs in end A's inner corner fillets for the PCB's corners (the board sits 0.2 off end wall A)
-    # rev O: up to the jacks' tops too (the walls are 0.4 off the PCB now, so jacks 1 and 3 reach into the fillets)
+    # reliefs in end A's inner corner fillets for the PCB's corners, up to the jacks' tops (jacks 1 and 3 reach into them)
     tray = cut(tray, bx(ia - 0.01, ia + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + c['rj_h'] + 0.4))
     tray = cut(tray, bx(ia - 0.01, ia + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + c['rj_h'] + 0.4))   # and the back one
     for xa, xb in ((a0 - 1, ia + 0.01), (in_b - 0.01, L + 1)):        # the lid's groove channel crosses both ends
-        tray = cut(tray, groove(c['groove_t'] + 0.05, xa, xb))   # print 2: 0.05 round the channel (was 0.15, a visible gap)
-    # --- floor recessed 0.4 under the PCB's outline (+0.2): room for its leads without raising the ESP
-    fr = fz - c['floor_recess']
-    bar_x1, _ = K(0, c['pcb_bar'])
-    # (+0.2, not +0.5: the 8 mm bosses reach 0.5 (H2: 0.7) past the board, so at +0.5 they only touched the recess wall along a
-    # line, which made the STL non-manifold. At +0.2 they all overlap it and merge)
-    if c['floor_recess'] > 0:   # (print 1: none now - the raised PCB's header tails clear the full floor)
-        tray = cut(tray, bx(ia - 0.01, bar_x1 + 0.2, ilo - 0.01, min(K(c['pcb_bar'], 0)[1] + 0.2, ihi + 0.01), fr, fz + 0.01),
-                   bx(bar_x1 - 0.01, C['pcb_end'] + 0.2, ilo - 0.01, K(c['pcb_body'], 0)[1] + 0.2, fr, fz + 0.01))
+        tray = cut(tray, groove(c['groove_t'] + 0.05, xa, xb))   # 0.05 round the lid's channel
     # --- PCB nest: it drops in and is located before the lid goes on: lengthwise by its three screws and the jacks in
-    # their openings (rev M: its trimmed edge stays 0.75-1.75 off end wall A), across by the room-side wall (0.7) and
-    # free-standing ribs along the bar's and the body's back edges (0.2); all below the board's top face
-    # the ribs' tops are level with the cell cradles' PCB-side horns (they run through them)
+    # their openings (its trimmed edge stays 0.75-1.75 off end wall A), across by the two side walls (0.4) and two
+    # free-standing ribs 0.2 off the body's back edge, all below the board's top face. The ribs' tops are level with
+    # the cell cradles' PCB-side horns (they run through them)
     _rc = c['bat_d'] / 2 + 0.2
     ztop = C['bat_zc'] - math.sqrt(_rc * _rc - (C['bat_y'] - c['cradle_y0'] - c['cradle_t']) ** 2)
-    by_bar, by_body = K(c['pcb_bar'], 0)[1], K(c['pcb_body'], 0)[1]
+    by_body = K(c['pcb_body'], 0)[1]
     for x0, x1, y0 in ((58.0, 72.0, by_body), (100.0, 114.0, by_body)):       # (the back wall now locates the bar's edge)
         tray = uni(tray, bx(x0, x1, y0 + 0.2, y0 + 1.4, F0, ztop))
     # --- PCB: three bosses under its holes; through holes with countersinks from below (screws come up)
@@ -203,7 +175,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         tray = uni(tray, cyl((hx, hy, F0), (hx, hy, zb), c['boss_d'] / 2))
     # --- jacks: plug-shaped apertures in end wall A, pockets under their tails and pegs, port marks (1, 2, 3 dots)
     def aperture(y, grow, xa, xb):
-        """rev M: the jack's own front outline (13.2 x 11.5 on the PCB) + jack_clear a side and on top, jack_clear_bot
+        """The jack's own front outline (13.2 x 11.5 on the PCB) + jack_clear a side and on top, jack_clear_bot
         under it; corners r ap_r (small enough to clear the jack's square corners). The jack comes through it."""
         w, r = c['rj_w'] / 2 + c['jack_clear'] + grow, c['ap_r'] + grow
         z0, z1 = zt - c['jack_clear_bot'] - grow, zt + c['rj_h'] + c['jack_clear_top'] + grow
@@ -216,10 +188,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     for n, xk in enumerate(c['rj_x']):
         _, y = K(xk, 0)
         tray = cut(tray, aperture(y, 0.0, a0 - 1, ia + 0.01))   # the jack comes through it; no bezel (0.4 nozzle)
-        x0, _ = K(0, 7.0)
-        x1, _ = K(0, c['rj_back'] + 1.0)
-        # (print 1: no pocket in the floor under the jack any more: the PCB is 0.7 higher, so its tails clear the full floor)
-        for k in range(n + 1):
+        for k in range(n + 1):                                  # port marks: 1, 2, 3 dots
             dy = (k - n / 2.0) * 2.4
             tray = cut(tray, cyl((a0 - 1, y + dy, 2.6), (a0 + 0.5, y + dy, 2.6), 0.6))
     # --- 18650: two saddles and two end stops (the end-B stop is low: the lead leaves that end)
@@ -236,12 +205,10 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     g, t, hw = c['bat_gap'], c['stop_t'], c['stop_hw']
     tray = uni(tray, bx(C['bat_x0'] - g - t, C['bat_x0'] - g, by - hw, min(by + hw, ihi + 0.01), F0, bc - 2.5),
                bx(C['bat_x0'] + c['bat_l'] + g, C['bat_x0'] + c['bat_l'] + g + t, by - hw, min(by + hw, ihi + 0.01), F0, bc - 4.0))
-    # --- charger (rev N): Adafruit 6092 on four posts, screwed down (self-tapping, from above through its holes); its
-    # USB-C end goes into a pocket in end wall B's inner face, the socket behind a stadium window
-    # rev N2: the two posts away from the wall take M2 screws; the two by end wall B carry studs into the board's holes
-    # (a screw there would sit 1.5 mm off the wall: no room for its head or a driver). rev N3: the wall stays full
-    # thickness with just a slot for the board's end and the USB-C; the studs are short (indexing only) and the slot's
-    # top inner edge has a 45 deg lead-in, so the board goes in USB-C end first, angled down, then drops onto the studs.
+    # --- charger: Adafruit 6092 on four posts. The two away from the wall take M2 self-tapping screws; the two by end
+    # wall B carry short indexing studs (a screw there would sit 1.5 mm off the wall: no room for a driver). End wall B
+    # has a slot for the board's end and the USB-C, its top inner edge a 45 deg lead-in, so the board goes in USB-C end
+    # first, angled down, then drops onto the studs.
     for hx_, hy_ in c['c6_holes']:
         px, py = E(hx_, hy_)
         tray = uni(tray, cyl((px, py, F0), (px, py, C['c6_z0']), c['c6_post_d'] / 2))
@@ -265,9 +232,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # --- the solar lead slot in end wall B (flat 2-core cable lying flat)
     tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 2.4, C['solar_y'] + 2.4, fz - 0.01, fz + 2.5))   # flat cable
     # --- screw holes + countersinks from below (all three)
-    for sx, sy, _, _ in SCREWS:
-        tray = cut(tray, cyl((sx, sy, -1), (sx, sy, zb + 1), 1.7),
-                   cone((sx, sy, c['floor_z'] - 0.01), 3.1, (sx, sy, c['floor_z'] + 1.65), 1.45))
+    for sx, sy, _ in SCREWS:
+        tray = cut(tray, cyl((sx, sy, -1), (sx, sy, zb + 1), FIT.M3_R),
+                   cone((sx, sy, c['floor_z'] - 0.01), FIT.CSINK_CTRL_R, (sx, sy, c['floor_z'] + FIT.CSINK_CTRL_H), FIT.CSINK_CTRL_R_TOP))
     out['Tray'] = [('Tray', tray)]
 
     # ================================================================ lid
@@ -288,22 +255,23 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
         f = min(want, room)
         return cone((px, py, top - f), r, (px, py, top + 0.01), r + f) if f >= 0.6 else None
 
+    # lid features run up to the lid's underside (zl); under the groove the final groove cut trims them
     pr = c['post_d'] / 2
     for (px, py), zbot in [(h, zt) for h in HOLES]:
-        top = ceiling(py, pr)
+        top = zl
         lid = uni(lid, cyl((px, py, zbot), (px, py, top + 0.01), pr))
         f = root(px, py, pr, top)
         if f:
             lid = uni(lid, f)
-        lid = cut(lid, bx(px - 5, px + 5, ihi - 0.2, ihi + 5, zbot - 1, zl - 0.01), bx(px - 5, px + 5, ilo - 5, ilo + 0.2, zbot - 1, zl - 0.01))   # rev O: flats 0.2 off the walls
-        lid = cut(lid, cyl((px, py, zbot - 0.01), (px, py, zbot + c['ins_depth']), c['ins_d'] / 2),
-                  cone((px, py, zbot - 0.01), c['ins_d'] / 2 + 0.4, (px, py, zbot + 0.4), c['ins_d'] / 2),   # lead-in
-                  cyl((px, py, zbot), (px, py, c['floor_z'] + c['screw_l'] + 0.8), 1.7))      # room past the insert
-    # hold-downs: jacks, cell; a stop over the ESP (0.5 clear). (rev N: the charger is screwed down, so no lid pins)
+        lid = cut(lid, bx(px - 5, px + 5, ihi - 0.2, ihi + 5, zbot - 1, zl - 0.01), bx(px - 5, px + 5, ilo - 5, ilo + 0.2, zbot - 1, zl - 0.01))   # flats 0.2 off the walls
+        lid = cut(lid, cyl((px, py, zbot - 0.01), (px, py, zbot + FIT.INSERT_LEN), FIT.INSERT_R),
+                  cone((px, py, zbot - 0.01), FIT.INSERT_R + 0.4, (px, py, zbot + 0.4), FIT.INSERT_R),   # lead-in
+                  cyl((px, py, zbot), (px, py, c['floor_z'] + c['screw_l'] + 0.8), FIT.M3_R))      # room past the insert
+    # hold-downs: jacks, cell; a stop over the ESP (0.5 clear)
     jtop = zt + c['rj_h']
     for xk in c['rj_x']:
         x, y = K(xk, 9.0)
-        lid = uni(lid, bx(x - 2, x + 2, y - 2, y + 2, jtop + 0.05, ceiling(y, 2) + 0.01))
+        lid = uni(lid, bx(x - 2, x + 2, y - 2, y + 2, jtop + 0.05, zl + 0.01))
     # cell: two cradles matching the tray's saddles (same X, same width, same bore, the same 1.5 trim on the PCB side),
     # coming down to the cell's axis on the back side, 0.2 off the back wall
     for sx in (C['bat_x0'] + a for a in c['cradle_at']):
@@ -373,7 +341,7 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     # 18650
     P.append(('18650', cyl((C['bat_x0'], by, bc), (C['bat_x0'] + c['bat_l'], by, bc), c['bat_d'] / 2)))
     # charger: Adafruit 6092 - board, USB-C socket (out past its edge), JST-PH socket (unused), screw terminal (unused),
-    # the three wired pads, and its four M2 screws (head on top, 6 long)
+    # the three wired pads, and its two M2 screws (head on top, 6 long)
     ex1, ey0, ey1, ez0, ezt = C['c6_x1'], C['c6_y0'], C['c6_y1'], C['c6_z0'], C['c6_zt']
     cb = bx(C['c6_x0'], ex1, ey0, ey1, ez0, ezt)
     for hx_, hy_ in c['c6_holes']:
@@ -420,10 +388,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
     pad = {nm: E(c['c6_pads'][nm], c['c6_pad_y']) for nm in ('VIN', 'G', 'BAT')}
     ptop = C['c6_zt'] + 0.35
     R = {}
-    # rev N harness, over the top to the 6092's pad row, each on its own level where they cross (G 17.7, BAT 19.4,
-    # PWR 21.1); B+ and L+ join in one splice 9 mm past the plug, and go on as one wire to BAT
-    # rev O (lid 2.8 lower): G and BAT leave the plug at 17.7 (over the plug and the solar cable), drop to 14.0 past
-    # X 132 (over the 6092's screw terminal and JST socket) and come in from the room side; PWR stays at 19.4 over them
+    # harness over the top to the 6092's pad row. G and BAT leave the plug at 17.7 (over the plug and the solar cable),
+    # drop to 14.0 past X 132 (over the 6092's screw terminal and JST socket) and come in from the room side; PWR stays
+    # at 19.4 over them. B+ and L+ join in one splice past the plug and go on as one wire to BAT
     px_, py_ = pad['G']
     R['Harness G (G)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 17.7), (130.0, j5[1], 17.7), (132.5, j5[1], 14.0), (px_, j5[1], 14.0),
                           (px_, py_ - 1.6, 14.0), (px_, py_, ptop)]
@@ -484,9 +451,9 @@ def build(tbm, bx, cyl, cone, uni, cut, rbox, obox):
 
 
 if __name__ == '__main__':
-    print('Box %.1f x %.1f x %.1f mm (V4 was 126.1 long)' % (L, C['out_hi'] - c['room_out'], c['top']))
+    print('Box %.1f x %.1f x %.1f mm' % (L, C['out_hi'] - c['room_out'], c['top']))
     print('PCB underside Z %.2f, top %.2f; ESP underside %.2f, pin tips %.2f; channel underside %.2f at 0, %.2f at the ESP pin row' % (
         C['zb'], C['zt'], C['esp_z0'], C['esp_z0'] + c['esp_t'] + c['esp_tip'], z_under(0, c['groove_t']), z_under(5.26, c['groove_t'])))
     print('cell Y %.1f..%.1f; charger X %.1f..%.1f Y %.1f..%.1f, board top Z %.2f' % (C['bat_y'] - c['bat_d'] / 2, C['bat_y'] + c['bat_d'] / 2,
           C['c6_x0'], C['c6_x1'], C['c6_y0'], C['c6_y1'], C['c6_zt']))
-    print('screws (from below):', ', '.join('(%.1f, %.1f) M3x%.0f' % (x, y, l) for x, y, _, l in SCREWS))
+    print('screws (from below):', ', '.join('(%.1f, %.1f) M3x%.0f' % (x, y, l) for x, y, l in SCREWS))

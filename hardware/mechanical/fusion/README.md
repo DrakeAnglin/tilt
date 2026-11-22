@@ -7,6 +7,16 @@
 
 Run through the bridge: `python3 hardware/mechanical/fusion/fusion.py exec tools/<script>.py --timeout 1800`.
 
+Shared pieces:
+- [`fits.py`](fits.py): fastener and fit sizes (M3, inserts, pegs, rod, rail) used by both generators.
+- [`Tilter/gear_geom.py`](Tilter/gear_geom.py): the tilter's dimensions and pure geometry (no Fusion);
+  [`Tilter/tilt_base.py`](Tilter/tilt_base.py): its Fusion helpers and the worm builder.
+- [`fusion_kit.py`](fusion_kit.py): fresh document, hide sketches and planes (used by the drivers in `tools/`).
+- `python3 -m unittest hardware/mechanical/fusion/test_geometry.py` checks the gear train and fits without Fusion.
+
+`fusion.py exec FILE` gives the code `__file__` and `REPO` (the repo root). A tilter build's result has `ok` and
+`failures`.
+
 ## FusionBridge: lets Claude Code drive Fusion
 An add-in that listens on **127.0.0.1:7655 only** and requires a random token, rewritten each time the add-in starts
 (`~/.fusion_bridge/token`, readable only by you).

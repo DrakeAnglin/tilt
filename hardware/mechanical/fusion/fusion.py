@@ -3,6 +3,7 @@
 
   python3 fusion.py ping
   python3 fusion.py exec  file.py            # run a file inside Fusion (assign `result` to return data)
+                                             # the code gets __file__ (the file's path) and REPO (the repo root)
   python3 fusion.py exec  -c "result = design.rootComponent.name"
   python3 fusion.py shot  out.png [--view iso|front|top|right|home|current] [--size 1600x1000] [--no-fit]
 """
@@ -14,7 +15,7 @@ import sys
 import urllib.request
 
 STATE_DIR = os.path.join(os.path.expanduser('~'), '.fusion_bridge')
-HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))   # hardware/mechanical/fusion -> repo
 
 
 def _conn():
@@ -48,17 +49,6 @@ def show(resp):
         print(resp['path'])
 
 
-LAYOUT_CODE = """
-mod = load_script({path!r})
-d = design
-if d is None:
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
-    d = adsk.fusion.Design.cast(app.activeProduct)
-mod.remove_old(d)
-result = mod.build(d)
-"""
-
-
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -72,18 +62,22 @@ def main():
     s.add_argument('--view', default='iso')
     s.add_argument('--size', default='1600x1000')
     s.add_argument('--no-fit', action='store_true')
-    sub.add_parser('layout')
     a = ap.parse_args()
 
     if a.cmd == 'ping':
         show({'ok': True, 'result': call('/ping')})
     elif a.cmd == 'exec':
-        code = a.code if a.code is not None else open(a.file).read()
+        if a.code is not None:
+            code = 'REPO = %r\n' % REPO + a.code
+        else:
+            path = os.path.abspath(a.file)
+            code = '__file__ = %r; REPO = %r\n' % (path, REPO) + open(path).read()   # one line, so tracebacks are only one line off
         show(call('/exec', {'code': code, 'timeout': a.timeout}, timeout=a.timeout + 30))
     elif a.cmd == 'shot':
         w, h = (int(x) for x in a.size.lower().split('x'))
         show(call('/screenshot', {'path': os.path.abspath(a.path), 'width': w, 'height': h,
                                   'view': a.view, 'fit': not a.no_fit}))
+
 
 if __name__ == '__main__':
     main()

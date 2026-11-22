@@ -1,6 +1,6 @@
 """The controller box in a fresh document: the PCB's own 3D export (KiCad STEP, every part on it), tray, lid, mock-ups of the
 parts the export doesn't have (RJ12 jacks, ESP32-C6, plugs, 18650, the Adafruit 6092 charger), rail + rod;
-exact interference check; STL export of tray + lid; renders with sketches hidden.
+exact interference check; STL export of tray, lid and an end-wall fit coupon. Renders only with RENDERS = True.
 
   K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli
   $K pcb export step --subst-models -f -o hardware/pcb/controller/3d/controller.step hardware/pcb/controller/controller.kicad_pcb
@@ -9,9 +9,13 @@ exact interference check; STL export of tray + lid; renders with sketches hidden
 import math
 import os
 
-REPO = os.path.expanduser('~/Documents/automated-blinds/blinds')
+# REPO is set by fusion.py exec
+KIT = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/fusion_kit.py'))
 M = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/Controller/Controller.py'))
 C = M.C
+PREFIX = 'C5 '                         # component names (old documents are found by it)
+TRAY_TEXT = 'BLINDS CONTROLLER\nV5'      # engraved under the tray
+LID_TEXT = 'V5 LID'                    # engraved under the lid
 STEP = os.path.join(REPO, 'hardware/pcb/controller/3d/controller.step')
 STL = os.path.join(REPO, 'hardware/mechanical/stl/controller')
 os.makedirs(STL, exist_ok=True)
@@ -67,7 +71,7 @@ def rbox(x0, x1, y0, y1, z0, z1, r):
     return b
 
 
-groups = M.build(tbm, bx, cyl, cone, uni, cut, rbox, obox)
+groups = M.build(bx, cyl, cone, uni, cut, rbox, obox)
 L = C['L']
 rh, rt = C['rail_w'] / 2, C['rail_wall']
 groups['Rail'] = [('Rail floor', bx(-20, L + 20, -rh - rt, rh + rt, -rt, 0)),
@@ -78,28 +82,15 @@ groups['Rail'] = [('Rail floor', bx(-20, L + 20, -rh - rt, rh + rt, -rt, 0)),
                   ('Tilt rod sweep', cyl((-20, 0, C['rod_z']), (L + 20, 0, C['rod_z']), C['rod'] * math.sqrt(2) / 2))]
 groups['Screws'] = [('M3x%.0f %d' % (l, k), uni(cone((x, y, C['floor_z']), 2.95, (x, y, C['floor_z'] + 1.6), 1.45),
                                                  cyl((x, y, C['floor_z'] + 1.55), (x, y, C['floor_z'] + l), 1.45)))
-                    for k, (x, y, _, l) in enumerate(M.SCREWS)]
+                    for k, (x, y, l) in enumerate(M.SCREWS)]
 
 # ------------------------------------------------------------------ fresh document, PCB export placed in the box
-old = []
-for i in range(app.documents.count):
-    d = app.documents.item(i)
-    try:
-        des = adsk.fusion.Design.cast(d.products.itemByProductType('DesignProductType'))
-        if des and any(des.allComponents.item(k).name.startswith('C5 ') for k in range(des.allComponents.count)):
-            old.append(d)
-    except Exception:
-        pass
-app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
-design = adsk.fusion.Design.cast(app.activeProduct)
-design.designType = adsk.fusion.DesignTypes.DirectDesignType
-for d in old:
-    d.close(False)
+design = KIT.fresh_document(app, 'controller', old_prefixes=(PREFIX,))
 root = design.rootComponent
 im = app.importManager
 im.importToTarget(im.createSTEPImportOptions(STEP), root)
 pcb_occ = root.occurrences.item(root.occurrences.count - 1)
-pcb_occ.component.name = 'C5 PCB (KiCad export)'
+pcb_occ.component.name = PREFIX + 'PCB (KiCad export)'
 # STEP (x, y, z) -> box: X = -y + pcb_x, Y = x + pcb_y, Z = z + zb  (a quarter turn about Z)
 m = adsk.core.Matrix3D.create()
 m.setWithCoordinateSystem(P3(C['pcb_x'], C['pcb_y'], C['zb']), adsk.core.Vector3D.create(0, 1, 0),
@@ -139,7 +130,7 @@ for o in proxies(pcb_occ):
         b = o.bRepBodies.item(j)
         if b.isVisible:
             step_bodies.append(('PCB:' + o.name, tbm.copy(b)))
-# rev M: the board's jack edge is trimmed by hand, 3-4 mm. Check the worst case for end wall A: the shortest trim
+# the board's jack edge is trimmed by hand, 3-4 mm. Check the worst case for end wall A: the shortest trim
 for n, b in step_bodies:
     if 'controller_PCB' in n or n == 'PCB:board':
         tbm.booleanOperation(b, bx(C['pcb_x'] - 5, C['pcb_x'] + C['pcb_trim'][0], -40, 40, -5, 40), B.DifferenceBooleanType)
@@ -241,7 +232,7 @@ COLOR = {'ESP32-C6 board': 'Plastic - Glossy (Blue)', '18650': 'Plastic - Glossy
 comps, occs = {}, {}
 for g, lst in groups.items():
     occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-    occ.component.name = 'C5 ' + g
+    occ.component.name = PREFIX + g
     comps[g], occs[g] = occ.component, occ
     ap = appearance(APPEAR[g])
     for nm, b in lst:
@@ -303,7 +294,7 @@ def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
     return done
 
 
-# print 2: no rounding where the lid meets the tray (it showed as a groove round the box): only the bottom and top edges
+# no rounding where the lid meets the tray (it shows as a groove round the box): only the bottom and top edges
 fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], C['edge_r'], C['zl'], None),
        'Lid': round_edges(comps['Lid'], C['top'], C['edge_r'], C['zl'], None, groove=True)}
 
@@ -348,8 +339,8 @@ def engrave(comp, z, lines, xc, yc, w, h, size=0.32):
         return 'failed: %s' % str(ex)[:120]
 
 
-eng = {'Tray': engrave(comps['Tray'], C['floor_z'], 'BLINDS CONTROLLER\nV5', L / 2, 0, 110, 18, 0.6),
-       'Lid': engrave(comps['Lid'], C['zl'], 'V5 LID', 100, -17, 30, 10, 0.5)}
+eng = {'Tray': engrave(comps['Tray'], C['floor_z'], TRAY_TEXT, L / 2, 0, 110, 18, 0.6),
+       'Lid': engrave(comps['Lid'], C['zl'], LID_TEXT, 100, -17, 30, 10, 0.5)}
 files = []
 em = design.exportManager
 for g, nm in (('Tray', 'controller_tray'), ('Lid', 'controller_lid')):
@@ -376,13 +367,7 @@ main_doc.activate()
 
 # ------------------------------------------------------------------ renders
 ui.activeSelections.clear()
-for k in range(design.allComponents.count):
-    cc = design.allComponents.item(k)
-    for attr in ('isSketchFolderLightBulbOn', 'isConstructionFolderLightBulbOn', 'isOriginFolderLightBulbOn'):
-        try:
-            setattr(cc, attr, False)
-        except Exception:
-            pass
+KIT.hide_helpers(design)
 vp = app.activeViewport
 try:
     vp.visualStyle = adsk.core.VisualStyles.ShadedVisualStyle
@@ -471,7 +456,7 @@ def only(prefixes):
     """Show just the bodies whose names start with one of the prefixes (Parts / Wires); hide everything else."""
     for i in range(root.occurrences.count):
         o = root.occurrences.item(i)
-        o.isLightBulbOn = o.component.name in ('C5 Parts', 'C5 Wires')
+        o.isLightBulbOn = o.component.name in (PREFIX + 'Parts', PREFIX + 'Wires')
         for j in range(o.component.bRepBodies.count):
             b = o.component.bRepBodies.item(j)
             b.isLightBulbOn = b.name.startswith(prefixes)

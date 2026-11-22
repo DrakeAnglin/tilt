@@ -5,7 +5,7 @@ checked there, and exported as STLs. One version of each part is kept; older one
 
 | Part | Generator | Build script | Print files and docs |
 |---|---|---|---|
-| **Tilter** | [`fusion/Tilter/Tilter.py`](fusion/Tilter/Tilter.py) (helpers and worm case in `tilt_base.py`) | `tools/fusion_tilter.py`, then `tools/fusion_thin.py` | [`stl/tilter/`](stl/tilter/README.md) |
+| **Tilter** | [`fusion/Tilter/Tilter.py`](fusion/Tilter/Tilter.py) (pure geometry in `gear_geom.py`, Fusion helpers and the worm in `tilt_base.py`) | `tools/fusion_tilter.py`, then `tools/fusion_thin.py` | [`stl/tilter/`](stl/tilter/README.md) |
 | **Controller box** | [`fusion/Controller/Controller.py`](fusion/Controller/Controller.py) | `tools/fusion_controller.py` | `stl/controller/`, [docs/controller-box.md](../../docs/controller-box.md) |
 
 Print files: `python3 tools/orient.py && python3 tools/bambu.py` writes `stl/tilter/print/` and the Bambu Studio projects.
