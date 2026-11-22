@@ -165,7 +165,7 @@ esp_err_t hDev(httpd_req_t *r) {
     BlindCfg &c = cfg.b[i];
     const char *pr = marksProblem(i);
     ap(j, "%s{\"ang\":%s,\"mv\":%.0f,\"sig\":\"%s\",\"pres\":%d,\"up\":%s,\"open\":%s,\"down\":%s,\"sign\":%d,\"bias\":%.1f,\"lead0\":%.1f,\"signSeen\":%d,\"speed\":%d,\"moves\":%lu,\"stalls\":%lu,\"prob\":%s}", i ? "," : "", jn(bs[i].ang, 1).c_str(), bs[i].mv, (bs[i].pwm || ((pwmSaved >> i) & 1)) ? "PWM" : "analog",
-       bs[i].present ? 1 : 0, jn(c.up, 1).c_str(), jn(c.open, 1).c_str(), jn(c.down, 1).c_str(), msign(i), bs[i].lead[1], bs[i].lead[0], abs(c.motSign) == 2 ? 1 : 0, c.speed, (unsigned long)stats.moves[i], (unsigned long)stats.stalls[i], pr ? jq(pr).c_str() : "null");
+       bs[i].present ? 1 : 0, jn(c.up, 1).c_str(), jn(c.open, 1).c_str(), jn(c.down, 1).c_str(), msign(i), bs[i].mem.lead[1], bs[i].mem.lead[0], abs(c.motSign) == 2 ? 1 : 0, c.speed, (unsigned long)stats.moves[i], (unsigned long)stats.stalls[i], pr ? jq(pr).c_str() : "null");
   }
   j += "]}";
   return sendJson(r, j);
@@ -255,36 +255,17 @@ esp_err_t hSched(httpd_req_t *r) {
 esp_err_t hGo(httpd_req_t *r) {
   Lock l;
   std::string b = arg(r, "b"), to = arg(r, "to");
-  rampCancel();                                  // a hand command ends a gentle move
-  int one = b == "all" ? -1 : constrain(atoi(b.c_str()), 0, PORTS - 1), started = 0;
-  bool all = one < 0 || (syncMode && !argi(r, "solo"));
-  float tOne = NAN;
-  const char *err = nullptr;
+  int one = b == "all" ? -1 : constrain(atoi(b.c_str()), 0, PORTS - 1);
   // ramp=N: gently, taking N minutes (the same slow move a schedule can make), instead of going straight there
-  uint32_t rampMs = (uint32_t)constrain(argi(r, "ramp"), 0, 60) * 60000u;
-  auto start = [&](int p, float t) -> const char * {
-    if (!rampMs || isnan(bs[p].tilt) || !calibrated(p)) return startTilt(p, t);
-    ramp[p] = {true, bs[p].tilt, t, millis(), rampMs, 0};
-    return nullptr;
-  };
-  if (one >= 0) {
-    tOne = to.length() ? tiltWord(one, to) : (float)atof(arg(r, "t").c_str());
-    if (isnan(tOne)) return fail(r, "unknown position");
-    const char *e = start(one, tOne);
-    if (e) return fail(r, e);
-    started++;
-  }
-  for (int p = 0; all && p < PORTS; p++) {
-    if (p == one || !movable(p)) continue;
-    float t = one >= 0 ? tOne : tiltWord(p, to);
-    if (isnan(t)) return fail(r, "unknown position");
-    const char *e = start(p, t);
-    if (e) err = e; else started++;
-  }
-  if (rampMs && started) event("gentle move started (%d min)", (int)(rampMs / 60000));
-  return started ? ok(r) : fail(r, err ? err : "no blind is set up");
+  MoveAsk a = moveAsk(FROM_APP, one, NAN, (uint32_t)constrain(argi(r, "ramp"), 0, 60) * 60000u);
+  a.solo = argi(r, "solo");
+  float tOne = one < 0 ? NAN : to.length() ? tiltWord(one, to) : (float)atof(arg(r, "t").c_str());
+  for (int p = 0; p < PORTS; p++) a.tilt[p] = one >= 0 ? tOne : tiltWord(p, to);   // the others go where the named one goes
+  MoveResult m = moveBlinds(a);
+  if (a.gentleMs && m.started) event("gentle move started (%d min)", (int)(a.gentleMs / 60000));
+  return m.started ? ok(r) : fail(r, m.why);
 }
-esp_err_t hStop(httpd_req_t *r) { Lock l; rampCancel(); stopAll("stopped"); return ok(r); }
+esp_err_t hStop(httpd_req_t *r) { Lock l; moveStop(); return ok(r); }
 esp_err_t hJog(httpd_req_t *r) { Lock l; return done(r, jog(argi(r, "b"), argi(r, "d") < 0 ? -1 : 1, constrain(argi(r, "p"), 30, 100), argi(r, "ms"))); }
 esp_err_t hAngle(httpd_req_t *r) { Lock l; return done(r, startAngle(argi(r, "b"), atof(arg(r, "a").c_str()))); }
 esp_err_t hMark(httpd_req_t *r) {

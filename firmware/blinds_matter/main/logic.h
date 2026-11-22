@@ -7,6 +7,8 @@
 #include <ctime>
 #include <string>
 
+const int PORTS = 3;                                         // a controller has 3 ports
+
 // ---- angles
 inline float angDiff(float to, float from) { return fmodf(to - from + 540.0f, 360.0f) - 180.0f; }   // shortest, -180..180
 inline float sgn(float v) { return v < 0 ? -1.0f : 1.0f; }
@@ -31,8 +33,16 @@ inline float xOfTiltMarks(const Marks &m, float t) {
   return t >= 0 ? t / 100.0f * fabsf(angDiff(m.up, m.open)) : t / 100.0f * fabsf(angDiff(m.down, m.open));
 }
 
-// ---- can a blind be moved? Shown (not hidden in the app), set up (all three marks good), and its tilter not missing.
-inline bool movableRule(bool hidden, bool calibrated, bool seen, bool present) { return !hidden && calibrated && !(seen && !present); }
+// ---- can a blind be moved? Set up (all three marks good), its tilter not missing, and enough battery. nullptr = yes,
+// else why not. Today a low battery stops every move, whoever asked (CONTEXT.md's Critical battery rule is not built yet).
+inline const char *cannotMoveWhy(bool calibrated, bool seen, bool present, bool battOk) {
+  if (!calibrated) return "not set up yet";
+  if (seen && !present) return "no tilter plugged in";
+  if (!battOk) return "battery too low";
+  return nullptr;
+}
+// Movable: the same, and shown (not hidden in the app). Battery is left to the move itself (it gives the reason).
+inline bool movableRule(bool hidden, bool calibrated, bool seen, bool present) { return !hidden && !cannotMoveWhy(calibrated, seen, present, true); }
 
 // ---- battery: resting Li-ion voltage -> percent (rough: a loaded or charging cell reads off by a few percent)
 inline int battPercent(float v) {
