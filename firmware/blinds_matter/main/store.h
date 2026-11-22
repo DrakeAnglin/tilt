@@ -45,8 +45,10 @@ const uint32_t CFG_MAGIC = 0xB11D0003, STAT_MAGIC = 0x57A70002;
 const int BATT_HIST = 168;     // hourly, one week
 
 Settings cfg;
-// The drive is slow (150 RPM motor through 88:1) and has play: after a change of direction the motor turns for a
-// while before the rod, and the sensor on it, moves at all. So a stall is only called after a long quiet time.
+// The drive has play: after a change of direction the motor turns for a while before the rod, and the sensor on it,
+// moves at all. So a stall is only called after a long quiet time. The play was measured at 6 to 8.5 s with the old
+// 150 RPM motor; the 300 RPM N20 (about 185 RPM on the cell) takes it up in roughly half that, 3 to 4.5 s. The grace
+// keeps a wide margin over that (a slow speed setting or a low battery stretches it).
 struct Tune {
   uint16_t magic;
   uint16_t graceMs;            // after a change of direction: no stall check for this long (gear play being taken up)
@@ -55,7 +57,7 @@ struct Tune {
   uint16_t moveMaxS;           // no move lasts longer (seconds)
 };
 const uint16_t TUNE_MAGIC = 0x7403;
-Tune tune = {TUNE_MAGIC, 12000, 2500, 10, 180};   // measured: 6 to 8.5 s of play after a change of direction
+Tune tune = {TUNE_MAGIC, 8000, 2500, 10, 180};    // grace about twice the expected play; a saved tune (app) wins
 uint8_t syncMode = 1;           // 1: blinds follow each other: moving one (app, Home, or its wand by hand) sends them all to the same tilt. Own NVS key.
 uint8_t parMode = 1;            // 1: blinds that have to move all move at the same time; 0: one after another. Own NVS key.
 uint8_t hkSeparate = 0;         // 1: Apple Home shows one Window covering per blind; 0: one for all. Own NVS key ("hksep").

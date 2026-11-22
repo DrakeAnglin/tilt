@@ -35,7 +35,7 @@ struct Move {
   float spRef = 0, slowest = 999, stallRef = 0, startErr = 0, runErr = 0, startAng = 0, live = NAN;
   int angDir = 0, travel = 0, nudges = 0, rawDir = 0;
   bool stalled = false, flipped = false, refSet = false, graceSet = false, fromRun = false;
-  uint32_t grace = 12000;
+  uint32_t grace = 8000;
   float lastA = NAN;
   int lastDir = 0, turnBacks = 0;
   const char *endMsg = nullptr;
