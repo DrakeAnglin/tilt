@@ -21,21 +21,21 @@ struct Settings {
   uint32_t magic;
   char name[24];
   uint8_t closeUp;             // "Close" means closed-up (1) or closed-down (0)
-  uint8_t battMode;            // on battery: 0 = sleep (Wi-Fi off), 1 = stay connected
-  uint16_t checkinMin;         // battery sleep: join Wi-Fi this often (0 = never)
+  uint8_t battMode;            // unused (Wi-Fi firmware's battery sleep): kept for the stored layout
+  uint16_t checkinMin;         // unused (Wi-Fi firmware's check-ins): kept for the stored layout
   uint8_t txPower;             // Wi-Fi transmit power, dBm (8..20)
   char tz[44];                 // POSIX time zone string
   char tzName[36];             // its IANA name, for display
-  char ssid[33], pass[65];     // empty: use the ones compiled in (secrets.h)
+  char ssid[33], pass[65];     // unused (Matter keeps the Wi-Fi network): kept for the stored layout
   Sched sched[SCHEDS];
   BlindCfg b[PORTS];
 };
 struct Stats {
   uint32_t magic;
-  uint32_t boots, brownouts, crashes, wdt, wakes, checkins;
+  uint32_t boots, brownouts, crashes, wdt, wakes, checkins;   // wakes, checkins: unused, kept for the stored layout
   uint32_t moves[PORTS], stalls[PORTS];
   uint32_t motorMs;            // all time
-  uint32_t battAwakeS, battMotorMs, battWakes;   // since the charger was last connected
+  uint32_t battAwakeS, battMotorMs, battWakes;   // since the charger was last connected (battWakes: unused, kept for the stored layout)
   uint32_t battSince;          // epoch when it went on battery (0 = unknown)
   uint32_t otaOk;
 };

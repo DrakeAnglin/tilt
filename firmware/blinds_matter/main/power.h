@@ -5,7 +5,6 @@
 float vbat = 0, vbatRest = 0, vin = 0;   // vbatRest: only updated while no motor runs (the motor pulls it down)
 bool powered = false;                    // input power present
 bool motorOn = false;                    // set by motion.h
-uint32_t lastActivity = 0;               // millis of the last request from a browser / app
 uint32_t keepAwakeUntil = 0;             // developer override (millis)
 
 float readMv(int pin) {

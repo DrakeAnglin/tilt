@@ -13,7 +13,6 @@
 
 // ---- limits (stall and time limits are settings: Tune in store.h)
 const float SAME_DIR_GRACE_MS = 2500;           // stall wait when the motor carries on the way it last turned (no gear play)
-const float NUDGE_MS_PER_DEG = 350.0f;           // the rod turns about 2 to 3 degrees a second
 const float TOL_DEG = 2.0f;                     // "reached"
 const float OVER_OK_DEG = 5.0f;                 // past the target by less than this: leave it (turning back costs the gear play)
 const int START_DUTY = 45;                      // percent
