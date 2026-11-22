@@ -26,7 +26,7 @@
 #endif
 #include <mdns.h>
 
-#define FW_VERSION "2.2.1-dev2"
+#define FW_VERSION "2.2.1-dev4"
 SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
 uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
 bool otaPending = false, restartSoon = false;
@@ -50,19 +50,8 @@ void sxSave() { nvs.putBytes("schx", &sx, sizeof sx); }
 void sxLoad() {
   if (nvs.getBytes("schx", &sx, sizeof sx) != sizeof sx || sx.magic != SX_MAGIC) { memset(&sx, 0, sizeof sx); sx.magic = SX_MAGIC; sx.lat = sx.lon = NAN; }
 }
-// Sunrise or sunset (epoch seconds) on the day that holds `noon`, at the saved place. 0 if the sun does not rise or set.
-uint32_t sunEvent(time_t noon, bool rise) {
-  if (isnan(sx.lat) || isnan(sx.lon)) return 0;
-  const double R = M_PI / 180.0;
-  double n = ceil(noon / 86400.0 + 2440587.5 - 2451545.0 + 0.0008), js = n - sx.lon / 360.0;
-  double M = fmod(357.5291 + 0.98560028 * js, 360.0), C = 1.9148 * sin(M * R) + 0.02 * sin(2 * M * R) + 0.0003 * sin(3 * M * R);
-  double lam = fmod(M + C + 180.0 + 102.9372, 360.0), jt = 2451545.0 + js + 0.0053 * sin(M * R) - 0.0069 * sin(2 * lam * R);
-  double sd = sin(lam * R) * sin(23.4397 * R), cd = cos(asin(sd));
-  double ch = (sin(-0.833 * R) - sin(sx.lat * R) * sd) / (cos(sx.lat * R) * cd);
-  if (ch < -1 || ch > 1) return 0;
-  double w = acos(ch) / R, jd = jt + (rise ? -w : w) / 360.0;
-  return (uint32_t)((jd - 2440587.5) * 86400.0);
-}
+// Sunrise or sunset (epoch seconds) on the day that holds `noon`, at the saved place (the math: logic.h).
+uint32_t sunEvent(time_t noon, bool rise) { return sunEventAt(noon, sx.lat, sx.lon, rise); }
 uint32_t schedTime(int i, time_t now, int dayOff) {      // when slot i fires on (today + dayOff); 0 = not that day
   const Sched &s = cfg.sched[i];
   struct tm tm, chk;

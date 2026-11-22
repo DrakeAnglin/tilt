@@ -55,34 +55,15 @@ bool moving() { for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) retu
 int firstMoving() { for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) return i; return -1; }
 bool usableBlind(int p) { return !cfg.b[p].hidden && !(bs[p].seen && !bs[p].present); }
 
-float angDiff(float to, float from) { return fmodf(to - from + 540.0f, 360.0f) - 180.0f; }   // shortest, -180..180
-float sgn(float v) { return v < 0 ? -1.0f : 1.0f; }
 int msign(int p) { return cfg.b[p].motSign > 0 ? 1 : -1; }
 
-// ---- marks
-const char *marksProblem(int p) {             // nullptr = good
-  BlindCfg &c = cfg.b[p];
-  if (isnan(c.up) || isnan(c.open) || isnan(c.down)) return "not all three positions are marked";
-  float u = angDiff(c.up, c.open), d = angDiff(c.down, c.open);
-  if (fabsf(u) < MIN_HALF_SPAN || fabsf(d) < MIN_HALF_SPAN) return "open is too close to a closed mark";
-  if (fabsf(u) > MAX_HALF_SPAN || fabsf(d) > MAX_HALF_SPAN) return "a closed mark is more than half a turn from open";
-  if ((u > 0) == (d > 0)) return "open must be between the two closed marks";
-  return nullptr;
-}
+// ---- marks (the math is in logic.h)
+Marks marksOf(int p) { const BlindCfg &c = cfg.b[p]; return Marks{c.up, c.open, c.down}; }
+const char *marksProblem(int p) { return marksProblemOf(marksOf(p)); }      // nullptr = good
 bool calibrated(int p) { return marksProblem(p) == nullptr; }
-float arcX(int p, float ang) {                // degrees from open, + toward closed-up
-  BlindCfg &c = cfg.b[p];
-  return angDiff(ang, c.open) * sgn(angDiff(c.up, c.open));
-}
-float tiltOf(int p, float ang) {
-  BlindCfg &c = cfg.b[p];
-  float x = arcX(p, ang);
-  return x >= 0 ? x / fabsf(angDiff(c.up, c.open)) * 100.0f : x / fabsf(angDiff(c.down, c.open)) * 100.0f;
-}
-float xOfTilt(int p, float t) {
-  BlindCfg &c = cfg.b[p];
-  return t >= 0 ? t / 100.0f * fabsf(angDiff(c.up, c.open)) : t / 100.0f * fabsf(angDiff(c.down, c.open));
-}
+float arcX(int p, float ang) { return arcXOf(marksOf(p), ang); }           // degrees from open, + toward closed-up
+float tiltOf(int p, float ang) { return tiltOfMarks(marksOf(p), ang); }
+float xOfTilt(int p, float t) { return xOfTiltMarks(marksOf(p), t); }
 
 // ---- hardware
 void motorRaw(int p, int d, int pct) {        // DRV8833 slow decay: one input high, PWM the other (both high = brake)
@@ -445,11 +426,9 @@ void moveTick(int p, uint32_t now) {           // one blind's move, 100 times a 
     } else if (el <= MVX.grace) { MVX.spT = now; MVX.spRef = MVX.fAng; }
     if (bs[p].blind) MVX.stallT = now;            // PWM sensor passing its zero: no reading for a few degrees, not a stall
     // Stall: no check while the gear play is taken up, then the angle has to change by stallDeg every stallMs.
-    if (el > MVX.grace && now - MVX.stallT >= tune.stallMs) {
-      if (fabsf(angDiff(MVX.fAng, MVX.stallRef)) < tune.stallDeg10 / 10.0f) { MVX.stalled = true; toSettle(nullptr); return; }
-      MVX.stallT = now;
-      MVX.stallRef = MVX.fAng;
-    }
+    StallVerdict sv = stallCheck(el, MVX.grace, now - MVX.stallT, tune.stallMs, MVX.fAng, MVX.stallRef, tune.stallDeg10 / 10.0f);
+    if (sv == STALL_YES) { MVX.stalled = true; toSettle(nullptr); return; }
+    if (sv == STALL_MOVED) { MVX.stallT = now; MVX.stallRef = MVX.fAng; }
   } else if (MVX.st == MS_PULSE) {
     tr(now, readAngle(p));
     if ((int32_t)(now - MVX.deadline) >= 0) toSettle(nullptr);

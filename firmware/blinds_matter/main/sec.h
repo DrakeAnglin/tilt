@@ -195,17 +195,8 @@ std::string qarg(const std::string &query, const char *key) {
 // nullptr: allowed. Otherwise the reason it is refused. Rules about the target (you cannot remove yourself, the last
 // owner stays) live in the handlers; who the caller is and what that lets them do is decided only here.
 const char *permit(const Route *rt, const std::string &path, const std::string &query, const Caller &c) {
-  if (!c.secure) {
-    if (rt->fn == hUpdate) return nullptr;       // checks its own signature (or password) and the owner's update window
-    if (!owned() || openApi) return nullptr;     // before any phone is paired, or with the developer switch on
-    return "use the app";
-  }
-  if (c.owner) return nullptr;
-  // A user may see the blinds and move them, see the people, and rename only themself. Settings, setup, schedules,
-  // people and updates are the owners'.
-  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/keys", "/api/wifistate"}) if (path == ok) return nullptr;
-  if (path == "/api/keyname" && qarg(query, "cid") == hexOf(c.id, 8)) return nullptr;
-  return "only the owner can do that";
+  return permitRule(c.secure, c.owner, !owned() || openApi, rt->fn == hUpdate, path,
+                    c.secure ? qarg(query, "cid") : std::string(), c.secure ? hexOf(c.id, 8) : std::string());
 }
 // The answer is sealed bytes when the status is "200 OK", plain JSON otherwise.
 const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
@@ -213,8 +204,7 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
   const uint8_t *p = (const uint8_t *)b.data();
   const uint8_t *nonce = p + 8, *ct = p + 20;
   size_t n = b.size() - 36;
-  uint64_t ctr = 0;
-  for (int i = 4; i < 12; i++) ctr = (ctr << 8) | nonce[i];
+  uint64_t ctr = nonceCounter(nonce);
   uint8_t aad[17];
   memcpy(aad, "blinds-v1", 9); memcpy(aad + 9, p, 8);
   std::string cmd(n, 0);
@@ -227,7 +217,7 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
     KeysLock kl;
     for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, p, 8)) slot = i;
     if (slot < 0) { resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
-    if (memcmp(nonce, bootId, 4) || ctr <= lastCtr[slot]) { resp = std::string("{\"err\":\"stale\",\"boot\":\"") + hexOf(bootId, 4) + "\"}"; return "409 Conflict"; }
+    if (!nonceFresh(nonce, bootId, lastCtr[slot])) { resp = std::string("{\"err\":\"stale\",\"boot\":\"") + hexOf(bootId, 4) + "\"}"; return "409 Conflict"; }
     memcpy(key, keys[slot].key, 32);
     if (!gcm(false, key, nonce, aad, 17, ct, n, (uint8_t *)&cmd[0], (uint8_t *)(ct + n))) { resp = "{\"err\":\"bad key\"}"; return "401 Unauthorized"; }
     lastCtr[slot] = ctr;

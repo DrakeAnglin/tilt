@@ -1,6 +1,7 @@
 // Blinds controller firmware, V1. Board: carrier PCB (hardware/pcb), ESP32-C6, Arduino-ESP32 core 3.x.
 #pragma once
 #include "ardu.h"
+#include "logic.h"                               // the pure rules and math (tested on the Mac)
 
 #define FW_BUILD __DATE__ " " __TIME__
 
@@ -24,7 +25,6 @@ const uint32_t RAMP_MS = 150, SETTLE_MS = 120;  // soft start; wait after brakin
 const int MAX_NUDGES = 8;
 const uint32_t POST_MS = 400;                   // after a move: keep the sensor on this long and take the final position then
 const float END_STALL_DEG = 10.0f;              // a stall this close to a closed mark counts as "at the end stop"
-const float MAX_HALF_SPAN = 170.0f, MIN_HALF_SPAN = 8.0f;   // open -> closed, each way (degrees of rod turn)
 
 // ---- power
 const float VIN_ON = 3.8f, VIN_OFF = 3.3f;      // input power present (USB or strong sun) / gone. USB reads ~4.3 V here.

@@ -43,15 +43,7 @@ void powerSample(bool first = false) {
   else if (powered && vin < VIN_OFF) powered = false;
 }
 
-// Resting Li-ion voltage -> percent (rough: a loaded or charging cell reads off by a few percent)
-int battPercent(float v) {
-  static const float V[] = {3.20f, 3.45f, 3.60f, 3.70f, 3.80f, 3.90f, 4.00f, 4.10f, 4.18f};
-  static const int P[] = {0, 5, 15, 35, 55, 70, 82, 93, 100};
-  if (v <= V[0]) return 0;
-  for (int k = 1; k < 9; k++)
-    if (v < V[k]) return P[k - 1] + (int)((P[k] - P[k - 1]) * (v - V[k - 1]) / (V[k] - V[k - 1]));
-  return 100;
-}
+// battPercent(): logic.h
 const char *chargeState() {
   if (!powered) return "battery";
   return vbatRest >= 4.12f ? "full" : "charging";
