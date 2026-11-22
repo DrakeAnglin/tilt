@@ -1,6 +1,6 @@
 # Building the controller PCB, step by step
 
-For the carrier PCB, v2.1 ([hardware/pcb](../hardware/pcb/README.md)). Every picture, part list and position here is
+For the carrier PCB, v2.1 and v2.2 ([hardware/pcb](../hardware/pcb/README.md)); on v2.2 skip step 0. Every picture, part list and position here is
 generated from the real board file by [`tools/pcb_guide.py`](../tools/pcb_guide.py), so it matches the board you hold.
 The circuit was proven on a hand-wired dev board first. On the PCB there is no hand
 wiring. Every part drops into its own holes, and the copper does the rest.
@@ -13,7 +13,7 @@ gold holes are still empty. End A (the RJ12 jacks) is on the left, end B (the US
 **The silkscreen prints each part's value** (1M, 220, 100n, 1N5819 …), not its reference, so you can match parts to the
 board without the picture. The references (R1, D3 …) are only in this guide.
 
-**For the V5 box:** after each step, **trim every lead to 1.8 mm or less under the board**. The PCB sits 2.4 mm off
+**For the box:** after each step, **trim every lead to 1.8 mm or less under the board**. The PCB sits 2.4 mm off
 the box floor.
 
 ## Parts for one board
@@ -66,11 +66,11 @@ A reversed diode just won't conduct. A reversed electrolytic, battery or charger
 
 ![board](renders/pcb-build-done.png)
 
-## Step 0: Trim the jack edge (for the V5 box)
+## Step 0: Trim the jack edge (for the box)
 
 **v2.1 boards only** (back silkscreen "controller v2"). v2.2 boards come with this edge already in place: skip this step.
 
-Cut **3 to 4 mm** off the board's jack edge (end A, the 47 mm wide end), straight across. The V5 box (rev M) has the
+Cut **3 to 4 mm** off the board's jack edge (end A, the 47 mm wide end), straight across. The controller box has the
 jacks come through its end wall, which needs that edge out of the way. Any cut between 3 and 4 mm fits: the box locates
 the board by its three screws, not by this edge.
 
@@ -196,7 +196,7 @@ rest.
 ![step 8](renders/pcb-build-08.png)
 
 C9, beside the jack strip. **Long leg (+) into the square pad** by the silkscreen's **+**. The silkscreen circle's
-**shaded half is the − side**: the stripe on the can goes there. Push it right down: in the V5 box it has 2–3 mm under
+**shaded half is the − side**: the stripe on the can goes there. Push it right down: in the box it has 2–3 mm under
 the lid's groove.
 
 ## Step 9: Fuses, then fold them (3)

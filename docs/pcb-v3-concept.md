@@ -1,5 +1,12 @@
 # Controller PCB v3: concept (rev 3, hand-solder only)
 
+> **On hold.** Nothing here is ordered. Two things changed since this was written: the v2 build now uses the
+> **Adafruit 6092** charger instead of the MCP73871 module ([PCB build, step 11](pcb-build.md#step-11-the-charger-the-battery-and-solar)),
+> and the controller runs **Matter over Wi-Fi**, not Thread. Solar gets a DC jack
+> ([#8](https://github.com/DrakeAnglin/tilt/issues/8)); the battery life is measured first
+> ([#6](https://github.com/DrakeAnglin/tilt/issues/6)). The must-test list below still stands. "V5" below means
+> the current controller box.
+
 One board that carries everything: the cell, charger, USB-C, solar input, three tilter ports and a lifter port, and the
 ESP32-C6. The case is then just a shell with openings. This is the parts proposal for review, before the schematic and
 routing.
@@ -27,7 +34,7 @@ power monitor) are gone; they are listed at the bottom only so the reasons stay 
 | Cell protection | **Protected 18650 cells** (protection board built into the cell, button top) | nothing on the PCB | the board itself has no protection chips, so **only protected cells** go in |
 | Temperature | 10 k NTC on the cell → the charger module's THERM pads | two wires | as in V5: no charging when the cell is hot |
 | USB-C | **The Cermant USB-C breakout** (has its own 5.1 k CC resistors) | on a header, at the board edge | as on V2.1 |
-| Solar | **3.5 × 1.35 mm barrel jack, SHOU HAN DC003-1.3** (LCSC C668594) | through-hole | 9 × 6.3 × 5 mm, round 4 mm opening in the end wall. The panel lead gets a 3.5 × 1.35 plug (common) |
+| Solar | **3.5 × 1.35 mm barrel jack, SHOU HAN DC003-1.3** (LCSC C668594) | through-hole | 9 × 6.3 × 5 mm, round 4 mm opening in the end wall. The panel lead gets a 3.5 × 1.35 plug (common). Tracked in [#8](https://github.com/DrakeAnglin/tilt/issues/8) |
 | Source OR-ing | **1N5822** Schottky × 2 (3 A) | through-hole | USB and solar into the charger's single input: both can stay plugged in, neither back-feeds the other |
 | **Power monitor** | **An INA3221 3-channel module** (common breakout, about 25 × 20 mm, I²C) | header pins | USB in, solar in and battery: current and voltage of each, separately. See below |
 | Battery current shunt | **0.025 Ω 3 W through-hole current-sense resistor** (e.g. Vishay LVR03 series) | through-hole | across the INA3221 module's battery channel, so lifter peaks stay in range with no rework on the module. See below |
@@ -104,18 +111,16 @@ The port and its wiring are reserved now, so no new board is needed.
 | LiFePO4 18650 | ~5 Wh | yes | safest in heat, but 3.2 V makes the N20s weaker (already torque-limited): no |
 | AA NiMH ×2–3 | 2.4–3.6 V | — | too low a voltage for the motors: no |
 
-What decides the capacity is the ESP. As a Thread sleepy device it averages roughly 1–2 mA, so a 2800 mAh cell runs
-~2–4 months on its own. Always-on (Thread router) is ~30–40 mA, ~3 days, which needs the panel. The motors are a
+What decides the capacity is the ESP. On Wi-Fi in power save it is estimated at a few mA (not measured yet:
+[#6](https://github.com/DrakeAnglin/tilt/issues/6)), so a 2800 mAh cell runs weeks on its own; as a Thread sleepy
+device it would be roughly 1–2 mA, months. The motors are a
 rounding error. The window's heat matters more than capacity: the NTC stops charging above ~45 °C, and the case should
 stay out of direct sun.
 
 ## Size: to be redone
 Rev 2's layout (121 × 52.8 × 26.4 mm case, everything as chips) no longer applies: the charger module (30.5 × 31.5 mm
 for the MCP73871 one) and the INA3221 module (~25 × 20 mm) sit on the board, so it grows back toward V5's 164.6 mm. The
-layout, the Fusion fit check and the case get redone once both modules are picked and measured. Rev 2's pictures are
-kept below as the starting point.
-
-![rev 2 layout (chip-level, superseded)](renders/pcb-v3-layout.png)
+layout, the Fusion fit check and the case get redone once both modules are picked and measured.
 
 ## Costs (rough, checked 2026-11)
 | Part | Source | Price |

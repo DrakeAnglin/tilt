@@ -1,16 +1,22 @@
 # Controller PCB (v2.2, carrier board)
 
-**v2.2 (2026-11-07): the jack edge is 3.5 mm shorter.** For the V5 box's rev M end wall, the RJ12 jacks come through
+**v2.2 (2026-11-07): the jack edge is 3.5 mm shorter.** For the controller box's end wall, the RJ12 jacks come through
 the wall, so the board's jack edge moves 3.5 mm in and the jacks overhang it by 2.95 mm. Everything else is v2.1:
 same parts, same copper, same holes. Only the outline moved, the ground fill pulled back with it, and the 11 ground
 stitching vias that sat 2 mm from the old edge are gone. Back silkscreen reads "v2.2". The v2.1 boards already
 made get the same edge cut by hand, 3–4 mm (see [the build guide, step 0](../../docs/pcb-build.md)). v2.1 as ordered
 is tagged `pcb-v2.1-ordered` in git.
 
-Replaces the hand-wired perfboard. Same core circuit as the dev board, on a 2-layer PCB: the **ESP32-C6 SuperMini** and
-the **USB-C breakout** plug into female header sockets; the **18650**, the **MCP73871 charger module** and the optional
-**solar panel** plug into three *different* JST headers; the **three RJ12 jacks** sit on the board edge with a fuse and
+The controller's board: a 2-layer PCB where the **ESP32-C6 SuperMini** plugs into female header sockets; the
+**18650**, the **charger** (an **Adafruit 6092**, through a 6-pin harness) and the optional **solar panel** plug into
+three *different* JST headers; the **three RJ12 jacks** sit on the board edge with a fuse and
 protection resistors behind each. Everything is through-hole and hand-soldered; there is no hand wiring.
+
+The board was drawn for an MCP73871 charger module and a separate USB-C board (J3). The build now uses the Adafruit
+6092 with its own USB-C instead, with no copper change: the harness and the battery splice in the J5 plug are in
+[the build guide, step 11](../../docs/pcb-build.md#step-11-the-charger-the-battery-and-solar). J3 stays empty.
+
+**Build it:** [docs/pcb-build.md](../../docs/pcb-build.md) (a picture per step). **Parts:** [BOM](../BOM.md#one-controller-3). **Box:** [docs/controller-box.md](../../docs/controller-box.md).
 
 ![top, 3D](controller/render-top.png)
 
@@ -67,70 +73,11 @@ Known limits (by design, not blockers): no reverse-battery protection beyond the
 MOSFET-based one is surface-mount or a TO-220; planned for v3); each port's battery + passes a 0.75 A PTC (~0.3 Ω)
 and the cord (~0.6 Ω per wire for 3 m of flat cord), which costs some motor voltage on long runs.
 
-
+## Ordering
 1. pcbway.com → PCB Instant Quote → **Quick-order PCB** → upload [controller-pcbway.zip](controller/controller-pcbway.zip).
 2. **2 layers, FR-4, 1.6 mm, 1 oz copper, HASL lead-free**, min track / spacing **6/6 mil**, min hole **0.3 mm**,
    solder mask green (or white to match the build), silkscreen white, **quantity 5**.
 3. Check the quote before paying (roughly $5–20 for 5 plus shipping). Bring one board up fully before building three.
-
-## Shopping list for the first build (3 controllers + spares)
-Order the PCBs (5) and these together, so nothing is missing when the boards arrive.
-
-| Part | Exact part (or equivalent) | Per board | Buy |
-|---|---|---|---|
-| RJ12 jack | Amphenol **87180-066LF** (the 54601-906WPLF is obsolete; 87180 is Amphenol's replacement, same holes: checked against its drawing) | 3 | **10** |
-| Resettable fuse 0.75 A | Bel Fuse **0ZRE0075FF1A** (radial, 5.1 mm pitch, 11.5 × 4.8 mm) | 3 | **10** |
-| Electrolytic 470 µF | 10 V (or 16 V), 8 mm dia, **3.5 mm pitch**, e.g. Panasonic EEU-FR1A471 | 1 | **4** |
-| Zener 6.2 V 3 W | **1N5920BRLG** (onsemi, cut tape; 1N5920BG is the same part, boxed) | 1 | **5** |
-| JST-XH header 2-pin | **B2B-XH-A(LF)(SN)** | 1 | **5** |
-| JST-XH header 6-pin | **B6B-XH-A(LF)(SN)** | 1 | **4** |
-| JST-XH housing 6-pin + leads | **XHP-6** + pre-crimped leads **ASXHSXH22K152** (6", crimp both ends: cut in half = 2 leads; no crimper needed) | 1 + 2 | **4 + 10** |
-| JST-ZH header 2-pin (solar) | **B2B-ZR(LF)(SN)** | 1 | **4** |
-| MCP73871 charger module | Comimark (same as before) | 1 | **1** (replaces the damaged one) |
-| Resistors 1/4 W | 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | from the kit; 220 Ω ×25 bought (**CFR-25JB-52-220R**), 18 needed for 3 boards |
-| Ceramic 100 nF / 10 µF | | 5 / 1 | from the kit |
-| Female header sockets 10-way / 6-way | Sullins **PPTC101LFBN-RC** / **PPTC061LFBN-RC** | 2 / 1 | **6 / 3** |
-| 1N5819, M3 screws | | | already have |
-
-## Parts for one board
-| Part | Qty | Have it? |
-|---|---|---|
-| This PCB | 1 | order |
-| ESP32-C6 SuperMini (male pins on) / USB-C breakout (Cermant, male pins on) | 1 / 1 | yes |
-| Female header socket 10-way / 6-way (Sullins PPTC101LFBN-RC / PPTC061LFBN-RC) | 2 / 1 | **buy** |
-| **RJ12 PCB jack, Amphenol 87180-066LF** (or another with the 54601 footprint) | 3 | **buy** |
-| **Resettable fuse 0.75 A hold, radial, Bel Fuse 0ZRE0075FF** (5.1 mm pin spacing) | 3 | **buy** |
-| **Electrolytic 470 µF 10 V+, 8 mm dia, 3.5 mm pitch** | 1 | **buy** |
-| **Zener 1N5920B (6.2 V 3 W)** | 1 | **buy** |
-| **JST-XH header 2-pin (B2B-XH-A) / 6-pin (B6B-XH-A), vertical**, + 6-pin housing and 4 crimp pins | 1 / 1 | **buy** (XH kit) |
-| **JST-ZH header 2-pin (B2B-ZR), vertical** (matches the solar extension plugs) | 1 | **buy** |
-| Resistors: 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | yes (kit) |
-| Ceramic capacitors: 100 nF ×5, 10 µF ×1 | 6 | yes (kit) |
-| 1N5819 | 3 | yes |
-| M3 screws (3 mounting holes) | 3 | yes |
-
-## Charger harness (one 6-pin JST-XH plug)
-| Header pin | Charger pad | Wire |
-|---|---|---|
-| 1 | GND (any of PWR−, BATT−, LOAD−: they're common on the module) | black 22 AWG |
-| 2 | BATT + | red 22 AWG |
-| 3 | – (leave empty) | |
-| 4 | LOAD + | red 22 AWG |
-| 5 | – (leave empty) | |
-| 6 | PWR + | red 22 AWG |
-
-## Soldering order (lowest parts first)
-**Full step-by-step guide with a picture per step: [docs/pcb-build.md](../../docs/pcb-build.md).** Short version:
-
-1. Resistors (19, flat, any way round). The four behind each jack stand in a row: 220, 10, 100k, 220 (see the silkscreen).
-2. Diodes: the band on the side marked **K**. 1N5819 ×3, zener ("6V2 3W Z").
-3. Ceramic capacitors (6), then the 470 µF (**+** marked; the long leg is +).
-4. Fuses (3, any way round), test pads.
-5. Sockets: 2 × 10-way for the ESP (push onto the ESP's pins, set it in, solder, lift it out), 6-way for the USB-C board.
-6. JST headers (3), RJ12 jacks (3).
-7. Meter checks, nothing plugged in: GND to BAT+, 5V, 3V3 and PWR pads: no beep.
-8. Plug in the ESP (**chip up, USB toward the bottom edge**, 5V row on the left), the USB-C board (socket out past the
-   bottom edge), the charger harness, the battery. 5V and 3V3 test pads should read about 3.7–4.0 V and 3.3 V.
 
 ## Pin plan (v2)
 | Port | IN1 | IN2 | EN | Angle (ADC) |
@@ -140,12 +87,6 @@ Order the PCBs (5) and these together, so nothing is missing when the boards arr
 | 3 | GPIO16 (TX) | GPIO17 (RX) | GPIO1 | GPIO2 |
 
 Battery voltage GPIO3, input-power voltage GPIO0. RJ12 pinout (both ends): 1 battery +, 2 IN1, 3 GND, 4 angle, 5 EN, 6 IN2.
-
-## Check before ordering
-- ESP32-C6 SuperMini pin rows 15.24 mm apart, pin 1 (5V / TX) at the USB end.
-- USB-C breakout pins VBUS, GND, CC1, D−, D+, CC2 at 2.54 mm.
-- The RJ12 jack and the PTC you buy match their footprints (RJ12: Amphenol 54601 / 87180-x66; PTC: 5.1 mm pin spacing).
-- Box: [controller box](../../docs/controller-box.md). In it the USB-C board sits on end wall B, joined to J3 pins 1–2 by a 2-wire lead (not plugged straight into J3).
 
 ## Rebuild the files
 ```bash
@@ -157,5 +98,4 @@ $K pcb export drill --format excellon --excellon-separate-th -o hardware/pcb/con
 ```
 
 ## Later (v3)
-- Fully integrated: charger chip, USB-C, ESP32-C6 module and an ideal-diode supply on the board (PCBWay assembly).
-- Tilter board: AS5600 + DRV8833 + RJ12 jack on one small board.
+On hold: [docs/pcb-v3-concept.md](../../docs/pcb-v3-concept.md). Its must-test list is checked on this board first.

@@ -1,8 +1,9 @@
-# App Store release checklist
+# App Store release
 
-What is still needed before Tilt can go to TestFlight and the App Store, and the answers to give.
+Tilt 1.0 (build 3) was submitted to the App Store on 2026-11-21. This page keeps the account steps, the answers
+given in App Store Connect, and how firmware is published, for the next release.
 
-## Steps only the owner can do (Apple account)
+## Account steps (owner only)
 1. ~~App Store Connect record~~ done 2026-11-21: "Tilt: Smart Blinds" (the name Tilt was taken), bundle ID `app.tilt.blinds`, SKU TILT001. The home-screen name stays Tilt.
 2. ~~CloudKit~~ done 2026-11-21 (`Gone` added; schema deployed to Production). Was: in the CloudKit Console, open container `iCloud.app.tilt.blinds`, Development, and use
    "Deploy Schema Changes" to copy the record types `Join` and `Gone` to Production. Add a query index on `Join.topic`
@@ -22,7 +23,7 @@ What is still needed before Tilt can go to TestFlight and the App Store, and the
 
 ## Listing status (filled in App Store Connect, 2026-11-21)
 - Version page: promotional text, description, keywords, support and marketing URLs, copyright, App Review notes,
-  sign-in not required, manual release. Still needed: App Review contact (name, phone, email), screenshots, a build.
+  sign-in not required, manual release, App Review contact, screenshots, build 3.
 - App Information: subtitle "Smart tilt for your blinds", Lifestyle / Utilities, no third-party content, rated 4+.
 - Pricing: free. Availability: 174 countries or regions, all except China mainland (it needs a security assessment
   and an AI-content filing).

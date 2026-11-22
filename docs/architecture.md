@@ -1,107 +1,125 @@
-# System architecture (cordless, Matter over Wi-Fi)
+# System architecture
 
-Decided 2026-10-28 with the owner: **ESP32-C6 SuperMini, Matter over Thread, controller inside a headrail, one 18650
-cell charged from USB-C or a small solar panel facing the window.** One controller drives up to 3 blinds.
+How the parts fit together today: the tilter on each blind, the controller that drives up to 3 of them, and the phone.
+Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md](../CONTEXT.md).
 
-**Path to hardware:** breakout boards on a breadboard first, then everything soldered onto a perfboard dev board,
-then a custom PCB once that works. Everything is modular: every device plugs in, nothing is hard-wired between units.
+## The parts
+- **Tilter** (one per blind): a printed worm gearbox on the blind's tilt rod, an N20 300 RPM motor, and a sensor module
+  with an AS5600 angle sensor, a DRV8833 motor driver and an RJ12 jack. The wand still turns the blind by hand.
+  Build: [tilter](../hardware/mechanical/stl/tilter/README.md), [wiring](tilter-wiring.md).
+- **Controller** (one per up to 3 blinds): an ESP32-C6 SuperMini on a carrier PCB, one protected 18650 cell, an
+  Adafruit 6092 charger with its own USB-C, and 3 RJ12 ports, in a box that slides into a headrail.
+  Build: [PCB](pcb-build.md), [box](controller-box.md).
+- **Cord**: a white, straight-wired RJ12 phone cord from each tilter to a port.
+- **Phone**: the **Tilt** iPhone app talks straight to each controller on the home Wi-Fi. **Apple Home** sees each
+  controller as a Matter device over Wi-Fi.
 
 ```
- 6 V solar panel (optional) ──[6.2 V zener]──D2──┐
- USB-C 5 V (charge only) ────────────────────D1──┤
-                                                 ▼
-            ┌──────────────┐  VBAT 3.0–4.2 V  ┌────────────────────────────────────────┐
- 10 k NTC ─►│ MCP73871      │─────────D3──────►│ ESP32-C6 SuperMini                     │
- (on cell)  │ power-path    │  ▲ 18650 cell    │ Matter over Thread, sleepy end device  │
-            │ charger       │──┘ (protected)   │ ADC: 3 × angle, battery, input power    │
-            └──────────────┘                  └───┬─────────┬─────────┬────────────────┘
-                   │ LOAD (VBAT)                   │ IN1/IN2  │ EN      │ ANGLE (1 k + 100 n)
-                   ▼                               ▼          ▼         ▲
-          RJ12 port ×3 ═══ white straight-wired cord ═══ tilter: DRV8833 ─ N20,  AS5600
-          (VBAT, IN1, GND, ANGLE, EN, IN2)                  (EN wakes the driver and powers the sensor)
+ USB-C ─► Adafruit 6092 ─VIN─┐                      ┌───────────────────────────────┐
+ solar (optional) ─J8─D2─────┴─ PWR (6.2 V zener)   │ ESP32-C6 SuperMini            │
+                  6092 BAT ═══ 18650 (protected)    │ Matter over Wi-Fi, BLE setup  │
+                     │                              │ GPIO: IN1, IN2, EN, angle ×3  │
+                     └─ BAT+ ──D3──► ESP 5V pin      │ ADC: battery, PWR             │
+                     │                              └──┬──────┬──────┬──────────────┘
+                     └─ 0.75 A fuse ×3                   │220 Ω │10 Ω   ▲ 1 k + 100 nF
+                            ▼                            ▼      ▼       │
+     RJ12 port ×3 ═══ white RJ12 cord ═══ tilter: DRV8833 ─ N20, AS5600 (PWM out)
+     (battery +, IN1, GND, angle, EN, IN2)       (EN wakes the driver and powers the sensor)
 ```
 
-## Why these choices
-- **Thread, not Wi-Fi.** On battery the radio dominates. A Wi-Fi ESP32 in power-save mode averages ~3–6 mA
-  (~70–150 mAh/day); an ESP32-C6 as a Thread *sleepy end device* averages well under 1 mA. The owner has a Thread
-  border router, and Matter over Thread works with both Apple Home and Alexa.
-- **ESP32-C6 SuperMini.** Small (≈ 22.5 × 18 mm), Wi-Fi 6 + Thread + BLE (BLE for commissioning), enough GPIO
-  including the 4 ADC inputs needed. **Remove the RGB LED (GPIO8) and the power LED**: a WS2812 draws ~0.5–1 mA
-  even when off, which alone would double the power budget. Check whether the board has a diode on its 5V pin
-  before feeding VBAT there.
-- **AS5600 analog OUT, not I²C.** All AS5600s share one I²C address; three analog inputs avoid a multiplexer. The
-  sensors are absolute, so they are **powered only while a motor moves** (3 × 6.5 mA would otherwise drain
-  ~470 mAh/day). A wand move while they're off is still read correctly next time.
-- **One GPIO per sensor, only the moving blind's sensor on.** The analog OUT is ratiometric to the sensor's
-  supply, so a sagging supply reads as angle error. One sensor (~6.5 mA) per GPIO keeps the sag to a few tens of
-  mV and constant. If bench tests still show drift, add a P-FET switch.
-- **ADC filtering.** RC filter (1 kΩ + 100 nF) at each ADC input. With the drivers in the tilters the cord carries
-  only logic-level PWM, not motor current, but the filter stays. Set the sensor so the tilt range sits mid-scale (no
-  0/360° wrap, away from the ADC's nonlinear top end).
-- **Motors straight from the battery.** The DRV8833 runs from 2.7–10.8 V, so VM = VBAT (3.0–4.2 V): the N20 gets
-  ~62 % of its 6 V stall torque with no current cap and runs ~185 RPM, plenty for the low tilt torque. (A 5 V boost
-  was considered and dropped; add one only if bench tests show too little torque.) The DRV8833s sleep (≈ 2 µA)
-  between moves.
-- **Charger with power-path (MCP73871).** Takes 5 V from a USB-C breakout or a 5–6 V solar panel, charges the
-  cell, and powers the load at the same time.
-- **Battery temperature.** A headrail behind blinds in sun can pass 50–60 °C, and Li-ion must not charge above
-  ~45 °C. A 10 kΩ NTC taped to each cell goes on the MCP73871's THERM pin (most breakout boards tie it to a fixed
-  resistor; replace that) so charging stops when hot.
-- **Solar over-voltage.** A "6 V" panel's open-circuit voltage can reach ~7 V cold in full sun; the MCP73871 is
-  rated 6 V operating / 7 V absolute. Measure the panel's open-circuit voltage behind glass on arrival; fit a
-  6.2 V 1 W zener across the solar input if it exceeds ~6.8 V (fit it anyway on the dev board).
+## Why it is built this way
+- **No cloud.** The app talks to controllers directly, and Apple Home covers voice and away-from-home control
+  ([ADR 0001](adr/0001-no-cloud-local-first.md)).
+- **Matter over Wi-Fi.** It works with Apple Home today with no hub. Wi-Fi costs more battery than Thread would; the
+  controller dozes between jobs (Wi-Fi power save), so it often answers a little slowly. Thread through a hub is a later
+  goal.
+- **ESP32-C6 SuperMini.** Small (about 22.5 × 18 mm), Wi-Fi 6, Thread and Bluetooth (Bluetooth for first setup),
+  enough pins for 3 ports. It plugs into sockets, so it can be swapped.
+- **Motor driver in each tilter.** The cord carries battery power and logic, not motor current switching at 20 kHz.
+  So the flat, untwisted cord does not couple motor noise into the angle wire, and a tilter is a complete unit (motor,
+  driver, sensor, plug).
+- **AS5600 in PWM mode.** Every AS5600 has the same I2C address, so each port reads its own sensor on one wire
+  instead. The sensor is switched to PWM output once on the bench ([as5600_setup](../firmware/README.md)): the angle
+  is the share of each 115 Hz frame that the line is high, so it does not shift with the supply or with motor current
+  in the ground wire. The ESP's capture timer stamps every edge, so all 3 ports can be read while blinds move.
+- **Sensors on only while moving.** The AS5600 is absolute, so it can be off between moves. One EN line per port
+  wakes that tilter's driver and powers its sensor. A wand turn while it is off is still read right next time.
+- **Motors straight from the cell.** The DRV8833 runs from 2.7 to 10.8 V, so the motor gets the cell's 3.0–4.2 V. The
+  6 V N20 runs at about 60% of its rated speed; the worm gearbox has torque to spare.
+- **Charger used as a charger only.** The cell feeds the whole board (motors and ESP) through a splice in the J5 plug,
+  and the 6092 just keeps it topped up. A charger's load output gives about 1 A; an 18650 gives 3 A or more. The
+  6092 stops after 6 hours of nonstop charging; replugging restarts it.
+- **Protection.** A 0.75 A resettable fuse on each port's battery +, series resistors on the cord lines, a 470 µF
+  capacitor by the jacks, keyed and labeled plugs, and a 6.2 V zener that clamps the solar input. The cell has its own
+  protection board (protected cells only).
+- **White outside.** White cords, white printed parts.
 
-## Power budget (estimates, 3 blinds, ~4 moves each per day)
-| Load | mAh / day |
+## Battery rules
+From [CONTEXT.md](../CONTEXT.md) and `firmware/blinds_matter/main/config.h`. The Battery level is worked out from the
+resting cell voltage.
+
+| State | When | What happens |
+|---|---|---|
+| Low battery | under 20% | warning in the app and in Apple Home |
+| Critical battery | under 10%, not charging | Schedules pause; blinds still move when told |
+| Motor cut-off | resting cell under 3.35 V, not charging | no motor runs until it charges |
+
+## Power budget (estimates, not measured)
+These are rough estimates for 3 blinds and about 4 moves each a day. **They have not been measured.** Real numbers
+come from [#6 (battery life)](https://github.com/DrakeAnglin/tilt/issues/6) and will replace this table.
+
+| Load | mAh a day (estimate) |
 |---|---|
-| ESP32-C6, Thread sleepy end device + LDO + charger quiescent (LEDs removed) | ~15–25 |
-| Motors: 12 moves × ~3 s × ~250 mA from the cell | ~3–5 |
-| AS5600, one at a time, only during moves | < 1 |
-| **Total** | **~20–30** |
+| ESP32-C6 on Wi-Fi in power save, plus regulator and charger standby | about 70–150 |
+| Motors: 12 moves × about 3 s × about 250 mA from the cell | about 3–5 |
+| AS5600, one at a time, only while moving | under 1 |
 
-18650 at 2600 mAh (≈ 2300 usable) → **~2.5–3 months with no sun**. A 6 V 0.8 W panel (70 × 69 mm) behind glass
-gives maybe 80–250 mAh on a sunny day (less behind low-E glass), so in a window it should stay charged. Verify on
-the bench: USB meter for charge and motor current, a multimeter's µA/mA range for sleep current.
+The Wi-Fi radio is most of it. If the estimate holds, a 2600 mAh cell (about 2300 mAh usable) lasts weeks, not
+months, without charging. That is why the battery life is measured before anything else is decided about solar or
+the cell size.
 
-## Pin plan
-Port 1/2/3 IN1-IN2 on GPIO 14/18, 19/20, 16/17 (controller PCB v2); EN on 7/5/1;
-angle on ADC 6/4/2; battery voltage on 3; input-power (USB/solar) voltage on 0. Three 1N5819 diodes: USB-C and solar into the charger's
-single input, and charger LOAD to the ESP's 5V pin.
+## Pins
+From `firmware/blinds_matter/main/config.h` (PCB v2):
 
-## Connectors (everything modular)
-| Link | Connector |
-|---|---|
-| Tilter ↔ controller | **RJ12 6P6C** jack flush in the tilter's sensor module and 3 on the controller; white straight-wired phone cords |
-| Solar panel ↔ controller | 2-pin ZH 1.5 mm (comes on the panel's lead); matching socket on the controller |
-| Battery ↔ controller | JST-XH 2-pin (comes on the cell) |
-| Charging | USB-C on the controller end |
+| Port | IN1 | IN2 | EN | Angle |
+|---|---|---|---|---|
+| 1 | GPIO14 | GPIO18 | GPIO7 | GPIO6 |
+| 2 | GPIO19 | GPIO20 | GPIO5 | GPIO4 |
+| 3 | GPIO16 | GPIO17 | GPIO1 | GPIO2 |
 
-**Motor driver at each tilter** (decided 2026-10-28): every tilter carries its own DRV8833 in its sensor module, so the phone cord carries battery power and logic instead of the 20 kHz motor PWM. The flat, untwisted
-cord no longer couples motor noise into the angle wire, the controller loses both drivers, and a tilter is a
-complete unit (motor + driver + sensor + plug). 8 drivers from the 10-pack.
+Battery voltage on GPIO3 and input power (USB or solar) on GPIO0, each through a 1 MΩ / 1 MΩ divider. USB reads
+about 4.3 V on the input line.
 
-**RJ12 pinout** (cords must be *straight-wired*, pin 1 to pin 1; check continuity on every cord before use):
+## RJ12 pinout
+Cords must be **straight-wired**: pin 1 to pin 1. Check every cord.
+
 | Pin | Net | At the tilter |
 |---|---|---|
-| 1 | VBAT (3.0–4.2 V) | DRV8833 VCC, 10 µF to GND |
+| 1 | battery + (3.0–4.2 V) | DRV8833 VCC, 10 µF to GND |
 | 2 | IN1 (PWM) | DRV8833 IN1 |
 | 3 | GND | DRV8833 GND, AS5600 GND |
-| 4 | ANGLE | AS5600 OUT (GPO tied to VCC) |
-| 5 | EN (3.3 V from an ESP GPIO) | AS5600 VCC **and** DRV8833 EEP (sleep; the board's ULT is FAULT): one line wakes both |
+| 4 | angle | AS5600 OUT |
+| 5 | EN (3.3 V from an ESP pin) | AS5600 VCC **and** DRV8833 EEP (sleep): one line wakes both |
 | 6 | IN2 (PWM) | DRV8833 IN2 |
 
-Motor wires: DRV8833 OUT1 / OUT2 → N20 tabs, inside the sensor module. Each tilter uses one channel of its DRV8833; the other
-is spare. A reversed cord would put VBAT on IN2 and EN on ANGLE's neighbor, so the continuity check matters.
+A reversed cord would put battery + on IN2, so the continuity check matters.
 
-- On the tilter: the **sensor module** carries the
-  AS5600 board, the DRV8833 and the RJ12 jack. It is wired on the bench with two loose motor leads, soldered to the
-  N20 at final assembly, slid onto the lid face over the motor and held by 3 × M3 × 25 from the main half's back face.
-  The tilt rod runs through a tube in the module and can stick out.
-- **Color:** visible parts are white: white cords, white PLA cases. The solar panel's cells are black (a white
-  cell can't absorb light), so it sits in a white printed frame with the cells facing the glass; from inside the
-  room only the white back shows.
+## Connectors
+| Link | Connector |
+|---|---|
+| Tilter to controller | RJ12 6P6C, white straight-wired cord |
+| Battery to PCB | JST-XH 2-pin (on the cell's lead) |
+| Charger to PCB | JST-XH 6-pin harness |
+| Solar to PCB (optional) | JST-ZH 2-pin. v3 gets a DC jack instead ([#8](https://github.com/DrakeAnglin/tilt/issues/8)) |
+| Charging | the 6092's own USB-C, at end B of the box |
 
-## Still open
-- Which rail face looks at the glass (where the solar panel and its lead go), if solar is kept.
-- Cable lengths from each controller to its blinds (8 cords bought: 4 × 10 ft, 4 × 6.6 ft).
-- Bench: N20 torque from the battery; panel open-circuit voltage behind glass; sleep current.
+## Software
+- **Firmware** ([firmware/README.md](../firmware/README.md)): ESP-IDF and esp-matter. Soft start, slows near the
+  target, stops on a stall, follows a blind turned by hand. Schedules run on the controller, so they work with the
+  phone away.
+- **App** ([app/README.md](../app/README.md)): SwiftUI, with a widget and Control Center buttons. No server. It sets up
+  a new controller over Bluetooth (the Wi-Fi password goes sealed, to the controller only), then talks to it over a
+  secured channel on Wi-Fi with a key per phone (Owner and Guests). It adds the controller to Apple Home with the
+  controller's own setup code.
+- **Firmware updates**: signed release files on the public `DrakeAnglin/tilt-site` repo; the app installs them
+  ([app-store.md](app-store.md)).

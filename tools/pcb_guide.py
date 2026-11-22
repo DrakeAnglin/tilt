@@ -576,7 +576,7 @@ def md():
     a = L.append
     a('# Building the controller PCB, step by step')
     a('')
-    a('For the carrier PCB, v2.1 ([hardware/pcb](../hardware/pcb/README.md)). Every picture, part list and position here is')
+    a('For the carrier PCB, v2.1 and v2.2 ([hardware/pcb](../hardware/pcb/README.md)); on v2.2 skip step 0. Every picture, part list and position here is')
     a('generated from the real board file by [`tools/pcb_guide.py`](../tools/pcb_guide.py), so it matches the board you hold.')
     a('The circuit was proven on a hand-wired dev board first. On the PCB there is no hand')
     a('wiring. Every part drops into its own holes, and the copper does the rest.')
@@ -589,7 +589,7 @@ def md():
     a('**The silkscreen prints each part\'s value** (1M, 220, 100n, 1N5819 …), not its reference, so you can match parts to the')
     a('board without the picture. The references (R1, D3 …) are only in this guide.')
     a('')
-    a('**For the V5 box:** after each step, **trim every lead to 1.8 mm or less under the board**. The PCB sits 2.4 mm off')
+    a('**For the box:** after each step, **trim every lead to 1.8 mm or less under the board**. The PCB sits 2.4 mm off')
     a('the box floor.')
     a('')
     a('## Parts for one board')
@@ -631,11 +631,11 @@ def md():
     a('')
 
     # ---- step 1
-    a('## Step 0: Trim the jack edge (for the V5 box)')
+    a('## Step 0: Trim the jack edge (for the box)')
     a('')
     a('**v2.1 boards only** (back silkscreen "controller v2"). v2.2 boards come with this edge already in place: skip this step.')
     a('')
-    a('Cut **3 to 4 mm** off the board\'s jack edge (end A, the 47 mm wide end), straight across. The V5 box (rev M) has the')
+    a('Cut **3 to 4 mm** off the board\'s jack edge (end A, the 47 mm wide end), straight across. The controller box has the')
     a('jacks come through its end wall, which needs that edge out of the way. Any cut between 3 and 4 mm fits: the box locates')
     a('the board by its three screws, not by this edge.')
     a('')
@@ -760,7 +760,7 @@ def md():
     a('![step 8](renders/pcb-build-08.png)')
     a('')
     a('C9, beside the jack strip. **Long leg (+) into the square pad** by the silkscreen\'s **+**. The silkscreen circle\'s')
-    a('**shaded half is the − side**: the stripe on the can goes there. Push it right down: in the V5 box it has 2–3 mm under')
+    a('**shaded half is the − side**: the stripe on the can goes there. Push it right down: in the box it has 2–3 mm under')
     a('the lid\'s groove.')
     a('')
     # ---- step 9

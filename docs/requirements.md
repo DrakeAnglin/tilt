@@ -1,7 +1,7 @@
 # Requirements
 
 IDs are stable so issues, tests, and commits can reference them. **Must** = v1 release blocker.
-**Should** = targeted for v1. **Could** = later / bonus.
+**Should** = targeted for v1. **Could** = later. How the design meets them: [architecture.md](architecture.md).
 
 ## Functional
 
@@ -17,31 +17,32 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | F-8 | Could | **Physical button** on the controller (pairing/reset) | — |
 | F-9 | Should | **Groups and scenes** (e.g. "living room blinds") | Through the ecosystem or the app |
 | F-10 | Should | **Schedules** (time, sunrise/sunset), stored on the device so they work without the cloud | — |
-| F-11 | Could | **Lift**: raise and lower cordless blinds (see [lift-bonus.md](lift-bonus.md)) | — |
+| F-11 | Should | **Lift**: raise and lower cordless blinds (see [lift.md](lift.md)). Not built yet | — |
 | F-12 | Must | **Manual use**: the wand still tilts the blind by hand; the position updates at the next wake | Turn the wand; the app shows the new angle |
 
 ## Connectivity & integrations
 
 | ID | Pri | Requirement |
 |---|---|---|
-| C-1 | Must | **Matter over Thread** (sleepy end device) through the house's Thread border router |
+| C-1 | Must | **Matter over Wi-Fi** with no hub. Thread through a hub is a later goal |
 | C-2 | Must | Works with **Amazon Alexa** voice commands ("Alexa, open the bedroom blinds", "...set to 50%") |
-| C-3 | Should | Works with **Apple Home / Siri** |
+| C-3 | Must | Works with **Apple Home / Siri** |
 | C-4 | Should | Works with Google Home and Home Assistant (free with Matter) |
-| C-5 | Must | **Works locally**: no vendor cloud required for basic control |
-| C-6 | Must | **OTA firmware updates** |
+| C-5 | Must | **Works locally**: no vendor cloud, account or server ([ADR 0001](adr/0001-no-cloud-local-first.md)) |
+| C-6 | Must | **Firmware updates over Wi-Fi**, signed, installed from the app |
 | C-7 | Should | Each of the 3 motors shows up as its **own named blind** in Alexa/Home |
 
-## Setup app
+## App
 
 | ID | Pri | Requirement |
 |---|---|---|
-| A-1 | Must | Commissioning a new controller into Apple Home / Alexa (Matter QR code over BLE) |
+| A-1 | Must | Set up a new controller over Bluetooth (Wi-Fi password), then add it to Apple Home with the controller's own setup code |
 | A-2 | Must | Name each motor port / blind, enable/disable ports |
 | A-3 | Must | Calibration wizard (jog, set limits, test) |
-| A-4 | Should | Manual control per blind, status (position, battery level, firmware version) |
-| A-5 | Should | Works on iPhone and Android **without App Store distribution** (web app served by the device) |
-| A-6 | Could | Native app (Flutter) with discovery of all controllers in the house |
+| A-4 | Should | Manual control per blind, status (tilt, Battery level, firmware version) |
+| A-5 | Must | Native iPhone and iPad app (**Tilt**, App Store), finds the controllers on the home Wi-Fi |
+| A-6 | Should | Share a controller with the people you live with (Owner invites Guests) |
+| A-7 | Could | Android |
 
 ## Mechanical
 
@@ -52,7 +53,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | M-3 | Must | **Reversible install**: no permanent changes to the blinds (no cutting/drilling of the headrail) |
 | M-4 | Should | Low drive noise: printed helical gears, grease; TPU isolation only if tests show it's needed |
 | M-5 | Should | Parametric CAD so other people (MakerWorld) can adapt it to their headrail size and tilt rod shape |
-| M-6 | Must | Prints without supports; assembly with common M3 / M1.6 screws and M3 heat-set inserts |
+| M-6 | Must | Gears and their faces print without supports (the tilter's tray lid needs support under one shelf); assembly with common M3 / M1.6 screws and M3 heat-set inserts |
 | M-7 | Must | Controller box fits **inside a headrail**, under the tilt rod |
 
 ## Performance
@@ -61,7 +62,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 |---|---|---|---|
 | P-1 | Must | **Quiet** | < 35 dBA at 1 m during a move (fridge level); measure with a phone SPL app vs. the old servo setup |
 | P-2 | Must | **Strong enough for the largest blind** | Motor *rated* torque ≥ 2× measured worst-case torque (see [measure-your-blinds.md](measure-your-blinds.md)) |
-| P-3 | Should | Full tilt travel time (11–12 worm turns ≈ 13 motor turns) | 3–10 s (300 RPM N20 ≈ 2.5–4 s) |
+| P-3 | Should | Full tilt travel time (closed to closed, about 260° of rod) | under 15 s (one motor reduction set: about 19°/s at the rod, so about 14 s) |
 | P-4 | Must | Positioning repeatability | ±2% of travel |
 | P-5 | Should | Lifetime | 10 years at 6 moves/day ≈ 22,000 cycles |
 
@@ -69,12 +70,12 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 
 | ID | Pri | Requirement |
 |---|---|---|
-| E-1 | Must | **Cordless**: 18650 cell per controller, ≥ 2 months per charge with no sun; charged from any USB-C charger. No wall (AC) power on our boards |
-| E-2 | Should | Optional small solar panel on the glass keeps the cell charged |
+| E-1 | Must | **Cordless**: 18650 cell per controller, charged from any USB-C charger. No wall (AC) power on our boards. Target ≥ 2 months per charge with no sun: on Wi-Fi this may not hold; measured in [#6](https://github.com/DrakeAnglin/tilt/issues/6) |
+| E-2 | Should | Optional small solar panel keeps the cell charged (v3: DC jack, [#8](https://github.com/DrakeAnglin/tilt/issues/8)) |
 | E-3 | Must | A stalled motor never browns out the ESP32 (one motor runs at a time; stall stop) |
-| E-4 | Must | Charging stops when the cell is hot (NTC); solar input clamped; ESD protection on the ports (PCB) |
+| E-4 | Must | Solar input clamped; fuse on each port; protected cells only. Charging stops when the cell is hot: open (the v2 board has no probe on the cell) |
 | E-5 | Should | Motor cables up to 3 m from the controller to each blind |
-| E-6 | Must | No exposed pinch points that could catch fingers; child safety for any cords (lift bonus) |
+| E-6 | Must | No exposed pinch points that could catch fingers; child safety for any cords (lift); the box must not pinch the blind's lift cord |
 
 ## Distribution
 

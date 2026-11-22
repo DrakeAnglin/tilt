@@ -10,13 +10,32 @@ checked there, and exported as STLs. One version of each part is kept; older one
 
 Print files: `python3 tools/orient.py && python3 tools/bambu.py` writes `stl/tilter/print/` and the Bambu Studio projects.
 
-## Known dimensions
+## The headrail
+Measured on the owner's cordless blinds (2026-10-25 and 26). Everything slides into the channel; nothing clamps its
+thin plastic walls.
+
 | What | Value |
 |---|---|
-| Headrail inner width × height | about 55.5 × 36.5 mm, 2 mm plastic walls, lips 4.5 mm in at the top |
+| Inner width × height | about 55.5 × 36.5 mm, 2 mm plastic walls, lips 4.5 mm in at the top ([cross-section](../../docs/reference/headrail-cross-section.png)) |
 | Tilt rod | 4 mm square steel, axis 24 mm above the inner floor, centered. A crimp stops it about 21 mm into the tilter |
-| Free length, end cap to first tilt drum | 110 mm |
+| Free length, end cap to first tilt drum | 110 mm (the tilter's pocket) |
 | Clearance above the installed headrail | about 6.5 mm: nothing may stick up more than about 5 mm |
+| Tilt travel | 11–12 wand turns closed to closed, about 250–270° of rod. Tilt torque is low |
+| Lift | a separate, self-contained module (two cord spools with spring drums), not connected to the tilt rod ([lift](../../docs/lift.md)) |
+
+## Reference photos
+In [`docs/reference/`](../../docs/reference/):
+
+| Photo | What it shows |
+|---|---|
+| [headrail-end-tilt-drum](../../docs/reference/headrail-end-tilt-drum.jpg) | Tilt drum in its cradle on the 4 mm square rod |
+| [headrail-end-profile](../../docs/reference/headrail-end-profile.jpg) | U-channel profile with inward lips |
+| [headrail-square-tilt-rod](../../docs/reference/headrail-square-tilt-rod.jpg) | Square rod running the full length |
+| [tilt-drum-ladder-cords](../../docs/reference/tilt-drum-ladder-cords.jpg) | Tilt drum with its ladder cords |
+| [printed-tilt-drum-front](../../docs/reference/printed-tilt-drum-front.jpg), [angle](../../docs/reference/printed-tilt-drum-angle.jpg) | The owner's printed copy of a tilt drum |
+| [tilter-side](../../docs/reference/tilter-side.jpg), [top](../../docs/reference/tilter-top-ruler.jpg), [face](../../docs/reference/tilter-face-ruler.jpg), [back face](../../docs/reference/tilter-back-face-ruler.jpg) | The blind's factory tilter, with a ruler |
+| [tilter-opened-overview](../../docs/reference/tilter-opened-overview.jpg), [gear](../../docs/reference/tilter-opened-gear.jpg), [worm](../../docs/reference/tilter-opened-worm.jpg), [worm gear](../../docs/reference/tilter-worm-gear.jpg) | Factory tilter opened: worm and 16T wheel (16:1), wand loop through the corner notch |
 
 ## Materials
-Housing in PLA. Parts that rub or mesh against PLA all the time in PETG. Grease the gears with Super Lube 21030.
+Housing in PLA. Parts that rub or mesh against PLA all the time in PETG. All white. Grease the gears with Super Lube
+21030.

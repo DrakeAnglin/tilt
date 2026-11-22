@@ -2,8 +2,8 @@
 
 Each tilter's **sensor module** holds three small boards: the **RJ12 breakout** (where the phone cord plugs in), the
 **DRV8833** motor driver and the **AS5600** angle sensor, plus two leads to the **N20 motor**. The controller only sends
-battery power and logic down the cord; the driver right here turns that into motor current. Same color code as the
-controller, so a cord can be checked end to end by color.
+battery power and logic down the cord; the driver right here turns that into motor current. Do this on the bench,
+before the [tilter assembly](../hardware/mechanical/stl/tilter/README.md#assembly).
 
 ![tilter wiring](renders/tilter-wiring.png)
 
@@ -12,8 +12,8 @@ controller, so a cord can be checked end to end by color.
 |---|---|
 | RJ12 6P6C breakout (risingsaplings) | 1 |
 | DRV8833 motor driver board (Suuoo) | 1 |
-| AS5600 board (with its Ø4 × 2 magnet, already in the sensor gear) | 1 |
-| N20 motor (fitted in the lid) | 1 |
+| AS5600 board, **already switched to PWM output** (its Ø4 × 2 magnet goes in the magnet gear) | 1 |
+| N20 motor (screwed to the motor shell at assembly) | 1 |
 | Ceramic capacitor 10 µF (106) | 1 |
 | **22 AWG** stranded: 1 red, 1 black, ~6 cm each (battery +, GND to the driver) | 2 |
 | **30 AWG** silicone, ~6 cm each: green, yellow, blue ×2, white, black | 6 |
@@ -31,20 +31,24 @@ edge marked **J1** between the words **"en"** and **"sleep"** (some batches prin
 2. Meter on **resistance (Ω)** between **EEP** and **VCC**: **megohms or open** is good. Near 0 = the jumper is still
    closed; a few kΩ = a pull-up resistor on EEP: remove it before wiring.
 
+**AS5600: switch it to PWM first.** Do this once per sensor, before any wiring, with the bench tool
+([firmware/README.md](../firmware/README.md#as5600_setup-sensor-bench-tool)): it needs the SDA and SCL pads, which
+are left empty in the tilter. The controller reads the angle as PWM.
+
 **AS5600: two links and two checks.** On this board the header pins are on opposite sides: **VCC, OUT, GND** on the
 left (VCC = square pad), **DIR, SCL, SDA, GPO** on the right (DIR = square pad). So the links are short pieces of
 **30 AWG wire on the back of the board**, pad to pad, not bridges between neighbors (dashed in the picture).
-1. **GPO to VCC** (blue): analog output mode, as the controller reads it.
+1. **GPO to VCC** (blue): GPO is the chip's program pin. Tied high it stays in normal mode.
 2. **DIR to GND** (black): DIR sets which way the angle counts; left open it floats and the reading can flip at random.
    Solder the links on the back before fitting header pins or leads to those pads, and keep them flat (the board sits
    in a seat).
 3. **3.3 V check:** the chip needs its 5V and 3V3 supply pins joined when run from 3.3 V. Meter in beep mode: **VCC**
    to one end of **C1** and to one end of **C2** (the two small parts beside R1, top of the board). If VCC beeps to
-   both, you're set. If it only beeps to one, send a photo before bridging anything.
-4. **R4** (bottom right, next to GPO) is a pull-up on the output on some versions. Leave it for now; if the angle
-   later reads stuck near the top of its range, remove it.
-5. Mechanical: file ~1 mm off the board edge nearest the rod so it fits its seat (see the
-   [tilter build](../hardware/mechanical/stl/tilter/README.md)).
+   both, you're set. If it only beeps to one, stop: don't bridge
+   anything until you know which pads are which.
+4. **R4** (bottom right, next to GPO) is a pull-up on the output on some versions. Leave it; if the angle later
+   reads stuck, remove it.
+5. Mechanical: if the board does not drop onto its studs in the tray, file a little off the edge nearest the rod.
 
 **Check the cord** before you trust it: meter beep mode, plug end to plug end. **Pin 1 must beep to pin 1** (not
 pin 6) on every cord: "straight-wired" is used loosely in listings, and a reversed cord puts battery + on IN2.
@@ -72,7 +76,6 @@ sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Le
 the driver and **SCL, SDA** on the sensor empty.
 
 ## 3. Check before plugging in
-The checks:
 Meter in beep mode, nothing connected:
 - RJ12 **pin 1 to pin 3** (battery + to GND): **no beep**.
 - Pin 5 (EN) to pin 3 (GND): no beep. Pin 4 (angle) to pin 3: no beep.
@@ -81,9 +84,10 @@ Meter in beep mode, nothing connected:
 - DRV8833 EEP to VCC: megohms or open (no jumper, no pull-up). Nothing on ULT.
 
 ## 4. Final assembly
-At final assembly, solder the white pair's free ends to the N20's two tabs (either way round; swap them later if the
-motor turns the wrong way), route them as the [tilter build](../hardware/mechanical/stl/tilter/README.md) step 4
-describes, and slide the module onto the lid.
+At final assembly, solder the white pair's free ends to the N20's two tabs (either way round; swap them if the
+motor turns the wrong way), then fit the boards into the tray as the
+[tilter build](../hardware/mechanical/stl/tilter/README.md#assembly) describes.
 
 ## Next
-Plug it into a controller port with an RJ12 cord and run setup in the Tilt app before it goes on a blind.
+Plug it into a controller port with an RJ12 cord and run setup in the Tilt app
+([build guide, step 7](build-guide.md#7-set-up-in-the-tilt-app)).
