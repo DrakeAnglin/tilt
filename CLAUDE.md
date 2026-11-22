@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues and specs are local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+Issues and specs are GitHub Issues on `DrakeAnglin/tilt` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Domain docs
 

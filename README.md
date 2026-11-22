@@ -19,7 +19,7 @@ Only the current version of each thing is kept here. Older versions are in the G
 | [docs](docs) | Design notes, build guides, reference photos |
 
 ## Start here
-- **What to do next:** [docs/todo.md](docs/todo.md)
+- **What to do next:** [GitHub issues](https://github.com/DrakeAnglin/tilt/issues)
 - **Tilter** (parts, printing, assembly, checks): [hardware/mechanical/stl/tilter/README.md](hardware/mechanical/stl/tilter/README.md)
 - **Controller box:** [docs/controller-box.md](docs/controller-box.md). **PCB build:** [docs/pcb-build.md](docs/pcb-build.md)
 - **Wiring a tilter:** [docs/tilter-wiring.md](docs/tilter-wiring.md)

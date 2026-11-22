@@ -28,6 +28,7 @@ tools/.blinds_client.json
 # Xcode / iOS app
 build-phone/
 build-release/
+build-release.log
 build-phone.log
 install-phone.log
 xcuserdata/

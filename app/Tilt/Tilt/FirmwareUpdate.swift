@@ -17,7 +17,7 @@ struct FirmwareRelease: Decodable, Equatable {
 final class FirmwareUpdates {
     static let shared = FirmwareUpdates()
     /// Where the release list lives. tools/release_firmware.py writes it; it is uploaded with each release.
-    static let defaultSource = "https://github.com/OWNER/REPO/releases/latest/download/firmware.json"
+    static let defaultSource = "https://github.com/DrakeAnglin/tilt/releases/latest/download/firmware.json"
 
     private(set) var stable: FirmwareRelease?
     private(set) var beta: FirmwareRelease?

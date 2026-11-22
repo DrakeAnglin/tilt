@@ -8,9 +8,10 @@ What is still needed before Tilt can go to TestFlight and the App Store, and the
    "Deploy Schema Changes" to copy the record types `Join` and `Gone` to Production. Add a query index on `Join.topic`
    (queryable) if the console asks.
 3. **Privacy policy URL:** once the repo is public on GitHub, use the link to `docs/privacy-policy.md`.
-4. **Firmware hosting:** once the repo is on GitHub, set `FirmwareUpdates.defaultSource` in
-   `app/Tilt/Tilt/FirmwareUpdate.swift` to `https://github.com/<user>/<repo>/releases/latest/download/firmware.json`,
-   and upload `firmware/releases/firmware.json` and the signed `.bin` to each GitHub release.
+4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt/releases/latest/download/firmware.json`.
+   For each firmware release: `python3 tools/release_firmware.py stable --notes "..."` (builds without secrets, signs),
+   then upload `firmware/releases/firmware.json` and the new `tilt-<version>.bin` to a GitHub release. The repo must be
+   public for phones to download them.
 5. **Release-day clean-up on the controller:** remove the "Duo Test" user, and the "Mac owner" key once the app can do
    every update (the Mac tools need that key today).
 

@@ -36,4 +36,4 @@ Solder the PCB first: [PCB build guide](pcb-build.md). The charger harness and b
 The top has no screw heads and the heads underneath sit flush, so the box slides into the rail.
 
 ## To do
-The box pinches the lift cord under its middle: add stick-on feet (see [todo.md](todo.md)).
+The box pinches the lift cord under its middle: add stick-on feet ([#9](https://github.com/DrakeAnglin/tilt/issues/9)).

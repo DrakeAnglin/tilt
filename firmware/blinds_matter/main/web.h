@@ -16,10 +16,17 @@
 #include "fwkey.h"
 #include <mbedtls/sha256.h>
 #include <mbedtls/ecdsa.h>
+#ifdef TILT_RELEASE
+// A public release carries no secrets: Wi-Fi comes from Bluetooth setup, and updates must be signed.
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
+#define OTA_PASSWORD ""
+#else
 #include "secrets.h"
+#endif
 #include <mdns.h>
 
-#define FW_VERSION "2.2.0-dev11"
+#define FW_VERSION "2.2.0"
 SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
 uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
 bool otaPending = false, restartSoon = false;
@@ -464,7 +471,7 @@ bool fwSignatureOk(const uint8_t hash[32], const uint8_t sig[64]) {
 esp_err_t hUpdate(httpd_req_t *r) {
   char pw[80] = "";
   httpd_req_get_hdr_value_str(r, "X-Update-Password", pw, sizeof pw);
-  bool pwOk = strcmp(pw, OTA_PASSWORD) == 0;
+  bool pwOk = OTA_PASSWORD[0] && strcmp(pw, OTA_PASSWORD) == 0;      // no password in a release: only signed files
   if (owned() && !openApi && (int32_t)(otaWindow - millis()) <= 0) return fail(r, "updates are locked: the owner must allow them from the app");
   { Lock l; stopAll("stopped"); }
   const esp_partition_t *to = esp_ota_get_next_update_partition(nullptr);

@@ -256,7 +256,7 @@ extern "C" void app_main()
     wifi_config_t wcfg = {};
     // (Only the development controller gets the built-in network. Any other board starts with none and is set up from
     // the app over Bluetooth.)
-    if (ctrlId() == "9888e0710610" && esp_wifi_get_config(WIFI_IF_STA, &wcfg) == ESP_OK && !wcfg.sta.ssid[0]) {
+    if (WIFI_SSID[0] && ctrlId() == "9888e0710610" && esp_wifi_get_config(WIFI_IF_STA, &wcfg) == ESP_OK && !wcfg.sta.ssid[0]) {
         strlcpy((char *)wcfg.sta.ssid, WIFI_SSID, sizeof wcfg.sta.ssid);
         strlcpy((char *)wcfg.sta.password, WIFI_PASSWORD, sizeof wcfg.sta.password);
         esp_wifi_set_storage(WIFI_STORAGE_FLASH);
