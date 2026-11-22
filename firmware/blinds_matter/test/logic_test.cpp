@@ -1,6 +1,7 @@
-// Tests for main/logic.h and main/request.h, run on the Mac: tools/firmware_tests.sh. No hardware, no ESP-IDF.
+// Tests for main/logic.h, main/request.h and main/tilter.h, run on the Mac: tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
 #include "../main/request.h"
+#include "../main/tilter.h"
 #include <cstdio>
 #include <ctime>
 #include <string>
@@ -60,6 +61,86 @@ static void requestTests() {
     CHECK(s.log == "n2:50 " && r.started == 1, "hand: the others follow, unless already there; gentle moves kept"); }
 }
 
+// A simulated Tilter: a rod turned through gear play, an Angle that reads 3 degrees high while the motor runs, hard
+// stops, a PWM sensor's blind spot near its zero, and a hand that can turn the wand.
+struct SimTilter : Tilter {
+  uint32_t t = 0;
+  float rod = 290, gear = 290;  // the rod's true angle; where the motor side of the gear play is
+  float play = 5;               // gear play, degrees of rod turn
+  float degPerS = 2.5f;         // at full duty
+  int phys = 1;                 // +1: motor "forward" makes the angle rise
+  float lo = -1e9f, hi = 1e9f;  // hard stops (unwrapped degrees)
+  float blindLo = -1, blindHi = -1;  // the sensor sees nothing while the rod is past blindLo or before blindHi (reads 0); -1 = never
+  uint32_t wandAt = 0; float wandBy = 0;   // a hand turns the wand this much at this time
+  int dir = 0, duty = 0;
+  int8_t sign = 1;
+  TiltMemory mem;
+  TiltSettings set{Marks{200, 290, 40}, 100, 12000, 2500, 180000, 1.0f};
+  int keeps = 0;
+  std::string log, endMsg;
+  Move last;
+  void step(uint32_t dt) {
+    t += dt;
+    if (wandAt && t >= wandAt) { rod += wandBy; gear += wandBy; wandAt = 0; }
+    gear += phys * dir * degPerS * duty / 100.0f * dt / 1000.0f;
+    if (gear > rod + play / 2) rod = gear - play / 2;
+    if (gear < rod - play / 2) rod = gear + play / 2;
+    if (rod > hi) rod = hi;
+    if (rod < lo) rod = lo;
+    gear = std::min(std::max(gear, rod - play / 2), rod + play / 2);
+  }
+  float wrapped() { return fmodf(fmodf(rod, 360.0f) + 360.0f, 360.0f); }
+  bool inBlind() { float a = wrapped(); return blindLo >= 0 && (a >= blindLo || a <= blindHi); }
+  uint32_t ms() override { return t; }
+  bool wake() override { return true; }
+  float angle() override { return inBlind() ? 0 : fmodf(wrapped() + (dir ? 3.0f : 0) + 360.0f, 360.0f); }
+  bool noReading() override { return inBlind(); }
+  float note(float a) override { return a; }
+  void motor(int d, int pct) override { dir = d; duty = pct; }
+  TiltSettings settings() override { return set; }
+  int8_t &motSign() override { return sign; }
+  TiltMemory &memory() override { return mem; }
+  void keep() override { keeps++; }
+  void say(const char *msg) override { log += msg; log += "; "; }
+  void ended(const Move &m, const char *msg) override { last = m; endMsg = msg; }
+  // Run a move to a tilt until it ends (100 ticks a second, as motionTick does). Returns the tilt it ended at.
+  float go(float tilt, uint32_t limitMs = 300000) {
+    Move m;
+    moveFresh(m, MV_TILT, 0, t);
+    m.tgt = tilt;
+    while (m.kind != MV_NONE && t < limitMs) { step(10); moveTick(m, *this, t); }
+    return tiltOfMarks(set.marks, wrapped());
+  }
+};
+static void tilterTests() {
+  { SimTilter s; float t = s.go(50);
+    CHECK(s.endMsg == "reached" && near(t, 50, 5), "reaches a Target through gear play and the high reading"); }
+  { SimTilter s; s.go(50); float before = s.mem.lead[0];
+    SimTilter s2; s2.mem.lead[0] = -1; s2.go(50);
+    CHECK(s2.mem.lead[0] > -1 && near(before, 2.5f, 1.5f), "lead is learned toward what the rod really does"); }
+  { SimTilter s; s.lo = 270; s.go(50);
+    CHECK(s.endMsg == "blocked (stalled)" && s.last.stalled, "a stall short of the Target reports blocked"); }
+  { SimTilter s; s.lo = 206; s.go(100);
+    CHECK(s.endMsg == "reached (end stop)", "a stall near a closed mark counts as reached"); }
+  { SimTilter s; s.mem.lead[0] = -1; s.go(50);                    // stops about 3 degrees late
+    float over = fabsf(angDiff(s.wrapped(), 245));
+    CHECK(s.endMsg == "reached" && s.last.turnBacks == 0 && over > TOL_DEG && over <= OVER_OK_DEG, "overshoot under the limit is left alone"); }
+  { SimTilter s; s.mem.lead[0] = -6; s.go(50);                    // stops about 8 degrees late
+    CHECK(s.endMsg == "reached" && s.last.turnBacks >= 1, "overshoot past the limit turns back"); }
+  { SimTilter s; s.phys = -1; s.hi = 320; float t = s.go(50);     // wired the other way round
+    CHECK(s.log.find("going the wrong way") != std::string::npos, "wrong way: tries the other direction");
+    CHECK(s.endMsg == "reached" && near(t, 50, 5) && s.sign == -2 && s.keeps == 1, "direction learned and kept"); }
+  { SimTilter s; s.sign = 2; s.phys = -1; s.hi = 320; s.go(50);   // a confirmed direction is not flipped
+    CHECK(s.endMsg == "blocked (stalled)" && s.sign == 2 && s.keeps == 0, "confirmed direction stays"); }
+  { SimTilter s; s.wandAt = 6000; s.wandBy = 12; float t = s.go(50);
+    CHECK(s.endMsg == "reached" && near(t, 50, 5), "a wand turn during the move: still reaches"); }
+  { SimTilter s; s.set.marks = Marks{300, 10, 100}; s.rod = s.gear = 50; s.blindLo = 351; s.blindHi = 4;
+    float t = s.go(100);                                         // passes the PWM sensor's zero on the way
+    CHECK(s.endMsg == "reached" && !s.last.stalled && near(t, 100, 5), "no reading at the sensor's zero is not a stall"); }
+  { SimTilter s; s.rod = s.gear = 244; s.go(50);
+    CHECK(s.endMsg == "already there" && s.dir == 0, "already there: the motor never runs"); }
+}
+
 int main() {
   // ---- angles
   CHECK(near(angDiff(10, 350), 20, 1e-4), "angDiff crosses zero forward");
@@ -96,6 +177,9 @@ int main() {
 
   // ---- Move requests
   requestTests();
+
+  // ---- one blind's Move, on a simulated Tilter
+  tilterTests();
 
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");

@@ -1,7 +1,7 @@
 // Motion. Every blind has its own move, so several can turn at the same time (parMode on), or one after another with
 // the rest waiting their turn (parMode off: easiest on the battery). Tilt is -100 (closed, slats down) .. 0 (open, level) ..
-// +100 (closed, slats up), from three marked sensor angles. Every move is timed, stops on a stall, and ends with a
-// reading taken with the motor stopped (the angle reads high while the motor runs: shared ground wire).
+// +100 (closed, slats up), from three marked sensor angles. The move itself is tilter.h; this file is the controller's
+// side: the sensors, the motor drivers, and the Tilter adapter (EspTilter) that tilter.h works through.
 #pragma once
 #include "power.h"
 #include "pwmin.h"
@@ -18,34 +18,11 @@ struct BlindState {
   bool queued = false;
   float qTilt = 0;
   char last[48] = "";           // how the last move ended
-  int lastRaw = 0;              // which way the motor last turned (0 = not known): the other way has gear play to take up
-  // How far the settled angle ends up beyond the last reading taken while running, per direction of turn
-  // ([0] angle falling, [1] angle rising). It covers the sensor reading off while the motor runs, the delay of the
-  // readings, and the rod carrying on. Learned at every stop; the motor is stopped this much early.
-  float lead[2] = {2.5f, -3.0f};   // measured: it reads about 3 deg high while running, either way
+  TiltMemory mem;               // which way it last turned, and how far it carries on (tilter.h)
 };
 BlindState bs[PORTS];
 
-enum { MV_NONE, MV_TILT, MV_ANGLE, MV_JOG };
-enum { MS_WAKE, MS_RUN, MS_SETTLE, MS_PULSE, MS_POST };
-struct Move {
-  int kind = MV_NONE, port = -1, st = MS_WAKE;
-  float tgt = 0;                // tilt (MV_TILT) or sensor angle (MV_ANGLE)
-  int jogDir = 0, pct = 100;
-  uint32_t t0 = 0, ts = 0, deadline = 0, stallT = 0, lastTick = 0, runMs = 0, spT = 0;
-  uint32_t winT = 0;
-  int winN = 0;
-  float winRef = 0, winAcc = 0, fAng = NAN, hb[5];   // quarter-second averages; the last five raw readings
-  int hn = 0, hit = 0;
-  float spRef = 0, slowest = 999, stallRef = 0, startErr = 0, runErr = 0, startAng = 0, live = NAN;
-  int angDir = 0, travel = 0, nudges = 0, rawDir = 0;
-  bool stalled = false, flipped = false, refSet = false, graceSet = false, fromRun = false;
-  uint32_t grace = 12000;
-  float lastA = NAN;
-  int lastDir = 0, turnBacks = 0;
-  const char *endMsg = nullptr;
-  const char *why = nullptr;    // forced stop reason
-};
+// (Move: tilter.h)
 Move mvs[PORTS];                // one per port
 Move *cur = &mvs[0];            // the one being worked on right now
 #define MVX (*cur)
@@ -75,12 +52,6 @@ void motorRaw(int p, int d, int pct) {        // DRV8833 slow decay: one input h
   else { ledcWrite(P_IN1[p], 255); ledcWrite(P_IN2[p], 255); }
   motOn[p] = d != 0;
   motorOn = motOn[0] || motOn[1] || motOn[2];
-  Move &m = mvs[p];
-  if (d && m.kind != MV_NONE) {
-    m.rawDir = d;
-    if (!m.graceSet) { m.graceSet = true; m.grace = bs[p].lastRaw == d ? (uint32_t)SAME_DIR_GRACE_MS : tune.graceMs; }
-    bs[p].lastRaw = d;
-  }
 }
 float degOf(float mv) { return constrain(mv / 1000.0f / (vdd - EN_DROP_V), 0.0f, 1.0f) * 360.0f; }   // output is a fraction of the sensor's supply
 // The rail dips for a millisecond or two whenever Wi-Fi transmits, and the sensor's output dips with it. So the rail is
@@ -193,10 +164,6 @@ bool handBusy = false;                         // the watch is on a blind that i
 void handCheck(int p, uint32_t now);
 uint32_t setupSeen = 0;                        // millis of the app's last "setup is open" call: no following by hand then
 // ---- moves
-float moveErr(float ang) {                    // signed degrees; + means the angle has to rise
-  if (MVX.kind == MV_TILT) return (xOfTilt(MVX.port, MVX.tgt) - arcX(MVX.port, ang)) * sgn(angDiff(cfg.b[MVX.port].up, cfg.b[MVX.port].open));
-  return angDiff(MVX.tgt, ang);
-}
 // A recording of the last move, for the developer page: the angle every 40 ms from the start until 1.5 s after the stop.
 struct TracePt { uint16_t t, a; uint8_t st; };          // t: 10 ms units; a: tenths of a degree; st: state, +16 = motor on
 const int TRACE_N = 1500;
@@ -205,68 +172,57 @@ int traceN = 0;
 uint32_t traceT0 = 0, traceLast = 0;
 float traceTgt = NAN;
 int tracePort = -1;                            // whose move is being recorded (the first one that started)
-void tr(uint32_t now, float a) {
-  if (MVX.port != tracePort || traceN >= TRACE_N || now - traceLast < 40 || isnan(a)) return;
+void tr(const Move &m, uint32_t now, float a) {
+  if (m.port != tracePort || traceN >= TRACE_N || now - traceLast < 40 || isnan(a)) return;
   traceLast = now;
-  trace[traceN++] = {(uint16_t)((now - traceT0) / 10), (uint16_t)lroundf(a * 10.0f), (uint8_t)(MVX.st | (motOn[MVX.port] ? 16 : 0))};
+  trace[traceN++] = {(uint16_t)((now - traceT0) / 10), (uint16_t)lroundf(a * 10.0f), (uint8_t)(m.st | (motOn[m.port] ? 16 : 0))};
 }
 float handRef[PORTS] = {NAN, NAN, NAN};        // each blind's tilt as the controller last left it (see "turned by hand")
-void finishMove(const char *msg) {
-  int p = MVX.port;
-  motorRaw(p, 0, 0);
-  sensorOff(p);
-  if (MVX.kind != MV_JOG) {
-    bool better = fabsf(moveErr(bs[p].ang)) < MVX.startErr - 3.0f;
-    if (MVX.flipped && !better) cfg.b[p].motSign = -cfg.b[p].motSign;      // the flip did not help: undo it
-    else if (better && abs(cfg.b[p].motSign) != 2) {                      // it went the right way: direction is now known
-      cfg.b[p].motSign = msign(p) * 2;
-      cfgSave();
-      event("%s: motor direction confirmed (%+d)", cfg.b[p].name, msign(p));
-    }
-    stats.moves[p]++;
-    if (MVX.stalled) stats.stalls[p]++;
-    float trav = fabsf(angDiff(bs[p].ang, MVX.startAng)), avg = MVX.runMs ? trav * 1000.0f / MVX.runMs : 0;
-    char sp[40];
-    snprintf(sp, sizeof sp, "%.1f deg/s, %d nudge%s, %d turn-back%s", avg, MVX.nudges - MVX.turnBacks, MVX.nudges - MVX.turnBacks == 1 ? "" : "s", MVX.turnBacks, MVX.turnBacks == 1 ? "" : "s");
-    if (isnan(bs[p].tilt)) event("%s: %s at %.1f deg (%.1f s, %s)", cfg.b[p].name, msg, bs[p].ang, MVX.runMs / 1000.0f, sp);
-    else event("%s: %s at tilt %.0f (%.1f deg, %.1f s, %s)", cfg.b[p].name, msg, bs[p].tilt, bs[p].ang, MVX.runMs / 1000.0f, sp);
-  } else if (MVX.runMs > 800) event("%s: jog %.1f deg in %.1f s%s", cfg.b[p].name, angDiff(bs[p].ang, MVX.startAng), MVX.runMs / 1000.0f, MVX.stalled ? " (stalled)" : "");
-  stats.motorMs += MVX.runMs;
-  if (!powered) stats.battMotorMs += MVX.runMs;
-  strlcpy(bs[p].last, msg, sizeof bs[p].last);
-  bs[p].target = NAN;
-  handRef[p] = bs[p].tilt;                     // the motor put it here: not a turn by hand
-  MVX = Move();
-}
-void toSettle(const char *why) {
-  MVX.fromRun = MVX.st == MS_RUN;
-  motorRaw(MVX.port, 0, 0);
-  MVX.why = why;
-  MVX.st = MS_SETTLE;
-  MVX.ts = millis();
-}
-void beginRun(float a) {
-  MVX.st = MS_RUN;
-  MVX.ts = MVX.stallT = MVX.spT = MVX.winT = millis();
-  MVX.stallRef = MVX.spRef = MVX.winRef = MVX.fAng = a;
-  MVX.winAcc = 0; MVX.winN = 0; MVX.hn = 0; MVX.hit = 0;
-  MVX.graceSet = false;
-  MVX.stalled = false;
-  MVX.runErr = fabsf(moveErr(a));
-  MVX.refSet = false;
-  MVX.angDir = 0;
-}
+// The Tilter seam's controller adapter: today's sensor, motor, clock, settings and log calls for one port.
+struct EspTilter : Tilter {
+  int p;
+  EspTilter(int port) : p(port) {}
+  uint32_t ms() override { return millis(); }
+  bool wake() override { senseWake(p); return bs[p].present; }
+  float angle() override { return readAngle(p); }
+  bool noReading() override { return bs[p].blind; }
+  float note(float a) override { noteAngle(p, a); return bs[p].ang; }
+  void motor(int d, int pct) override { motorRaw(p, d, pct); }
+  TiltSettings settings() override {
+    return {marksOf(p), cfg.b[p].speed, tune.graceMs, tune.stallMs, (uint32_t)tune.moveMaxS * 1000, tune.stallDeg10 / 10.0f};
+  }
+  int8_t &motSign() override { return cfg.b[p].motSign; }
+  TiltMemory &memory() override { return bs[p].mem; }
+  void keep() override { cfgSave(); }
+  void say(const char *msg) override { event("%s: %s", cfg.b[p].name, msg); }
+  void trace(uint32_t now, float a, const Move &m) override { tr(m, now, a); }
+  void ended(const Move &m, const char *msg) override {
+    sensorOff(p);
+    if (m.kind != MV_JOG) {
+      stats.moves[p]++;
+      if (m.stalled) stats.stalls[p]++;
+      float trav = fabsf(angDiff(bs[p].ang, m.startAng)), avg = m.runMs ? trav * 1000.0f / m.runMs : 0;
+      char sp[40];
+      snprintf(sp, sizeof sp, "%.1f deg/s, %d nudge%s, %d turn-back%s", avg, m.nudges - m.turnBacks, m.nudges - m.turnBacks == 1 ? "" : "s", m.turnBacks, m.turnBacks == 1 ? "" : "s");
+      if (isnan(bs[p].tilt)) event("%s: %s at %.1f deg (%.1f s, %s)", cfg.b[p].name, msg, bs[p].ang, m.runMs / 1000.0f, sp);
+      else event("%s: %s at tilt %.0f (%.1f deg, %.1f s, %s)", cfg.b[p].name, msg, bs[p].tilt, bs[p].ang, m.runMs / 1000.0f, sp);
+    } else if (m.runMs > 800) event("%s: jog %.1f deg in %.1f s%s", cfg.b[p].name, angDiff(bs[p].ang, m.startAng), m.runMs / 1000.0f, m.stalled ? " (stalled)" : "");
+    stats.motorMs += m.runMs;
+    if (!powered) stats.battMotorMs += m.runMs;
+    strlcpy(bs[p].last, msg, sizeof bs[p].last);
+    bs[p].target = NAN;
+    handRef[p] = bs[p].tilt;                     // the motor put it here: not a turn by hand
+  }
+};
+EspTilter tilters[PORTS] = {EspTilter(0), EspTilter(1), EspTilter(2)};
 bool beginMove(int kind, int p) {             // leaves cur on port p
   cur = &mvs[p];
   if (MVX.kind != MV_NONE) { motorRaw(p, 0, 0); sensorOff(p); bs[p].target = NAN; }
   bool others = false;
   for (int i = 0; i < PORTS; i++) if (i != p && mvs[i].kind != MV_NONE) others = true;
-  MVX = Move();
-  MVX.kind = kind;
-  MVX.port = p;
   if (watchOn) { if (watchPort != p) sensorOff(watchPort); watchOn = false; }
   watchPort = -1; handBusy = false;
-  MVX.t0 = MVX.ts = MVX.lastTick = millis();
+  moveFresh(MVX, kind, p, millis());
   if (!others) { tracePort = p; traceN = 0; traceT0 = MVX.t0; traceLast = 0; traceTgt = NAN; }
   digitalWrite(P_EN[p], HIGH);
   return true;
@@ -282,7 +238,7 @@ const char *startTilt(int p, float t) {
   Use u(p);
   if (MVX.kind == MV_TILT) {                    // new target while moving: carry on from here
     MVX.tgt = t; MVX.nudges = 0; MVX.t0 = millis(); bs[p].target = t;
-    if (MVX.st != MS_WAKE) beginRun(isnan(MVX.live) ? bs[p].ang : MVX.live);
+    if (MVX.st != MS_WAKE) beginRun(MVX, tilters[p], isnan(MVX.live) ? bs[p].ang : MVX.live);
     return nullptr;
   }
   beginMove(MV_TILT, p);
@@ -316,8 +272,9 @@ void stopAll(const char *why) {
   for (int i = 0; i < PORTS; i++) {
     if (mvs[i].kind == MV_NONE) continue;
     Use u(i);
-    if (MVX.st == MS_WAKE) { noteAngle(i, readAngle(i)); finishMove(why); continue; }
-    if (MVX.st != MS_SETTLE || !MVX.why) { MVX.nudges = MAX_NUDGES + 1; toSettle(why); }
+    Tilter &t = tilters[i];
+    if (MVX.st == MS_WAKE) { MVX.noted = t.note(t.angle()); finishMove(MVX, t, why); continue; }
+    if (MVX.st != MS_SETTLE || !MVX.why) { MVX.nudges = MAX_NUDGES + 1; toSettle(MVX, t, why); }
   }
 }
 
@@ -338,18 +295,7 @@ struct EspMoves : MoveSeam {
 MoveResult moveBlinds(const MoveAsk &a) { return moveRequest(a, espMoves); }
 void moveStop() { rampCancel(); stopAll("stopped"); }   // the app's or Home's stop: also ends a gentle move
 
-void endMove(const char *msg) { motorRaw(MVX.port, 0, 0); MVX.endMsg = msg; MVX.st = MS_POST; MVX.ts = millis(); }
-bool tryFlip(float a) {                        // direction never seen to be right: the motor may be the other way round, try once
-  if (MVX.flipped || MVX.kind == MV_JOG || abs(cfg.b[MVX.port].motSign) == 2) return false;
-  MVX.flipped = true;
-  cfg.b[MVX.port].motSign = -cfg.b[MVX.port].motSign;
-  event("%s: going the wrong way, trying the other direction", cfg.b[MVX.port].name);
-  beginRun(a);
-  return true;
-}
-
 bool uiActive();                               // app_main.cpp
-void moveTick(int p, uint32_t now);
 void motionTick() {
   uint32_t now = millis();
   static uint32_t lastT = 0, lastIdle = 0;
@@ -374,131 +320,8 @@ void motionTick() {
   }
   if (now - lastT < 10) return;                // 100 Hz
   lastT = now;
-  for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) { Use u(i); moveTick(i, now); }
+  for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) { Use u(i); moveTick(mvs[i], tilters[i], now); }
 }
-void moveTick(int p, uint32_t now) {           // one blind's move, 100 times a second (cur is its move)
-  BlindCfg &c = cfg.b[p];
-  if (motOn[p]) MVX.runMs += now - MVX.lastTick;
-  MVX.lastTick = now;
-
-  if (MVX.st == MS_WAKE) {
-    if (now - MVX.ts < 20) return;
-    senseWake(p);
-    float a = readAngle(p);
-    noteAngle(p, a);
-    if (!bs[p].present) { finishMove("no tilter plugged in"); return; }
-    MVX.startAng = a;
-    MVX.live = a;
-    if (MVX.kind != MV_JOG) {
-      MVX.startErr = fabsf(moveErr(a));
-      if (MVX.startErr <= TOL_DEG) { finishMove("already there"); return; }
-    }
-    beginRun(a);
-  } else if (MVX.st == MS_RUN) {
-    // While the motor runs the reading jumps about by a couple of degrees (brush noise on the shared wires).
-    // For stopping: the middle one of the last five readings, twice in a row. For speed and stall: quarter-second averages.
-    float raw = readAngle(p), a = raw;
-    MVX.hb[MVX.hn % 5] = raw;
-    MVX.hn++;
-    if (MVX.hn >= 5) {                           // the middle one of the last five (measured: +-1 deg jitter, spikes to +10)
-      float d[5];
-      for (int k = 0; k < 5; k++) d[k] = angDiff(MVX.hb[k], raw);
-      for (int x = 1; x < 5; x++) for (int y = x; y > 0 && d[y - 1] > d[y]; y--) { float t = d[y]; d[y] = d[y - 1]; d[y - 1] = t; }
-      a = fmodf(raw + d[2] + 360.0f, 360.0f);
-    }
-    MVX.lastA = a;
-    tr(now, a);
-    MVX.lastDir = MVX.rawDir * msign(p);                       // +1: the angle is rising
-    if (MVX.lastDir) a = fmodf(a + MVX.lastDir * bs[p].lead[MVX.lastDir > 0] + 360.0f, 360.0f);   // where it will settle if stopped now
-    MVX.winAcc += angDiff(a, MVX.winRef); MVX.winN++;
-    if (now - MVX.winT >= 250) {
-      MVX.fAng = fmodf(MVX.winRef + MVX.winAcc / MVX.winN + 360.0f, 360.0f);
-      MVX.winRef = MVX.fAng; MVX.winAcc = 0; MVX.winN = 0; MVX.winT = now;
-    }
-    MVX.live = MVX.fAng;
-    uint32_t el = now - MVX.ts;
-    int sp;
-    if (now - MVX.t0 > (uint32_t)tune.moveMaxS * 1000) { MVX.nudges = MAX_NUDGES + 1; toSettle("stopped: time limit"); return; }
-    if (MVX.kind == MV_JOG) {
-      if ((int32_t)(now - MVX.deadline) >= 0) { toSettle(nullptr); return; }
-      sp = MVX.pct;
-      if (el < RAMP_MS) sp = min(sp, (int)(START_DUTY + (sp - START_DUTY) * (int)el / (int)RAMP_MS));
-      motorRaw(p, MVX.jogDir, sp);
-    } else {
-      float e = moveErr(a);
-      int want = e > 0 ? 1 : -1;
-      if (MVX.angDir == 0) MVX.angDir = MVX.travel = want;
-      if (MVX.hn < 5) want = MVX.angDir;                          // not enough readings yet to judge
-      if (want != MVX.angDir || fabsf(e) <= 1.0f) { if (++MVX.hit >= 2) { toSettle(nullptr); return; } }   // there, or just past it
-      else MVX.hit = 0;
-      sp = c.speed;                            // no slowing near the target: the drive is slow and stops dead
-      if (el < RAMP_MS) sp = min(sp, (int)(START_DUTY + (sp - START_DUTY) * (int)el / (int)RAMP_MS));
-      motorRaw(p, MVX.angDir * msign(p), sp);
-    }
-    if (el > MVX.grace && now - MVX.spT >= 500) {         // speed, for the log (after the gear play is taken up)
-      float s = fabsf(angDiff(MVX.fAng, MVX.spRef)) * 1000.0f / (now - MVX.spT);
-      if (s < MVX.slowest) MVX.slowest = s;
-      MVX.spT = now;
-      MVX.spRef = MVX.fAng;
-    } else if (el <= MVX.grace) { MVX.spT = now; MVX.spRef = MVX.fAng; }
-    if (bs[p].blind) MVX.stallT = now;            // PWM sensor passing its zero: no reading for a few degrees, not a stall
-    // Stall: no check while the gear play is taken up, then the angle has to change by stallDeg every stallMs.
-    StallVerdict sv = stallCheck(el, MVX.grace, now - MVX.stallT, tune.stallMs, MVX.fAng, MVX.stallRef, tune.stallDeg10 / 10.0f);
-    if (sv == STALL_YES) { MVX.stalled = true; toSettle(nullptr); return; }
-    if (sv == STALL_MOVED) { MVX.stallT = now; MVX.stallRef = MVX.fAng; }
-  } else if (MVX.st == MS_PULSE) {
-    tr(now, readAngle(p));
-    if ((int32_t)(now - MVX.deadline) >= 0) toSettle(nullptr);
-  } else if (MVX.st == MS_POST) {               // stopped: keep watching for a moment (the rod springs back a little)
-    float a = readAngle(p);
-    tr(now, a);
-    if (now - MVX.ts < POST_MS) return;
-    noteAngle(p, a);
-    finishMove(MVX.endMsg ? MVX.endMsg : "stopped");
-  } else if (MVX.st == MS_SETTLE) {
-    float a = readAngle(p);
-    tr(now, a);
-    if (now - MVX.ts < SETTLE_MS) return;
-    noteAngle(p, a);
-    if (MVX.fromRun && !isnan(MVX.lastA) && MVX.lastDir) {     // learn how far it went on after the last running reading
-      float c = angDiff(a, MVX.lastA) * MVX.lastDir;
-      float &ld = bs[p].lead[MVX.lastDir > 0];
-      if (c > -10.0f && c < 12.0f) ld = constrain(ld + (c - ld) * 0.4f, -8.0f, 8.0f);
-      MVX.fromRun = false;
-    }
-    MVX.live = a;
-    if (MVX.kind == MV_JOG) {                   // a jog also shows which way the motor turns the sensor
-      float d = angDiff(a, MVX.startAng);
-      if (fabsf(d) > 4.0f) {
-        int s = (d > 0 ? 1 : -1) * MVX.jogDir * 2;
-        if (s != c.motSign) { c.motSign = s; cfgSave(); event("%s: motor direction learned (%+d)", c.name, s / 2); }
-      }
-      endMove(MVX.stalled ? "jog: stalled" : (MVX.why ? MVX.why : "jog"));
-      return;
-    }
-    float e = moveErr(a);
-    if (MVX.why) { endMove(MVX.why); return; }
-    if (fabsf(e) <= TOL_DEG) { endMove("reached"); return; }
-    if (MVX.stalled) {
-      bool atEnd = MVX.kind == MV_TILT && fabsf(MVX.tgt) >= 99.5f && fabsf(e) < END_STALL_DEG;
-      if (atEnd) { endMove("reached (end stop)"); return; }
-      if (fabsf(e) > MVX.startErr - 2.0f && tryFlip(a)) return;                      // no progress at all
-      endMove("blocked (stalled)");
-      return;
-    }
-    int dir = e > 0 ? 1 : -1;
-    if (dir != MVX.travel) {                    // went past it. Turning back means taking up the gear play again.
-      if (fabsf(e) <= OVER_OK_DEG) { endMove("reached"); return; }
-      if (MVX.nudges < MAX_NUDGES) { MVX.nudges++; MVX.turnBacks++; beginRun(a); return; }
-    } else if (MVX.nudges < MAX_NUDGES) {       // short: run on the same way, watching the angle (no blind timed push)
-      MVX.nudges++;
-      beginRun(a);
-      return;
-    }
-    endMove("stopped near the target");
-  }
-}
-
 // ---- setup: keep one blind's sensor on and its reading live (the app asks again every second while a setup is open)
 void watchStop() { if (watchOn && watchPort >= 0 && !movingPort(watchPort)) sensorOff(watchPort); watchOn = false; watchPort = -1; handBusy = false; }
 // ---- turned by hand: with "blinds follow each other" on, a blind that is turned with its wand takes the others along.

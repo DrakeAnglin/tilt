@@ -165,7 +165,7 @@ esp_err_t hDev(httpd_req_t *r) {
     BlindCfg &c = cfg.b[i];
     const char *pr = marksProblem(i);
     ap(j, "%s{\"ang\":%s,\"mv\":%.0f,\"sig\":\"%s\",\"pres\":%d,\"up\":%s,\"open\":%s,\"down\":%s,\"sign\":%d,\"bias\":%.1f,\"lead0\":%.1f,\"signSeen\":%d,\"speed\":%d,\"moves\":%lu,\"stalls\":%lu,\"prob\":%s}", i ? "," : "", jn(bs[i].ang, 1).c_str(), bs[i].mv, (bs[i].pwm || ((pwmSaved >> i) & 1)) ? "PWM" : "analog",
-       bs[i].present ? 1 : 0, jn(c.up, 1).c_str(), jn(c.open, 1).c_str(), jn(c.down, 1).c_str(), msign(i), bs[i].lead[1], bs[i].lead[0], abs(c.motSign) == 2 ? 1 : 0, c.speed, (unsigned long)stats.moves[i], (unsigned long)stats.stalls[i], pr ? jq(pr).c_str() : "null");
+       bs[i].present ? 1 : 0, jn(c.up, 1).c_str(), jn(c.open, 1).c_str(), jn(c.down, 1).c_str(), msign(i), bs[i].mem.lead[1], bs[i].mem.lead[0], abs(c.motSign) == 2 ? 1 : 0, c.speed, (unsigned long)stats.moves[i], (unsigned long)stats.stalls[i], pr ? jq(pr).c_str() : "null");
   }
   j += "]}";
   return sendJson(r, j);
