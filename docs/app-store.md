@@ -12,10 +12,11 @@ What is still needed before Tilt can go to TestFlight and the App Store, and the
    - Privacy policy URL: https://drakeanglin.github.io/tilt-site/privacy/
    - Support URL: https://drakeanglin.github.io/tilt-site/support/
    - Questions and problems: issues on `DrakeAnglin/tilt-site`
-4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt/releases/latest/download/firmware.json`.
-   For each firmware release: `python3 tools/release_firmware.py stable --notes "..."` (builds without secrets, signs),
-   then upload `firmware/releases/firmware.json` and the new `tilt-<version>.bin` to a GitHub release. The repo must be
-   public for phones to download them.
+4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt-site/releases/latest/download/firmware.json`
+   (the public site repo, so this code repo can stay private). For each firmware release:
+   `python3 tools/release_firmware.py stable --notes "..."` (builds without secrets, signs), then
+   `gh release create firmware-<version> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/tilt-<version>.bin`.
+   Use releases on tilt-site for firmware only, so "latest" is always the newest firmware.
 5. **Release-day clean-up on the controller:** remove the "Duo Test" user, and the "Mac owner" key once the app can do
    every update (the Mac tools need that key today).
 

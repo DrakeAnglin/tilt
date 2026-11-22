@@ -8,7 +8,8 @@ firmware/blinds_matter/build-release), checks none of secrets.h's values ended u
 ~/.tilt/firmware-signing-key.pem, and writes into firmware/releases/:
   tilt-<version>.bin   the image | signature (64 bytes) | "TILTSIG1"  (the controller checks the signature)
   firmware.json        {"stable": {...}, "beta": {...}}  the newest version on each channel; the file name is relative
-Upload both files to the same place (a GitHub release) and the app finds them at its update address.
+Publish both on the public site repo (the app reads its latest release):
+  gh release create firmware-<version> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/tilt-<version>.bin
 """
 import argparse, hashlib, json, os, re, subprocess, sys
 

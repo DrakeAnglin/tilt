@@ -1,5 +1,5 @@
-// Firmware updates without the App Store: the release list (firmware.json) and the signed files sit on the project's
-// GitHub releases. The app reads the list, downloads the file and hands it to the controller over the home Wi-Fi.
+// Firmware updates without the App Store: the release list (firmware.json) and the signed files sit on the public
+// site repo's GitHub releases (DrakeAnglin/tilt-site; the code repo is private). Releases there are firmware only. The app reads the list, downloads the file and hands it to the controller over the home Wi-Fi.
 // The controller only takes a file signed with the release key (firmware/blinds_matter/main/fwkey.h), so a file from
 // anywhere else is refused, and an owner has to allow the upload first.
 import CryptoKit
@@ -17,7 +17,7 @@ struct FirmwareRelease: Decodable, Equatable {
 final class FirmwareUpdates {
     static let shared = FirmwareUpdates()
     /// Where the release list lives. tools/release_firmware.py writes it; it is uploaded with each release.
-    static let defaultSource = "https://github.com/DrakeAnglin/tilt/releases/latest/download/firmware.json"
+    static let defaultSource = "https://github.com/DrakeAnglin/tilt-site/releases/latest/download/firmware.json"
 
     private(set) var stable: FirmwareRelease?
     private(set) var beta: FirmwareRelease?
