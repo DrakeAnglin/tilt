@@ -154,10 +154,10 @@ void blindsTask(void *)
         bool busy = moving() || bs[0].queued || bs[1].queued || bs[2].queued;
         // Dozing switches the chip's USB port off (no logs, no flashing). So: stay awake for the first minute after
         // every start, and for as long as a computer is connected by USB.
-        // On battery, with nothing to do, the chip dozes between Wi-Fi beacons (it still hears the router, so Home and the
-        // web app still reach it). It stays fully awake: while moving, on input power, for a minute after a start, while
+        // With nothing to do, the chip dozes between Wi-Fi beacons (USB charger and solar too; it still hears the router, so Home and the
+        // web app still reach it). It stays fully awake: while moving, for a minute after a start, while
         // a computer is on its USB port, while someone uses the web app, or when asked to (/api/awake).
-        bool stay = DEV_STAY_AWAKE || busy || powered || now < 60000 || usb_serial_jtag_is_connected() ||
+        bool stay = DEV_STAY_AWAKE || busy || now < 60000 || usb_serial_jtag_is_connected() ||
                     (lastWeb && now - lastWeb < 15000) || (int32_t)(keepAwakeUntil - now) > 0;
         if (!stay && held) { esp_pm_lock_release(awake); held = false; }
         static uint32_t lastS = 0;

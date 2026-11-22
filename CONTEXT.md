@@ -97,10 +97,10 @@ _Avoid_: charge, power (for this)
 Battery level under 20%. Warns in the app and in Apple Home; changes nothing else.
 
 **Critical battery**:
-Battery level under 10% while not charging. Schedules pause and it is reported; blinds still move when told, until the Motor cut-off.
+Battery level under 10%. Schedules pause and it is reported; blinds still move when told, until the Motor cut-off.
 
 **Motor cut-off**:
-Resting cell voltage under 3.35 V (about 3% Battery level) while not charging. No motor runs at all, whoever asks, so the cell is never drained that low; moves come back once it charges.
+Resting cell voltage under 3.35 V (about 3% Battery level), plugged in or not (a solar panel in weak light shows a voltage but charges nothing). No motor runs at all, whoever asks, so the cell is never drained that low; moves come back once it charges.
 _Avoid_: dead battery, empty
 
 **Charge source**:

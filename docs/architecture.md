@@ -61,8 +61,8 @@ resting cell voltage.
 | State | When | What happens |
 |---|---|---|
 | Low battery | under 20% | warning in the app and in Apple Home |
-| Critical battery | under 10%, not charging | Schedules pause; blinds still move when told |
-| Motor cut-off | resting cell under 3.35 V, not charging | no motor runs until it charges |
+| Critical battery | under 10% | Schedules pause; blinds still move when told |
+| Motor cut-off | resting cell under 3.35 V | no motor runs until it charges |
 
 ## Power budget (estimates, not measured)
 These are rough estimates for 3 blinds and about 4 moves each a day. **They have not been measured.** Real numbers

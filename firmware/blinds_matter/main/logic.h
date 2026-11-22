@@ -34,7 +34,7 @@ inline float xOfTiltMarks(const Marks &m, float t) {
 }
 
 // ---- can a blind be moved? Set up (all three marks good), its tilter not missing, and the battery above the motor
-// cut-off (CONTEXT.md: under 3.35 V resting and not charging, no motor runs, whoever asks). nullptr = yes, else why not.
+// cut-off (CONTEXT.md: under 3.35 V resting, no motor runs, whoever asks). nullptr = yes, else why not.
 inline const char *cannotMoveWhy(bool calibrated, bool seen, bool present, bool battOk) {
   if (!calibrated) return "not set up yet";
   if (seen && !present) return "no tilter plugged in";
@@ -44,12 +44,12 @@ inline const char *cannotMoveWhy(bool calibrated, bool seen, bool present, bool 
 // Movable: the same, and shown (not hidden in the app). Battery is left to the move itself (it gives the reason).
 inline bool movableRule(bool hidden, bool calibrated, bool seen, bool present) { return !hidden && !cannotMoveWhy(calibrated, seen, present, true); }
 
-// ---- Battery level (CONTEXT.md): Low under 20 % warns; Critical under 10 % also pauses Schedules. On the charger: OK.
+// ---- Battery level (CONTEXT.md): Low under 20 % warns; Critical under 10 % also pauses Schedules. From the cell voltage
+// only: input power doesn't count, because a solar panel in weak light shows a voltage but charges nothing.
 // (The motor cut-off, VBAT_CUTOFF in config.h, is lower still: no motor moves at all below it.)
 const int BATT_LOW_PCT = 20, BATT_CRITICAL_PCT = 10;
 enum BattLevel { BATT_OK, BATT_LOW, BATT_CRITICAL };
-inline BattLevel battLevel(int pct, bool powered = false) {
-  if (powered) return BATT_OK;
+inline BattLevel battLevel(int pct) {
   return pct < BATT_CRITICAL_PCT ? BATT_CRITICAL : pct < BATT_LOW_PCT ? BATT_LOW : BATT_OK;
 }
 

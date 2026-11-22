@@ -206,7 +206,6 @@ int main() {
   CHECK(!strcmp(cannotMoveWhy(true, false, false, false), "battery too low"), "then the motor cut-off");
   CHECK(!cannotMoveWhy(true, false, false, true), "a tilter never seen is not missing");
   CHECK(battLevel(9) == BATT_CRITICAL && battLevel(10) == BATT_LOW && battLevel(19) == BATT_LOW && battLevel(20) == BATT_OK, "Battery levels");
-  CHECK(battLevel(5, true) == BATT_OK, "on the charger the battery is OK");
 
   // ---- Move requests
   requestTests();

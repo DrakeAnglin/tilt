@@ -307,11 +307,11 @@ void motionTick() {
       if (bs[i].queued) { bs[i].queued = false; const char *e = startTilt(i, bs[i].qTilt); if (e) { strlcpy(bs[i].last, e, sizeof bs[i].last); bs[i].target = NAN; } return; }
     if (watchPort >= 0) { watchTick(now); return; }
     // Keep the positions fresh: the wand may have been turned by hand. One port at a time. With "blinds follow each
-    // other" on and two or more blinds, always (quicker on input power); otherwise only while someone looks.
+    // other" on and two or more blinds, always (quicker while someone looks); otherwise only while someone looks.
     int n = 0;
     for (int i = 0; i < PORTS; i++) if (movable(i)) n++;
     bool follow = syncMode && n >= 2;
-    uint32_t step = follow && (powered || uiActive()) ? 350 : 1000;
+    uint32_t step = follow && uiActive() ? 350 : 1000;
     if (now - lastIdle >= step && (follow || uiActive() || !bs[idlePort].seen)) {
       lastIdle = now;
       pulseRead(idlePort);
