@@ -1,6 +1,6 @@
 # Tilt
 
-**Tilt** is the product: a battery-powered motor kit and app that adds smart control (Matter over Thread) to existing cordless window blinds. Today it tilts the slats; lifting is a planned part of the same product.
+**Tilt** is the product: a battery-powered motor kit and app that adds smart control to existing cordless window blinds. Today it is Matter over Wi-Fi (Apple Home); Thread through a hub is a later goal. Today it tilts the slats; lifting is a planned part of the same product.
 
 ## Language
 
@@ -33,8 +33,8 @@ The compass direction (north, south, east, west) a blind's window faces. It matt
 The name of the whole system and its app, lifting included. Capital T. The slat angle is written lowercase, below.
 
 **tilt** (slat angle):
-The slat angle as the user sees it, one number from -90 degrees (closed one way) through 0 (open) to +90 (closed the other way). Same number in Matter, the app and the firmware.
-_Avoid_: position, slat angle, open/closed percent
+Where the slats are, as one number from -100 (closed, slats down) through 0 (open, slats level) to +100 (closed, slats up): the percent of the way from open to closed, worked out from the Marks. It is not a slat angle in degrees (the controller never knows that). Same number in the app and the firmware; Matter gets it as "percent closed".
+_Avoid_: position, slat angle, degrees
 
 **Angle**:
 Only the raw sensor reading (0-360 degrees of the AS5600), never what the user sees.
@@ -109,7 +109,7 @@ Where the cell is topped up from: USB-C (charge only) or the optional solar pane
 ### Reachability
 
 **Asleep**:
-The controller is a Thread sleepy end device, so it often answers slowly. Normal; the user never sees it, and a command still works.
+The controller dozes between moves to save the battery (Wi-Fi power save), so it often answers slowly. Normal; the user never sees it, and a command still works.
 
 **Unreachable**:
 The controller has not answered after a timeout. The app shows it with **Last seen**; Matter and the app use the same word.
