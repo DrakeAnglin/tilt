@@ -53,7 +53,6 @@ bool motOn[PORTS] = {false, false, false};
 bool movingPort(int p) { return mvs[p].kind != MV_NONE; }
 bool moving() { for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) return true; return false; }
 int firstMoving() { for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) return i; return -1; }
-bool usableBlind(int p) { return !cfg.b[p].hidden && !(bs[p].seen && !bs[p].present); }
 
 int msign(int p) { return cfg.b[p].motSign > 0 ? 1 : -1; }
 
@@ -61,6 +60,8 @@ int msign(int p) { return cfg.b[p].motSign > 0 ? 1 : -1; }
 Marks marksOf(int p) { const BlindCfg &c = cfg.b[p]; return Marks{c.up, c.open, c.down}; }
 const char *marksProblem(int p) { return marksProblemOf(marksOf(p)); }      // nullptr = good
 bool calibrated(int p) { return marksProblem(p) == nullptr; }
+// The one "can this blind be moved?" rule (logic.h), for commands, schedules, following and Apple Home alike.
+bool movable(int p) { return movableRule(cfg.b[p].hidden, calibrated(p), bs[p].seen, bs[p].present); }
 float arcX(int p, float ang) { return arcXOf(marksOf(p), ang); }           // degrees from open, + toward closed-up
 float tiltOf(int p, float ang) { return tiltOfMarks(marksOf(p), ang); }
 float xOfTilt(int p, float t) { return xOfTiltMarks(marksOf(p), t); }
@@ -344,7 +345,7 @@ void motionTick() {
     // Keep the positions fresh: the wand may have been turned by hand. One port at a time. With "blinds follow each
     // other" on and two or more blinds, always (quicker on input power); otherwise only while someone looks.
     int n = 0;
-    for (int i = 0; i < PORTS; i++) if (usableBlind(i) && calibrated(i)) n++;
+    for (int i = 0; i < PORTS; i++) if (movable(i)) n++;
     bool follow = syncMode && n >= 2;
     uint32_t step = follow && (powered || uiActive()) ? 350 : 1000;
     if (now - lastIdle >= step && (follow || uiActive() || !bs[idlePort].seen)) {
@@ -491,7 +492,7 @@ const float HAND_TILT = 6.0f;                  // a change of this much (tilt un
 float handLast = 0;
 uint32_t handStill = 0, handSince = 0;
 void handCheck(int p, uint32_t now) {          // p has just been read (motor stopped)
-  if (!calibrated(p) || !usableBlind(p) || bs[p].blind || isnan(bs[p].tilt)) return;
+  if (!movable(p) || bs[p].blind || isnan(bs[p].tilt)) return;
   if (setupSeen && now - setupSeen < 15000) { handRef[p] = bs[p].tilt; return; }     // a setup screen is open: hands are expected
   if (isnan(handRef[p])) { handRef[p] = bs[p].tilt; return; }
   if (fabsf(bs[p].tilt - handRef[p]) < HAND_TILT) return;
@@ -512,7 +513,7 @@ void handTick(uint32_t now) {                  // from watchTick, every 100 ms, 
   if (!moved) return;
   int n = 0;
   for (int i = 0; i < PORTS; i++)
-    if (i != p && usableBlind(i) && calibrated(i) && (isnan(bs[i].tilt) || fabsf(bs[i].tilt - t) > 3.0f) && !startTilt(i, t)) n++;
+    if (i != p && movable(i) && (isnan(bs[i].tilt) || fabsf(bs[i].tilt - t) > 3.0f) && !startTilt(i, t)) n++;
   event("%s turned by hand to tilt %.0f: %d other blind%s follow%s", cfg.b[p].name, t, n, n == 1 ? "" : "s", n == 1 ? "s" : "");
 }
 void watchTick(uint32_t now) {                 // from motionTick, only while nothing moves

@@ -26,7 +26,7 @@
 #endif
 #include <mdns.h>
 
-#define FW_VERSION "2.2.1-dev4"
+#define FW_VERSION "2.2.1-dev5"
 SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
 uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
 bool otaPending = false, restartSoon = false;
@@ -38,81 +38,7 @@ static uint32_t appSize = 0;
 
 bool timeValid() { return time(nullptr) > 1700000000; }
 
-// ---- schedules (as in the Wi-Fi firmware's sleep.h, without the sleeping)
-uint32_t lastSched = 0;
-// Extra facts per schedule slot (kept beside the settings, so adding them did not disturb the saved marks):
-//   kind 0 = at a clock time, 1 = at sunrise, 2 = at sunset (plus `off` minutes);  ramp = gentle: take this many minutes;
-//   gid = the app's own number for a schedule, the same on every controller it covers.
-struct SchedX { uint8_t kind, ramp; int16_t off; uint32_t gid; };
-struct SchedExtra { uint32_t magic; SchedX x[SCHEDS]; float lat, lon; } sx;
-const uint32_t SX_MAGIC = 0x53580001;
-void sxSave() { nvs.putBytes("schx", &sx, sizeof sx); }
-void sxLoad() {
-  if (nvs.getBytes("schx", &sx, sizeof sx) != sizeof sx || sx.magic != SX_MAGIC) { memset(&sx, 0, sizeof sx); sx.magic = SX_MAGIC; sx.lat = sx.lon = NAN; }
-}
-// Sunrise or sunset (epoch seconds) on the day that holds `noon`, at the saved place (the math: logic.h).
-uint32_t sunEvent(time_t noon, bool rise) { return sunEventAt(noon, sx.lat, sx.lon, rise); }
-uint32_t schedTime(int i, time_t now, int dayOff) {      // when slot i fires on (today + dayOff); 0 = not that day
-  const Sched &s = cfg.sched[i];
-  struct tm tm, chk;
-  localtime_r(&now, &tm);
-  tm.tm_mday += dayOff;
-  tm.tm_hour = sx.x[i].kind ? 12 : 0; tm.tm_min = sx.x[i].kind ? 0 : s.minute; tm.tm_sec = 0; tm.tm_isdst = -1;
-  time_t t = mktime(&tm);
-  localtime_r(&t, &chk);
-  if (!((s.days >> chk.tm_wday) & 1)) return 0;
-  if (!sx.x[i].kind) return (uint32_t)t;
-  uint32_t e = sunEvent(t, sx.x[i].kind == 1);
-  return e ? e + sx.x[i].off * 60 : 0;
-}
-// Gentle moves: a blind that is being taken to a tilt slowly, a little every 20 seconds.
-struct Ramp { bool on; float from, to; uint32_t t0, durMs, last; } ramp[PORTS];
-void rampCancel() { for (auto &r : ramp) r.on = false; }
-bool rampAny() { for (auto &r : ramp) if (r.on) return true; return false; }
-void rampTick() {
-  uint32_t now = millis();
-  for (int p = 0; p < PORTS; p++) {
-    Ramp &r = ramp[p];
-    if (!r.on || now - r.last < 20000 || moving()) continue;
-    r.last = now;
-    float f = min(1.0f, (float)(now - r.t0) / r.durMs);
-    startTilt(p, r.from + (r.to - r.from) * f);
-    if (f >= 1.0f) r.on = false;
-  }
-}
-void schedRun() {
-  if (!timeValid()) return;
-  uint32_t now = time(nullptr);
-  if (lastSched > now || now - lastSched > 1800) lastSched = now - 90;
-  for (int i = 0; i < SCHEDS; i++) {
-    Sched &s = cfg.sched[i];
-    if (!s.on) continue;
-    for (int d = -1; d <= 0; d++) {
-      uint32_t t = schedTime(i, now, d);
-      if (t && t > lastSched && t <= now) {
-        event("schedule %d: tilt %d", i + 1, s.tilt);
-        for (int p = 0; p < PORTS; p++) {
-          if (!((s.mask >> p) & 1) || cfg.b[p].hidden || !calibrated(p)) continue;
-          if (sx.x[i].ramp && !isnan(bs[p].tilt)) ramp[p] = {true, bs[p].tilt, (float)s.tilt, millis(), (uint32_t)sx.x[i].ramp * 60000u, 0};
-          else startTilt(p, s.tilt);
-        }
-      }
-    }
-  }
-  lastSched = now;
-}
-uint32_t schedNext() {
-  if (!timeValid()) return 0;
-  uint32_t now = time(nullptr), best = 0;
-  for (int i = 0; i < SCHEDS; i++) {
-    if (!cfg.sched[i].on) continue;
-    for (int d = 0; d <= 7; d++) {
-      uint32_t t = schedTime(i, now, d);
-      if (t > now) { if (!best || t < best) best = t; break; }
-    }
-  }
-  return best;
-}
+#include "schedules.h"
 
 // ---- small helpers
 void ap(std::string &j, const char *fmt, ...) {
@@ -349,7 +275,7 @@ esp_err_t hGo(httpd_req_t *r) {
     started++;
   }
   for (int p = 0; all && p < PORTS; p++) {
-    if (p == one || cfg.b[p].hidden || !calibrated(p) || (bs[p].seen && !bs[p].present)) continue;
+    if (p == one || !movable(p)) continue;
     float t = one >= 0 ? tOne : tiltWord(p, to);
     if (isnan(t)) return fail(r, "unknown position");
     const char *e = start(p, t);
@@ -447,61 +373,7 @@ extern uint32_t otaWindow;
 // A firmware file may carry a signature at its end: image | signature (64 bytes, r then s) | "TILTSIG1".
 // A signed file needs no update password: the signature proves it came from whoever holds the release key. Either way
 // an owner must have allowed updates first (/api/otaopen, 5 minutes).
-static const char SIG_MAGIC[8] = {'T', 'I', 'L', 'T', 'S', 'I', 'G', '1'};
-bool fwSignatureOk(const uint8_t hash[32], const uint8_t sig[64]) {
-  mbedtls_ecp_group grp; mbedtls_ecp_point q; mbedtls_mpi r, s;
-  mbedtls_ecp_group_init(&grp); mbedtls_ecp_point_init(&q); mbedtls_mpi_init(&r); mbedtls_mpi_init(&s);
-  bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_ecp_point_read_binary(&grp, &q, FW_SIGN_PUB, 65) == 0 &&
-            mbedtls_mpi_read_binary(&r, sig, 32) == 0 && mbedtls_mpi_read_binary(&s, sig + 32, 32) == 0 &&
-            mbedtls_ecdsa_verify(&grp, hash, 32, &q, &r, &s) == 0;
-  mbedtls_ecp_group_free(&grp); mbedtls_ecp_point_free(&q); mbedtls_mpi_free(&r); mbedtls_mpi_free(&s);
-  return ok;
-}
-esp_err_t hUpdate(httpd_req_t *r) {
-  char pw[80] = "";
-  httpd_req_get_hdr_value_str(r, "X-Update-Password", pw, sizeof pw);
-  bool pwOk = OTA_PASSWORD[0] && strcmp(pw, OTA_PASSWORD) == 0;      // no password in a release: only signed files
-  if (owned() && !openApi && (int32_t)(otaWindow - millis()) <= 0) return fail(r, "updates are locked: the owner must allow them from the app");
-  { Lock l; stopAll("stopped"); }
-  const esp_partition_t *to = esp_ota_get_next_update_partition(nullptr);
-  esp_ota_handle_t h;
-  if (!to || esp_ota_begin(to, OTA_SIZE_UNKNOWN, &h) != ESP_OK) return fail(r, "could not start the update");
-  event("update over Wi-Fi: %d bytes", (int)r->content_len);
-  // The last 72 bytes may be the signature: they are held back until the end, everything before them is written.
-  static uint8_t buf[4096 + 72];
-  static uint8_t tail[72];
-  int tailN = 0;
-  mbedtls_sha256_context sha;
-  mbedtls_sha256_init(&sha); mbedtls_sha256_starts(&sha, 0);
-  int left = r->content_len;
-  bool good = left > 100000;
-  while (left > 0 && good) {
-    memcpy(buf, tail, tailN);
-    int n = httpd_req_recv(r, (char *)buf + tailN, min(left, 4096));
-    if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
-    if (n <= 0) { good = false; break; }
-    left -= n;
-    int have = tailN + n, out = have > 72 ? have - 72 : 0;
-    if (out && esp_ota_write(h, buf, out) != ESP_OK) { good = false; break; }
-    mbedtls_sha256_update(&sha, buf, out);
-    tailN = have - out;
-    memcpy(tail, buf + out, tailN);
-  }
-  bool signedFile = good && tailN == 72 && !memcmp(tail + 64, SIG_MAGIC, 8);
-  if (good && !signedFile && tailN) {                // no signature: those last bytes are part of the image
-    if (esp_ota_write(h, tail, tailN) != ESP_OK) good = false; else mbedtls_sha256_update(&sha, tail, tailN);
-  }
-  uint8_t hash[32];
-  mbedtls_sha256_finish(&sha, hash); mbedtls_sha256_free(&sha);
-  if (!good) { esp_ota_abort(h); return fail(r, "the upload broke off"); }
-  if (signedFile && !fwSignatureOk(hash, tail)) { esp_ota_abort(h); event("update refused: bad signature"); return fail(r, "the file's signature is not valid"); }
-  if (!signedFile && !pwOk) { esp_ota_abort(h); return fail(r, "this file is not signed"); }
-  if (esp_ota_end(h) != ESP_OK || esp_ota_set_boot_partition(to) != ESP_OK) return fail(r, "the file was not accepted");
-  event(signedFile ? "signed update accepted" : "update accepted (password)");
-  statsSave();
-  restartSoon = true;
-  return ok(r);
-}
+#include "update.h"
 
 // ---- who may use this controller
 uint8_t openApi = 1;                             // 1: the plain /api and the web page still answer (until the app replaces them)
@@ -547,139 +419,8 @@ esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) ad
   openHomeWindow();
   return sendJson(r, "{\"ok\":1,\"code\":\"3497-011-2332\",\"qr\":\"MT:Y.K9042C00KA0648G00\"}");
 }
-esp_err_t hKeys(httpd_req_t *r) {
-  Lock l;
-  std::string j = "{\"keys\":[";
-  bool any = false;
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used) {
-    ap(j, "%s{\"cid\":\"%s\",\"name\":%s,\"owner\":%d,\"me\":%d,\"wait\":%d,\"code\":\"%s\"}", any ? "," : "", hexOf(keys[i].id, 8).c_str(), jq(keys[i].name).c_str(), keys[i].role,
-       i == secClient ? 1 : 0, keys[i].used == 2 ? 1 : 0, keys[i].used == 2 ? askCode(keys[i]).c_str() : "");
-    any = true;
-  }
-  j += "]}";
-  return sendJson(r, j);
-}
-esp_err_t hRevoke(httpd_req_t *r) {              // owner: remove a phone. "all" removes every phone (back to unpaired).
-  Lock l;
-  std::string c = arg(r, "cid");
-  uint8_t id[8];
-  int n = 0;
-  std::string proof;
-  if (c != "all" && !unhex(c, id, 8)) return fail(r, "bad id");
-  if (c != "all" && secClient >= 0 && !memcmp(keys[secClient].id, id, 8)) return fail(r, "you cannot remove yourself");
-  if (c != "all") {                              // never remove the last owner: nobody could manage the controller
-    int others = 0;
-    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && keys[i].role && memcmp(keys[i].id, id, 8)) others++;
-    if (!others) return fail(r, "that is the only owner");
-  }
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && (c == "all" || !memcmp(keys[i].id, id, 8))) {
-    uint8_t h[32];                               // proof for the removed phone (made with its own key) that it really was removed here
-    hmac256(keys[i].key, 32, (const uint8_t *)"removed", 7, h);
-    proof = hexOf(h, 16);
-    event("%s removed", keys[i].name); memset(&keys[i], 0, sizeof keys[i]); n++;
-  }
-  if (!n) return fail(r, "no such phone");
-  keysSave();
-  return sendJson(r, std::string("{\"ok\":1,\"proof\":\"") + proof + "\"}");
-}
-esp_err_t hKeyName(httpd_req_t *r) {             // rename a phone in the People list (who may: permit() in sec.h)
-  Lock l;
-  uint8_t id[8];
-  if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, id, 8)) {
-    char nm[sizeof keys[i].name];
-    cleanText(nm, sizeof nm, arg(r, "name"));
-    if (!nm[0]) return fail(r, "a name is needed");
-    strlcpy(keys[i].name, nm, sizeof keys[i].name);
-    keysSave();
-    return ok(r);
-  }
-  return fail(r, "no such phone");
-}
-esp_err_t hApprove(httpd_req_t *r) {             // owner: answer a phone that asked to join. ok=1 lets it in (owner=1: as an owner), ok=0 removes it.
-  Lock l;
-  uint8_t id[8];
-  if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) {
-    if (arg(r, "ok") == "1") { keys[i].used = 1; keys[i].role = arg(r, "owner") == "1" ? 1 : 0; lastCtr[i] = 0; event("%s approved (%s)", keys[i].name, keys[i].role ? "owner" : "user"); }
-    else { event("%s turned down", keys[i].name); memset(&keys[i], 0, sizeof keys[i]); }
-    keysSave();
-    return ok(r);
-  }
-  return fail(r, "no such request");
-}
-// ---- getting back in when no owner's phone is left
-// Physical proof instead of a reset button: whoever asks must turn one blind's wand fully closed up, then fully closed
-// down, then level (open), within two minutes. Only someone at the window can do that. The phone that asked becomes
-// an owner; the blinds' settings and the other phones are left as they are.
-struct Recover { int slot = -1, port = 0, step = 0; uint32_t until = 0, moves = 0; } recover;
-uint32_t movesEver() { uint32_t n = 0; for (int p = 0; p < PORTS; p++) n += stats.moves[p]; return n; }
-void recoverTick() {                             // from webTick, once a second
-  if (recover.slot < 0) return;
-  uint32_t now = millis();
-  ClientKey &k = keys[recover.slot];
-  if ((int32_t)(recover.until - now) <= 0 || k.used != 2) {
-    if (k.used == 2) { memset(&k, 0, sizeof k); keysSave(); event("recovery timed out"); }
-    recover.slot = -1;
-    return;
-  }
-  // The turning has to be by hand. If a motor runs at all (a paired phone could send a blind to these positions), the
-  // attempt is over: otherwise a user could make themself an owner without touching the blind.
-  if (moving() || movesEver() != recover.moves) {
-    memset(&k, 0, sizeof k); keysSave(); recover.slot = -1;
-    event("recovery stopped: a motor ran");
-    return;
-  }
-  int p = recover.port;
-  if (watchPort >= 0 && watchPort != p) watchStop();
-  watchPort = p; handBusy = false; watchUntil = now + 3000;      // keep this blind's sensor read, as a setup screen does
-  setupSeen = now ? now : 1;                                     // and the other blinds do not follow these twists
-  float t = bs[p].tilt;
-  if (isnan(t)) return;
-  bool hit = recover.step == 0 ? t >= 85 : recover.step == 1 ? t <= -85 : fabsf(t) <= 20;
-  if (!hit || ++recover.step < 3) return;
-  k.used = 1; k.role = 1; lastCtr[recover.slot] = 0;
-  keysSave();
-  event("%s recovered access by turning blind %d", k.name, p + 1);
-  recover.slot = -1;
-}
-esp_err_t hRecover(httpd_req_t *r) {             // POST /x/recover: the same JSON as /x/ask
-  int p = -1;
-  for (int i = 0; i < PORTS && p < 0; i++) if (calibrated(i) && !cfg.b[i].hidden && !(bs[i].seen && !bs[i].present)) p = i;
-  if (p < 0) return plain(r, "409 Conflict", "{\"err\":\"no blind is set up, so there is nothing to turn\"}");
-  if (recover.slot >= 0) return plain(r, "429 Too Many Requests", "{\"err\":\"a recovery is already under way. Try again in two minutes.\"}");
-  std::string out;
-  const char *st = pairDo(body(r, 600), out, true);
-  if (strcmp(st, "200 OK")) return plain(r, st, out);
-  uint8_t id[8];
-  unhex(jsonStr(out, "cid"), id, 8);
-  {
-    KeysLock kl;                                 // recover, ramps and keys[] are also used by the main loop (recoverTick)
-    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) recover.slot = i;
-    rampCancel();                                // a gentle move would run the motor and end the attempt
-    recover.port = p; recover.step = 0; recover.until = millis() + 120000; recover.moves = movesEver();
-  }
-  event("recovery started: turn blind %d", p + 1);
-  out.pop_back();                                // the closing brace
-  out += std::string(",\"recover\":1,\"blind\":") + std::to_string(p) + ",\"blindName\":" + jq(cfg.b[p].name) + "}";
-  return plain(r, st, out);
-}
-esp_err_t hRecoverState(httpd_req_t *r) {        // GET /x/recstate: how far the turning has got (0..3), seconds left
-  std::string j;
-  ap(j, "{\"on\":%d,\"step\":%d,\"left\":%d}", recover.slot >= 0 ? 1 : 0, recover.slot >= 0 ? recover.step : 0, recover.slot >= 0 ? (int)((int32_t)(recover.until - millis()) / 1000) : 0);
-  return plain(r, "200 OK", j);
-}
-esp_err_t hMakeOwner(httpd_req_t *r) {           // owner: give another phone the owner's rights too
-  Lock l;
-  uint8_t id[8];
-  if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
-  bool on = arg(r, "on") != "0";                 // on=0: back to a user
-  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && !memcmp(keys[i].id, id, 8)) {
-    if (!on && i == secClient) return fail(r, "you cannot change yourself");
-    keys[i].role = on ? 1 : 0; keysSave(); event("%s is now %s", keys[i].name, on ? "an owner" : "a user"); return ok(r);
-  }
-  return fail(r, "no such phone");
-}
+#include "people.h"
+
 uint32_t otaWindow = 0;                          // millis until which a firmware upload is accepted
 esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = millis() + 300000; event("firmware updates allowed for 5 minutes"); return ok(r); }
 // Found by the app with Bonjour: _tilt._tcp, with this controller's id and address.

@@ -31,6 +31,9 @@ inline float xOfTiltMarks(const Marks &m, float t) {
   return t >= 0 ? t / 100.0f * fabsf(angDiff(m.up, m.open)) : t / 100.0f * fabsf(angDiff(m.down, m.open));
 }
 
+// ---- can a blind be moved? Shown (not hidden in the app), set up (all three marks good), and its tilter not missing.
+inline bool movableRule(bool hidden, bool calibrated, bool seen, bool present) { return !hidden && calibrated && !(seen && !present); }
+
 // ---- battery: resting Li-ion voltage -> percent (rough: a loaded or charging cell reads off by a few percent)
 inline int battPercent(float v) {
   static const float V[] = {3.20f, 3.45f, 3.60f, 3.70f, 3.80f, 3.90f, 4.00f, 4.10f, 4.18f};

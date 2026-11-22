@@ -52,7 +52,6 @@ int lastLift[PORTS], lastOp[PORTS];
 bool selfUpd = false;
 esp_pm_lock_handle_t awake;
 
-bool usable(int p) { return !cfg.b[p].hidden && calibrated(p) && !(bs[p].seen && !bs[p].present); }
 float tiltOfLift(int lift) { return (cfg.closeUp ? 1.0f : -1.0f) * lift / 100.0f; }
 float liveTilt(int p) { return (movingPort(p) && !isnan(mvs[p].live)) ? tiltOf(p, mvs[p].live) : bs[p].tilt; }
 
@@ -108,7 +107,7 @@ void report(bool force)
         float sum = 0;
         int n = 0, op = 0;
         for (int p = 0; p < PORTS; p++) {
-            if ((epPort[e] >= 0 && epPort[e] != p) || !usable(p)) continue;
+            if ((epPort[e] >= 0 && epPort[e] != p) || !movable(p)) continue;
             float t = liveTilt(p);
             if (isnan(t)) continue;
             float c = min(fabsf(t), 100.0f);
@@ -155,7 +154,7 @@ void blindsTask(void *)
             int started = 0;
             for (int p = 0; p < PORTS; p++) {
                 bool mine = epPort[e] < 0 || epPort[e] == p || syncMode;
-                if (mine && usable(p) && !startTilt(p, tiltOfLift(v))) started++;
+                if (mine && movable(p) && !startTilt(p, tiltOfLift(v))) started++;
             }
             ::event("Home: %d %% closed (%d blind%s)", (int)v / 100, started, started == 1 ? "" : "s");
         }

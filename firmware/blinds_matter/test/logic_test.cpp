@@ -30,6 +30,13 @@ int main() {
   CHECK(marksProblemOf(Marks{285, 290, 40}) != nullptr, "open too close to a closed mark refused");
   CHECK(marksProblemOf(Marks{200, 290, 250}) != nullptr, "both closed marks on one side refused");
 
+  // ---- can a blind move?
+  CHECK(movableRule(false, true, true, true), "shown, set up, plugged in: movable");
+  CHECK(movableRule(false, true, false, false), "not looked at yet: movable (the move itself finds out)");
+  CHECK(!movableRule(true, true, true, true), "hidden: not movable");
+  CHECK(!movableRule(false, false, true, true), "not set up: not movable");
+  CHECK(!movableRule(false, true, true, false), "tilter missing: not movable");
+
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");
   CHECK(battPercent(3.7f) == 35, "table point 3.70 V");
