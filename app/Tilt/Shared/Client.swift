@@ -12,18 +12,32 @@ protocol ControllerTransport: Sendable {
     var host: String { get async }
 }
 
-// ---- answers (the controller's JSON, see firmware web.h / people.h)
+// ---- answers (the controller's JSON, see firmware web.h / wire.h / people.h). The shared fixture in
+// firmware/blinds_matter/test/wire/ is checked against these types by the app's tests and against the firmware by its own.
+/// How many Ports and Schedule slots a controller has. Firmware 2.2.1 and later says so in /api/cfg; older ones have 3 and 8.
+struct ControllerLimits: Equatable, Sendable {
+    var ports: Int, slots: Int
+    static let fallback = ControllerLimits(ports: 3, slots: 8)
+    /// What a controller reported; anything it leaves out is the fallback.
+    static func reported(ports: Int?, slots: Int?) -> ControllerLimits { ControllerLimits(ports: ports ?? fallback.ports, slots: slots ?? fallback.slots) }
+}
 struct ControllerConfig: Decodable {
     struct Blind: Decodable { var name: String; var hid: Int; var speed: Int; var fav: Int }
     var name: String
+    var ports: Int?, slots: Int?  // the controller's limits (firmware 2.2.1 and later): read them as `limits`
     var closeUp: Int, sync: Int
     var par: Int?                 // move at the same time (firmware 2.2 and later)
     var tzn: String
     var hksep: Int?
     var b: [Blind]
+    var limits: ControllerLimits { .reported(ports: ports, slots: slots) }
 }
 struct SchedSlot: Decodable, Equatable { var on: Int, days: Int, mask: Int, min: Int, tilt: Int, kind: Int, off: Int, ramp: Int; var gid: UInt32 }
-struct SchedConfig: Decodable { var sched: [SchedSlot]; var lat: Double?; var lon: Double?; var sun: [Double]? }
+struct SchedConfig: Decodable {
+    var ports: Int?, slots: Int?
+    var sched: [SchedSlot]; var lat: Double?; var lon: Double?; var sun: [Double]?
+    var limits: ControllerLimits { .reported(ports: ports, slots: slots) }
+}
 struct PhoneKey: Decodable, Identifiable, Equatable { let cid: String; let name: String; let owner: Int; let me: Int; let wait: Int?; let code: String?; var id: String { cid } }
 /// One Wi-Fi network the controller can see: {"s": name, "r": signal in dBm, "l": 1 if it needs a password}.
 struct WifiNetwork: Decodable, Identifiable, Hashable {
@@ -97,14 +111,40 @@ struct ControllerClient: Sendable {
     /// Save one of the three marks ("up", "open", "down", or "clear"). The answer says if the marks make sense together.
     func mark(blind: Int, _ which: String) async throws -> CommandAnswer { try await json(Api.mark(blind: blind, which)) }
 
-    // ---- settings and schedules
-    func set(_ key: String, _ value: String) async throws { try await send(Api.set(key, value)) }
-    func set(blind: Int, _ field: String, _ value: String) async throws { try await send(Api.set("b\(blind).\(field)", value)) }
+    // ---- settings (the setting names are firmware web.h hSet's; in the app they live only here)
+    private func set(_ key: String, _ value: String, extra: String = "") async throws { try await send(Api.set(key, value) + extra) }
+    private func set(blind: Int, _ field: String, _ value: String) async throws { try await set("b\(blind).\(field)", value) }
+    private func flag(_ on: Bool) -> String { on ? "1" : "0" }
+    func setName(_ name: String) async throws { try await set("name", name) }
+    /// "Close" tilts the slats up (true) or down.
+    func setCloseUp(_ up: Bool) async throws { try await set("closeUp", flag(up)) }
+    /// Blinds follow each other: moving one moves the others.
+    func setFollow(_ on: Bool) async throws { try await set("sync", flag(on)) }
+    /// Move at the same time (off: one after another).
+    func setSameTime(_ on: Bool) async throws { try await set("par", flag(on)) }
+    /// Apple Home shows each blind separately. The controller restarts.
+    func setHomeSeparate(_ on: Bool) async throws { try await set("hksep", flag(on)) }
     func setLocation(latitude: Double, longitude: Double) async throws { try await set("loc", String(format: "%.3f,%.3f", latitude, longitude)) }
-    /// Write one schedule slot (see SchedulePlan for which slot holds what).
-    func setSchedule(slot: Int, _ v: SchedSlot) async throws {
-        try await send(Api.schedule(slot: slot) + "on=\(v.on)&days=\(v.days)&mask=\(v.mask)&min=\(v.min)&tilt=\(v.tilt)&kind=\(v.kind)&off=\(v.off)&ramp=\(v.ramp)&gid=\(v.gid)")
+    /// The time zone: a POSIX rule ("CST6CDT,M3.2.0,M11.1.0") and its name ("America/Chicago").
+    func setTimeZone(_ rule: String, name: String) async throws { try await set("tz", rule, extra: "&n=\(name.urlQuery)") }
+    /// Stall sensing (developer).
+    enum Tuning: String { case grace = "tune.grace", stall = "tune.stall", deg10 = "tune.deg10", max = "tune.max" }
+    func setTuning(_ t: Tuning, _ value: Int) async throws { try await set(t.rawValue, "\(value)") }
+    func setBlindName(blind: Int, _ name: String) async throws { try await set(blind: blind, "name", name) }
+    func setHidden(blind: Int, _ hidden: Bool) async throws { try await set(blind: blind, "hid", flag(hidden)) }
+    /// Motor speed, percent (50…100).
+    func setSpeed(blind: Int, _ percent: Int) async throws { try await set(blind: blind, "speed", "\(percent)") }
+    /// The favorite tilt (-100…100).
+    func setFavorite(blind: Int, _ tilt: Int) async throws { try await set(blind: blind, "fav", "\(tilt)") }
+    /// Which way the motor turns: 1 or -1.
+    func setMotorSign(blind: Int, _ sign: Int) async throws { try await set(blind: blind, "sign", "\(sign)") }
+
+    // ---- Schedule slots
+    /// The command that writes one Schedule slot (see SchedulePlan for which slot holds what).
+    static func scheduleCommand(slot: Int, _ v: SchedSlot) -> String {
+        Api.schedule(slot: slot) + "on=\(v.on)&days=\(v.days)&mask=\(v.mask)&min=\(v.min)&tilt=\(v.tilt)&kind=\(v.kind)&off=\(v.off)&ramp=\(v.ramp)&gid=\(v.gid)"
     }
+    func setSchedule(slot: Int, _ v: SchedSlot) async throws { try await send(Self.scheduleCommand(slot: slot, v)) }
 
     // ---- Wi-Fi (first setup, over Bluetooth)
     func scanWifi(fresh: Bool) async throws -> WifiScan { try await json(Api.scan(fresh: fresh)) }

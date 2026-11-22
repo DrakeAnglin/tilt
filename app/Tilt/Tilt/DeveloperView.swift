@@ -21,7 +21,7 @@ struct DeveloperView: View {
                     row("Battery", "pwr.rest", "%.2f V"); row("Under load", "pwr.vbat", "%.2f V"); row("Input", "pwr.vin", "%.2f V"); row("3.3 V rail", "pwr.vdd", "%.2f V")
                     LabeledContent("Source", value: num("pwr.powered") == 1 ? "Input power" : "Battery")
                 }
-                ForEach(0..<3, id: \.self) { i in
+                ForEach(0..<((value("p") as? [Any])?.count ?? ControllerLimits.fallback.ports), id: \.self) { i in      // one per Port
                     Section("Port \(i + 1)") {
                         LabeledContent("Sensor", value: (str("p.\(i).sig") ?? "") + (num("p.\(i).pres") == 1 ? "" : " · nothing plugged in"))
                         row("Angle", "p.\(i).ang", "%.1f°")

@@ -5,4 +5,5 @@ cd "$(dirname "$0")/../app/Tilt"
 OUT=$(mktemp -d)
 # Design.swift is colors (UIKit, iPhone only): the tests do not need it.
 swiftc -o "$OUT/tilt-tests" $(ls Shared/*.swift | grep -v Design.swift) Tests/main.swift 2>"$OUT/errors" || { cat "$OUT/errors"; exit 1; }
-"$OUT/tilt-tests"
+# The shared wire fixture: made from the firmware and checked by both sides.
+"$OUT/tilt-tests" ../../firmware/blinds_matter/test/wire

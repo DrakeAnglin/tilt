@@ -3,9 +3,6 @@ import CoreLocation
 import SwiftUI
 
 // Schedule and BlindTarget live in Shared/SchedulePlan.swift.
-extension Schedule {
-    static func everyBlind(_ controllers: [Controller]) -> Set<BlindTarget> { everyPort(controllers.map(\.id)) }
-}
 
 struct BlindScene: Identifiable, Codable, Equatable {
     var id = UUID()
@@ -73,7 +70,11 @@ final class AutomationStore {
     var hasPlace = false
     var loading = false
     private var slots: [String: [SchedSlot]] = [:]          // per controller, as last read
+    private var limits: [String: ControllerLimits] = [:]    // per controller, as it reported them
 
+    private func limits(_ id: String) -> ControllerLimits { limits[id] ?? .fallback }
+    /// Every Port of these controllers (a new Schedule starts with all of them).
+    func everyBlind(_ controllers: [Controller]) -> Set<BlindTarget> { Schedule.everyPort(controllers.map { ($0.id, limits($0.id).ports) }) }
 
     func load(_ controllers: [Controller]) async {
         loading = true; defer { loading = false }
@@ -81,6 +82,7 @@ final class AutomationStore {
         for c in controllers {
             guard let cfg = try? await c.client.schedules() else { continue }
             slots[c.id] = cfg.sched
+            limits[c.id] = cfg.limits
             if let s = cfg.sun, s.count == 2, s[0] > 0 { sun = (Date(timeIntervalSince1970: s[0]), Date(timeIntervalSince1970: s[1])); hasPlace = true; Sky.remember(rise: sun!.rise, set: sun!.set) }
         }
         schedules = SchedulePlan.schedules(controllers.compactMap { c in slots[c.id].map { (c.id, $0) } })
@@ -90,8 +92,8 @@ final class AutomationStore {
     func save(_ s: Schedule, delete: Bool = false, controllers: [Controller]) async throws {
         let name = { (id: String) in controllers.first { $0.id == id }?.state?.name ?? "A controller" }
         let writes: [SlotWrite]
-        do { writes = try SchedulePlan.writes(s, delete: delete, slots: slots) }
-        catch .full(let c) { throw TiltError("\(name(c)) already has \(slots[c]?.count ?? 8) schedules.") }
+        do { writes = try SchedulePlan.writes(s, delete: delete, slots: slots, ports: limits.mapValues(\.ports)) }
+        catch .full(let c) { throw TiltError("\(name(c)) already has \(limits(c).slots) schedules.") }
         catch .notRead(let c) { throw TiltError("\(name(c)) did not answer. Try again when it is reachable.") }
         for w in writes { try await controllers.first { $0.id == w.controller }?.client.setSchedule(slot: w.slot, w.value) }
         await load(controllers)
@@ -135,7 +137,7 @@ struct AutomationsTab: View {
                             Toggle("On", isOn: Binding(get: { s.on }, set: { on in var c = s; c.on = on; save(c) })).labelsHidden().disabled(!owner)
                         }
                     }
-                    if owner { Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: Schedule.everyBlind(model.controllers)) } }
+                    if owner { Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: store.everyBlind(model.controllers)) } }
                 } header: { Text("Schedules") } footer: {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Schedules are kept on the controllers, so they run even when this phone is away. The play button runs one right now.")
@@ -152,7 +154,7 @@ struct AutomationsTab: View {
             .navigationTitle("Automations")
             .task { await store.load(model.controllers) }
             .refreshable { await store.load(model.controllers) }
-            .sheet(item: $editing) { item in ScheduleEditor(schedule: item, isNew: !store.schedules.contains { $0.id == item.id }) { s, del in save(s, delete: del) } }
+            .sheet(item: $editing) { item in ScheduleEditor(schedule: item, isNew: !store.schedules.contains { $0.id == item.id }, everyBlind: store.everyBlind(model.controllers)) { s, del in save(s, delete: del) } }
         }
     }
 
@@ -192,6 +194,8 @@ struct ScheduleEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State var schedule: Schedule
     let isNew: Bool
+    /// Every Port of every controller: what "All blinds" saves.
+    let everyBlind: Set<BlindTarget>
     let done: (Schedule, Bool) -> Void
     @State private var custom = false
     @State private var all = true
@@ -259,7 +263,7 @@ struct ScheduleEditor: View {
             .skyPage().navigationTitle(isNew ? "New Schedule" : "Schedule").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { var s = schedule; if all { s.targets = Schedule.everyBlind(model.controllers) }; done(s, false); dismiss() }.disabled(schedule.days == 0 || (!all && schedule.targets.isEmpty)) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { var s = schedule; if all { s.targets = everyBlind }; done(s, false); dismiss() }.disabled(schedule.days == 0 || (!all && schedule.targets.isEmpty)) }
             }
             .onAppear {
                 custom = ![0, 100, -100].contains(schedule.tilt)
