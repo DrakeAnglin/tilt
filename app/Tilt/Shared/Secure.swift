@@ -84,6 +84,22 @@ enum Secure {
     }
 }
 
+/// The secured message format, shared with the firmware (sec.h secDo) and tested against it (Tests/main.swift).
+///   command: client id (8) | nonce = boot id (4) + counter (8, big-endian) | AES-256-GCM ciphertext | tag (16),
+///            authenticated with "blinds-v1" + client id
+///   reply:   nonce (12) | ciphertext | tag (16), authenticated with "blinds-v1r" + client id + the command's nonce
+enum Frame {
+    static func seal(_ command: String, key: SymmetricKey, cid: Data, boot: Data, counter: UInt64) throws -> (packet: Data, nonce: Data) {
+        let nonce = boot + withUnsafeBytes(of: counter.bigEndian) { Data($0) }
+        let box = try AES.GCM.seal(Data(command.utf8), using: key, nonce: AES.GCM.Nonce(data: nonce), authenticating: Data("blinds-v1".utf8) + cid)
+        return (cid + nonce + box.ciphertext + box.tag, nonce)
+    }
+    static func open(_ reply: Data, key: SymmetricKey, cid: Data, nonce: Data) throws -> Data {
+        let box = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: reply.prefix(12)), ciphertext: reply.dropFirst(12).dropLast(16), tag: reply.suffix(16))
+        return try AES.GCM.open(box, using: key, authenticating: Data("blinds-v1r".utf8) + cid + nonce)
+    }
+}
+
 /// Sealed commands to one paired controller.
 actor Link {
     private(set) var host: String
@@ -104,13 +120,9 @@ actor Link {
             if boot == nil { boot = Data(hex: try await Secure.hello(host).boot) }
             guard let boot, boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }
             counter = max(counter + 1, UInt64(Date().timeIntervalSince1970 * 1000))
-            let nonce = boot + withUnsafeBytes(of: counter.bigEndian) { Data($0) }
-            let box = try AES.GCM.seal(Data(command.utf8), using: key, nonce: AES.GCM.Nonce(data: nonce), authenticating: Data("blinds-v1".utf8) + cid)
-            let (st, d) = try await Secure.http(host, "/x", body: cid + nonce + box.ciphertext + box.tag)
-            if st == 200, d.count >= 28 {
-                let back = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: d.prefix(12)), ciphertext: d.dropFirst(12).dropLast(16), tag: d.suffix(16))
-                return try AES.GCM.open(back, using: key, authenticating: Data("blinds-v1r".utf8) + cid + nonce)
-            }
+            let (packet, nonce) = try Frame.seal(command, key: key, cid: cid, boot: boot, counter: counter)
+            let (st, d) = try await Secure.http(host, "/x", body: packet)
+            if st == 200, d.count >= 28 { return try Frame.open(d, key: key, cid: cid, nonce: nonce) }
             if st == 409, attempt == 0 { self.boot = nil; continue }          // the controller restarted: get its new number
             if st == 401 { throw LinkProblem.notPaired }
             if st == 403 { throw LinkProblem.waiting }
