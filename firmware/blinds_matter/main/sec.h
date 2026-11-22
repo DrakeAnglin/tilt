@@ -45,7 +45,7 @@ SemaphoreHandle_t secMx = nullptr;             // one secured command at a time 
 // already hold when they touch shared state. Lock order: secMx, then mx; nothing holding mx may take secMx.
 struct KeysLock { KeysLock() { xSemaphoreTake(mx, portMAX_DELAY); } ~KeysLock() { xSemaphoreGive(mx); } };
 
-uint8_t openApi = 1;                           // 1: the plain /api still answers (until the owner turns it off). Own NVS key.
+uint8_t openApi = 0;                           // 1: the plain /api answers even once a phone is paired (owner's choice, off by default)
 static int secRng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
 void keysSave() { nvs.putBytes("keys", keys, sizeof keys); }
 void secBegin() {
@@ -53,7 +53,7 @@ void secBegin() {
   esp_fill_random(bootId, sizeof bootId);
   if (nvs.getBytes("topic", cloudTopic, sizeof cloudTopic) != sizeof cloudTopic) { esp_fill_random(cloudTopic, sizeof cloudTopic); nvs.putBytes("topic", cloudTopic, sizeof cloudTopic); }
   memset(lastCtr, 0, sizeof lastCtr);
-  openApi = nvs.getUChar("openapi", 1);
+  openApi = nvs.getUChar("plainopen", 0);     // new key: the old "openapi" defaulted to open, so it is ignored
   secMx = xSemaphoreCreateMutex();
 }
 bool owned() { for (auto &k : keys) if (k.used == 1) return true; return false; }

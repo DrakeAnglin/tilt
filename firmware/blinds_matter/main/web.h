@@ -336,7 +336,7 @@ void bonjourTick(bool up) {
   else mdns_service_txt_set("_tilt", "_tcp", txt, 4);
   if (added) { strlcpy(lastIp, ip, sizeof lastIp); lastOwned = own; }
 }
-esp_err_t hOpenApi(httpd_req_t *r) { Lock l; openApi = argi(r, "v") ? 1 : 0; nvs.putUChar("openapi", openApi); return ok(r); }
+esp_err_t hOpenApi(httpd_req_t *r) { Lock l; openApi = argi(r, "v") ? 1 : 0; nvs.putUChar("plainopen", openApi); return ok(r); }
 // Every plain (not secured) request comes through here: once a phone is paired and the plain side is switched off,
 // only the secured connection answers.
 esp_err_t hGuard(httpd_req_t *r) {
