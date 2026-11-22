@@ -2,7 +2,11 @@
 // hardware). It answers the same commands as a real controller (see Api.swift), and its blinds move over time.
 import Foundation
 
-actor Demo {
+actor Demo: ControllerTransport {
+    nonisolated var host: String { Demo.host }
+    func move(to host: String) {}
+    func call(_ command: String) async throws -> Data { answer(command) }
+
     static let host = "demo"
     static let id = "demo"
     static let shared = Demo()

@@ -22,7 +22,7 @@ final class Controller: Identifiable {
     var removed = false
     /// The saved record changed (approved): the model saves it.
     var changed: (() -> Void)?
-    let link: Link
+    let client: ControllerClient
     private var task: Task<Void, Never>?
     nonisolated var id: String { _id }
     private let _id: String
@@ -30,7 +30,7 @@ final class Controller: Identifiable {
     init(record: ControllerRecord, key: SymmetricKey) {
         self.record = record
         _id = record.id
-        link = Link(host: record.host, cid: Data(hex: record.cid) ?? Data(), key: key)
+        client = .make(record: record, key: key)
     }
 
     func start() {
@@ -40,7 +40,7 @@ final class Controller: Identifiable {
             while !Task.isCancelled {
                 guard let self else { return }
                 do {
-                    let s: ControllerState = try await self.link.json(Api.state)
+                    let s = try await self.client.state()
                     if s != self.state { self.state = s }
                     BatteryAlerts.check(id: self.id, name: s.name, battery: s.batt)
                     self.online = true
@@ -70,34 +70,34 @@ final class Controller: Identifiable {
     func stop() { task?.cancel(); task = nil }
 
     func loadRequests() async {
-        struct K: Decodable { let keys: [PhoneKey] }
-        guard let k = try? await link.json(Api.keys, as: K.self) else { return }
-        requests = k.keys.filter { $0.wait == 1 }
+        guard let people = try? await client.people() else { return }
+        requests = people.filter { $0.wait == 1 }
     }
     /// Let a phone that asked to join in (as an owner or a user), or turn it down.
     func answer(_ r: PhoneKey, approve: Bool, owner: Bool = false) async {
-        do { try await link.send(Api.approve(cid: r.cid, approve, owner: owner)) } catch { lastError = error.localizedDescription }
+        do { try await client.approve(cid: r.cid, approve, owner: owner) } catch { lastError = error.localizedDescription }
         await loadRequests()
     }
 
     /// The controller's firmware is older than this version of the app needs.
     var needsUpdate: Bool { state.map { Api.tooOld($0.v) } ?? false }
 
-    /// Run a command; on failure remember the reason so the screen can show it.
-    func run(_ command: String) {
+    /// Do something on the controller; on failure remember the reason so the screen can show it.
+    func run(_ action: @escaping @Sendable (ControllerClient) async throws -> Void) {
+        let client = client
         Task {
-            do { try await link.send(command) } catch { lastError = error.localizedDescription }
+            do { try await action(client) } catch { lastError = error.localizedDescription }
         }
     }
-    func go(blind: Int, tilt: Int) { run(Api.go(blind: blind, tilt: tilt)) }
-    func go(blind: Int, to word: String) { run(Api.go(blind: blind, to: word)) }
+    func go(blind: Int, tilt: Int, solo: Bool = false) { run { try await $0.go(blind: blind, tilt: tilt, solo: solo) } }
+    func go(blind: Int, to word: String) { run { try await $0.go(blind: blind, to: word) } }
     /// `gently`: take this many minutes instead of going straight there.
-    func goAll(to word: String, gently minutes: Int = 0) { run(Api.goAll(to: word, gently: minutes)) }
+    func goAll(to word: String, gently minutes: Int = 0) { run { try await $0.goAll(to: word, gently: minutes) } }
     /// Every blind that is set up, to one position.
-    func goAll(tilt: Int) { for (i, b) in (state?.b ?? []).enumerated() where b.ready { run(Api.go(blind: i, tilt: tilt, solo: true)) } }
-    func stopAll() { run(Api.stop) }
+    func goAll(tilt: Int) { for (i, b) in (state?.b ?? []).enumerated() where b.ready { go(blind: i, tilt: tilt, solo: true) } }
+    func stopAll() { run { try await $0.stop() } }
     /// Hold-to-turn: one short push; send again within half a second to keep turning.
-    func jog(blind: Int, dir: Int, percent: Int) { Task { _ = try? await link.call(Api.jog(blind: blind, dir: dir, percent: percent)) } }
+    func jog(blind: Int, dir: Int, percent: Int) { let client = client; Task { await client.jog(blind: blind, dir: dir, percent: percent) } }
 }
 
 @MainActor @Observable
@@ -128,7 +128,7 @@ final class AppModel {
         let n = name.trimmingCharacters(in: .whitespaces)
         guard !n.isEmpty else { return }
         AppModel.myName = n
-        for c in controllers { Task { try? await c.link.send(Api.rename(cid: c.record.cid, to: n)) } }
+        for c in controllers { Task { try? await c.client.rename(cid: c.record.cid, to: n) } }
     }
 
     init() {
@@ -210,7 +210,7 @@ final class AppModel {
         for f in list {
             guard let c = (controllers + waiting).first(where: { $0.id == f.id }), c.record.host != f.host else { continue }
             c.record.host = f.host
-            Task { await c.link.move(to: f.host) }
+            Task { await c.client.transport.move(to: f.host) }
             changed = true
         }
         if changed { save() }
@@ -222,7 +222,7 @@ final class AppModel {
     }
     func remove(_ c: Controller) {
         c.stop()
-        if c.record.waiting == true, !c.denied { Task { _ = try? await c.link.call(Api.leave) } }      // take the request back
+        if c.record.waiting == true, !c.denied { let client = c.client; Task { await client.leave() } }      // take the request back
         if c.record.waiting == true { Task { await Cloud.clearJoin(cid: c.record.cid) } }
         if let t = c.record.topic { Task { await Cloud.unwatch(topic: t) } }
         Keychain.delete(c.id)

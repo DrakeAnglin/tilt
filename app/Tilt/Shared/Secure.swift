@@ -101,7 +101,7 @@ enum Frame {
 }
 
 /// Sealed commands to one paired controller.
-actor Link {
+actor Link: ControllerTransport {
     private(set) var host: String
     private let cid: Data
     private let key: SymmetricKey
@@ -115,7 +115,6 @@ actor Link {
 
     /// Send "/api/…?…" and return the controller's JSON answer.
     func call(_ command: String) async throws -> Data {
-        if host == Demo.host { return await Demo.shared.answer(command) }          // the demo room answers itself
         for attempt in 0..<2 {
             if boot == nil { boot = Data(hex: try await Secure.hello(host).boot) }
             guard let boot, boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }
@@ -129,17 +128,6 @@ actor Link {
             throw TiltError("The controller refused the command.")
         }
         throw TiltError("The controller did not answer.")
-    }
-
-    func json<T: Decodable>(_ command: String, as: T.Type = T.self) async throws -> T {
-        try JSONDecoder().decode(T.self, from: try await call(command))
-    }
-
-    /// A command whose answer is {"ok":1} or {"ok":0,"err":"…"}.
-    func send(_ command: String) async throws {
-        struct R: Decodable { let ok: Int; let err: String? }
-        let r: R = try await json(command)
-        if r.ok != 1 { throw TiltError((r.err ?? "That did not work.").capitalizedFirst) }
     }
 }
 

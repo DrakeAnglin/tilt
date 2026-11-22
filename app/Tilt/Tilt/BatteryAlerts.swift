@@ -57,8 +57,8 @@ enum BatteryAlerts {
     /// Run by iOS now and then while the app is closed.
     static func backgroundCheck() async {
         scheduleRefresh()
-        for (rec, link) in TiltActions.links() {
-            guard let s: ControllerState = try? await link.json(Api.state) else { continue }
+        for (rec, client) in TiltActions.clients() {
+            guard let s = try? await client.state() else { continue }
             check(id: rec.id, name: s.name, battery: s.batt)
             if rec.owner, (s.asks ?? 0) > 0 { JoinAlerts.notify(cid: "any.\(rec.id)", who: "Someone", room: s.name) }
         }

@@ -3,17 +3,6 @@ import CoreImage.CIFilterBuiltins
 import HomeKit
 import SwiftUI
 
-struct ControllerConfig: Decodable {
-    struct Blind: Decodable { var name: String; var hid: Int; var speed: Int; var fav: Int }
-    var name: String
-    var closeUp: Int, sync: Int
-    var par: Int?                 // move at the same time (firmware 2.2 and later)
-    var tzn: String
-    var hksep: Int?
-    var b: [Blind]
-}
-struct PhoneKey: Decodable, Identifiable, Equatable { let cid: String; let name: String; let owner: Int; let me: Int; let wait: Int?; let code: String?; var id: String { cid } }
-
 struct ControllerSettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -145,7 +134,7 @@ struct ControllerSettingsView: View {
 
     private func remove(reset: Bool) {
         Task {
-            if reset { try? await controller.link.send(Api.revokeAll) }
+            if reset { try? await controller.client.revokeAll() }
             model.remove(controller)                 // the Blinds tab goes back to the rooms by itself
             dismiss()
         }
@@ -160,10 +149,9 @@ struct ControllerSettingsView: View {
     }
     private func load() async {
         do {
-            let c: ControllerConfig = try await controller.link.json(Api.config)
+            let c = try await controller.client.config()
             cfg = c; name = c.name; problem = nil
-            struct K: Decodable { let keys: [PhoneKey] }
-            let list = ((try? await controller.link.json(Api.keys, as: K.self).keys) ?? []).sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
+            let list = ((try? await controller.client.people()) ?? []).sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
             withAnimation { phones = list }
             if let me = phones.first(where: { $0.me == 1 }) { model.setOwner(controller, me.owner == 1) }      // the owner may have changed
         } catch {
@@ -176,33 +164,30 @@ struct ControllerSettingsView: View {
     }
     private func set(_ key: String, _ value: String) {
         Task {
-            do { try await controller.link.send(Api.set(key, value)); await load() } catch { problem = error.localizedDescription }
+            do { try await controller.client.set(key, value); await load() } catch { problem = error.localizedDescription }
         }
     }
     private func setRole(_ p: PhoneKey, owner: Bool) {
-        Task { do { try await controller.link.send(Api.makeOwner(cid: p.cid, owner)); await load() } catch { problem = error.localizedDescription } }
+        Task { do { try await controller.client.makeOwner(cid: p.cid, owner); await load() } catch { problem = error.localizedDescription } }
     }
     private func rename(_ p: PhoneKey) {
         let n = newName.trimmingCharacters(in: .whitespaces)
         guard !n.isEmpty else { return }
         if p.me == 1 { AppModel.myName = n }
-        Task { do { try await controller.link.send(Api.rename(cid: p.cid, to: n)); await load() } catch { problem = error.localizedDescription } }
+        Task { do { try await controller.client.rename(cid: p.cid, to: n); await load() } catch { problem = error.localizedDescription } }
     }
     private func revoke(_ p: PhoneKey) {
         Task {
-            struct R: Decodable { let ok: Int; let err: String?; let proof: String? }
             do {
-                let r: R = try await controller.link.json(Api.revoke(cid: p.cid))
-                if r.ok != 1 { throw TiltError((r.err ?? "That did not work.").capitalizedFirst) }
-                await Cloud.postGone(cid: p.cid, proof: r.proof ?? "")        // so that phone drops these blinds even away from home
+                let proof = try await controller.client.revoke(cid: p.cid)
+                await Cloud.postGone(cid: p.cid, proof: proof)        // so that phone drops these blinds even away from home
                 await load()
             } catch { problem = error.localizedDescription }
         }
     }
     private func openHome() {
         Task {
-            struct H: Decodable { let code: String; let qr: String }
-            do { let h: H = try await controller.link.json(Api.homeOpen); home = HomeInfo(code: h.code, qr: h.qr) } catch { problem = error.localizedDescription }
+            do { let h = try await controller.client.homeSetupCode(); home = HomeInfo(code: h.code, qr: h.qr) } catch { problem = error.localizedDescription }
         }
     }
 }
@@ -308,6 +293,6 @@ struct BlindSettingsView: View {
         .fullScreenCover(isPresented: $settingUp) { SetupWizard(controller: controller, index: index, name: blind.name) }
     }
     private func set(_ field: String, _ value: String) {
-        Task { try? await controller.link.send(Api.set("b\(index).\(field)", value)); await reload() }
+        Task { try? await controller.client.set(blind: index, field, value); await reload() }
     }
 }

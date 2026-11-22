@@ -46,7 +46,7 @@ struct DeveloperView: View {
                 Section("Counters") {
                     row("Starts", "st.boots", "%.0f"); row("Brownouts", "st.brown", "%.0f"); row("Crashes", "st.crash", "%.0f"); row("Updates kept", "st.ota", "%.0f")
                 }
-                Section { Button("Restart Controller", role: .destructive) { controller.run(Api.reboot) } }
+                Section { Button("Restart Controller", role: .destructive) { controller.run { try await $0.restart() } } }
             } else {
                 Section("Newest first") {
                     ForEach(Array(log.reversed().enumerated()), id: \.offset) { _, l in Text(l).font(.caption.monospaced()) }
@@ -59,8 +59,8 @@ struct DeveloperView: View {
         .navigationTitle("Developer").navigationBarTitleDisplayMode(.inline)
         .task {
             while !Task.isCancelled {
-                if let d = try? await controller.link.call(Api.dev), let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { dev = j }
-                if page == 2, let d = try? await controller.link.call(Api.log), let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { log = j["lines"] as? [String] ?? [] }
+                dev = await controller.client.developerInfo()
+                if page == 2 { log = await controller.client.log() }
                 try? await Task.sleep(for: .milliseconds(700))
             }
         }

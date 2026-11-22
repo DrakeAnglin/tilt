@@ -23,10 +23,10 @@ struct TiltProvider: TimelineProvider {
         }
     }
     private func load() async -> TiltEntry {
-        let links = TiltActions.links()
+        let links = TiltActions.clients()
         var rooms: [RoomLine] = []
-        for (rec, link) in links {
-            if let s: ControllerState = try? await link.json(Api.state) {
+        for (rec, client) in links {
+            if let s = try? await client.state() {
                 let tilts = s.b.filter(\.ready).compactMap(\.tilt)
                 let closed = tilts.isEmpty ? 0 : tilts.map { abs($0) }.reduce(0, +) / Double(tilts.count) / 100
                 rooms.append(RoomLine(name: s.name, status: TiltActions.words(s), closed: closed))

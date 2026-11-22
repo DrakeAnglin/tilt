@@ -55,9 +55,9 @@ struct SetupWizard: View {
                     Text("\(name) is set up").font(.system(size: 28, weight: .bold, design: .rounded)).padding(.top, 10)
                     Text("Try each position. The blind moves by itself now.").font(.body).foregroundStyle(.secondary).padding(.top, 2)
                     HStack(spacing: 10) {
-                        PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.run(Api.go(blind: index, tilt: -100, solo: true)) }
-                        PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.run(Api.go(blind: index, tilt: 0, solo: true)) }
-                        PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.run(Api.go(blind: index, tilt: 100, solo: true)) }
+                        PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.go(blind: index, tilt: -100, solo: true) }
+                        PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.go(blind: index, tilt: 0, solo: true) }
+                        PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.go(blind: index, tilt: 100, solo: true) }
                     }
                     .padding(.top, 24)
                     Text(blind.map(TiltWords.status) ?? "").font(.subheadline).foregroundStyle(.secondary).padding(.top, 12)
@@ -75,7 +75,7 @@ struct SetupWizard: View {
                 controller.boost = true
                 defer { controller.boost = false }
                 while !Task.isCancelled && step < 3 {
-                    if blind?.mov != 1 { _ = try? await controller.link.call(Api.watch(blind: index)) }
+                    if blind?.mov != 1 { await controller.client.watch(blind: index) }
                     try? await Task.sleep(for: .milliseconds(900))
                 }
             }
@@ -97,12 +97,11 @@ struct SetupWizard: View {
         busy = true; problem = nil
         Task {
             defer { busy = false }
-            struct M: Decodable { let ok: Int; let err: String?; let prob: String? }
             do {
-                let m: M = try await controller.link.json(Api.mark(blind: index, which))
+                let m = try await controller.client.mark(blind: index, which)
                 if m.ok != 1 { problem = (m.err ?? "That did not work.").capitalizedFirst; return }
                 if which == "down", let p = m.prob {            // the three marks do not make sense together: start over
-                    _ = try? await controller.link.call(Api.mark(blind: index, "clear"))
+                    _ = try? await controller.client.mark(blind: index, "clear")
                     problem = p.capitalizedFirst + ". Start again from step 1."
                     step = 0
                     return

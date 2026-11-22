@@ -55,16 +55,37 @@ check(Api.goAll(to: "open") == "/api/go?b=all&to=open", "no ramp when not gentle
 check(Api.set("name", "Den & Hall") == "/api/set?k=name&v=Den%20%26%20Hall", "values are escaped")
 
 // ---- the demo room answers like a controller
-let demo = Link(host: Demo.host, cid: Data(), key: key)
-let s: ControllerState = try await demo.json(Api.state)
+let demo = ControllerClient(transport: Demo.shared)
+let s = try await demo.state()
 check(s.b.count == 3 && s.b.allSatisfy(\.ready), "the demo has three ready blinds")
-try await demo.send(Api.goAll(to: "close"))
-let moving: ControllerState = try await demo.json(Api.state)
+try await demo.goAll(to: "close")
+let moving = try await demo.state()
 check(moving.mv >= 0, "after Close the demo blinds are moving")
 try await Task.sleep(for: .seconds(3.5))
-let done: ControllerState = try await demo.json(Api.state)
+let done = try await demo.state()
 check(done.mv == -1 && done.b.allSatisfy { ($0.tilt ?? 0) == 100 }, "after a few seconds they are closed (slats up)")
-check((try? await demo.send(Api.homeOpen)) == nil, "Apple Home says it is not available in the demo")
+check((try? await demo.homeSetupCode()) == nil, "Apple Home says it is not available in the demo")
+
+// ---- the client against a fake controller: no network, no crypto
+actor FakeController: ControllerTransport {
+    var sent: [String] = []
+    var host: String { "fake" }
+    func move(to host: String) {}
+    func call(_ command: String) async throws -> Data {
+        sent.append(command)
+        if command.hasPrefix("/api/keys") { return Data(#"{"keys":[{"cid":"aa","name":"Alex","owner":1,"me":1,"wait":0,"code":""},{"cid":"bb","name":"Sam","owner":0,"me":0,"wait":1,"code":"1234"}]}"#.utf8) }
+        if command.hasPrefix("/api/revoke") { return Data(#"{"ok":1,"proof":"abc"}"#.utf8) }
+        if command.hasPrefix("/api/set") { return Data(#"{"ok":0,"err":"only the owner can do that"}"#.utf8) }
+        return Data(#"{"ok":1}"#.utf8)
+    }
+}
+let fake = FakeController(), fc = ControllerClient(transport: fake)
+let ppl = try await fc.people()
+check(ppl.count == 2 && ppl[1].wait == 1 && ppl[1].code == "1234", "people are decoded")
+check((try await fc.revoke(cid: "bb")) == "abc", "remove returns the proof")
+do { try await fc.set("name", "Den"); check(false, "a refusal throws") } catch { check(error.localizedDescription == "Only the owner can do that", "the controller's reason is passed on") }
+try await fc.go(blind: 2, tilt: -40, solo: true)
+check(await fake.sent.last == "/api/go?b=2&t=-40&solo=1", "the client builds the command")
 
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

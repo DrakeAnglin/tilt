@@ -4,8 +4,6 @@ import SwiftUI
 
 struct BlindTarget: Hashable, Codable { var controller: String; var blind: Int }
 
-struct SchedSlot: Decodable { var on: Int, days: Int, mask: Int, min: Int, tilt: Int, kind: Int, off: Int, ramp: Int; var gid: UInt32 }
-struct SchedConfig: Decodable { var sched: [SchedSlot]; var lat: Double?; var lon: Double?; var sun: [Double]? }
 
 /// One schedule as the app shows it. It may live on several controllers (one slot on each, tagged with `id`).
 struct Schedule: Identifiable, Equatable {
@@ -53,7 +51,7 @@ final class SceneStore {
     var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: Prefs.scenes)).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
     func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: Prefs.scenes) }
     func run(_ scene: BlindScene, controllers: [Controller]) {
-        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.run(Api.go(blind: t.blind, tilt: tilt, solo: true)) }
+        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.go(blind: t.blind, tilt: tilt, solo: true) }
     }
 }
 
@@ -111,7 +109,7 @@ final class AutomationStore {
         loading = true; defer { loading = false }
         var found: [UInt32: Schedule] = [:]
         for c in controllers {
-            guard let cfg: SchedConfig = try? await c.link.json(Api.config) else { continue }
+            guard let cfg = try? await c.client.schedules() else { continue }
             slots[c.id] = cfg.sched
             if let s = cfg.sun, s.count == 2, s[0] > 0 { sun = (Date(timeIntervalSince1970: s[0]), Date(timeIntervalSince1970: s[1])); hasPlace = true; Sky.remember(rise: sun!.rise, set: sun!.set) }
             for (i, sl) in cfg.sched.enumerated() where sl.mask != 0 {
@@ -135,7 +133,8 @@ final class AutomationStore {
                 if mask != 0 { throw TiltError("\(c.state?.name ?? "A controller") already has 8 schedules.") }
                 continue
             }
-            try await c.link.send(Api.schedule(slot: i) + "on=\(s.on && mask != 0 ? 1 : 0)&days=\(s.days)&mask=\(mask)&min=\(s.minute)&tilt=\(s.tilt)&kind=\(s.kind)&off=\(s.offset)&ramp=\(s.ramp)&gid=\(mask != 0 ? s.id : 0)")
+            try await c.client.setSchedule(slot: i, on: s.on && mask != 0, days: s.days, mask: mask, minute: s.minute, tilt: s.tilt,
+                                           kind: s.kind, offset: s.offset, ramp: s.ramp, id: mask != 0 ? s.id : 0)
         }
         await load(controllers)
     }
@@ -214,7 +213,7 @@ struct AutomationsTab: View {
     private func runNow(_ s: Schedule) {
         for t in s.targets {
             guard let c = model.controllers.first(where: { $0.id == t.controller }), c.state?.b[safe: t.blind]?.ready == true else { continue }
-            c.run(Api.go(blind: t.blind, tilt: s.tilt, solo: true))
+            c.go(blind: t.blind, tilt: s.tilt, solo: true)
         }
     }
     private func save(_ s: Schedule, delete: Bool = false) {
@@ -224,7 +223,7 @@ struct AutomationsTab: View {
         Task {
             problem = nil
             guard let place = await locator.once() else { problem = "Tilt could not get this phone's location. Allow location for Tilt in Settings."; return }
-            for c in model.controllers { try? await c.link.send(Api.set("loc", String(format: "%.3f,%.3f", place.latitude, place.longitude))) }
+            for c in model.controllers { try? await c.client.setLocation(latitude: place.latitude, longitude: place.longitude) }
             await store.load(model.controllers)
         }
     }

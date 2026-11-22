@@ -76,13 +76,14 @@ enum TiltActions {
         let d = Keychain.load("records") ?? UserDefaults.standard.data(forKey: Prefs.controllers)
         return d.flatMap { try? JSONDecoder().decode([ControllerRecord].self, from: $0) } ?? []
     }
-    static func links() -> [(ControllerRecord, Link)] {
-        records().filter { $0.waiting != true }.compactMap { r in Keychain.load(r.id).map { (r, Link(host: r.host, cid: Data(hex: r.cid) ?? Data(), key: SymmetricKey(data: $0))) } }
+    /// A client for every controller this phone may use (for Siri, the widget and background checks).
+    static func clients() -> [(ControllerRecord, ControllerClient)] {
+        records().filter { $0.waiting != true }.compactMap { r in Keychain.load(r.id).map { (r, ControllerClient.make(record: r, key: SymmetricKey(data: $0))) } }
     }
-    /// Send one command to every controller. Throws if none could be reached.
-    static func all(_ command: String) async throws {
+    /// Do one thing on every controller. Throws if none could be reached.
+    static func all(_ action: (ControllerClient) async throws -> Void) async throws {
         var reached = 0
-        for (_, link) in links() { if (try? await link.send(command)) != nil { reached += 1 } }
+        for (_, client) in clients() { if (try? await action(client)) != nil { reached += 1 } }
         if reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
         WidgetCenter.shared.reloadAllTimelines()
     }
@@ -93,10 +94,10 @@ enum TiltActions {
 struct OpenBlindsIntent: AppIntent {
     static var title: LocalizedStringResource = "Open Blinds"
     static var description = IntentDescription("Opens all your blinds (slats level).")
-    func perform() async throws -> some IntentResult { try await TiltActions.all(Api.goAll(to: "open")); return .result() }
+    func perform() async throws -> some IntentResult { try await TiltActions.all { try await $0.goAll(to: "open") }; return .result() }
 }
 struct CloseBlindsIntent: AppIntent {
     static var title: LocalizedStringResource = "Close Blinds"
     static var description = IntentDescription("Closes all your blinds.")
-    func perform() async throws -> some IntentResult { try await TiltActions.all(Api.goAll(to: "close")); return .result() }
+    func perform() async throws -> some IntentResult { try await TiltActions.all { try await $0.goAll(to: "close") }; return .result() }
 }

@@ -60,8 +60,8 @@ final class FirmwareUpdates {
     /// Put a firmware file on a controller: allow the upload, send it, wait for the restart, then keep the new firmware.
     static func install(_ file: Data, on c: Controller, step: @escaping (Step) -> Void) async throws {
         step(.sending)
-        try await c.link.send(Api.otaOpen)
-        let host = await c.link.host
+        try await c.client.allowUpdate()
+        let host = await c.client.transport.host
         guard let url = URL(string: "http://\(host)/api/update") else { throw TiltError("The controller's address is not valid.") }
         var req = URLRequest(url: url, timeoutInterval: 240)
         req.httpMethod = "POST"
@@ -75,7 +75,7 @@ final class FirmwareUpdates {
         try await Task.sleep(for: .seconds(20))
         step(.confirming)
         for _ in 0..<20 {                         // up to about a minute more for it to come back
-            if let h = try? await Secure.hello(host), (try? await c.link.send(Api.keep)) != nil { step(.done(h.fw)); return }
+            if let h = try? await Secure.hello(host), (try? await c.client.keepFirmware()) != nil { step(.done(h.fw)); return }
             try await Task.sleep(for: .seconds(3))
         }
         throw TiltError("The controller did not come back. If it restarts later it goes back to the old firmware by itself.")
