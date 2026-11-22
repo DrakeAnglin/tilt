@@ -27,6 +27,7 @@
 #include "sec.h"
 #include "web.h"
 #include "ble.h"
+#include "home_code.h"
 #include "home_view.h"
 #include <app/server/CommissioningWindowManager.h>
 
@@ -230,7 +231,8 @@ extern "C" void app_main()
     };
     set_openthread_platform_config(&config);
 #endif
-    bleSetupBegin();                             // 10. the transports: our Bluetooth service, then Matter (its BLE too)
+    homeCodeBegin();                             // 10. this controller's own Apple Home setup code (before the radio is on)
+    bleSetupBegin();                             // 11. the transports: our Bluetooth service, then Matter (its BLE too)
     esp_err_t err = esp_matter::start(event_cb);
     ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Matter did not start: %d", err));
 
@@ -250,7 +252,7 @@ extern "C" void app_main()
     }
     esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&sntp);
-    webBegin();                                  // 11. HTTP
+    webBegin();                                  // 12. HTTP
     ::event("start %s (%s), battery %.2f V, input %.2f V, %d covering%s for Home", FW_VERSION, resetReason(), vbatRest, vin, nEp, nEp == 1 ? "" : "s");
-    xTaskCreate(blindsTask, "blinds", 6144, NULL, 5, &blindsTaskH);   // 12. the blinds task
+    xTaskCreate(blindsTask, "blinds", 6144, NULL, 5, &blindsTaskH);   // 13. the blinds task
 }

@@ -171,3 +171,7 @@ CONFIG_BT_LE_LP_CLK_SRC_MAIN_XTAL=y
 
 # Matter uses the standard mDNS responder, so the controller can also announce itself to the app (_tilt._tcp)
 CONFIG_USE_MINIMAL_MDNS=n
+
+# Each controller makes its own Apple Home setup code on its first start (main/home_code.h), not the public test code
+CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER=y
+CONFIG_ENABLE_TEST_SETUP_PARAMS=n
