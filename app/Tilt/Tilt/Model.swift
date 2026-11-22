@@ -11,6 +11,19 @@ final class Controller: Identifiable {
     var record: ControllerRecord
     var state: ControllerState?
     var online = false
+    /// When the controller last answered. Kept on the phone, so the app can say "last seen 2 hours ago".
+    var lastSeen: Date?
+    private var seenSaved = Date.distantPast
+    enum Reach: Equatable { case online, asleep, unreachable }
+    /// Online: answering. Asleep: not answering, but on battery and seen in the last 15 minutes, so most likely dozing.
+    /// Unreachable: not on this Wi-Fi, switched off, or gone.
+    var reach: Reach {
+        if online { return .online }
+        guard let t = lastSeen, state?.batt.charging == false, Date().timeIntervalSince(t) < 15 * 60 else { return .unreachable }
+        return .asleep
+    }
+    /// One line for the room when it is not answering.
+    var awayLine: String { TiltWords.away(asleep: reach == .asleep, lastSeen: lastSeen) }
     var lastError: String?
     /// Read the controller more often (a setup screen is watching the sensor).
     var boost = false
@@ -31,6 +44,7 @@ final class Controller: Identifiable {
         self.record = record
         _id = record.id
         client = .make(record: record, key: key)
+        lastSeen = UserDefaults.standard.object(forKey: Prefs.lastSeen(record.id)) as? Date
     }
 
     func start() {
@@ -45,6 +59,7 @@ final class Controller: Identifiable {
                     BatteryAlerts.check(id: self.id, name: s.name, battery: s.batt)
                     self.online = true
                     misses = 0
+                    self.noteSeen()
                     if self.record.waiting == true { self.record.waiting = nil; self.record.code = nil; self.changed?(); Task { await Cloud.clearJoin(cid: self.record.cid) } }      // an owner let this phone in
                     if let t = s.topic, !t.isEmpty, t != self.record.topic { self.record.topic = t; self.changed?() }
                     if let t = self.record.topic { if self.record.owner { await Cloud.watch(topic: t) } else { await Cloud.unwatch(topic: t) } }      // owners get a push when someone asks to join
@@ -68,6 +83,10 @@ final class Controller: Identifiable {
         }
     }
     func stop() { task?.cancel(); task = nil }
+    private func noteSeen() {
+        lastSeen = Date()
+        if Date().timeIntervalSince(seenSaved) > 60 { seenSaved = Date(); UserDefaults.standard.set(lastSeen, forKey: Prefs.lastSeen(id)) }
+    }
 
     func loadRequests() async {
         guard let people = try? await client.people() else { return }
@@ -227,6 +246,7 @@ final class AppModel {
         if let t = c.record.topic { Task { await Cloud.unwatch(topic: t) } }
         Keychain.delete(c.id)
         BatteryAlerts.forget(id: c.id)
+        UserDefaults.standard.removeObject(forKey: Prefs.lastSeen(c.id))
         controllers.removeAll { $0.id == c.id }
         let store = SceneStore.shared                       // scenes that only moved this controller's blinds go with it
         let before = store.scenes.count

@@ -119,14 +119,14 @@ struct RoomCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))      // nothing pokes past the edge mid-move
         .card()
         .geometryGroup()                // the inside moves with the card as it changes size, not each piece by itself
-        .opacity(controller.online || controller.state == nil ? 1 : 0.75)
+        .opacity(controller.reach == .online || controller.state == nil ? 1 : 0.75)
     }
     private func top(_ s: ControllerState?, _ shown: [BlindState]) -> some View {
            VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(s?.name ?? controller.record.name).font(.title3.weight(.semibold)).lineLimit(1).fixedSize()      // never cut short mid-move
-                    Text(controller.online ? (s.map(TiltWords.room) ?? "Connecting…") : "Not reachable").font(.subheadline).foregroundStyle(controller.online ? .secondary : Palette.warning).lineLimit(1).fixedSize()
+                    Text(controller.reach == .online ? (s.map(TiltWords.room) ?? "Connecting…") : controller.awayLine).font(.subheadline).foregroundStyle(controller.reach == .unreachable ? Palette.warning : .secondary).lineLimit(1).fixedSize()
                 }
                 .layoutPriority(1)
                 Spacer(minLength: 6)

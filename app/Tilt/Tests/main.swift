@@ -48,6 +48,12 @@ check(low.isLow && !ok.isLow, "under 20% on battery is low")
 check(!chargingLow.isLow, "charging is not low")
 check(empty.isLow && empty.tooLowToMove, "too low to move is low even while charging")
 
+// ---- asleep / not reachable wording
+let seenAt = Date(timeIntervalSince1970: 1_800_000_000)
+check(TiltWords.away(asleep: true, lastSeen: seenAt.addingTimeInterval(-30), now: seenAt) == "Asleep · seen just now", "asleep, seen moments ago")
+check(TiltWords.away(asleep: false, lastSeen: nil) == "Not reachable", "never seen")
+check(TiltWords.away(asleep: false, lastSeen: seenAt.addingTimeInterval(-7200), now: seenAt).hasPrefix("Not reachable · last seen 2"), "unreachable, with when it was last seen")
+
 // ---- command strings
 check(Api.go(blind: 1, tilt: -100, solo: true) == "/api/go?b=1&t=-100&solo=1", "one blind, solo")
 check(Api.goAll(to: "close", gently: 10) == "/api/go?b=all&to=close&ramp=10", "a gentle move for all")

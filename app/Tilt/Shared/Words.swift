@@ -35,6 +35,13 @@ enum TiltWords {
         guard let first = tilts.first else { return "\(ready.count) blind\(ready.count == 1 ? "" : "s")" }
         return tilts.allSatisfy({ abs($0 - first) < sameWithin }) ? long(first) : "Mixed positions"
     }
+    /// A controller that is not answering: asleep (dozing on battery, expected) or not reachable, and when it was last seen.
+    static func away(asleep: Bool, lastSeen: Date?, now: Date = .now) -> String {
+        guard let t = lastSeen else { return asleep ? "Asleep" : "Not reachable" }
+        let f = RelativeDateTimeFormatter(); f.unitsStyle = .short
+        let ago = now.timeIntervalSince(t) < 60 ? "just now" : f.localizedString(for: t, relativeTo: now)
+        return asleep ? "Asleep · seen \(ago)" : "Not reachable · last seen \(ago)"
+    }
     /// The widget's shorter line: Open, Closed, or how far closed on average.
     static func short(_ s: ControllerState) -> String {
         let tilts = s.b.filter(\.ready).compactMap(\.tilt)

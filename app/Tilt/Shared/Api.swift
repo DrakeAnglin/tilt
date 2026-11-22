@@ -74,6 +74,8 @@ enum Prefs {
     /// Developer builds only: follow the beta firmware channel, and where to look for firmware.
     static let firmwareBeta = "fwBeta"
     static let firmwareSource = "fwSource"
+    /// When a controller last answered, by its id.
+    static func lastSeen(_ id: String) -> String { "seen.\(id)" }
 }
 
 /// Developer Mode exists only in builds made from Xcode, never in an App Store build.

@@ -26,7 +26,7 @@ struct SettingsTab: View {
                                 SlatView(tilt: c.state?.b.first(where: \.ready)?.tilt ?? 0, known: c.state != nil, slats: 5).frame(width: 44, height: 44)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(c.state?.name ?? c.record.name).font(.body.weight(.medium))
-                                    Text("\(c.record.owner ? "Owner" : "User")\(c.state == nil ? " · not reachable" : "")").font(.footnote).foregroundStyle(.secondary)
+                                    Text("\(c.record.owner ? "Owner" : "User")\(c.reach == .online ? "" : c.reach == .asleep ? " · asleep" : " · not reachable")").font(.footnote).foregroundStyle(.secondary)
                                 }
                             }
                             .padding(.vertical, 2)
