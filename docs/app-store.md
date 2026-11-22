@@ -7,7 +7,11 @@ What is still needed before Tilt can go to TestFlight and the App Store, and the
 2. ~~CloudKit~~ done 2026-11-21 (`Gone` added; schema deployed to Production). Was: in the CloudKit Console, open container `iCloud.app.tilt.blinds`, Development, and use
    "Deploy Schema Changes" to copy the record types `Join` and `Gone` to Production. Add a query index on `Join.topic`
    (queryable) if the console asks.
-3. **Privacy policy URL:** once the repo is public on GitHub, use the link to `docs/privacy-policy.md`.
+3. **Website (public, separate from this private repo):** https://drakeanglin.github.io/tilt-site/ from the
+   `DrakeAnglin/tilt-site` repo. The privacy policy lives only there (`privacy.md`); edit it in that repo.
+   - Privacy policy URL: https://drakeanglin.github.io/tilt-site/privacy/
+   - Support URL: https://drakeanglin.github.io/tilt-site/support/
+   - Questions and problems: issues on `DrakeAnglin/tilt-site`
 4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt/releases/latest/download/firmware.json`.
    For each firmware release: `python3 tools/release_firmware.py stable --notes "..."` (builds without secrets, signs),
    then upload `firmware/releases/firmware.json` and the new `tilt-<version>.bin` to a GitHub release. The repo must be
