@@ -86,6 +86,22 @@ inline StallVerdict stallCheck(uint32_t elapsed, uint32_t grace, uint32_t sinceR
   return fabsf(angDiff(ang, ref)) < minDeg ? STALL_YES : STALL_MOVED;
 }
 
+// ---- this controller's own Apple Home setup code (home_code.h keeps it in flash; made once, never changed)
+const uint32_t HOME_CODE_MAGIC = 0x48430001;
+struct HomeCode { uint32_t magic, pin, iter; uint16_t disc; uint8_t salt[32], verifier[97]; };
+inline bool setupPinValid(uint32_t pin) {                    // the Matter rules: 1..99999998, not 11111111 and the like
+  if (pin == 0 || pin > 99999998 || pin == 12345678 || pin == 87654321) return false;
+  return pin % 11111111 != 0;
+}
+// Keep what flash holds (n bytes read), or make a new one?
+inline bool homeCodeKeep(const HomeCode &c, size_t n) {
+  return n == sizeof c && c.magic == HOME_CODE_MAGIC && setupPinValid(c.pin) && c.disc <= 0xFFF && c.iter >= 1000 && c.iter <= 100000;
+}
+// "12345678901" -> "1234-567-8901", as Apple Home shows it
+inline std::string manualCodeDashed(const std::string &d) {
+  return d.size() == 11 ? d.substr(0, 4) + "-" + d.substr(4, 3) + "-" + d.substr(7) : d;
+}
+
 // ---- secured commands: nonce = boot id (4) | counter (8, big-endian). Fresh = this start's boot id and a counter
 // above the last one accepted from that phone (so a captured command cannot be replayed).
 inline uint64_t nonceCounter(const uint8_t nonce[12]) { uint64_t c = 0; for (int i = 4; i < 12; i++) c = (c << 8) | nonce[i]; return c; }

@@ -316,9 +316,10 @@ esp_err_t hWifiState(httpd_req_t *r) {
   return sendJson(r, j);
 }
 void openHomeWindow();                           // app_main.cpp
+std::string homeCodeJson();                      // home_code.h
 esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) add this controller in the next 10 minutes
   openHomeWindow();
-  return sendJson(r, "{\"ok\":1,\"code\":\"3497-011-2332\",\"qr\":\"MT:Y.K9042C00KA0648G00\"}");
+  return sendJson(r, homeCodeJson());
 }
 esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = millis() + 300000; event("firmware updates allowed for 5 minutes"); return ok(r); }
 // Found by the app with Bonjour: _tilt._tcp, with this controller's id and address.

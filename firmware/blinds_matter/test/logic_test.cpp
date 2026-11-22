@@ -343,6 +343,24 @@ int main() {
   CHECK(got.mask == 7 && got.tilt == -100 && got.min == 1439, "out-of-range values are brought into range (mask to 3 Ports)");
   CHECK(slotOfArgs(arg, 2).mask == 3, "the mask follows the number of Ports");
 
+  // ---- Apple Home setup code: kept once made
+  CHECK(setupPinValid(1) && setupPinValid(99999998) && setupPinValid(24681357), "ordinary passcodes are valid");
+  CHECK(!setupPinValid(0) && !setupPinValid(99999999) && !setupPinValid(33333333) && !setupPinValid(12345678) &&
+        !setupPinValid(87654321) && !setupPinValid(100000000), "the forbidden passcodes are not");
+  HomeCode hc = {HOME_CODE_MAGIC, 51234567, 1000, 0xABC, {}, {}};
+  CHECK(homeCodeKeep(hc, sizeof hc), "a good stored code is kept");
+  CHECK(!homeCodeKeep(hc, 0), "nothing stored: make one");
+  CHECK(!homeCodeKeep(hc, sizeof hc - 1), "wrong size: make one");
+  HomeCode bad = hc; bad.magic = 0;
+  CHECK(!homeCodeKeep(bad, sizeof bad), "wrong magic: make one");
+  bad = hc; bad.pin = 11111111;
+  CHECK(!homeCodeKeep(bad, sizeof bad), "forbidden passcode: make one");
+  bad = hc; bad.disc = 0x1000;
+  CHECK(!homeCodeKeep(bad, sizeof bad), "discriminator over 12 bits: make one");
+  bad = hc; bad.iter = 999;
+  CHECK(!homeCodeKeep(bad, sizeof bad), "too few iterations: make one");
+  CHECK(manualCodeDashed("12345678901") == "1234-567-8901" && manualCodeDashed("123") == "123", "the manual code is dashed 4-3-4");
+
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;
 }
