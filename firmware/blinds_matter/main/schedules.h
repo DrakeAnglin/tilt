@@ -29,10 +29,7 @@ uint32_t schedTime(int i, time_t now, int dayOff) {      // when slot i fires on
   uint32_t e = sunEvent(t, sx.x[i].kind == 1);
   return e ? e + sx.x[i].off * 60 : 0;
 }
-// Gentle moves: a blind that is being taken to a tilt slowly, a little every 20 seconds.
-struct Ramp { bool on; float from, to; uint32_t t0, durMs, last; } ramp[PORTS];
-void rampCancel() { for (auto &r : ramp) r.on = false; }
-bool rampAny() { for (auto &r : ramp) if (r.on) return true; return false; }
+// Gentle moves (started by moveBlinds, motion.h): a little nearer the Target every 20 seconds.
 void rampTick() {
   uint32_t now = millis();
   for (int p = 0; p < PORTS; p++) {
@@ -55,11 +52,7 @@ void schedRun() {
       uint32_t t = schedTime(i, now, d);
       if (t && t > lastSched && t <= now) {
         event("schedule %d: tilt %d", i + 1, s.tilt);
-        for (int p = 0; p < PORTS; p++) {
-          if (!((s.mask >> p) & 1) || !movable(p)) continue;
-          if (sx.x[i].ramp && !isnan(bs[p].tilt)) ramp[p] = {true, bs[p].tilt, (float)s.tilt, millis(), (uint32_t)sx.x[i].ramp * 60000u, 0};
-          else startTilt(p, s.tilt);
-        }
+        moveBlinds(moveAsk(FROM_SCHEDULE, -1, s.tilt, (uint32_t)sx.x[i].ramp * 60000u, s.mask));
       }
     }
   }

@@ -1,11 +1,64 @@
-// Tests for main/logic.h, run on the Mac: tools/firmware_tests.sh. No hardware, no ESP-IDF.
+// Tests for main/logic.h and main/request.h, run on the Mac: tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
+#include "../main/request.h"
 #include <cstdio>
 #include <ctime>
+#include <string>
 
 static int passed = 0, failed = 0;
 #define CHECK(cond, what) do { if (cond) passed++; else { failed++; printf("FAIL line %d: %s\n", __LINE__, what); } } while (0)
 static bool near(double a, double b, double tol) { return fabs(a - b) <= tol; }
+
+// A controller that only writes down what a Move request asked of it.
+struct RecMoves : MoveSeam {
+  bool fol = false, mov[PORTS] = {true, true, true}, cal[PORTS] = {true, true, true};
+  float cur[PORTS] = {0, 0, 0};
+  const char *refuse[PORTS] = {nullptr, nullptr, nullptr};
+  std::string log;                                    // "n0:50 g1:0>30/60000 x" = now, gently, gentle moves stopped
+  bool follow() override { return fol; }
+  bool movable(int p) override { return mov[p]; }
+  bool calibrated(int p) override { return cal[p]; }
+  float tilt(int p) override { return cur[p]; }
+  const char *now(int p, float t) override { log += "n" + std::to_string(p) + ":" + std::to_string((int)t) + " "; return refuse[p]; }
+  void gently(int p, float from, float to, uint32_t ms) override {
+    log += "g" + std::to_string(p) + ":" + std::to_string((int)from) + ">" + std::to_string((int)to) + "/" + std::to_string(ms) + " ";
+  }
+  void stopGentle() override { log += "x "; }
+};
+static void requestTests() {
+  { RecMoves s; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
+    CHECK(s.log == "x n1:50 " && r.started == 1 && !r.why, "app: one blind, gentle moves end"); }
+  { RecMoves s; s.fol = true; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
+    CHECK(s.log == "x n1:50 n0:50 n2:50 " && r.started == 3, "app: follow mode takes the others along"); }
+  { RecMoves s; s.fol = true; MoveAsk a = moveAsk(FROM_APP, 1, 50); a.solo = true; moveRequest(a, s);
+    CHECK(s.log == "x n1:50 ", "app: solo leaves the others"); }
+  { RecMoves s; s.mov[0] = false; MoveResult r = moveRequest(moveAsk(FROM_APP, -1, -100), s);
+    CHECK(s.log == "x n1:-100 n2:-100 " && r.started == 2, "app: all = every movable blind"); }
+  { RecMoves s; s.mov[1] = false; s.refuse[1] = "not set up yet"; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
+    CHECK(r.started == 0 && r.why && !strcmp(r.why, "not set up yet"), "app: a named blind's refusal is the answer"); }
+  { RecMoves s; s.fol = true; s.refuse[1] = "battery too low"; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
+    CHECK(s.log == "x n1:50 " && r.started == 0 && !strcmp(r.why, "battery too low"), "app: named refused, nobody follows"); }
+  { RecMoves s; s.refuse[0] = s.refuse[1] = s.refuse[2] = "battery too low"; MoveResult r = moveRequest(moveAsk(FROM_APP, -1, 0), s);
+    CHECK(r.started == 0 && !strcmp(r.why, "battery too low"), "app: all refused gives the reason"); }
+  { RecMoves s; s.mov[0] = s.mov[1] = s.mov[2] = false; MoveResult r = moveRequest(moveAsk(FROM_APP, -1, 0), s);
+    CHECK(r.started == 0 && !strcmp(r.why, "no blind is set up"), "app: nothing movable"); }
+  { RecMoves s; MoveResult r = moveRequest(moveAsk(FROM_APP, 0, NAN), s);
+    CHECK(s.log == "x " && r.started == 0 && !strcmp(r.why, "unknown position"), "app: unknown word refused"); }
+  { RecMoves s; s.cur[2] = NAN; MoveResult r = moveRequest(moveAsk(FROM_APP, -1, 80, 600000), s);
+    CHECK(s.log == "x g0:0>80/600000 g1:0>80/600000 n2:80 " && r.started == 3, "app: gently, straight there when the tilt is not known"); }
+  { RecMoves s; s.fol = true; s.mov[2] = false; MoveResult r = moveRequest(moveAsk(FROM_SCHEDULE, -1, 30, 0, 0x06), s);
+    CHECK(s.log == "n1:30 " && r.started == 1, "schedule: its blinds that can move, no follow, gentle moves kept"); }
+  { RecMoves s; moveRequest(moveAsk(FROM_SCHEDULE, -1, 30, 120000, 0x01), s);
+    CHECK(s.log == "g0:0>30/120000 ", "schedule: gently"); }
+  { RecMoves s; MoveResult r = moveRequest(moveAsk(FROM_HOME, 2, -40), s);
+    CHECK(s.log == "x n2:-40 " && r.started == 1, "Home: its covering's blind"); }
+  { RecMoves s; s.fol = true; s.mov[2] = false; moveRequest(moveAsk(FROM_HOME, 2, -40), s);
+    CHECK(s.log == "x n0:-40 n1:-40 ", "Home: follow mode, can-move rule even for its own blind"); }
+  { RecMoves s; moveRequest(moveAsk(FROM_HOME, -1, 10), s);
+    CHECK(s.log == "x n0:10 n1:10 n2:10 ", "Home: one covering for all"); }
+  { RecMoves s; s.cur[0] = 48; s.cur[2] = NAN; MoveResult r = moveRequest(moveAsk(FROM_HAND, 1, 50), s);
+    CHECK(s.log == "n2:50 " && r.started == 1, "hand: the others follow, unless already there; gentle moves kept"); }
+}
 
 int main() {
   // ---- angles
@@ -36,6 +89,13 @@ int main() {
   CHECK(!movableRule(true, true, true, true), "hidden: not movable");
   CHECK(!movableRule(false, false, true, true), "not set up: not movable");
   CHECK(!movableRule(false, true, true, false), "tilter missing: not movable");
+  CHECK(!cannotMoveWhy(true, true, true, true), "can move");
+  CHECK(!strcmp(cannotMoveWhy(false, true, false, false), "not set up yet"), "set up is checked first");
+  CHECK(!strcmp(cannotMoveWhy(true, true, false, false), "no tilter plugged in"), "then the tilter");
+  CHECK(!strcmp(cannotMoveWhy(true, false, false, false), "battery too low"), "then the battery");
+
+  // ---- Move requests
+  requestTests();
 
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");

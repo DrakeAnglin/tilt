@@ -5,6 +5,7 @@
 #pragma once
 #include "power.h"
 #include "pwmin.h"
+#include "request.h"
 
 struct BlindState {
   bool present = false, seen = false;
@@ -273,9 +274,7 @@ bool beginMove(int kind, int p) {             // leaves cur on port p
 // Go to a tilt. Returns nullptr if accepted, else why not.
 const char *startTilt(int p, float t) {
   if (p < 0 || p >= PORTS) return "no such blind";
-  if (!calibrated(p)) return "not set up yet";
-  if (bs[p].seen && !bs[p].present) return "no tilter plugged in";
-  if (!battOkToMove()) return "battery too low";
+  if (const char *e = cannotMoveWhy(calibrated(p), bs[p].seen, bs[p].present, battOkToMove())) return e;   // logic.h
   t = constrain(t, -100.0f, 100.0f);
   bool others = false;
   for (int i = 0; i < PORTS; i++) if (i != p && mvs[i].kind != MV_NONE) others = true;
@@ -321,6 +320,23 @@ void stopAll(const char *why) {
     if (MVX.st != MS_SETTLE || !MVX.why) { MVX.nudges = MAX_NUDGES + 1; toSettle(why); }
   }
 }
+
+// ---- Move requests (request.h decides; this is the controller's side of its seam)
+// Gentle moves: a blind that is being taken to a tilt slowly, a little every 20 seconds (schedules.h: rampTick).
+struct Ramp { bool on; float from, to; uint32_t t0, durMs, last; } ramp[PORTS];
+void rampCancel() { for (auto &r : ramp) r.on = false; }
+bool rampAny() { for (auto &r : ramp) if (r.on) return true; return false; }
+struct EspMoves : MoveSeam {
+  bool follow() override { return syncMode; }
+  bool movable(int p) override { return ::movable(p); }
+  bool calibrated(int p) override { return ::calibrated(p); }
+  float tilt(int p) override { return bs[p].tilt; }
+  const char *now(int p, float t) override { return startTilt(p, t); }
+  void gently(int p, float from, float to, uint32_t ms) override { ramp[p] = {true, from, to, millis(), ms, 0}; }
+  void stopGentle() override { rampCancel(); }
+} espMoves;
+MoveResult moveBlinds(const MoveAsk &a) { return moveRequest(a, espMoves); }
+void moveStop() { rampCancel(); stopAll("stopped"); }   // the app's or Home's stop: also ends a gentle move
 
 void endMove(const char *msg) { motorRaw(MVX.port, 0, 0); MVX.endMsg = msg; MVX.st = MS_POST; MVX.ts = millis(); }
 bool tryFlip(float a) {                        // direction never seen to be right: the motor may be the other way round, try once
@@ -511,9 +527,7 @@ void handTick(uint32_t now) {                  // from watchTick, every 100 ms, 
   handRef[p] = bs[p].tilt;
   watchStop();
   if (!moved) return;
-  int n = 0;
-  for (int i = 0; i < PORTS; i++)
-    if (i != p && movable(i) && (isnan(bs[i].tilt) || fabsf(bs[i].tilt - t) > 3.0f) && !startTilt(i, t)) n++;
+  int n = moveBlinds(moveAsk(FROM_HAND, p, t)).started;
   event("%s turned by hand to tilt %.0f: %d other blind%s follow%s", cfg.b[p].name, t, n, n == 1 ? "" : "s", n == 1 ? "s" : "");
 }
 void watchTick(uint32_t now) {                 // from motionTick, only while nothing moves

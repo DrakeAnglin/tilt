@@ -6,7 +6,6 @@
 #define FW_BUILD __DATE__ " " __TIME__
 
 // ---- pins (hardware/pcb/netlist.py): per port IN1, IN2, EN, angle
-const int PORTS = 3;
 const int P_IN1[PORTS] = {14, 19, 16}, P_IN2[PORTS] = {18, 20, 17}, P_EN[PORTS] = {7, 5, 1}, P_ANG[PORTS] = {6, 4, 2};
 const int PIN_VBAT = 3, PIN_VIN = 0;            // 1 M / 1 M dividers: battery (LOAD rail), input power (USB / solar)
 const int PWM_HZ = 20000, PWM_BITS = 8;

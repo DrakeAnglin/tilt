@@ -149,13 +149,8 @@ void blindsTask(void *)
             int32_t v = pend[e];
             if (v < 0) continue;
             pend[e] = -1;
-            rampCancel();                        // a command from Home ends a gentle move
-            if (moving() && abs(v - lastLift[e]) < 100) { stopAll("stopped"); continue; }   // "stop" arrives as: go to where you are
-            int started = 0;
-            for (int p = 0; p < PORTS; p++) {
-                bool mine = epPort[e] < 0 || epPort[e] == p || syncMode;
-                if (mine && movable(p) && !startTilt(p, tiltOfLift(v))) started++;
-            }
+            if (moving() && abs(v - lastLift[e]) < 100) { moveStop(); continue; }   // "stop" arrives as: go to where you are
+            int started = moveBlinds(moveAsk(FROM_HOME, epPort[e], tiltOfLift(v))).started;   // (ends a gentle move too)
             ::event("Home: %d %% closed (%d blind%s)", (int)v / 100, started, started == 1 ? "" : "s");
         }
         if (!held) { esp_pm_lock_acquire(awake); held = true; }      // no dozing while a sensor or motor is on
