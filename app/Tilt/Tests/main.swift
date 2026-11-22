@@ -93,5 +93,44 @@ do { try await fc.set("name", "Den"); check(false, "a refusal throws") } catch {
 try await fc.go(blind: 2, tilt: -40, solo: true)
 check(await fake.sent.last == "/api/go?b=2&t=-40&solo=1", "the client builds the command")
 
+// ---- Schedules on the controllers' slots (Shared/SchedulePlan.swift)
+func emptySlots() -> [SchedSlot] { Array(repeating: .empty, count: 8) }
+func apply(_ ws: [SlotWrite], to slots: inout [String: [SchedSlot]]) { for w in ws { slots[w.controller]![w.slot] = w.value } }
+func both(_ slots: [String: [SchedSlot]]) -> [Schedule] { SchedulePlan.schedules(slots.keys.sorted().map { ($0, slots[$0]!) }) }
+
+var rooms: [String: [SchedSlot]] = ["den": emptySlots(), "hall": emptySlots()]
+let wake = Schedule(id: 42, days: 62, kind: 1, minute: 0, offset: 15, tilt: -100, ramp: 10,
+                    targets: [BlindTarget(controller: "den", blind: 0), BlindTarget(controller: "den", blind: 2), BlindTarget(controller: "hall", blind: 1)])
+apply(try SchedulePlan.writes(wake, slots: rooms), to: &rooms)
+check(both(rooms) == [wake], "a Schedule saved to two controllers loads back the same")
+check(rooms["den"]![0].mask == 0b101 && rooms["hall"]![0].mask == 0b010 && rooms["hall"]![0].gid == 42, "one slot on each, same gid")
+
+// legacy slot (gid 0): stable id, edited in place
+var legacy: [String: [SchedSlot]] = ["den": emptySlots()]
+legacy["den"]![3] = SchedSlot(on: 1, days: 127, mask: 1, min: 420, tilt: 0, kind: 0, off: 0, ramp: 0, gid: 0)
+let first = both(legacy), again = both(legacy)
+check(first.count == 1 && first[0].id == again[0].id && first[0].id == SchedulePlan.legacyId(controller: "den", slot: 3), "a gid-0 slot has the same id on every load")
+var edited = first[0]; edited.minute = 450
+let legacyWrites = try SchedulePlan.writes(edited, slots: legacy)
+check(legacyWrites.count == 1 && legacyWrites[0].slot == 3 && legacyWrites[0].value.gid == edited.id, "editing a gid-0 slot rewrites that slot and gives it a gid")
+apply(legacyWrites, to: &legacy)
+check(both(legacy) == [edited] && legacy["den"]!.filter { $0.mask != 0 }.count == 1, "no duplicate after the edit")
+
+// moving a Schedule's blinds to another controller clears the old slot
+var moved = wake; moved.targets = [BlindTarget(controller: "hall", blind: 0)]
+apply(try SchedulePlan.writes(moved, slots: rooms), to: &rooms)
+check(rooms["den"]!.allSatisfy { $0.mask == 0 } && both(rooms) == [moved], "the old controller's slot is cleared")
+apply(try SchedulePlan.writes(moved, delete: true, slots: rooms), to: &rooms)
+check(both(rooms).isEmpty, "delete clears every slot")
+
+// a full controller: nothing is written
+var full: [String: [SchedSlot]] = ["den": emptySlots(), "hall": (0..<8).map { SchedSlot(on: 1, days: 127, mask: 1, min: $0, tilt: 0, kind: 0, off: 0, ramp: 0, gid: UInt32($0 + 100)) }]
+do { _ = try SchedulePlan.writes(wake, slots: full); check(false, "a full controller throws") }
+catch { check(error == .full(controller: "hall"), "the full controller is named") }
+do { _ = try SchedulePlan.writes(wake, slots: ["den": emptySlots()]); check(false, "an unread controller throws") }
+catch { check(error == .notRead(controller: "hall"), "the unread controller is named") }
+full["hall"]![5].gid = 42                          // it already holds this Schedule: reuse that slot
+check((try? SchedulePlan.writes(wake, slots: full))?.first { $0.controller == "hall" }?.slot == 5, "the slot already holding it is reused")
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

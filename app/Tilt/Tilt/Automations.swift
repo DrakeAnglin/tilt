@@ -2,39 +2,9 @@
 import CoreLocation
 import SwiftUI
 
-struct BlindTarget: Hashable, Codable { var controller: String; var blind: Int }
-
-
-/// One schedule as the app shows it. It may live on several controllers (one slot on each, tagged with `id`).
-struct Schedule: Identifiable, Equatable {
-    var id: UInt32 = UInt32.random(in: 1...UInt32.max)
-    var on = true
-    var days = 127                  // bit 0 = Sunday
-    var kind = 0                    // 0 clock time, 1 sunrise, 2 sunset
-    var minute = 8 * 60
-    var offset = 0                  // minutes after (+) or before (-) sunrise / sunset
-    var tilt = 0
-    var ramp = 0                    // gentle: minutes to take
-    var targets: Set<BlindTarget> = []
-
-    var whenText: String {
-        if kind == 0 { return Self.clock(minute) }
-        let base = kind == 1 ? "Sunrise" : "Sunset"
-        return offset == 0 ? base : "\(abs(offset)) min \(offset > 0 ? "after" : "before") \(base.lowercased())"
-    }
-    var actionText: String { TiltWords.action(tilt) }
-    var daysText: String {
-        switch days { case 127: return "Every day"; case 62: return "Weekdays"; case 65: return "Weekends"; case 0: return "Never"
-        default: return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated().filter { days >> $0.offset & 1 == 1 }.map(\.element).joined(separator: " ") }
-    }
-    /// Every port of every controller: a schedule for "all blinds" also covers a blind that is plugged in later.
-    static func everyBlind(_ controllers: [Controller]) -> Set<BlindTarget> {
-        Set(controllers.flatMap { c in (0..<3).map { BlindTarget(controller: c.id, blind: $0) } })
-    }
-    static func clock(_ m: Int) -> String {
-        var c = DateComponents(); c.hour = m / 60; c.minute = m % 60
-        return Calendar.current.date(from: c).map { $0.formatted(date: .omitted, time: .shortened) } ?? ""
-    }
+// Schedule and BlindTarget live in Shared/SchedulePlan.swift.
+extension Schedule {
+    static func everyBlind(_ controllers: [Controller]) -> Set<BlindTarget> { everyPort(controllers.map(\.id)) }
 }
 
 struct BlindScene: Identifiable, Codable, Equatable {
@@ -107,35 +77,23 @@ final class AutomationStore {
 
     func load(_ controllers: [Controller]) async {
         loading = true; defer { loading = false }
-        var found: [UInt32: Schedule] = [:]
+        slots = [:]
         for c in controllers {
             guard let cfg = try? await c.client.schedules() else { continue }
             slots[c.id] = cfg.sched
             if let s = cfg.sun, s.count == 2, s[0] > 0 { sun = (Date(timeIntervalSince1970: s[0]), Date(timeIntervalSince1970: s[1])); hasPlace = true; Sky.remember(rise: sun!.rise, set: sun!.set) }
-            for (i, sl) in cfg.sched.enumerated() where sl.mask != 0 {
-                let gid = sl.gid != 0 ? sl.gid : UInt32(truncatingIfNeeded: c.id.hashValue &+ i &+ 1)
-                var sc = found[gid] ?? Schedule(id: gid, on: sl.on == 1, days: sl.days, kind: sl.kind, minute: sl.min, offset: sl.off, tilt: sl.tilt, ramp: sl.ramp)
-                for b in 0..<3 where sl.mask >> b & 1 == 1 { sc.targets.insert(BlindTarget(controller: c.id, blind: b)) }
-                found[gid] = sc
-            }
         }
-        schedules = found.values.sorted { ($0.kind, $0.minute, $0.id) < ($1.kind, $1.minute, $1.id) }
+        schedules = SchedulePlan.schedules(controllers.compactMap { c in slots[c.id].map { (c.id, $0) } })
     }
 
-    /// Write a schedule to every controller it covers, and clear it from the ones it no longer covers.
+    /// Write a Schedule to every controller it covers, and clear it from the ones it no longer covers.
     func save(_ s: Schedule, delete: Bool = false, controllers: [Controller]) async throws {
-        for c in controllers {
-            let mine = slots[c.id] ?? []
-            var mask = 0
-            if !delete { for t in s.targets where t.controller == c.id { mask |= 1 << t.blind } }
-            let existing = mine.firstIndex { $0.gid == s.id && $0.mask != 0 }
-            guard let i = existing ?? (mask != 0 ? mine.firstIndex { $0.mask == 0 } : nil) else {
-                if mask != 0 { throw TiltError("\(c.state?.name ?? "A controller") already has 8 schedules.") }
-                continue
-            }
-            try await c.client.setSchedule(slot: i, on: s.on && mask != 0, days: s.days, mask: mask, minute: s.minute, tilt: s.tilt,
-                                           kind: s.kind, offset: s.offset, ramp: s.ramp, id: mask != 0 ? s.id : 0)
-        }
+        let name = { (id: String) in controllers.first { $0.id == id }?.state?.name ?? "A controller" }
+        let writes: [SlotWrite]
+        do { writes = try SchedulePlan.writes(s, delete: delete, slots: slots) }
+        catch .full(let c) { throw TiltError("\(name(c)) already has \(slots[c]?.count ?? 8) schedules.") }
+        catch .notRead(let c) { throw TiltError("\(name(c)) did not answer. Try again when it is reachable.") }
+        for w in writes { try await controllers.first { $0.id == w.controller }?.client.setSchedule(slot: w.slot, w.value) }
         await load(controllers)
     }
 }

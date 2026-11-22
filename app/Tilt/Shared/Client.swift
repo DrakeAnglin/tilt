@@ -22,7 +22,7 @@ struct ControllerConfig: Decodable {
     var hksep: Int?
     var b: [Blind]
 }
-struct SchedSlot: Decodable { var on: Int, days: Int, mask: Int, min: Int, tilt: Int, kind: Int, off: Int, ramp: Int; var gid: UInt32 }
+struct SchedSlot: Decodable, Equatable { var on: Int, days: Int, mask: Int, min: Int, tilt: Int, kind: Int, off: Int, ramp: Int; var gid: UInt32 }
 struct SchedConfig: Decodable { var sched: [SchedSlot]; var lat: Double?; var lon: Double?; var sun: [Double]? }
 struct PhoneKey: Decodable, Identifiable, Equatable { let cid: String; let name: String; let owner: Int; let me: Int; let wait: Int?; let code: String?; var id: String { cid } }
 /// {"ok":1} or {"ok":0,"err":"…"}, sometimes with more.
@@ -84,8 +84,9 @@ struct ControllerClient: Sendable {
     func set(_ key: String, _ value: String) async throws { try await send(Api.set(key, value)) }
     func set(blind: Int, _ field: String, _ value: String) async throws { try await send(Api.set("b\(blind).\(field)", value)) }
     func setLocation(latitude: Double, longitude: Double) async throws { try await set("loc", String(format: "%.3f,%.3f", latitude, longitude)) }
-    func setSchedule(slot: Int, on: Bool, days: Int, mask: Int, minute: Int, tilt: Int, kind: Int, offset: Int, ramp: Int, id: UInt32) async throws {
-        try await send(Api.schedule(slot: slot) + "on=\(on ? 1 : 0)&days=\(days)&mask=\(mask)&min=\(minute)&tilt=\(tilt)&kind=\(kind)&off=\(offset)&ramp=\(ramp)&gid=\(id)")
+    /// Write one schedule slot (see SchedulePlan for which slot holds what).
+    func setSchedule(slot: Int, _ v: SchedSlot) async throws {
+        try await send(Api.schedule(slot: slot) + "on=\(v.on)&days=\(v.days)&mask=\(v.mask)&min=\(v.min)&tilt=\(v.tilt)&kind=\(v.kind)&off=\(v.off)&ramp=\(v.ramp)&gid=\(v.gid)")
     }
 
     // ---- people
