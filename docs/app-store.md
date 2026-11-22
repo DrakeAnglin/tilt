@@ -20,6 +20,15 @@ What is still needed before Tilt can go to TestFlight and the App Store, and the
 5. **Release-day clean-up on the controller:** remove the "Duo Test" user, and the "Mac owner" key once the app can do
    every update (the Mac tools need that key today).
 
+## Listing status (filled in App Store Connect, 2026-11-21)
+- Version page: promotional text, description, keywords, support and marketing URLs, copyright, App Review notes,
+  sign-in not required, manual release. Still needed: App Review contact (name, phone, email), screenshots, a build.
+- App Information: subtitle "Smart tilt for your blinds", Lifestyle / Utilities, no third-party content, rated 4+.
+- Pricing: free. Availability: 174 countries or regions, all except China mainland (it needs a security assessment
+  and an AI-content filing).
+- App Privacy: answers saved (below); the owner publishes them (the publish step is an attestation).
+- Screenshots: app/Tilt/AppStore/release-1.0/ (iPhone 6.9" 1320x2868, iPad 13" 2064x2752).
+
 ## App Privacy answers (App Store Connect)
 - Data used to track you: **None.**
 - Data linked to you, for App Functionality only: **Name** (your display name, in a request to join),
