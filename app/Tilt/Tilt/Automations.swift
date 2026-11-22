@@ -127,7 +127,7 @@ struct AutomationsTab: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack(spacing: 6) {
                                         Text(s.whenText).font(.headline)
-                                        if s.ramp > 0 { Image(systemName: "sunrise").font(.footnote).foregroundStyle(Palette.warning) }
+                                        if s.ramp > 0 { Image(systemName: s.kind == 2 ? "sunset" : "sunrise").font(.footnote).foregroundStyle(Palette.warning) }
                                     }
                                     Text("\(s.actionText) · \(s.daysText) · \(blindNames(s))").font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                                 }
