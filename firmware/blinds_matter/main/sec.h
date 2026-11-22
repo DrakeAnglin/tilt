@@ -23,6 +23,9 @@
 #include <esp_random.h>
 #include <esp_http_server.h>
 #include "ardu.h"
+#include "logic.h"                               // nonceFresh, permitRule
+#include "store.h"                               // nvs, event, cleanText
+#include "lock.h"                                // mx
 
 const int MAX_KEYS = 8;
 struct ClientKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // used 1 = paired, 2 = asked to join, waiting for an owner; role 1 = owner
@@ -37,13 +40,12 @@ uint8_t cloudTopic[16];
 int secClient = -1;                            // which key the command came with (-1: not a secured one)
 const char *secQuery = nullptr;                // its "a=b&c=d" part, for arg()
 std::string *secOut = nullptr;                 // where its answer goes, for sendJson()
-extern Preferences nvs;
 SemaphoreHandle_t secMx = nullptr;             // one secured command at a time (Wi-Fi and Bluetooth share the handlers)
-// keys[] and lastCtr[] are guarded by the controller's main lock (mx, web.h), the one every handler and the main loop
+// keys[] and lastCtr[] are guarded by the controller lock (mx, lock.h), the one every handler and the main loop
 // already hold when they touch shared state. Lock order: secMx, then mx; nothing holding mx may take secMx.
-extern SemaphoreHandle_t mx;
 struct KeysLock { KeysLock() { xSemaphoreTake(mx, portMAX_DELAY); } ~KeysLock() { xSemaphoreGive(mx); } };
 
+uint8_t openApi = 1;                           // 1: the plain /api still answers (until the owner turns it off). Own NVS key.
 static int secRng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
 void keysSave() { nvs.putBytes("keys", keys, sizeof keys); }
 void secBegin() {
@@ -51,6 +53,7 @@ void secBegin() {
   esp_fill_random(bootId, sizeof bootId);
   if (nvs.getBytes("topic", cloudTopic, sizeof cloudTopic) != sizeof cloudTopic) { esp_fill_random(cloudTopic, sizeof cloudTopic); nvs.putBytes("topic", cloudTopic, sizeof cloudTopic); }
   memset(lastCtr, 0, sizeof lastCtr);
+  openApi = nvs.getUChar("openapi", 1);
   secMx = xSemaphoreCreateMutex();
 }
 bool owned() { for (auto &k : keys) if (k.used == 1) return true; return false; }
@@ -186,7 +189,6 @@ struct Caller {
   bool owner;                                    // secured: the phone is an owner (else a user)
   const uint8_t *id;                             // secured: the phone's 8-byte id
 };
-extern uint8_t openApi;
 esp_err_t hUpdate(httpd_req_t *r);
 std::string qarg(const std::string &query, const char *key) {
   char v[80] = "";

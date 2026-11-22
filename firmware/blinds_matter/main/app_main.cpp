@@ -19,6 +19,12 @@
 #endif
 #include <driver/usb_serial_jtag.h>
 #include "ardu.h"
+#include "store.h"
+#include "lock.h"
+#include "motion.h"
+#include "schedules.h"
+#include "update.h"
+#include "sec.h"
 #include "web.h"
 #include "ble.h"
 #include "home_view.h"
@@ -44,7 +50,6 @@ void openHomeWindow()
     }, 0);
 }
 
-uint8_t hkSeparate = 0;
 int nEp = 0;
 uint16_t epId[PORTS];
 int epPort[PORTS];                       // which blind an endpoint stands for; -1 = all of them
@@ -168,8 +173,11 @@ void blindsTask(void *)
 
 extern "C" void app_main()
 {
-    logBegin();
-    nvs_flash_init();
+    // The start order. Each module loads its own state in its xxxBegin(). Everything the secured channel needs (the
+    // phones' keys, sec.h) is loaded before anything that answers from outside starts: Bluetooth and Matter
+    // (esp_matter::start), then HTTP (webBegin).
+    logBegin();                                  // 1. the event log's lock: event() is safe from any task from here on
+    nvs_flash_init();                            // 2. flash storage and power management
 #if CONFIG_PM_ENABLE
     esp_pm_config_t pm = {.max_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, .min_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, .light_sleep_enable = true};
     esp_pm_configure(&pm);
@@ -178,23 +186,13 @@ extern "C" void app_main()
     esp_pm_lock_acquire(awake);                  // released by blindsTask (see there)
 
     adcBegin();
-    analogSetPinAttenuation(PIN_VBAT, ADC_11db);
-    analogSetPinAttenuation(PIN_VIN, ADC_11db);
-    motionBegin();
-    nvs.begin("blinds", false);
-    storeBegin();
-    hkSeparate = nvs.getUChar("hksep", 0);
-    pwmSaved = nvs.getUChar("pwm", 0);
-    setenv("TZ", cfg.tz, 1);
-    tzset();
-    powerSample(true);
-    stats.boots++;
-    esp_reset_reason_t rr = esp_reset_reason();
-    if (rr == ESP_RST_BROWNOUT) stats.brownouts++;
-    else if (rr == ESP_RST_PANIC) stats.crashes++;
-    else if (rr == ESP_RST_INT_WDT || rr == ESP_RST_TASK_WDT || rr == ESP_RST_WDT) stats.wdt++;
-    statsSave();
-    mx = xSemaphoreCreateMutex();
+    storeBegin();                                // 3. settings, counters (this start counted), Home layout, battery history
+    lockBegin();                                 // 4. the controller lock, mx (lock.h)
+    motionBegin();                               // 5. motors braked, drivers asleep; which sensors send PWM
+    powerBegin();                                // 6. the first battery and input readings
+    schedBegin();                                // 7. the Schedules' extra facts and place, the time zone
+    updateBegin();                               // 8. is this firmware on trial?
+    secBegin();                                  // 9. the phones' keys, this start's boot id, the plain-API switch
 
     node::config_t node_config;
     node_t *node = node::create(&node_config, attr_cb, ident_cb);
@@ -232,7 +230,7 @@ extern "C" void app_main()
     };
     set_openthread_platform_config(&config);
 #endif
-    bleSetupBegin();
+    bleSetupBegin();                             // 10. the transports: our Bluetooth service, then Matter (its BLE too)
     esp_err_t err = esp_matter::start(event_cb);
     ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Matter did not start: %d", err));
 
@@ -252,7 +250,7 @@ extern "C" void app_main()
     }
     esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&sntp);
-    webBegin();
+    webBegin();                                  // 11. HTTP
     ::event("start %s (%s), battery %.2f V, input %.2f V, %d covering%s for Home", FW_VERSION, resetReason(), vbatRest, vin, nEp, nEp == 1 ? "" : "s");
-    xTaskCreate(blindsTask, "blinds", 6144, NULL, 5, &blindsTaskH);
+    xTaskCreate(blindsTask, "blinds", 6144, NULL, 5, &blindsTaskH);   // 12. the blinds task
 }

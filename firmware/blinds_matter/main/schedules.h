@@ -1,6 +1,10 @@
-// Schedules (clock, sunrise, sunset) and gentle moves, run by the controller itself.
-// Part of the web server (web.h includes it in place): uses its helpers and the blinds' shared state.
+// Schedules (clock, sunrise, sunset) and gentle moves, run by the controller itself. Also the clock.
+// Its state (sx, lastSched) is under the controller lock (lock.h); schedRun and rampTick run in the blinds task.
 #pragma once
+#include <time.h>
+#include "motion.h"                              // cfg, nvs, event, moveBlinds, startTilt, ramp
+
+bool timeValid() { return time(nullptr) > 1700000000; }
 
 // ---- schedules (as in the Wi-Fi firmware's sleep.h, without the sleeping)
 uint32_t lastSched = 0;
@@ -11,8 +15,10 @@ struct SchedX { uint8_t kind, ramp; int16_t off; uint32_t gid; };
 struct SchedExtra { uint32_t magic; SchedX x[SCHEDS]; float lat, lon; } sx;
 const uint32_t SX_MAGIC = 0x53580001;
 void sxSave() { nvs.putBytes("schx", &sx, sizeof sx); }
-void sxLoad() {
+void schedBegin() {                              // the Schedules' extra facts and place; the saved time zone
   if (nvs.getBytes("schx", &sx, sizeof sx) != sizeof sx || sx.magic != SX_MAGIC) { memset(&sx, 0, sizeof sx); sx.magic = SX_MAGIC; sx.lat = sx.lon = NAN; }
+  setenv("TZ", cfg.tz, 1);
+  tzset();
 }
 // Sunrise or sunset (epoch seconds) on the day that holds `noon`, at the saved place (the math: logic.h).
 uint32_t sunEvent(time_t noon, bool rise) { return sunEventAt(noon, sx.lat, sx.lon, rise); }

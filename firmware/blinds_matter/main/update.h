@@ -1,6 +1,32 @@
 // Firmware upload over Wi-Fi: a signed file (or, in a developer build, the update password).
-// Part of the web server (web.h includes it in place): uses its helpers and the blinds' shared state.
+//
+// Firmware update: the .bin as the body of a POST, with the update password in a header. The new firmware runs on
+// trial: it is kept once it has joined Wi-Fi and answered a request; a reset before that goes back to this one.
+// A firmware file may carry a signature at its end: image | signature (64 bytes, r then s) | "TILTSIG1".
+// A signed file needs no update password: the signature proves it came from whoever holds the release key. Either way
+// an owner must have allowed updates first (/api/otaopen, 5 minutes).
 #pragma once
+#include <esp_ota_ops.h>
+#include <esp_image_format.h>
+#include <mbedtls/sha256.h>
+#include <mbedtls/ecdsa.h>
+#include "config.h"                              // OTA_PASSWORD
+#include "fwkey.h"                               // FW_SIGN_PUB
+#include "motion.h"                              // stopAll, event, stats
+#include "sec.h"                                 // owned, openApi
+#include "api.h"                                 // Lock, ok, fail, restartSoon
+
+uint32_t otaWindow = 0;                          // millis until which a firmware upload is accepted
+bool otaPending = false;                         // this firmware is on trial (kept or dropped by webTick, /api/keep)
+static uint32_t appSize = 0;                     // this firmware's size, for the developer page
+void updateBegin() {                             // is this firmware on trial? how big is it?
+  const esp_partition_t *part = esp_ota_get_running_partition();
+  esp_image_metadata_t md = {};
+  esp_partition_pos_t pos = {part->address, part->size};
+  if (esp_image_get_metadata(&pos, &md) == ESP_OK) appSize = md.image_len;
+  esp_ota_img_states_t st;
+  otaPending = esp_ota_get_state_partition(part, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
+}
 
 static const char SIG_MAGIC[8] = {'T', 'I', 'L', 'T', 'S', 'I', 'G', '1'};
 bool fwSignatureOk(const uint8_t hash[32], const uint8_t sig[64]) {

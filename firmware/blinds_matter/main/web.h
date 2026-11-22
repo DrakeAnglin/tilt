@@ -1,9 +1,8 @@
-// The JSON interface the Tilt app talks to, on ESP-IDF's HTTP server.
-// Also: firmware update over Wi-Fi, schedules, the clock.
+// The JSON interface the Tilt app talks to, on ESP-IDF's HTTP server: the pages, the routes, and webTick.
+// Schedules, firmware upload and the people handlers live in their own files, included here at the top.
 #pragma once
 #include <esp_http_server.h>
 #include <esp_ota_ops.h>
-#include <esp_image_format.h>
 #include <esp_wifi.h>
 #include <esp_netif.h>
 #include <esp_netif_sntp.h>
@@ -11,63 +10,20 @@
 #include <esp_chip_info.h>
 #include <esp_system.h>
 #include <driver/temperature_sensor.h>
+#include <mdns.h>
+#include "config.h"                              // WIFI_SSID
 #include "motion.h"
 #include "sec.h"
-#include "fwkey.h"
-#include "wire.h"
-#include <mbedtls/sha256.h>
-#include <mbedtls/ecdsa.h>
-#ifdef TILT_RELEASE
-// A public release carries no secrets: Wi-Fi comes from Bluetooth setup, and updates must be signed.
-#define WIFI_SSID ""
-#define WIFI_PASSWORD ""
-#define OTA_PASSWORD ""
-#else
-#include "secrets.h"
-#endif
-#include <mdns.h>
+#include "wire.h"                                // the wire contract for /api/cfg and Schedule slots
+#include "api.h"                                 // the reply helpers and Lock
+#include "schedules.h"
+#include "update.h"
+#include "people.h"
 
 #define FW_VERSION "2.2.1-dev5"
-SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
-uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
-bool otaPending = false, restartSoon = false;
-extern uint8_t hkSeparate;
 int homesPaired();                       // app_main.cpp
-void pokeBlinds();
 static temperature_sensor_handle_t tsens = nullptr;
-static uint32_t appSize = 0;
 
-bool timeValid() { return time(nullptr) > 1700000000; }
-
-#include "schedules.h"
-
-// ---- small helpers (ap, jq, jn: wire.h)
-std::string arg(httpd_req_t *r, const char *key) {       // a value from the address's ?a=b&c=d part, decoded
-  char q[600], v[300];
-  if (secQuery) { if (httpd_query_key_value(secQuery, key, v, sizeof v) != ESP_OK) return ""; }      // a secured command
-  else if (httpd_req_get_url_query_str(r, q, sizeof q) != ESP_OK || httpd_query_key_value(q, key, v, sizeof v) != ESP_OK) return "";
-  std::string o;
-  for (char *p = v; *p; p++) {
-    if (*p == '+') o += ' ';
-    else if (*p == '%' && isxdigit((unsigned char)p[1]) && isxdigit((unsigned char)p[2])) { char h[3] = {p[1], p[2], 0}; o += (char)strtol(h, nullptr, 16); p += 2; }
-    else o += *p;
-  }
-  return o;
-}
-int argi(httpd_req_t *r, const char *key) { return atoi(arg(r, key).c_str()); }
-esp_err_t sendJson(httpd_req_t *r, const std::string &j) {
-  if (secOut) { *secOut = j; return ESP_OK; }    // a secured command: the answer is sealed by hSecure
-  httpd_resp_set_type(r, "application/json");
-  httpd_resp_set_hdr(r, "Cache-Control", "no-store");
-  return httpd_resp_send(r, j.c_str(), j.size());
-}
-esp_err_t ok(httpd_req_t *r) { return sendJson(r, "{\"ok\":1}"); }
-esp_err_t fail(httpd_req_t *r, const char *e) { return sendJson(r, std::string("{\"ok\":0,\"err\":") + jq(e) + "}"); }
-esp_err_t done(httpd_req_t *r, const char *e) { return e ? fail(r, e) : ok(r); }
-struct Lock {                             // every handler holds this while it touches the blinds
-  Lock() { xSemaphoreTake(mx, portMAX_DELAY); lastWeb = millis() ? millis() : 1; }
-  ~Lock() { xSemaphoreGive(mx); pokeBlinds(); }
-};
 const char *resetReason() {
   switch (esp_reset_reason()) {
     case ESP_RST_POWERON: return "power on";
@@ -321,17 +277,7 @@ void scanRun() {
   scanAt = millis() ? millis() : 1;
 }
 
-// Firmware update: the .bin as the body of a POST, with the update password in a header. The new firmware runs on
-// trial: it is kept once it has joined Wi-Fi and answered a request; a reset before that goes back to this one.
-extern uint8_t openApi;
-extern uint32_t otaWindow;
-// A firmware file may carry a signature at its end: image | signature (64 bytes, r then s) | "TILTSIG1".
-// A signed file needs no update password: the signature proves it came from whoever holds the release key. Either way
-// an owner must have allowed updates first (/api/otaopen, 5 minutes).
-#include "update.h"
-
-// ---- who may use this controller
-uint8_t openApi = 1;                             // 1: the plain /api and the web page still answer (until the app replaces them)
+// ---- who may use this controller (the rules and openApi: sec.h)
 std::string ctrlId() { uint8_t m[6] = {0}; esp_read_mac(m, ESP_MAC_WIFI_STA); return hexOf(m, 6); }
 bool wifiUp(char *ip, size_t n, char *ssid, size_t sn) {
   wifi_ap_record_t apr = {};
@@ -374,9 +320,6 @@ esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) ad
   openHomeWindow();
   return sendJson(r, "{\"ok\":1,\"code\":\"3497-011-2332\",\"qr\":\"MT:Y.K9042C00KA0648G00\"}");
 }
-#include "people.h"
-
-uint32_t otaWindow = 0;                          // millis until which a firmware upload is accepted
 esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = millis() + 300000; event("firmware updates allowed for 5 minutes"); return ok(r); }
 // Found by the app with Bonjour: _tilt._tcp, with this controller's id and address.
 void bonjourTick(bool up) {
@@ -415,18 +358,10 @@ const Route routes[] = {
 };
 const int routeCount = sizeof routes / sizeof routes[0];
 
+// Starts the HTTP server. The state its handlers use is loaded before this (app_main.cpp, the start order).
 void webBegin() {
-  secBegin();
-  sxLoad();
-  openApi = nvs.getUChar("openapi", 1);
   temperature_sensor_config_t tc = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 80);
   if (temperature_sensor_install(&tc, &tsens) == ESP_OK) temperature_sensor_enable(tsens); else tsens = nullptr;
-  const esp_partition_t *part = esp_ota_get_running_partition();
-  esp_image_metadata_t md = {};
-  esp_partition_pos_t pos = {part->address, part->size};
-  if (esp_image_get_metadata(&pos, &md) == ESP_OK) appSize = md.image_len;
-  esp_ota_img_states_t st;
-  otaPending = esp_ota_get_state_partition(part, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
 
   httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
   hc.max_uri_handlers = 48;

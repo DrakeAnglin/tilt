@@ -1,6 +1,9 @@
 // The phones on this controller: the list, rename, remove, approve, owner rights, and getting back in by turning a blind.
-// Part of the web server (web.h includes it in place): uses its helpers and the blinds' shared state.
+// Its state (recover) is under the controller lock (lock.h); recoverTick runs in the blinds task.
 #pragma once
+#include "motion.h"                              // bs, movable, moving, the watch, rampCancel, stats, event
+#include "sec.h"                                 // keys, pairing, KeysLock
+#include "api.h"                                 // Lock, arg, ok, fail, sendJson
 
 esp_err_t hKeys(httpd_req_t *r) {
   Lock l;

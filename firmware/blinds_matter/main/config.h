@@ -17,3 +17,13 @@ const float EN_DROP_V = 0.26f;
 // ---- power
 const float VIN_ON = 3.8f, VIN_OFF = 3.3f;      // input power present (USB or strong sun) / gone. USB reads ~4.3 V here.
 const float VBAT_LOW = 3.35f;                   // no moves below this (resting)
+
+// ---- network
+#ifdef TILT_RELEASE
+// A public release carries no secrets: Wi-Fi comes from Bluetooth setup, and updates must be signed.
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
+#define OTA_PASSWORD ""
+#else
+#include "secrets.h"
+#endif

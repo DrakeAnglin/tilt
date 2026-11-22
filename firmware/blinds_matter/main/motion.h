@@ -153,6 +153,7 @@ void motionBegin() {
     ledcWrite(P_IN2[i], 255);
     analogSetPinAttenuation(P_ANG[i], ADC_11db);
   }
+  pwmSaved = nvs.getUChar("pwm", 0);
 }
 
 // (setup's live reading, see watchTick)

@@ -42,6 +42,12 @@ void powerSample(bool first = false) {
   else if (powered && vin < VIN_OFF) powered = false;
 }
 
+void powerBegin() {                             // the dividers' ADC range, then the first readings
+  analogSetPinAttenuation(PIN_VBAT, ADC_11db);
+  analogSetPinAttenuation(PIN_VIN, ADC_11db);
+  powerSample(true);
+}
+
 // battPercent(): logic.h
 const char *chargeState() {
   if (!powered) return "battery";

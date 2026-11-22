@@ -3,6 +3,7 @@
 #include "ardu.h"
 #include "config.h"
 #include "freertos/semphr.h"
+#include <esp_system.h>
 
 struct BlindCfg {
   char name[20];
@@ -57,6 +58,7 @@ const uint16_t TUNE_MAGIC = 0x7403;
 Tune tune = {TUNE_MAGIC, 12000, 2500, 10, 180};   // measured: 6 to 8.5 s of play after a change of direction
 uint8_t syncMode = 1;           // 1: blinds follow each other: moving one (app, Home, or its wand by hand) sends them all to the same tilt. Own NVS key.
 uint8_t parMode = 1;            // 1: blinds that have to move all move at the same time; 0: one after another. Own NVS key.
+uint8_t hkSeparate = 0;         // 1: Apple Home shows one Window covering per blind; 0: one for all. Own NVS key ("hksep").
 Stats stats;
 uint8_t battHist[BATT_HIST];   // (volts - 2.5) * 100, 0 = no reading; newest last
 Preferences nvs;
@@ -94,6 +96,7 @@ void storeBegin() {
   }
   syncMode = nvs.getUChar("sync", 1);
   parMode = nvs.getUChar("par", 1);
+  hkSeparate = nvs.getUChar("hksep", 0);
   if (nvs.getUChar("angv", 1) < 2) {             // marks made with the first angle scale (rail - 0.10 V): rescale once
     for (int i = 0; i < PORTS; i++) {
       float *m[3] = {&cfg.b[i].up, &cfg.b[i].open, &cfg.b[i].down};
@@ -105,6 +108,12 @@ void storeBegin() {
   Tune t;
   if (nvs.getBytes("tune", &t, sizeof t) == sizeof t && t.magic == TUNE_MAGIC) tune = t;
   if (nvs.getBytes("bhist", battHist, sizeof battHist) != sizeof battHist) memset(battHist, 0, sizeof battHist);
+  stats.boots++;                                 // count this start, and why the last one ended
+  esp_reset_reason_t rr = esp_reset_reason();
+  if (rr == ESP_RST_BROWNOUT) stats.brownouts++;
+  else if (rr == ESP_RST_PANIC) stats.crashes++;
+  else if (rr == ESP_RST_INT_WDT || rr == ESP_RST_TASK_WDT || rr == ESP_RST_WDT) stats.wdt++;
+  statsSave();
 }
 void histPush(float v) {
   memmove(battHist, battHist + 1, BATT_HIST - 1);
