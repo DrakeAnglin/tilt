@@ -132,5 +132,41 @@ catch { check(error == .notRead(controller: "hall"), "the unread controller is n
 full["hall"]![5].gid = 42                          // it already holds this Schedule: reuse that slot
 check((try? SchedulePlan.writes(wake, slots: full))?.first { $0.controller == "hall" }?.slot == 5, "the slot already holding it is reused")
 
+// ---- Bluetooth setup (Shared/Bluetooth.swift): the same frames as Frame, and Wi-Fi setup through the client
+final class FakeRadio: @unchecked Sendable {      // a controller in setup mode, answering over Bluetooth
+    var written: [Data] = []
+    var scans = 0, polls = 0
+    let lock = NSLock()
+    func exchange(_ d: Data) -> Data {
+        lock.lock(); defer { lock.unlock() }
+        written.append(d)
+        guard d.first == UInt8(ascii: "X") else { return Data("4{}".utf8) }
+        let nonce = d.dropFirst(9).prefix(12)
+        let command = try! AES.GCM.open(AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: nonce), ciphertext: d.dropFirst(21).dropLast(16), tag: d.suffix(16)),
+                                        using: fkey, authenticating: Data("blinds-v1".utf8) + fcid)
+        let c = String(decoding: command, as: UTF8.self)
+        var answer = #"{"ok":1}"#
+        if c.hasPrefix("/api/scan") { scans += 1; answer = scans < 2 ? #"{"ok":1,"busy":1,"nets":[]}"# : #"{"ok":1,"busy":0,"nets":[{"s":"Home","r":-55,"l":1},{"s":"Cafe","r":-80,"l":0}]}"# }
+        if c.hasPrefix("/api/wifistate") { polls += 1; answer = polls < 2 ? #"{"ok":1,"up":0,"ssid":"","ip":""}"# : #"{"ok":1,"up":1,"ssid":"Home","ip":"192.168.1.40"}"# }
+        if c.hasPrefix("/api/setwifi?ssid=Bad") { answer = #"{"ok":0,"err":"bad network name or password"}"# }
+        let rn = Data(repeating: 7, count: 12)
+        let box = try! AES.GCM.seal(Data(answer.utf8), using: fkey, nonce: AES.GCM.Nonce(data: rn), authenticating: Data("blinds-v1r".utf8) + fcid + nonce)
+        return Data("2".utf8) + rn + box.ciphertext + box.tag
+    }
+}
+let radio = FakeRadio()
+let wire = BluetoothWire { radio.exchange($0) }
+let bp = Paired(cid: fcid, key: fkey, owner: true)
+let ble = wire.client(bp, boot: fboot, clock: { 1795319000123 })
+try await ble.go(blind: 0, tilt: 50)
+check(radio.written.first == Data("X".utf8) + fpkt, "a Bluetooth command is 'X' + the same frame as Frame.seal")
+_ = try? await ble.state()
+check(radio.written.last.map { $0.dropFirst(13).prefix(8).hex } == "000001a20159ec3c", "the counter rises when the clock does not")
+let found = try await ble.networks(again: true, pause: .zero)
+check(found == [WifiNetwork(ssid: "Home", rssi: -55, locked: true), WifiNetwork(ssid: "Cafe", rssi: -80, locked: false)], "networks are decoded once the scan is done")
+check((try await ble.joinWifi(ssid: "Home", password: "pw", pause: .zero)) == "192.168.1.40", "join waits until it is on the network")
+do { _ = try await ble.joinWifi(ssid: "Bad", password: "", pause: .zero); check(false, "a refused network throws") }
+catch { check(error.localizedDescription == "Bad network name or password", "the controller's reason for a refused network") }
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

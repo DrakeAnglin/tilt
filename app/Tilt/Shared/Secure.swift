@@ -100,15 +100,29 @@ enum Frame {
     }
 }
 
+/// Seals commands for one paired controller, over Wi-Fi or Bluetooth. The counter must rise with every command
+/// (sec.h nonceFresh): it is the time in milliseconds, or one more than the last one if that is later.
+struct Sealer: Sendable {
+    let cid: Data, key: SymmetricKey
+    private var counter: UInt64 = 0
+    private let clock: @Sendable () -> UInt64
+    init(cid: Data, key: SymmetricKey, clock: @escaping @Sendable () -> UInt64 = { UInt64(Date().timeIntervalSince1970 * 1000) }) {
+        self.cid = cid; self.key = key; self.clock = clock
+    }
+    mutating func seal(_ command: String, boot: Data) throws -> (packet: Data, nonce: Data) {
+        counter = max(counter + 1, clock())
+        return try Frame.seal(command, key: key, cid: cid, boot: boot, counter: counter)
+    }
+    func open(_ reply: Data, nonce: Data) throws -> Data { try Frame.open(reply, key: key, cid: cid, nonce: nonce) }
+}
+
 /// Sealed commands to one paired controller.
 actor Link: ControllerTransport {
     private(set) var host: String
-    private let cid: Data
-    private let key: SymmetricKey
+    private var sealer: Sealer
     private var boot: Data?
-    private var counter: UInt64 = 0
 
-    init(host: String, cid: Data, key: SymmetricKey) { self.host = host; self.cid = cid; self.key = key }
+    init(host: String, cid: Data, key: SymmetricKey) { self.host = host; sealer = Sealer(cid: cid, key: key) }
 
     /// The controller's address changed (found again on the network).
     func move(to newHost: String) { if newHost != host { host = newHost; boot = nil } }
@@ -118,10 +132,9 @@ actor Link: ControllerTransport {
         for attempt in 0..<2 {
             if boot == nil { boot = Data(hex: try await Secure.hello(host).boot) }
             guard let boot, boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }
-            counter = max(counter + 1, UInt64(Date().timeIntervalSince1970 * 1000))
-            let (packet, nonce) = try Frame.seal(command, key: key, cid: cid, boot: boot, counter: counter)
+            let (packet, nonce) = try sealer.seal(command, boot: boot)
             let (st, d) = try await Secure.http(host, "/x", body: packet)
-            if st == 200, d.count >= 28 { return try Frame.open(d, key: key, cid: cid, nonce: nonce) }
+            if st == 200, d.count >= 28 { return try sealer.open(d, nonce: nonce) }
             if st == 409, attempt == 0 { self.boot = nil; continue }          // the controller restarted: get its new number
             if st == 401 { throw LinkProblem.notPaired }
             if st == 403 { throw LinkProblem.waiting }

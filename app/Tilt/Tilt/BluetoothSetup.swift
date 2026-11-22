@@ -1,5 +1,6 @@
 // First setup of a brand-new controller over Bluetooth: find it, become its owner, put it on Wi-Fi.
-// It mirrors firmware/blinds_matter/main/ble.h. The Wi-Fi password is sealed with this phone's new key before it is sent.
+// This file is only the Bluetooth radio; the protocol (firmware ble.h) is BluetoothWire in Shared/Bluetooth.swift, and
+// Wi-Fi setup goes through the controller client. The Wi-Fi password is sealed with this phone's new key before it is sent.
 @preconcurrency import CoreBluetooth
 import CryptoKit
 import SwiftUI
@@ -52,60 +53,15 @@ final class BleSetup: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         do { try await withCheckedThrowingContinuation { ready = $0; central.connect(p) } }
         catch { central.cancelPeripheralConnection(p); throw error }
     }
-    /// One request and its answer: (status, body). Status is 200, 400 or 500 (only the first digit travels).
-    func request(_ data: Data) async throws -> (Int, Data) {
+    /// Write one request and read back the answer (raw bytes). The protocol on top is BluetoothWire (Shared/Bluetooth.swift).
+    func exchange(_ data: Data) async throws -> Data {
         guard let p = peripheral, let rx, let tx else { throw TiltError("Bluetooth is not connected.") }
         let timeout = Task { do { try await Task.sleep(for: .seconds(10)) } catch { return }; self.fail(TiltError("The controller stopped answering over Bluetooth.")) }
         defer { timeout.cancel() }
         try await withCheckedThrowingContinuation { wrote = $0; p.writeValue(data, for: rx, type: .withResponse) }
-        let d = try await withCheckedThrowingContinuation { readBack = $0; p.readValue(for: tx) }
-        guard let first = d.first, first >= 0x30, first <= 0x39 else { throw TiltError("The controller gave a bad answer.") }
-        return (Int(first - 0x30) * 100, d.dropFirst())
+        return try await withCheckedThrowingContinuation { readBack = $0; p.readValue(for: tx) }
     }
-    func hello() async throws -> Hello {
-        let (st, d) = try await request(Data("H".utf8))
-        guard st == 200, let h = try? JSONDecoder().decode(Hello.self, from: d) else { throw TiltError("That is not a Tilt controller.") }
-        return h
-    }
-    func pair() async throws -> Paired {
-        try await Secure.pair(phoneName: AppModel.myName) { try await self.request(Data("P".utf8) + $0) }
-    }
-    /// A sealed command, as in Link.call, carried over Bluetooth.
-    func sealed(_ command: String, as p: Paired, boot: Data) async throws -> [String: Any] {
-        let counter = UInt64(Date().timeIntervalSince1970 * 1000)
-        let nonce = boot + withUnsafeBytes(of: counter.bigEndian) { Data($0) }
-        let box = try AES.GCM.seal(Data(command.utf8), using: p.key, nonce: AES.GCM.Nonce(data: nonce), authenticating: Data("blinds-v1".utf8) + p.cid)
-        let (st, d) = try await request(Data("X".utf8) + p.cid + nonce + box.ciphertext + box.tag)
-        guard st == 200, d.count >= 28 else { throw TiltError("The controller refused the command.") }
-        let back = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: d.prefix(12)), ciphertext: d.dropFirst(12).dropLast(16), tag: d.suffix(16))
-        let plain = try AES.GCM.open(back, using: p.key, authenticating: Data("blinds-v1r".utf8) + p.cid + nonce)
-        return (try? JSONSerialization.jsonObject(with: plain)) as? [String: Any] ?? [:]
-    }
-    struct Net: Identifiable, Hashable { let ssid: String; let rssi: Int; let locked: Bool; var id: String { ssid } }
-    /// The Wi-Fi networks the controller can see (it looks around for a few seconds).
-    func networks(as p: Paired, boot: Data, again: Bool) async throws -> [Net] {
-        var first = again
-        for _ in 0..<10 {
-            let r = try await sealed(Api.scan(fresh: first), as: p, boot: boot)
-            first = false
-            if (r["busy"] as? Int) == 0, let list = r["nets"] as? [[String: Any]] {
-                return list.compactMap { n in (n["s"] as? String).map { Net(ssid: $0, rssi: n["r"] as? Int ?? -90, locked: (n["l"] as? Int ?? 1) == 1) } }
-            }
-            try await Task.sleep(for: .milliseconds(1200))
-        }
-        return []
-    }
-    /// Give the controller the network, then wait until it is on it. Returns its address.
-    func joinWifi(ssid: String, password: String, as p: Paired, boot: Data) async throws -> String {
-        let r = try await sealed(Api.setWifi(ssid: ssid, password: password), as: p, boot: boot)
-        if (r["ok"] as? Int) != 1 { throw TiltError(((r["err"] as? String) ?? "The controller did not accept that network.").capitalizedFirst) }
-        for _ in 0..<20 {
-            try await Task.sleep(for: .seconds(2))
-            guard let s = try? await sealed(Api.wifiState, as: p, boot: boot) else { continue }
-            if (s["up"] as? Int) == 1, let ip = s["ip"] as? String, !ip.isEmpty, (s["ssid"] as? String) == ssid { return ip }
-        }
-        throw TiltError("The controller could not join “\(ssid)”. Check the name and password. It needs a 2.4 GHz network.")
-    }
+    var wire: BluetoothWire { BluetoothWire { try await self.exchange($0) } }
 
     private func fail(_ e: Error) {
         ready?.resume(throwing: e); ready = nil
@@ -194,7 +150,8 @@ struct BluetoothSetupView: View {
     @State private var ssid = ""
     @State private var password = ""
     @State private var problem: String?
-    @State private var nets: [BleSetup.Net] = []
+    @State private var client: ControllerClient?            // sealed commands over Bluetooth, once paired
+    @State private var nets: [WifiNetwork] = []
     @State private var scanning = false
     @State private var chosen: String?
     @State private var asking = false
@@ -271,34 +228,36 @@ struct BluetoothSetupView: View {
         problem = nil
         do {
             try await ble.connect(device)
-            let h = try await ble.hello()
+            let wire = ble.wire
+            let h = try await wire.hello()
             let p: Paired
             if h.owned == 1 {
                 guard let mine = Pending.load(h.id) else { throw TiltError("This controller already has an owner. Ask them to share it with you.") }
                 p = mine                                               // this phone started setting it up earlier
             } else {
-                p = try await ble.pair()
+                p = try await wire.pair(phoneName: AppModel.myName)
                 Pending.save(h.id, p)
             }
-            hello = h; paired = p
+            guard let boot = Data(hex: h.boot), boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }
+            hello = h; paired = p; client = wire.client(p, boot: boot)
             if h.wifi == 1, let ip = h.ip, !ip.isEmpty { finish(ip) } else { step = .wifi; await scan(again: false) }
         } catch { problem = error.localizedDescription }
     }
     private func scan(again: Bool) async {
-        guard let h = hello, let p = paired, let boot = Data(hex: h.boot) else { return }
+        guard let client else { return }
         scanning = true; defer { scanning = false }
-        nets = (try? await ble.networks(as: p, boot: boot, again: again)) ?? nets
+        nets = (try? await client.networks(again: again)) ?? nets
     }
     private func pick(_ name: String, locked: Bool) {
         ssid = name; chosen = name; password = ""
         if locked { typing = true } else { join() }
     }
     private func join() {
-        guard let h = hello, let p = paired, let boot = Data(hex: h.boot) else { return }
+        guard let client else { return }
         problem = nil; step = .joining
         Task {
             do {
-                let ip = try await ble.joinWifi(ssid: ssid, password: password, as: p, boot: boot)
+                let ip = try await client.joinWifi(ssid: ssid, password: password)
                 finish(ip)
             } catch { problem = error.localizedDescription; step = .wifi }
         }
