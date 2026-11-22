@@ -86,7 +86,7 @@ final class BleSetup: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     func networks(as p: Paired, boot: Data, again: Bool) async throws -> [Net] {
         var first = again
         for _ in 0..<10 {
-            let r = try await sealed("/api/scan" + (first ? "?new=1" : ""), as: p, boot: boot)
+            let r = try await sealed(Api.scan(fresh: first), as: p, boot: boot)
             first = false
             if (r["busy"] as? Int) == 0, let list = r["nets"] as? [[String: Any]] {
                 return list.compactMap { n in (n["s"] as? String).map { Net(ssid: $0, rssi: n["r"] as? Int ?? -90, locked: (n["l"] as? Int ?? 1) == 1) } }
@@ -97,11 +97,11 @@ final class BleSetup: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
     /// Give the controller the network, then wait until it is on it. Returns its address.
     func joinWifi(ssid: String, password: String, as p: Paired, boot: Data) async throws -> String {
-        let r = try await sealed("/api/setwifi?ssid=\(ssid.urlQuery)&pass=\(password.urlQuery)", as: p, boot: boot)
+        let r = try await sealed(Api.setWifi(ssid: ssid, password: password), as: p, boot: boot)
         if (r["ok"] as? Int) != 1 { throw TiltError(((r["err"] as? String) ?? "The controller did not accept that network.").capitalizedFirst) }
         for _ in 0..<20 {
             try await Task.sleep(for: .seconds(2))
-            guard let s = try? await sealed("/api/wifistate", as: p, boot: boot) else { continue }
+            guard let s = try? await sealed(Api.wifiState, as: p, boot: boot) else { continue }
             if (s["up"] as? Int) == 1, let ip = s["ip"] as? String, !ip.isEmpty, (s["ssid"] as? String) == ssid { return ip }
         }
         throw TiltError("The controller could not join “\(ssid)”. Check the name and password. It needs a 2.4 GHz network.")
@@ -203,6 +203,7 @@ struct BluetoothSetupView: View {
 
     var body: some View {
         Form {
+            Group {
             switch step {
             case .connecting:
                 Section { if problem == nil { HStack(spacing: 12) { SlatLoader(size: 22); Text("Connecting over Bluetooth…") } } }
@@ -242,17 +243,19 @@ struct BluetoothSetupView: View {
                 Section { HStack(spacing: 12) { SlatLoader(size: 22); Text("Joining “\(ssid)”… This can take half a minute.") } }
             case .done:
                 Section {
-                    Label("\(hello?.name ?? "Your controller") is ready", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.headline)
+                    Label("\(hello?.name ?? "Your controller") is ready", systemImage: "checkmark.circle.fill").foregroundStyle(Palette.good).font(.headline)
                     Text("Next, open its room and use the gear to set each blind's open and closed positions.").font(.subheadline).foregroundStyle(.secondary)
                 }
                 Section { Button("Done") { finished() } }
             }
             if let problem {
                 Section {
-                    Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning)
                     if step == .connecting { Button("Try Again") { Task { await begin() } } }
                 }
             }
+        }
+            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }
         .skyPage()
         .navigationTitle("New Controller").navigationBarTitleDisplayMode(.inline)

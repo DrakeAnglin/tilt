@@ -27,7 +27,7 @@ enum Sky {
     static let dusk = k(RGB(0.07, 0.13, 0.33), RGB(0.20, 0.31, 0.48), RGB(0.86, 0.42, 0.24), 0.4)
 
     /// For mock-ups: launch with "-skyminute 400" to pin the time (minutes after midnight).
-    static let pinned: Double? = { let v = UserDefaults.standard.double(forKey: "skyminute"); return v > 0 ? v : nil }()
+    static let pinned: Double? = { guard developerBuild else { return nil }; let v = UserDefaults.standard.double(forKey: "skyminute"); return v > 0 ? v : nil }()
 
     /// Today's sunrise and sunset in minutes after midnight. Comes from the controller once a location is set; otherwise a plain guess.
     static var sunTimes: (rise: Double, set: Double) {
@@ -104,28 +104,35 @@ enum Sky {
     }
 }
 
-/// Fills the screen behind every page: a soft version of the sky outside right now.
+/// Fills the screen behind every page.
+/// Light mode looks like stock iOS: Apple's grouped background (`Palette.page`) with only a faint wash of today's sky at
+/// the top. Dark mode is the sky itself: a night-blue top with today's light glowing low, and stars at night.
 struct AppBackground: View {
     @Environment(\.colorScheme) private var scheme
     var body: some View {
         TimelineView(.periodic(from: .now, by: 120)) { t in
-            let look = Sky.look(at: t.date), dark = scheme == .dark
-            // dark mode: a night-blue top with today's sky glowing low on the screen; at night, the night sky itself
-            let deep = Sky.night.top, n = look.stars
-            let a = Color(dark ? deep + (look.top * 0.45 - deep) * (0.5 + 0.5 * n) : look.top)
-            let b = Color(dark ? look.mid * (0.34 + 0.5 * n) : look.mid)
-            let c = Color(dark ? look.low * (0.50 + 0.4 * n) : look.low)
-            ZStack {
-                MeshGradient(width: 3, height: 3,
-                             points: [[0, 0], [0.5, 0], [1, 0], [0, 0.5], [0.6, 0.45], [1, 0.6], [0, 1], [0.5, 1], [1, 1]],
-                             colors: [a, a, b, b, a, b, c, c, b])
-                if dark && look.stars > 0.02 {
-                    Canvas { ctx, size in
-                        for s in Sky.starField { ctx.fill(Path(ellipseIn: CGRect(x: s.x * size.width, y: s.y * size.height, width: s.r * 2.4, height: s.r * 2.4)), with: .color(.white.opacity(s.a * look.stars * 0.8))) }
+            let look = Sky.look(at: t.date)
+            if scheme == .dark {
+                let deep = Sky.night.top, n = look.stars
+                let a = Color(deep + (look.top * 0.45 - deep) * (0.5 + 0.5 * n))
+                let b = Color(look.mid * (0.34 + 0.5 * n))
+                let c = Color(look.low * (0.50 + 0.4 * n))
+                ZStack {
+                    MeshGradient(width: 3, height: 3,
+                                 points: [[0, 0], [0.5, 0], [1, 0], [0, 0.5], [0.6, 0.45], [1, 0.6], [0, 1], [0.5, 1], [1, 1]],
+                                 colors: [a, a, b, b, a, b, c, c, b])
+                    if look.stars > 0.02 {
+                        Canvas { ctx, size in
+                            for s in Sky.starField { ctx.fill(Path(ellipseIn: CGRect(x: s.x * size.width, y: s.y * size.height, width: s.r * 2.4, height: s.r * 2.4)), with: .color(.white.opacity(s.a * look.stars))) }
+                        }
                     }
+                    Color.black.opacity(0.18)
                 }
-                // light mode keeps dark text readable, even at night
-                (dark ? Color.black.opacity(0.18) : Color.white.opacity(0.36 + 0.26 * look.stars))
+            } else {
+                ZStack(alignment: .top) {
+                    Palette.page
+                    LinearGradient(colors: [Color(look.top).opacity(0.28), Color(look.top).opacity(0)], startPoint: .top, endPoint: .center)
+                }
             }
         }
         .ignoresSafeArea()
@@ -139,19 +146,32 @@ extension View {
         // layout change (glass applied to the content itself resizes on its own clock and lags behind).
         background { Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous)) }
     }
-    /// A page with the sky behind it (for lists and forms too).
+    /// A page with the sky behind it (for lists and forms too), including behind the navigation and status bars.
     func skyPage() -> some View {
-        scrollContentBackground(.hidden).background(AppBackground())
+        scrollContentBackground(.hidden)
+            .background(AppBackground().ignoresSafeArea())
+            .containerBackground(for: .navigation) { AppBackground() }
+            .containerBackground(for: .navigationSplitView) { AppBackground() }      // the side-by-side layout, behind the status bar too
     }
 }
 
 struct Greeting {
     static func text(_ date: Date = .now) -> String {
-        switch Calendar.current.component(.hour, from: date) {
+        let hour = Sky.pinned.map { Int($0) / 60 } ?? Calendar.current.component(.hour, from: date)      // a pinned sky (screenshots) sets the greeting too
+        switch hour {
         case 5..<12: return "Good morning"
         case 12..<17: return "Good afternoon"
         case 17..<22: return "Good evening"
         default: return "Good night"
         }
+    }
+}
+
+/// The background of a list row: the same Liquid Glass as the cards, buttons and bars. On the light grey page plain glass
+/// has too little behind it to show, so in light mode it is tinted white (still glass, and as clear as stock iOS rows).
+struct RowGlass: View {
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        Color.clear.glassEffect(scheme == .dark ? .regular : .regular.tint(Palette.glassTint), in: Rectangle())
     }
 }

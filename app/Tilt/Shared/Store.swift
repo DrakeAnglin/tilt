@@ -12,7 +12,9 @@ struct BlindState: Decodable, Equatable {
     let mov: Int, q: Int, fav: Int
     let ang: Double?
     let last: String
-    var ready: Bool { hid == 0 && cal == 1 && !(seen == 1 && pres == 0) }
+    /// Shown in the app: not hidden, and not an empty port.
+    var listed: Bool { hid == 0 && !(seen == 1 && pres == 0) }
+    var ready: Bool { listed && cal == 1 }
     /// The last move ran the motor but the sensor saw no turn.
     var stuck: Bool { last.hasPrefix("blocked") && mov == 0 && q == 0 }
     var moving: Bool { mov == 1 || q == 1 }
@@ -71,7 +73,7 @@ enum TiltActions {
         if let d = try? JSONEncoder().encode(records) { Keychain.save("records", d) }
     }
     static func records() -> [ControllerRecord] {
-        let d = Keychain.load("records") ?? UserDefaults.standard.data(forKey: "controllers.v1")
+        let d = Keychain.load("records") ?? UserDefaults.standard.data(forKey: Prefs.controllers)
         return d.flatMap { try? JSONDecoder().decode([ControllerRecord].self, from: $0) } ?? []
     }
     static func links() -> [(ControllerRecord, Link)] {
@@ -97,10 +99,10 @@ enum TiltActions {
 struct OpenBlindsIntent: AppIntent {
     static var title: LocalizedStringResource = "Open Blinds"
     static var description = IntentDescription("Opens all your blinds (slats level).")
-    func perform() async throws -> some IntentResult { try await TiltActions.all("/api/go?b=all&to=open"); return .result() }
+    func perform() async throws -> some IntentResult { try await TiltActions.all(Api.goAll(to: "open")); return .result() }
 }
 struct CloseBlindsIntent: AppIntent {
     static var title: LocalizedStringResource = "Close Blinds"
     static var description = IntentDescription("Closes all your blinds.")
-    func perform() async throws -> some IntentResult { try await TiltActions.all("/api/go?b=all&to=close"); return .result() }
+    func perform() async throws -> some IntentResult { try await TiltActions.all(Api.goAll(to: "close")); return .result() }
 }

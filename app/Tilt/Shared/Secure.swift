@@ -21,6 +21,8 @@ struct Paired {
     var waiting = false
     /// The controller's name in iCloud notices.
     var topic = ""
+    /// Recovery: the blind whose wand has to be turned.
+    var blindName = ""
     /// The 4 digits both phones show for a request to join.
     var code: String { String(format: "%04d", Data(HMAC<SHA256>.authenticationCode(for: Data("code".utf8), using: key)).prefix(2).reduce(0) { $0 << 8 | Int($1) } % 10000) }
 }
@@ -54,8 +56,16 @@ enum Secure {
     }
 
     /// Make this phone's key on a controller. The first phone becomes an owner; later ones ask to join and wait.
-    static func pair(host: String, phoneName: String, ask: Bool) async throws -> Paired {
-        try await pair(phoneName: phoneName) { try await http(host, ask ? "/x/ask" : "/x/pair", body: $0) }
+    static func pair(host: String, phoneName: String, how: Joining) async throws -> Paired {
+        try await pair(phoneName: phoneName) { try await http(host, how.rawValue, body: $0) }
+    }
+    /// The three ways in: the first phone of a new controller, asking an owner, or proving you are at the window.
+    enum Joining: String { case first = "/x/pair", ask = "/x/ask", recover = "/x/recover" }
+    /// How far a recovery has got: steps done (0…3) and seconds left; nil when none is running.
+    static func recovery(_ host: String) async -> (step: Int, left: Int)? {
+        struct R: Decodable { let on: Int, step: Int, left: Int }
+        guard let (st, d) = try? await http(host, "/x/recstate"), st == 200, let r = try? JSONDecoder().decode(R.self, from: d), r.on == 1 else { return nil }
+        return (r.step, r.left)
     }
     /// The same, through any channel that carries the request and brings back (status, answer).
     static func pair(phoneName: String, via: (Data) async throws -> (Int, Data)) async throws -> Paired {
@@ -70,7 +80,7 @@ enum Secure {
         let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: Data(), sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
         let mine = Data(HMAC<SHA256>.authenticationCode(for: Data("confirm".utf8), using: key)).prefix(8).hex
         guard mine == check else { throw TiltError("The controller's key did not match. Pairing was cancelled.") }
-        return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1, waiting: (j["wait"] as? Int) == 1, topic: (j["topic"] as? String) ?? "")
+        return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1, waiting: (j["wait"] as? Int) == 1, topic: (j["topic"] as? String) ?? "", blindName: (j["blindName"] as? String) ?? "")
     }
 }
 
@@ -89,6 +99,7 @@ actor Link {
 
     /// Send "/api/…?…" and return the controller's JSON answer.
     func call(_ command: String) async throws -> Data {
+        if host == Demo.host { return await Demo.shared.answer(command) }          // the demo room answers itself
         for attempt in 0..<2 {
             if boot == nil { boot = Data(hex: try await Secure.hello(host).boot) }
             guard let boot, boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }

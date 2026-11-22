@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         application.registerForRemoteNotifications()
         return true
     }
-    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) { print("push: \(error.localizedDescription)") }
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {}
 }
 
 @main
@@ -21,7 +21,7 @@ struct TiltApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("-slatdemo") {
+            if developerBuild && ProcessInfo.processInfo.arguments.contains("-slatdemo") {
                 HStack { SlatView(tilt: -100); SlatView(tilt: -55); SlatView(tilt: 55); SlatView(tilt: 100) }.frame(height: 260).padding(8).frame(maxHeight: .infinity).background(AppBackground())
             } else {
             RootView()
@@ -39,10 +39,11 @@ struct TiltApp: App {
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("appearance") private var appearance = 0
+    @AppStorage(Prefs.appearance) private var appearance = 0
     @State private var splash = true
     @State private var later: Set<String> = []
-    @State private var tab = 0
+    /// Developer builds, for screenshots: "-tab 1" starts on Automations, "-demo" adds the demo room.
+    @State private var tab = developerBuild ? UserDefaults.standard.integer(forKey: "tab") : 0
     @State private var join: JoinAsk?
     @State private var needName = AppModel.savedName == nil
     /// Requests to join the controllers this phone owns.
@@ -52,7 +53,7 @@ struct RootView: View {
         if let j = join { if pending.contains(where: { $0.id == j.id }) { return }; join = nil }
         if !splash, !needName { join = pending.first { !later.contains($0.id) }; if let j = join { later.insert(j.id) } }
     }
-    @State private var wizardDemo = ProcessInfo.processInfo.arguments.contains("-wizarddemo")
+    @State private var wizardDemo = developerBuild && ProcessInfo.processInfo.arguments.contains("-wizarddemo")
 
     var body: some View {
         // Tapping the Blinds tab while already on it goes back to the home page (all rooms).
@@ -61,11 +62,13 @@ struct RootView: View {
             Tab("Automations", systemImage: "clock", value: 1) { AutomationsTab() }
             Tab("Settings", systemImage: "gearshape", value: 2) { SettingsTab() }
         }
+        .background(AppBackground().ignoresSafeArea())      // the sky behind the status bar too, not a white strip
         .overlay { if splash { SplashView { splash = false } } }
         // For mock-ups: launch with "-wizarddemo" to open the blind setup screen straight away.
         .sheet(isPresented: Binding(get: { !splash && wizardDemo && model.controllers.first != nil }, set: { if !$0 { wizardDemo = false } })) {
             if let c = model.controllers.first { SetupWizard(controller: c, index: 0, name: c.state?.b.first?.name ?? "Blind 1") }
         }
+        .onAppear { if developerBuild && ProcessInfo.processInfo.arguments.contains("-demo") { model.addDemo() } }
         .preferredColorScheme(appearance == 1 ? .light : appearance == 2 ? .dark : nil)
         // First time: who is this? (So other people see a name, not "iPhone".)
         .sheet(isPresented: Binding(get: { !splash && needName }, set: { if !$0 { needName = false } })) { WelcomeSheet { needName = false }.presentationDetents([.height(400)]).interactiveDismissDisabled() }

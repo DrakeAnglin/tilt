@@ -29,14 +29,17 @@ struct ControllerSettingsView: View {
     @State private var problem: String?
     @State private var confirmRemove = false
     @State private var retried = false
-    @AppStorage("devMode") private var devMode = false
+    @AppStorage(Prefs.devMode) private var devMode = false
 
     struct HomeInfo: Identifiable { let code: String; let qr: String; var id: String { qr } }
 
     var body: some View {
         List {
+            Group {
             if !controller.record.owner { Section { Label("You can open and close these blinds. Only an owner can change settings.", systemImage: "lock") } }
+            if controller.needsUpdate { Section { FirmwareNotice(controller: controller) } }
             if let cfg {
+              if controller.record.owner {       // settings, setup and Apple Home are the owners'
                 Section("Blinds") {
                     ForEach(Array(cfg.b.enumerated()), id: \.offset) { i, b in
                         NavigationLink {
@@ -67,6 +70,7 @@ struct ControllerSettingsView: View {
                 } header: { Text("Apple Home") } footer: {
                     Text((controller.state?.hk ?? 0) > 0 ? "Added to Apple Home. Changing how blinds are shown restarts the controller." : "Not added to Apple Home yet.")
                 }
+              }
                 Section {
                     ForEach(phones) { p in
                         if p.wait == 1 {
@@ -82,8 +86,8 @@ struct ControllerSettingsView: View {
                             .buttonStyle(.plain)                // names in the normal text color, not as links
                             .swipeActions {
                                 if controller.record.owner && p.me == 0 {
-                                    Button("Remove") { removing = p }.tint(.red)
-                                    Button(p.owner == 1 ? "Make User" : "Make Owner") { setRole(p, owner: p.owner != 1) }.tint(.blue)
+                                    Button("Remove") { removing = p }.tint(Palette.danger)
+                                    Button(p.owner == 1 ? "Make User" : "Make Owner") { setRole(p, owner: p.owner != 1) }.tint(Palette.accent)
                                 }
                             }
                             .confirmationDialog("Remove \(p.name)?", isPresented: Binding(get: { removing?.cid == p.cid }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
@@ -94,15 +98,15 @@ struct ControllerSettingsView: View {
                 } header: { Text("People") } footer: {
                     Text("Tap a name to change it. To add someone: on your Wi-Fi, they open Tilt, tap Add, and ask to join. You approve it here." + (controller.record.owner ? " Swipe left on someone to remove them or change their role." : ""))
                 }
-                if devMode { Section {
+                if devMode && developerBuild { Section {
                     NavigationLink { DeveloperView(controller: controller) } label: { Label("Developer", systemImage: "chevron.left.forwardslash.chevron.right") }
                 } }
             } else if problem == nil {
                 SlatLoader(label: "Loading settings…").frame(maxWidth: .infinity).padding(.vertical, 24).listRowBackground(Color.clear)
             }
-            if let v = controller.state?.v { Section("About") { LabeledContent("Firmware", value: v) } }
+            if controller.state != nil { FirmwareSection(controller: controller) }
             if cfg == nil, problem == nil { Section { HStack(spacing: 10) { SlatLoader(size: 20); Text("Loading…").foregroundStyle(.secondary) } } }
-            if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) } }
+            if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
             Section {
                 Button("Remove from This Phone", role: .destructive) { confirmRemove = true }
                     .confirmationDialog("Remove this controller from this phone?", isPresented: $confirmRemove, titleVisibility: .visible) {
@@ -117,6 +121,8 @@ struct ControllerSettingsView: View {
                                                      : "The blinds keep working. To use them here again you will need a new sharing code.")
                     }
             }
+        }
+            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }
         .skyPage()
         .navigationTitle(controller.state?.name ?? controller.record.name)
@@ -139,7 +145,7 @@ struct ControllerSettingsView: View {
 
     private func remove(reset: Bool) {
         Task {
-            if reset { try? await controller.link.send("/api/revoke?cid=all") }
+            if reset { try? await controller.link.send(Api.revokeAll) }
             model.remove(controller)                 // the Blinds tab goes back to the rooms by itself
             dismiss()
         }
@@ -154,10 +160,10 @@ struct ControllerSettingsView: View {
     }
     private func load() async {
         do {
-            let c: ControllerConfig = try await controller.link.json("/api/cfg")
+            let c: ControllerConfig = try await controller.link.json(Api.config)
             cfg = c; name = c.name; problem = nil
             struct K: Decodable { let keys: [PhoneKey] }
-            let list = ((try? await controller.link.json("/api/keys", as: K.self).keys) ?? []).sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
+            let list = ((try? await controller.link.json(Api.keys, as: K.self).keys) ?? []).sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
             withAnimation { phones = list }
             if let me = phones.first(where: { $0.me == 1 }) { model.setOwner(controller, me.owner == 1) }      // the owner may have changed
         } catch {
@@ -170,23 +176,23 @@ struct ControllerSettingsView: View {
     }
     private func set(_ key: String, _ value: String) {
         Task {
-            do { try await controller.link.send("/api/set?k=\(key)&v=\(value.urlQuery)"); await load() } catch { problem = error.localizedDescription }
+            do { try await controller.link.send(Api.set(key, value)); await load() } catch { problem = error.localizedDescription }
         }
     }
     private func setRole(_ p: PhoneKey, owner: Bool) {
-        Task { do { try await controller.link.send("/api/makeowner?cid=\(p.cid)&on=\(owner ? 1 : 0)"); await load() } catch { problem = error.localizedDescription } }
+        Task { do { try await controller.link.send(Api.makeOwner(cid: p.cid, owner)); await load() } catch { problem = error.localizedDescription } }
     }
     private func rename(_ p: PhoneKey) {
         let n = newName.trimmingCharacters(in: .whitespaces)
         guard !n.isEmpty else { return }
         if p.me == 1 { AppModel.myName = n }
-        Task { do { try await controller.link.send("/api/keyname?cid=\(p.cid)&name=\(n.urlQuery)"); await load() } catch { problem = error.localizedDescription } }
+        Task { do { try await controller.link.send(Api.rename(cid: p.cid, to: n)); await load() } catch { problem = error.localizedDescription } }
     }
     private func revoke(_ p: PhoneKey) {
         Task {
             struct R: Decodable { let ok: Int; let err: String?; let proof: String? }
             do {
-                let r: R = try await controller.link.json("/api/revoke?cid=\(p.cid)")
+                let r: R = try await controller.link.json(Api.revoke(cid: p.cid))
                 if r.ok != 1 { throw TiltError((r.err ?? "That did not work.").capitalizedFirst) }
                 await Cloud.postGone(cid: p.cid, proof: r.proof ?? "")        // so that phone drops these blinds even away from home
                 await load()
@@ -196,7 +202,7 @@ struct ControllerSettingsView: View {
     private func openHome() {
         Task {
             struct H: Decodable { let code: String; let qr: String }
-            do { let h: H = try await controller.link.json("/api/homeopen"); home = HomeInfo(code: h.code, qr: h.qr) } catch { problem = error.localizedDescription }
+            do { let h: H = try await controller.link.json(Api.homeOpen); home = HomeInfo(code: h.code, qr: h.qr) } catch { problem = error.localizedDescription }
         }
     }
 }
@@ -212,7 +218,7 @@ struct QRCode: View {
             if let img { Image(decorative: img, scale: 1).interpolation(.none).resizable().scaledToFit() } else { Image(systemName: "qrcode") }
         }
         .padding(14)
-        .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Palette.codeBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -231,7 +237,7 @@ struct HomeSheet: View {
                         .buttonStyle(.borderedProminent).controlSize(.large)
                     Text("When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The controller accepts this for the next 10 minutes.")
                         .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    if let note { Label(note, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange) }
+                    if let note { Label(note, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(Palette.warning) }
 
                     VStack(spacing: 12) {
                         Text("Or add it by hand").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
@@ -244,18 +250,18 @@ struct HomeSheet: View {
                         Text("In Home tap +, Add Accessory, More Options. Pick this controller, or tap \u{201C}My Accessory Isn\u{2019}t Shown Here\u{201D} and paste the code.")
                             .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(16).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .padding(16).background(Palette.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                     VStack(spacing: 10) {
                         Text("From another iPhone or iPad").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                         QRCode(text: info.qr).frame(maxWidth: 170)
                         Text("Point its camera at this code.").font(.footnote).foregroundStyle(.secondary)
                     }
-                    .padding(16).frame(maxWidth: .infinity).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .padding(16).frame(maxWidth: .infinity).background(Palette.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .skyPage()
             .navigationTitle("Add to Apple Home").navigationBarTitleDisplayMode(.inline)
             .sensoryFeedback(.success, trigger: copied)
         }
@@ -283,6 +289,7 @@ struct BlindSettingsView: View {
 
     var body: some View {
         Form {
+            Group {
             Section("Name") {
                 TextField("Name", text: $name).onSubmit { set("name", name) }.submitLabel(.done)
             }
@@ -293,12 +300,14 @@ struct BlindSettingsView: View {
                 Button("Set Up Positions", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
             } footer: { Text("Mark where this blind is closed up, open, and closed down.") }
         }
+            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
+        }
         .skyPage()
         .navigationTitle(blind.name).navigationBarTitleDisplayMode(.inline)
         .onAppear { name = blind.name }
         .fullScreenCover(isPresented: $settingUp) { SetupWizard(controller: controller, index: index, name: blind.name) }
     }
     private func set(_ field: String, _ value: String) {
-        Task { try? await controller.link.send("/api/set?k=b\(index).\(field)&v=\(value.urlQuery)"); await reload() }
+        Task { try? await controller.link.send(Api.set("b\(index).\(field)", value)); await reload() }
     }
 }

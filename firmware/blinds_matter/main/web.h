@@ -13,10 +13,13 @@
 #include <driver/temperature_sensor.h>
 #include "motion.h"
 #include "sec.h"
+#include "fwkey.h"
+#include <mbedtls/sha256.h>
+#include <mbedtls/ecdsa.h>
 #include "secrets.h"
 #include <mdns.h>
 
-#define FW_VERSION "2.2.0-dev8"
+#define FW_VERSION "2.2.0-dev11"
 SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
 uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
 bool otaPending = false, restartSoon = false;
@@ -445,28 +448,60 @@ void scanRun() {
 // trial: it is kept once it has joined Wi-Fi and answered a request; a reset before that goes back to this one.
 extern uint8_t openApi;
 extern uint32_t otaWindow;
+// A firmware file may carry a signature at its end: image | signature (64 bytes, r then s) | "TILTSIG1".
+// A signed file needs no update password: the signature proves it came from whoever holds the release key. Either way
+// an owner must have allowed updates first (/api/otaopen, 5 minutes).
+static const char SIG_MAGIC[8] = {'T', 'I', 'L', 'T', 'S', 'I', 'G', '1'};
+bool fwSignatureOk(const uint8_t hash[32], const uint8_t sig[64]) {
+  mbedtls_ecp_group grp; mbedtls_ecp_point q; mbedtls_mpi r, s;
+  mbedtls_ecp_group_init(&grp); mbedtls_ecp_point_init(&q); mbedtls_mpi_init(&r); mbedtls_mpi_init(&s);
+  bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_ecp_point_read_binary(&grp, &q, FW_SIGN_PUB, 65) == 0 &&
+            mbedtls_mpi_read_binary(&r, sig, 32) == 0 && mbedtls_mpi_read_binary(&s, sig + 32, 32) == 0 &&
+            mbedtls_ecdsa_verify(&grp, hash, 32, &q, &r, &s) == 0;
+  mbedtls_ecp_group_free(&grp); mbedtls_ecp_point_free(&q); mbedtls_mpi_free(&r); mbedtls_mpi_free(&s);
+  return ok;
+}
 esp_err_t hUpdate(httpd_req_t *r) {
   char pw[80] = "";
   httpd_req_get_hdr_value_str(r, "X-Update-Password", pw, sizeof pw);
-  if (strcmp(pw, OTA_PASSWORD) != 0) return fail(r, "wrong update password");
-  // Once a phone owns this controller, the owner has to allow updates first (/api/otaopen, 5 minutes).
+  bool pwOk = strcmp(pw, OTA_PASSWORD) == 0;
   if (owned() && !openApi && (int32_t)(otaWindow - millis()) <= 0) return fail(r, "updates are locked: the owner must allow them from the app");
   { Lock l; stopAll("stopped"); }
   const esp_partition_t *to = esp_ota_get_next_update_partition(nullptr);
   esp_ota_handle_t h;
   if (!to || esp_ota_begin(to, OTA_SIZE_UNKNOWN, &h) != ESP_OK) return fail(r, "could not start the update");
   event("update over Wi-Fi: %d bytes", (int)r->content_len);
-  static char buf[4096];
+  // The last 72 bytes may be the signature: they are held back until the end, everything before them is written.
+  static uint8_t buf[4096 + 72];
+  static uint8_t tail[72];
+  int tailN = 0;
+  mbedtls_sha256_context sha;
+  mbedtls_sha256_init(&sha); mbedtls_sha256_starts(&sha, 0);
   int left = r->content_len;
   bool good = left > 100000;
   while (left > 0 && good) {
-    int n = httpd_req_recv(r, buf, min(left, (int)sizeof buf));
+    memcpy(buf, tail, tailN);
+    int n = httpd_req_recv(r, (char *)buf + tailN, min(left, 4096));
     if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
-    if (n <= 0 || esp_ota_write(h, buf, n) != ESP_OK) good = false;
-    else left -= n;
+    if (n <= 0) { good = false; break; }
+    left -= n;
+    int have = tailN + n, out = have > 72 ? have - 72 : 0;
+    if (out && esp_ota_write(h, buf, out) != ESP_OK) { good = false; break; }
+    mbedtls_sha256_update(&sha, buf, out);
+    tailN = have - out;
+    memcpy(tail, buf + out, tailN);
   }
+  bool signedFile = good && tailN == 72 && !memcmp(tail + 64, SIG_MAGIC, 8);
+  if (good && !signedFile && tailN) {                // no signature: those last bytes are part of the image
+    if (esp_ota_write(h, tail, tailN) != ESP_OK) good = false; else mbedtls_sha256_update(&sha, tail, tailN);
+  }
+  uint8_t hash[32];
+  mbedtls_sha256_finish(&sha, hash); mbedtls_sha256_free(&sha);
   if (!good) { esp_ota_abort(h); return fail(r, "the upload broke off"); }
+  if (signedFile && !fwSignatureOk(hash, tail)) { esp_ota_abort(h); event("update refused: bad signature"); return fail(r, "the file's signature is not valid"); }
+  if (!signedFile && !pwOk) { esp_ota_abort(h); return fail(r, "this file is not signed"); }
   if (esp_ota_end(h) != ESP_OK || esp_ota_set_boot_partition(to) != ESP_OK) return fail(r, "the file was not accepted");
+  event(signedFile ? "signed update accepted" : "update accepted (password)");
   statsSave();
   restartSoon = true;
   return ok(r);
@@ -578,6 +613,64 @@ esp_err_t hApprove(httpd_req_t *r) {             // owner: answer a phone that a
   }
   return fail(r, "no such request");
 }
+// ---- getting back in when no owner's phone is left
+// Physical proof instead of a reset button: whoever asks must turn one blind's wand fully closed up, then fully closed
+// down, then level (open), within two minutes. Only someone at the window can do that. The phone that asked becomes
+// an owner; the blinds' settings and the other phones are left as they are.
+struct Recover { int slot = -1, port = 0, step = 0; uint32_t until = 0, moves = 0; } recover;
+uint32_t movesEver() { uint32_t n = 0; for (int p = 0; p < PORTS; p++) n += stats.moves[p]; return n; }
+void recoverTick() {                             // from webTick, once a second
+  if (recover.slot < 0) return;
+  uint32_t now = millis();
+  ClientKey &k = keys[recover.slot];
+  if ((int32_t)(recover.until - now) <= 0 || k.used != 2) {
+    if (k.used == 2) { memset(&k, 0, sizeof k); keysSave(); event("recovery timed out"); }
+    recover.slot = -1;
+    return;
+  }
+  // The turning has to be by hand. If a motor runs at all (a paired phone could send a blind to these positions), the
+  // attempt is over: otherwise a user could make themself an owner without touching the blind.
+  if (moving() || movesEver() != recover.moves) {
+    memset(&k, 0, sizeof k); keysSave(); recover.slot = -1;
+    event("recovery stopped: a motor ran");
+    return;
+  }
+  int p = recover.port;
+  if (watchPort >= 0 && watchPort != p) watchStop();
+  watchPort = p; handBusy = false; watchUntil = now + 3000;      // keep this blind's sensor read, as a setup screen does
+  setupSeen = now ? now : 1;                                     // and the other blinds do not follow these twists
+  float t = bs[p].tilt;
+  if (isnan(t)) return;
+  bool hit = recover.step == 0 ? t >= 85 : recover.step == 1 ? t <= -85 : fabsf(t) <= 20;
+  if (!hit || ++recover.step < 3) return;
+  k.used = 1; k.role = 1; lastCtr[recover.slot] = 0;
+  keysSave();
+  event("%s recovered access by turning blind %d", k.name, p + 1);
+  recover.slot = -1;
+}
+esp_err_t hRecover(httpd_req_t *r) {             // POST /x/recover: the same JSON as /x/ask
+  int p = -1;
+  for (int i = 0; i < PORTS && p < 0; i++) if (calibrated(i) && !cfg.b[i].hidden && !(bs[i].seen && !bs[i].present)) p = i;
+  if (p < 0) return plain(r, "409 Conflict", "{\"err\":\"no blind is set up, so there is nothing to turn\"}");
+  if (recover.slot >= 0) return plain(r, "429 Too Many Requests", "{\"err\":\"a recovery is already under way. Try again in two minutes.\"}");
+  std::string out;
+  const char *st = pairDo(body(r, 600), out, true);
+  if (strcmp(st, "200 OK")) return plain(r, st, out);
+  uint8_t id[8];
+  unhex(jsonStr(out, "cid"), id, 8);
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) recover.slot = i;
+  rampCancel();                                  // a gentle move would run the motor and end the attempt
+  recover.port = p; recover.step = 0; recover.until = millis() + 120000; recover.moves = movesEver();
+  event("recovery started: turn blind %d", p + 1);
+  out.pop_back();                                // the closing brace
+  out += std::string(",\"recover\":1,\"blind\":") + std::to_string(p) + ",\"blindName\":" + jq(cfg.b[p].name) + "}";
+  return plain(r, st, out);
+}
+esp_err_t hRecoverState(httpd_req_t *r) {        // GET /x/recstate: how far the turning has got (0..3), seconds left
+  std::string j;
+  ap(j, "{\"on\":%d,\"step\":%d,\"left\":%d}", recover.slot >= 0 ? 1 : 0, recover.slot >= 0 ? recover.step : 0, recover.slot >= 0 ? (int)((int32_t)(recover.until - millis()) / 1000) : 0);
+  return plain(r, "200 OK", j);
+}
 esp_err_t hMakeOwner(httpd_req_t *r) {           // owner: give another phone the owner's rights too
   Lock l;
   uint8_t id[8];
@@ -653,7 +746,7 @@ void webBegin() {
     u.uri = routes[i].uri; u.method = routes[i].m; u.handler = hGuard; u.user_ctx = (void *)&routes[i];
     httpd_register_uri_handler(srv, &u);
   }
-  httpd_uri_t x[] = {{"/x/hello", HTTP_GET, hHello, nullptr}, {"/x/pair", HTTP_POST, hPair, nullptr}, {"/x/ask", HTTP_POST, hAsk, nullptr}, {"/x", HTTP_POST, hSecure, nullptr}};
+  httpd_uri_t x[] = {{"/x/hello", HTTP_GET, hHello, nullptr}, {"/x/pair", HTTP_POST, hPair, nullptr}, {"/x/ask", HTTP_POST, hAsk, nullptr}, {"/x/recover", HTTP_POST, hRecover, nullptr}, {"/x/recstate", HTTP_GET, hRecoverState, nullptr}, {"/x", HTTP_POST, hSecure, nullptr}};
   for (auto &u : x) httpd_register_uri_handler(srv, &u);
 }
 
@@ -693,6 +786,7 @@ void webTick() {
   }
   schedRun();
   rampTick();
+  recoverTick();
   static uint32_t lastHist = 0;
   uint32_t ep = time(nullptr);
   if (lastHist > ep || ep - lastHist >= 3600) { lastHist = ep; histPush(vbatRest); }

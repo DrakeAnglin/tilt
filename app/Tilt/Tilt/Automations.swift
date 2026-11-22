@@ -50,10 +50,10 @@ struct BlindScene: Identifiable, Codable, Equatable {
 @MainActor @Observable
 final class SceneStore {
     static let shared = SceneStore()
-    var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: "scenes.v1")).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
-    func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: "scenes.v1") }
+    var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: Prefs.scenes)).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
+    func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: Prefs.scenes) }
     func run(_ scene: BlindScene, controllers: [Controller]) {
-        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.run("/api/go?b=\(t.blind)&t=\(tilt)&solo=1") }
+        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.run(Api.go(blind: t.blind, tilt: tilt, solo: true)) }
     }
 }
 
@@ -111,7 +111,7 @@ final class AutomationStore {
         loading = true; defer { loading = false }
         var found: [UInt32: Schedule] = [:]
         for c in controllers {
-            guard let cfg: SchedConfig = try? await c.link.json("/api/cfg") else { continue }
+            guard let cfg: SchedConfig = try? await c.link.json(Api.config) else { continue }
             slots[c.id] = cfg.sched
             if let s = cfg.sun, s.count == 2, s[0] > 0 { sun = (Date(timeIntervalSince1970: s[0]), Date(timeIntervalSince1970: s[1])); hasPlace = true; Sky.remember(rise: sun!.rise, set: sun!.set) }
             for (i, sl) in cfg.sched.enumerated() where sl.mask != 0 {
@@ -135,7 +135,7 @@ final class AutomationStore {
                 if mask != 0 { throw TiltError("\(c.state?.name ?? "A controller") already has 8 schedules.") }
                 continue
             }
-            try await c.link.send("/api/sched?i=\(i)&on=\(s.on && mask != 0 ? 1 : 0)&days=\(s.days)&mask=\(mask)&min=\(s.minute)&tilt=\(s.tilt)&kind=\(s.kind)&off=\(s.offset)&ramp=\(s.ramp)&gid=\(mask != 0 ? s.id : 0)")
+            try await c.link.send(Api.schedule(slot: i) + "on=\(s.on && mask != 0 ? 1 : 0)&days=\(s.days)&mask=\(mask)&min=\(s.minute)&tilt=\(s.tilt)&kind=\(s.kind)&off=\(s.offset)&ramp=\(s.ramp)&gid=\(mask != 0 ? s.id : 0)")
         }
         await load(controllers)
     }
@@ -148,10 +148,13 @@ struct AutomationsTab: View {
     @State private var problem: String?
     @State private var locator = Locator()
     @State private var ran: UInt32?
+    /// Schedules are the owners' to change; anyone can run one.
+    private var owner: Bool { model.controllers.contains { $0.record.owner } }
 
     var body: some View {
         NavigationStack {
             List {
+            Group {
                 Section("Scenes") {
                     ScenesRow().listRowInsets(EdgeInsets(top: 6, leading: 2, bottom: 6, trailing: 0)).listRowBackground(Color.clear)
                 }
@@ -161,30 +164,33 @@ struct AutomationsTab: View {
                             Button { ran = s.id; runNow(s) } label: { Image(systemName: "play.fill").frame(width: 34, height: 34).background(.tint.opacity(0.15), in: Circle()) }
                                 .buttonStyle(.borderless).accessibilityLabel("Run now")
                                 .sensoryFeedback(.impact, trigger: ran)
-                            Button { editing = s } label: {
+                            Button { if owner { editing = s } } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack(spacing: 6) {
                                         Text(s.whenText).font(.headline)
-                                        if s.ramp > 0 { Image(systemName: "sunrise").font(.footnote).foregroundStyle(.orange) }
+                                        if s.ramp > 0 { Image(systemName: "sunrise").font(.footnote).foregroundStyle(Palette.warning) }
                                     }
                                     Text("\(s.actionText) · \(s.daysText) · \(blindNames(s))").font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())      // the whole row opens it, not just the words
                             }
                             .buttonStyle(.plain)
-                            Toggle("On", isOn: Binding(get: { s.on }, set: { on in var c = s; c.on = on; save(c) })).labelsHidden()
+                            Toggle("On", isOn: Binding(get: { s.on }, set: { on in var c = s; c.on = on; save(c) })).labelsHidden().disabled(!owner)
                         }
                     }
-                    Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: Schedule.everyBlind(model.controllers)) }.disabled(model.controllers.isEmpty)
+                    if owner { Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: Schedule.everyBlind(model.controllers)) } }
                 } header: { Text("Schedules") } footer: {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Schedules are kept on the controllers, so they run even when this phone is away. The play button runs one right now.")
                         if let sun = store.sun { Text("Today: sunrise \(sun.rise.formatted(date: .omitted, time: .shortened)), sunset \(sun.set.formatted(date: .omitted, time: .shortened)).") }
-                        Button(store.hasPlace ? "Update Location for Sunrise and Sunset" : "Set Location for Sunrise and Sunset") { setPlace() }.font(.footnote)
+                        if !owner { Text("Only an owner can add or change schedules.") }
+                        if owner { Button(store.hasPlace ? "Update Location for Sunrise and Sunset" : "Set Location for Sunrise and Sunset") { setPlace() }.font(.footnote) }
                     }
                 }
-                if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) } }
+                if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
             }
+            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
+        }
             .skyPage()
             .navigationTitle("Automations")
             .task { await store.load(model.controllers) }
@@ -208,7 +214,7 @@ struct AutomationsTab: View {
     private func runNow(_ s: Schedule) {
         for t in s.targets {
             guard let c = model.controllers.first(where: { $0.id == t.controller }), c.state?.b[safe: t.blind]?.ready == true else { continue }
-            c.run("/api/go?b=\(t.blind)&t=\(s.tilt)&solo=1")
+            c.run(Api.go(blind: t.blind, tilt: s.tilt, solo: true))
         }
     }
     private func save(_ s: Schedule, delete: Bool = false) {
@@ -218,7 +224,7 @@ struct AutomationsTab: View {
         Task {
             problem = nil
             guard let place = await locator.once() else { problem = "Tilt could not get this phone's location. Allow location for Tilt in Settings."; return }
-            for c in model.controllers { try? await c.link.send("/api/set?k=loc&v=" + String(format: "%.3f,%.3f", place.latitude, place.longitude).urlQuery) }
+            for c in model.controllers { try? await c.link.send(Api.set("loc", String(format: "%.3f,%.3f", place.latitude, place.longitude))) }
             await store.load(model.controllers)
         }
     }
@@ -236,6 +242,7 @@ struct ScheduleEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+            Group {
                 Section("When") {
                     Picker("Starts", selection: $schedule.kind) { Text("At a time").tag(0); Text("At sunrise").tag(1); Text("At sunset").tag(2) }
                     if schedule.kind == 0 {
@@ -249,8 +256,8 @@ struct ScheduleEditor: View {
                             let on = schedule.days >> d & 1 == 1
                             Text(["S", "M", "T", "W", "T", "F", "S"][d]).font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity, minHeight: 36)
-                                .background(on ? Color.accentColor : Color(.tertiarySystemFill), in: Circle())
-                                .foregroundStyle(on ? Color.white : Color.primary)
+                                .background(on ? Palette.accent : Palette.fill, in: Circle())
+                                .foregroundStyle(on ? Palette.onAccent : Color.primary)
                                 .onTapGesture { schedule.days ^= 1 << d }
                                 .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
                         }
@@ -290,6 +297,8 @@ struct ScheduleEditor: View {
                 }
                 if !isNew { Section { Button("Delete Schedule", role: .destructive) { done(schedule, true); dismiss() } } }
             }
+            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
+        }
             .skyPage().navigationTitle(isNew ? "New Schedule" : "Schedule").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -298,7 +307,7 @@ struct ScheduleEditor: View {
             .onAppear {
                 custom = ![0, 100, -100].contains(schedule.tilt)
                 // "All" if it already covers every blind that is shown
-                let shown = Set(model.controllers.flatMap { c in (c.state?.b ?? []).enumerated().filter { $0.element.hid == 0 && !($0.element.seen == 1 && $0.element.pres == 0) }.map { BlindTarget(controller: c.id, blind: $0.offset) } })
+                let shown = Set(model.controllers.flatMap { c in (c.state?.b ?? []).enumerated().filter { $0.element.listed }.map { BlindTarget(controller: c.id, blind: $0.offset) } })
                 all = isNew || schedule.targets.isSuperset(of: shown)
             }
         }
@@ -315,13 +324,14 @@ struct SceneEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+            Group {
                 Section("Name") { TextField("Name", text: $scene.name) }
                 Section("Icon") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(symbols, id: \.self) { s in
                                 Image(systemName: s).font(.title3).frame(width: 46, height: 46)
-                                    .background(scene.symbol == s ? Color.accentColor.opacity(0.25) : Color(.tertiarySystemFill), in: Circle())
+                                    .background(scene.symbol == s ? Palette.fillSelected : Palette.fill, in: Circle())
                                     .onTapGesture { scene.symbol = s }
                             }
                         }
@@ -349,6 +359,8 @@ struct SceneEditor: View {
                     }
                 }
             }
+            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
+        }
             .skyPage().navigationTitle("Scene").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }

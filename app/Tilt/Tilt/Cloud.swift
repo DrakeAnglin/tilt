@@ -7,8 +7,10 @@
 import CloudKit
 import CryptoKit
 import Foundation
+import os
 
 enum Cloud {
+    private static let log = Logger(subsystem: "app.tilt.blinds", category: "cloud")
     @MainActor private static var lastTry: [String: Date] = [:]
     private static let db = CKContainer(identifier: "iCloud.app.tilt.blinds").publicCloudDatabase
 
@@ -20,7 +22,7 @@ enum Cloud {
         guard !topic.isEmpty else { return }
         let r = CKRecord(recordType: "Join", recordID: CKRecord.ID(recordName: "join-\(cid)"))
         r["topic"] = topic; r["who"] = who; r["room"] = room
-        do { _ = try await db.save(r) } catch { NSLog("cloud: join not sent: %@", "\(error)") }
+        do { _ = try await db.save(r) } catch { log.error("join not sent: \(error.localizedDescription)") }
     }
     /// The request was answered or taken back.
     static func clearJoin(cid: String) async { _ = try? await db.deleteRecord(withID: CKRecord.ID(recordName: "join-\(cid)")) }
@@ -40,7 +42,7 @@ enum Cloud {
         for attempt in 0..<2 {
             do { _ = try await db.save(sub); UserDefaults.standard.set(true, forKey: key); return }
             catch {
-                NSLog("cloud: watch failed: %@", "\(error)")
+                log.error("watch failed: \(error.localizedDescription)")
                 guard attempt == 0 else { return }
                 // The very first time, iCloud does not know what a "Join" is yet: save one and take it away again.
                 let r = CKRecord(recordType: "Join", recordID: CKRecord.ID(recordName: "join-setup-\(UUID().uuidString)"))
@@ -62,7 +64,7 @@ enum Cloud {
         guard !proof.isEmpty else { return }
         let r = CKRecord(recordType: "Gone", recordID: CKRecord.ID(recordName: "gone-\(cid)"))
         r["proof"] = proof
-        do { _ = try await db.save(r) } catch { NSLog("cloud: removal not sent: %@", "\(error)") }
+        do { _ = try await db.save(r) } catch { log.error("removal not sent: \(error.localizedDescription)") }
     }
     /// Was this phone removed from the controller? True only with the controller's proof.
     static func gone(cid: String, key: SymmetricKey) async -> Bool {

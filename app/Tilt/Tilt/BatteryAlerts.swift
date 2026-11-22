@@ -52,13 +52,13 @@ enum BatteryAlerts {
     static func scheduleRefresh() {
         let r = BGAppRefreshTaskRequest(identifier: refreshId)
         r.earliestBeginDate = Date(timeIntervalSinceNow: 4 * 3600)
-        BGTaskScheduler.shared.submitTaskRequest(r) { _ in }
+        try? BGTaskScheduler.shared.submit(r)
     }
     /// Run by iOS now and then while the app is closed.
     static func backgroundCheck() async {
         scheduleRefresh()
         for (rec, link) in TiltActions.links() {
-            guard let s: ControllerState = try? await link.json("/api/s") else { continue }
+            guard let s: ControllerState = try? await link.json(Api.state) else { continue }
             check(id: rec.id, name: s.name, battery: s.batt)
             if rec.owner, (s.asks ?? 0) > 0 { JoinAlerts.notify(cid: "any.\(rec.id)", who: "Someone", room: s.name) }
         }

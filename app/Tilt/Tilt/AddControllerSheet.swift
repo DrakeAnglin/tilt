@@ -13,9 +13,10 @@ struct AddControllerSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+            Group {
                 let fresh = discovery.found.filter { f in !(model.controllers + model.waiting).contains { $0.id == f.id } }
                 Section {
-                    if let p = ble.problem { Label(p, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
+                    if let p = ble.problem { Label(p, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) }
                     else if ble.found.isEmpty { Label("Looking for new controllers…", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(.secondary) }
                     ForEach(ble.found) { d in
                         NavigationLink(value: d) { Label("Blinds Controller", systemImage: "blinds.horizontal.closed") }
@@ -39,8 +40,15 @@ struct AddControllerSheet: View {
                         .disabled(busy)
                     }
                 } header: { Text("Already on your Wi-Fi") }
-                if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) } }
+                if !model.hasDemo {
+                    Section {
+                        Button("Try the Demo", systemImage: "play.rectangle") { model.addDemo(); dismiss() }
+                    } footer: { Text("A pretend room with three blinds, to see how Tilt works before you have a controller. Remove it in Settings.") }
+                }
+                if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
             }
+            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
+        }
             .skyPage()
             .navigationDestination(for: BleSetup.Found.self) { d in BluetoothSetupView(ble: ble, device: d) { dismiss() } }
             .onAppear { ble.start() }

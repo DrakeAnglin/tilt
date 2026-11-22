@@ -3,7 +3,8 @@
 .pio/
 build/
 *.bin
-!firmware/releases/*.bin
+# firmware release files go to GitHub releases, not the repo
+firmware/releases/
 # KiCad
 *-backups/
 *.kicad_prl
@@ -26,6 +27,7 @@ tools/.blinds_client.json
 
 # Xcode / iOS app
 build-phone/
+build-release/
 build-phone.log
 install-phone.log
 xcuserdata/
@@ -35,3 +37,6 @@ DerivedData/
 # Scratch / run artifacts (not source)
 /result.json
 firmware/blinds-settings-backup.json
+
+# App Store screenshots: made again with the demo room (see docs/app-store.md)
+app/Tilt/AppStore/

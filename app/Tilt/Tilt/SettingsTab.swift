@@ -6,8 +6,10 @@ struct SettingsTab: View {
     @State private var adding = false
     @State private var selected: String?
     @Environment(\.horizontalSizeClass) private var wide
-    @AppStorage("appearance") private var appearance = 0
-    @AppStorage("devMode") private var devMode = false
+    @AppStorage(Prefs.appearance) private var appearance = 0
+    @AppStorage(Prefs.devMode) private var devMode = false
+    @AppStorage(Prefs.firmwareBeta) private var firmwareBeta = false
+    @AppStorage(Prefs.firmwareSource) private var firmwareSource = ""
     @State private var myName = AppModel.myName
     @State private var cloud: Bool?
 
@@ -16,6 +18,7 @@ struct SettingsTab: View {
         // On a phone the same list pushes the room's settings as its own page.
         NavigationSplitView {
             List(selection: $selected) {
+            Group {
                 Section {
                     ForEach(model.controllers) { c in
                         NavigationLink(value: c.id) {
@@ -43,15 +46,24 @@ struct SettingsTab: View {
                 } header: { Text("This Phone") } footer: {
                     Text(cloud == false ? "Sign in to iCloud in the Settings app to be told when someone asks to join your blinds, even when Tilt is closed." : "Your display name is what other people see in People and when you ask to join their blinds. iCloud tells you when someone asks to join yours.")
                 }
-                Section {
-                    Toggle(isOn: $devMode) { Label("Developer Mode", systemImage: "chevron.left.forwardslash.chevron.right") }
-                } footer: {
-                    Text("Shows sensor readings, motor tuning and logs in each room's settings.")
+                // Never in an App Store build; also hidden when launched with "-demo" for App Store screenshots.
+                if developerBuild && !ProcessInfo.processInfo.arguments.contains("-demo") {
+                    Section {
+                        Toggle(isOn: $devMode) { Label("Developer Mode", systemImage: "chevron.left.forwardslash.chevron.right") }
+                        if devMode {
+                            Toggle("Beta Firmware", isOn: $firmwareBeta)
+                            TextField("Firmware list address", text: $firmwareSource, prompt: Text("Default (GitHub releases)")).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                        }
+                    } footer: {
+                        Text("Shows sensor readings, motor tuning, logs and Install from File in each room's settings. Beta Firmware offers beta releases.")
+                    }
                 }
                 Section("About") {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
                 }
             }
+            .listRowBackground(wide == .regular ? nil : RowGlass())      // glass rows on a phone; the iPad sidebar keeps its own look
+        }
             .skyPage()
             .navigationTitle("Settings")
             .onAppear { if wide == .regular, selected == nil { selected = model.controllers.first?.id } }

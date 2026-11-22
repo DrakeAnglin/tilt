@@ -26,7 +26,7 @@ struct SetupWizard: View {
                 if step < 3 {
                     let s = steps[step]
                     HStack(spacing: 6) {
-                        ForEach(0..<3, id: \.self) { i in Capsule().fill(i <= step ? Color.accentColor : Color.primary.opacity(0.15)).frame(height: 5) }
+                        ForEach(0..<3, id: \.self) { i in Capsule().fill(i <= step ? Palette.accent : Color.primary.opacity(0.15)).frame(height: 5) }
                     }
                     .padding(.bottom, 18)
                     Text("STEP \(step + 1) OF 3").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
@@ -38,26 +38,26 @@ struct SetupWizard: View {
                     Text(s.detail).font(.body).multilineTextAlignment(.center).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Label(blind?.pres == 0 ? "No blind on this port" : steady ? "Holding still. Ready to save." : "Turning…",
                           systemImage: blind?.pres == 0 ? "cable.connector.slash" : steady ? "checkmark.circle.fill" : "arrow.triangle.2.circlepath")
-                        .font(.subheadline.weight(.medium)).foregroundStyle(steady && blind?.pres != 0 ? Color.green : Color.secondary)
+                        .font(.subheadline.weight(.medium)).foregroundStyle(steady && blind?.pres != 0 ? Palette.good : Color.secondary)
                         .padding(.horizontal, 14).padding(.vertical, 8).card(radius: 20).padding(.top, 16)
                         .animation(.default, value: steady)
-                    if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(.orange).multilineTextAlignment(.center).padding(.top, 12) }
+                    if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).padding(.top, 12) }
                     Spacer(minLength: 12)
                     Button { mark(s.mark) } label: {
-                        HStack { if busy { ProgressView().tint(.white) }; Text(busy ? "Saving…" : s.save).font(.headline) }.frame(maxWidth: .infinity).padding(.vertical, 6)
+                        HStack { if busy { ProgressView().tint(Palette.onAccent) }; Text(busy ? "Saving…" : s.save).font(.headline) }.frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
                     .buttonStyle(.glassProminent).controlSize(.large).disabled(busy || blind?.pres == 0)
                     .sensoryFeedback(.success, trigger: step)
                     Button("Back") { step -= 1; problem = nil }.padding(.top, 10).opacity(step > 0 ? 1 : 0).disabled(step == 0)
                 } else {
                     Spacer()
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 64)).foregroundStyle(.green)
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 64)).foregroundStyle(Palette.good)
                     Text("\(name) is set up").font(.system(size: 28, weight: .bold, design: .rounded)).padding(.top, 10)
                     Text("Try each position. The blind moves by itself now.").font(.body).foregroundStyle(.secondary).padding(.top, 2)
                     HStack(spacing: 10) {
-                        PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.run("/api/go?b=\(index)&t=-100&solo=1") }
-                        PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.run("/api/go?b=\(index)&t=0&solo=1") }
-                        PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.run("/api/go?b=\(index)&t=100&solo=1") }
+                        PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.run(Api.go(blind: index, tilt: -100, solo: true)) }
+                        PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.run(Api.go(blind: index, tilt: 0, solo: true)) }
+                        PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.run(Api.go(blind: index, tilt: 100, solo: true)) }
                     }
                     .padding(.top, 24)
                     Text(blind.map(TiltWords.status) ?? "").font(.subheadline).foregroundStyle(.secondary).padding(.top, 12)
@@ -75,7 +75,7 @@ struct SetupWizard: View {
                 controller.boost = true
                 defer { controller.boost = false }
                 while !Task.isCancelled && step < 3 {
-                    if blind?.mov != 1 { _ = try? await controller.link.call("/api/watch?b=\(index)") }
+                    if blind?.mov != 1 { _ = try? await controller.link.call(Api.watch(blind: index)) }
                     try? await Task.sleep(for: .milliseconds(900))
                 }
             }
@@ -99,10 +99,10 @@ struct SetupWizard: View {
             defer { busy = false }
             struct M: Decodable { let ok: Int; let err: String?; let prob: String? }
             do {
-                let m: M = try await controller.link.json("/api/mark?b=\(index)&w=\(which)")
+                let m: M = try await controller.link.json(Api.mark(blind: index, which))
                 if m.ok != 1 { problem = (m.err ?? "That did not work.").capitalizedFirst; return }
                 if which == "down", let p = m.prob {            // the three marks do not make sense together: start over
-                    _ = try? await controller.link.call("/api/mark?b=\(index)&w=clear")
+                    _ = try? await controller.link.call(Api.mark(blind: index, "clear"))
                     problem = p.capitalizedFirst + ". Start again from step 1."
                     step = 0
                     return
@@ -124,7 +124,7 @@ struct HoldButton: View {
     var body: some View {
         Label(title, systemImage: systemImage)
             .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 26)
-            .background(held ? Color.accentColor.opacity(0.25) : Color(.secondarySystemFill), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(held ? Palette.fillSelected : Palette.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .onLongPressGesture(minimumDuration: 600, maximumDistance: 80, perform: {}, onPressingChanged: { held = $0; if !$0 { release() } })
             .task(id: held) {
                 while held && !Task.isCancelled { press(); try? await Task.sleep(for: .milliseconds(180)) }
