@@ -42,20 +42,20 @@ struct ControllerSettingsView: View {
                     }
                 }
                 Section {
-                    TextField("Name", text: $name).onSubmit { set("name", name) }.submitLabel(.done)
-                    Picker("\u{201C}Close\u{201D} tilts the slats", selection: Binding(get: { cfg.closeUp }, set: { set("closeUp", "\($0)") })) {
+                    TextField("Name", text: $name).onSubmit { let n = name; change { try await $0.setName(n) } }.submitLabel(.done)
+                    Picker("\u{201C}Close\u{201D} tilts the slats", selection: Binding(get: { cfg.closeUp }, set: { v in change { try await $0.setCloseUp(v == 1) } })) {
                         Text("Up").tag(1); Text("Down").tag(0)
                     }
-                    Toggle("Blinds Follow Each Other", isOn: Binding(get: { cfg.sync == 1 }, set: { set("sync", $0 ? "1" : "0") }))
+                    Toggle("Blinds Follow Each Other", isOn: Binding(get: { cfg.sync == 1 }, set: { on in change { try await $0.setFollow(on) } }))
                     if let par = cfg.par {
-                        Toggle("Move at the Same Time", isOn: Binding(get: { par == 1 }, set: { set("par", $0 ? "1" : "0") }))
+                        Toggle("Move at the Same Time", isOn: Binding(get: { par == 1 }, set: { on in change { try await $0.setSameTime(on) } }))
                     }
                 } header: { Text("General") } footer: {
                     Text("Follow Each Other: when one blind is moved, from here, from Apple Home or by turning its wand, the others go to the same position.\n\nMove at the Same Time: off moves them one after another, which is quieter and easier on the battery.")
                 }
                 Section {
                     Button("Add to Apple Home", systemImage: "homekit") { openHome() }
-                    Toggle("Show each blind separately", isOn: Binding(get: { cfg.hksep == 1 }, set: { set("hksep", $0 ? "1" : "0") }))
+                    Toggle("Show each blind separately", isOn: Binding(get: { cfg.hksep == 1 }, set: { on in change { try await $0.setHomeSeparate(on) } }))
                 } header: { Text("Apple Home") } footer: {
                     Text((controller.state?.hk ?? 0) > 0 ? "Added to Apple Home. Changing how blinds are shown restarts the controller." : "Not added to Apple Home yet.")
                 }
@@ -162,9 +162,10 @@ struct ControllerSettingsView: View {
         }
         retried = false
     }
-    private func set(_ key: String, _ value: String) {
+    /// Change a setting on the controller, then read the settings again.
+    private func change(_ what: @escaping (ControllerClient) async throws -> Void) {
         Task {
-            do { try await controller.client.set(key, value); await load() } catch { problem = error.localizedDescription }
+            do { try await what(controller.client); await load() } catch { problem = error.localizedDescription }
         }
     }
     private func setRole(_ p: PhoneKey, owner: Bool) {
@@ -276,10 +277,10 @@ struct BlindSettingsView: View {
         Form {
             Group {
             Section("Name") {
-                TextField("Name", text: $name).onSubmit { set("name", name) }.submitLabel(.done)
+                TextField("Name", text: $name).onSubmit { let n = name; change { try await $0.setBlindName(blind: index, n) } }.submitLabel(.done)
             }
             Section {
-                Toggle("Show this blind", isOn: Binding(get: { blind.hid == 0 }, set: { blind.hid = $0 ? 0 : 1; set("hid", $0 ? "0" : "1") }))
+                Toggle("Show this blind", isOn: Binding(get: { blind.hid == 0 }, set: { shown in blind.hid = shown ? 0 : 1; change { try await $0.setHidden(blind: index, !shown) } }))
             } footer: { Text("Turn off for a port with nothing plugged in.") }
             Section {
                 Button("Set Up Positions", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
@@ -292,7 +293,7 @@ struct BlindSettingsView: View {
         .onAppear { name = blind.name }
         .fullScreenCover(isPresented: $settingUp) { SetupWizard(controller: controller, index: index, name: blind.name) }
     }
-    private func set(_ field: String, _ value: String) {
-        Task { try? await controller.client.set(blind: index, field, value); await reload() }
+    private func change(_ what: @escaping (ControllerClient) async throws -> Void) {
+        Task { try? await what(controller.client); await reload() }
     }
 }

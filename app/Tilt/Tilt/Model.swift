@@ -197,7 +197,7 @@ final class AppModel {
         // Two sample scenes, so the demo shows what scenes are for (removed again with the demo room).
         let store = SceneStore.shared
         if store.scenes.isEmpty {
-            let all = (0..<3).map { BlindTarget(controller: Demo.id, blind: $0) }
+            let all = (0..<ControllerLimits.fallback.ports).map { BlindTarget(controller: Demo.id, blind: $0) }      // the demo room has the usual 3 Ports
             store.scenes = [BlindScene(name: "Morning", symbol: "sunrise", tilts: Dictionary(uniqueKeysWithValues: all.map { ($0, 0) })),
                             BlindScene(name: "Movie", symbol: "film", tilts: Dictionary(uniqueKeysWithValues: all.map { ($0, -100) }))]
             store.save()

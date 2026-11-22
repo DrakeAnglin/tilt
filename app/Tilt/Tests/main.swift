@@ -89,9 +89,43 @@ let fake = FakeController(), fc = ControllerClient(transport: fake)
 let ppl = try await fc.people()
 check(ppl.count == 2 && ppl[1].wait == 1 && ppl[1].code == "1234", "people are decoded")
 check((try await fc.revoke(cid: "bb")) == "abc", "remove returns the proof")
-do { try await fc.set("name", "Den"); check(false, "a refusal throws") } catch { check(error.localizedDescription == "Only the owner can do that", "the controller's reason is passed on") }
+do { try await fc.setName("Den"); check(false, "a refusal throws") } catch { check(error.localizedDescription == "Only the owner can do that", "the controller's reason is passed on") }
 try await fc.go(blind: 2, tilt: -40, solo: true)
 check(await fake.sent.last == "/api/go?b=2&t=-40&solo=1", "the client builds the command")
+
+// ---- typed settings: the names firmware web.h hSet knows
+func sentBy(_ what: (ControllerClient) async throws -> Void) async -> String? { try? await what(fc); return await fake.sent.last }
+check(await sentBy { try await $0.setName("Den") } == "/api/set?k=name&v=Den", "name")
+check(await sentBy { try await $0.setCloseUp(false) } == "/api/set?k=closeUp&v=0", "close up")
+check(await sentBy { try await $0.setFollow(true) } == "/api/set?k=sync&v=1", "follow each other")
+check(await sentBy { try await $0.setSameTime(false) } == "/api/set?k=par&v=0", "same time")
+check(await sentBy { try await $0.setHomeSeparate(true) } == "/api/set?k=hksep&v=1", "Home separate")
+check(await sentBy { try await $0.setLocation(latitude: 41.88, longitude: -87.63) } == "/api/set?k=loc&v=41%2E880%2C%2D87%2E630", "location")
+check(await sentBy { try await $0.setTimeZone("CST6CDT,M3.2.0,M11.1.0", name: "America/Chicago") } == "/api/set?k=tz&v=CST6CDT%2CM3%2E2%2E0%2CM11%2E1%2E0&n=America%2FChicago", "time zone")
+check(await sentBy { try await $0.setTuning(.stall, 900) } == "/api/set?k=tune.stall&v=900", "stall tuning")
+check(await sentBy { try await $0.setBlindName(blind: 1, "Left") } == "/api/set?k=b1.name&v=Left", "a blind's name")
+check(await sentBy { try await $0.setHidden(blind: 2, true) } == "/api/set?k=b2.hid&v=1", "hide a blind")
+check(await sentBy { try await $0.setSpeed(blind: 0, 80) } == "/api/set?k=b0.speed&v=80", "a blind's speed")
+check(await sentBy { try await $0.setFavorite(blind: 1, -50) } == "/api/set?k=b1.fav&v=%2D50", "a blind's favorite")
+check(await sentBy { try await $0.setMotorSign(blind: 0, -1) } == "/api/set?k=b0.sign&v=%2D1", "a motor's direction")
+
+// ---- the shared wire fixture (firmware/blinds_matter/test/wire/, made from known firmware state and checked by the
+// firmware's own tests too): the app reads the same /api/cfg and writes the same slot command
+let wireDir = URL(fileURLWithPath: CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "../../firmware/blinds_matter/test/wire")
+let cfgData = try Data(contentsOf: wireDir.appendingPathComponent("cfg.json"))
+let wcfg = try JSONDecoder().decode(ControllerConfig.self, from: cfgData)
+let wsched = try JSONDecoder().decode(SchedConfig.self, from: cfgData)
+check(wcfg.limits == ControllerLimits(ports: 3, slots: 8) && wsched.limits == wcfg.limits, "the limits are read from /api/cfg")
+check(wcfg.name == "Den \"East\"" && wcfg.b.count == wcfg.limits.ports && wcfg.b[2].hid == 1 && wcfg.b[1].fav == -50 && wcfg.par == 0 && wcfg.tzn == "America/Chicago", "the config decodes")
+check(wsched.sched.count == wsched.limits.slots && wsched.sched[2].gid == 4_000_000_000 && wsched.sched[2].off == -15 && wsched.lat == 41.88, "the Schedule slots decode")
+let slotWrite = try String(contentsOf: wireDir.appendingPathComponent("slot_write.txt"), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+check(ControllerClient.scheduleCommand(slot: 2, wsched.sched[2]) == slotWrite, "writing slot 2 back is the fixture's command")
+try await fc.setSchedule(slot: 2, wsched.sched[2])
+check(await fake.sent.last == slotWrite, "the client sends that command")
+let oldCfg = Data(#"{"name":"Den","closeUp":1,"sync":0,"tzn":"","b":[],"sched":[]}"#.utf8)
+check((try? JSONDecoder().decode(ControllerConfig.self, from: oldCfg))?.limits == .fallback && (try? JSONDecoder().decode(SchedConfig.self, from: oldCfg))?.limits == .fallback,
+      "older firmware without limits: 3 Ports and 8 slots")
+check(Schedule.everyPort([("den", 2), ("hall", 3)]).count == 5, "every Port follows each controller's limits")
 
 // ---- Schedules on the controllers' slots (Shared/SchedulePlan.swift)
 func emptySlots() -> [SchedSlot] { Array(repeating: .empty, count: 8) }
@@ -131,6 +165,9 @@ do { _ = try SchedulePlan.writes(wake, slots: ["den": emptySlots()]); check(fals
 catch { check(error == .notRead(controller: "hall"), "the unread controller is named") }
 full["hall"]![5].gid = 42                          // it already holds this Schedule: reuse that slot
 check((try? SchedulePlan.writes(wake, slots: full))?.first { $0.controller == "hall" }?.slot == 5, "the slot already holding it is reused")
+// a controller with 2 Ports: a target on a third Port is left out of its mask
+let twoPorts = try SchedulePlan.writes(wake, slots: ["den": emptySlots(), "hall": emptySlots()], ports: ["den": 2])
+check(twoPorts.first { $0.controller == "den" }?.value.mask == 0b001, "the mask follows the controller's Ports")
 
 // ---- Bluetooth setup (Shared/Bluetooth.swift): the same frames as Frame, and Wi-Fi setup through the client
 final class FakeRadio: @unchecked Sendable {      // a controller in setup mode, answering over Bluetooth

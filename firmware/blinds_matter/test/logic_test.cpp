@@ -1,15 +1,36 @@
-// Tests for main/logic.h, main/home_view.h, main/request.h and main/tilter.h, run on the Mac: tools/firmware_tests.sh. No hardware, no ESP-IDF.
+// Tests for main/logic.h, main/home_view.h, main/request.h, main/tilter.h and main/wire.h, run on the Mac:
+// tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
 #include "../main/home_view.h"
 #include "../main/request.h"
 #include "../main/tilter.h"
+#include "../main/wire.h"
 #include <cstdio>
 #include <ctime>
+#include <fstream>
+#include <map>
+#include <sstream>
 #include <string>
 
 static int passed = 0, failed = 0;
 #define CHECK(cond, what) do { if (cond) passed++; else { failed++; printf("FAIL line %d: %s\n", __LINE__, what); } } while (0)
 static bool near(double a, double b, double tol) { return fabs(a - b) <= tol; }
+static std::string readFile(const char *path) {               // the whole file, without its last newline
+  std::ifstream f(path);
+  std::stringstream ss;
+  ss << f.rdbuf();
+  std::string s = ss.str();
+  while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+  return s;
+}
+
+// The known controller state behind the shared fixture test/wire/cfg.json (the app's tests decode the same file).
+static const WireBlind FIX_B[3] = {{"Left", 0, 100, 0}, {"Middle", 0, 80, -50}, {"Right", 1, 50, 100}};
+static const WireSlot FIX_EMPTY = {0, 127, 0, 480, 0, 0, 0, 0, 0};
+static const WireSlot FIX_S[8] = {{1, 62, 7, 420, 0, 0, 0, 0, 1}, FIX_EMPTY, {1, 127, 5, 480, -100, 2, -15, 10, 4000000000u},
+                                  FIX_EMPTY, FIX_EMPTY, FIX_EMPTY, FIX_EMPTY, FIX_EMPTY};
+static const WireCfg FIX = {"Den \"East\"", 1, 1, 0, 20, "CST6CDT,M3.2.0,M11.1.0", "America/Chicago", 0, FIX_B, 3, FIX_S, 8,
+                            41.88f, -87.63f, 1795351560u, 1795386240u};
 
 // A controller that only writes down what a Move request asked of it.
 struct RecMoves : MoveSeam {
@@ -290,6 +311,26 @@ int main() {
   CHECK(homeBatPercent(0) == 0 && homeBatPercent(37) == 74 && homeBatPercent(100) == 200, "half percents");
   CHECK(homeChargeLevel(9) == 2 && homeChargeLevel(10) == 1, "Critical below 10 %");
   CHECK(homeChargeLevel(19) == 1 && homeChargeLevel(20) == 0, "Low below 20 %");
+
+  // ---- the wire contract: the shared fixture (test/wire/), also checked by the app's tests
+  std::string fixCfg = readFile("wire/cfg.json");
+  CHECK(!fixCfg.empty(), "wire/cfg.json is there");
+  CHECK(cfgJson(FIX) == fixCfg, "/api/cfg matches wire/cfg.json byte for byte");
+  if (cfgJson(FIX) != fixCfg) printf("  got: %s\n", cfgJson(FIX).c_str());
+  std::string write = readFile("wire/slot_write.txt");       // the app's command that writes slot 2 of the fixture
+  std::map<std::string, std::string> q;
+  std::stringstream qs(write.substr(write.find('?') + 1));
+  for (std::string kv; std::getline(qs, kv, '&');) { size_t e = kv.find('='); q[kv.substr(0, e)] = e == std::string::npos ? "" : kv.substr(e + 1); }
+  auto arg = [&](const char *k) { auto it = q.find(k); return it == q.end() ? std::string() : it->second; };
+  WireSlot got = slotOfArgs(arg, 3);
+  const WireSlot &want = FIX_S[2];
+  CHECK(write.rfind("/api/sched?", 0) == 0 && q["i"] == "2", "the slot write is for slot 2");
+  CHECK(got.on == want.on && got.days == want.days && got.mask == want.mask && got.min == want.min && got.tilt == want.tilt &&
+        got.kind == want.kind && got.off == want.off && got.ramp == want.ramp && got.gid == want.gid, "the slot write reads back as slot 2");
+  q["mask"] = "15"; q["tilt"] = "-300"; q["min"] = "2000";
+  got = slotOfArgs(arg, 3);
+  CHECK(got.mask == 7 && got.tilt == -100 && got.min == 1439, "out-of-range values are brought into range (mask to 3 Ports)");
+  CHECK(slotOfArgs(arg, 2).mask == 3, "the mask follows the number of Ports");
 
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;

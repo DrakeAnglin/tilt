@@ -54,7 +54,7 @@ actor Demo: ControllerTransport {
                    "hk": 0, "asks": 0, "me": 1, "gentle": 0, "b": b]
         case Api.config:
             let day = Calendar.current.startOfDay(for: now).timeIntervalSince1970
-            out = ["name": name, "closeUp": closeUp, "sync": sync, "par": par, "tzn": TimeZone.current.identifier, "hksep": hksep,
+            out = ["name": name, "ports": blinds.count, "slots": slots.count, "closeUp": closeUp, "sync": sync, "par": par, "tzn": TimeZone.current.identifier, "hksep": hksep,
                    "b": blinds.map { ["name": $0.name, "hid": $0.hidden ? 1 : 0, "speed": 100, "fav": 0] },
                    "sched": slots, "sun": [day + 7 * 3600, day + 17.5 * 3600]]
         case Api.keys:

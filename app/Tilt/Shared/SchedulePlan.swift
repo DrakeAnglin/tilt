@@ -27,9 +27,9 @@ struct Schedule: Identifiable, Equatable {
         switch days { case 127: return "Every day"; case 62: return "Weekdays"; case 65: return "Weekends"; case 0: return "Never"
         default: return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated().filter { days >> $0.offset & 1 == 1 }.map(\.element).joined(separator: " ") }
     }
-    /// Every port of these controllers: a Schedule for "all blinds" also covers a blind that is plugged in later.
-    static func everyPort(_ controllers: [String]) -> Set<BlindTarget> {
-        Set(controllers.flatMap { c in (0..<SchedulePlan.ports).map { BlindTarget(controller: c, blind: $0) } })
+    /// Every Port of these controllers: a Schedule for "all blinds" also covers a blind that is plugged in later.
+    static func everyPort(_ controllers: [(id: String, ports: Int)]) -> Set<BlindTarget> {
+        Set(controllers.flatMap { c in (0..<c.ports).map { BlindTarget(controller: c.id, blind: $0) } })
     }
     static func clock(_ m: Int) -> String {
         var c = DateComponents(); c.hour = m / 60; c.minute = m % 60
@@ -47,8 +47,6 @@ enum PlanProblem: Error, Equatable {
 }
 
 enum SchedulePlan {
-    static let ports = 3
-
     /// The id for a slot written before Schedules had ids (gid 0). The same on every launch.
     static func legacyId(controller: String, slot: Int) -> UInt32 {
         var h: UInt32 = 2166136261                       // FNV-1a, 32 bits
@@ -66,7 +64,8 @@ enum SchedulePlan {
             for (i, sl) in slots.enumerated() where sl.mask != 0 {
                 let id = id(of: sl, controller: c, index: i)
                 var s = found[id] ?? Schedule(id: id, on: sl.on == 1, days: sl.days, kind: sl.kind, minute: sl.min, offset: sl.off, tilt: sl.tilt, ramp: sl.ramp)
-                for b in 0..<ports where sl.mask >> b & 1 == 1 { s.targets.insert(BlindTarget(controller: c, blind: b)) }
+                var m = sl.mask                          // bit n = Port n (the controller keeps only its own Ports' bits)
+                while m != 0 { s.targets.insert(BlindTarget(controller: c, blind: m.trailingZeroBitCount)); m &= m - 1 }
                 found[id] = s
             }
         }
@@ -74,14 +73,16 @@ enum SchedulePlan {
     }
 
     /// The slot writes that save (or delete) a Schedule: one slot on each controller it covers, the slot that
-    /// already holds it if there is one, and clears for any other slot holding it.
-    static func writes(_ s: Schedule, delete: Bool = false, slots: [String: [SchedSlot]]) throws(PlanProblem) -> [SlotWrite] {
+    /// already holds it if there is one, and clears for any other slot holding it. `ports`: each controller's number of
+    /// Ports (ControllerLimits); a controller not in it has the fallback.
+    static func writes(_ s: Schedule, delete: Bool = false, slots: [String: [SchedSlot]], ports: [String: Int] = [:]) throws(PlanProblem) -> [SlotWrite] {
         for t in s.targets where !delete && slots[t.controller] == nil { throw .notRead(controller: t.controller) }
         var out: [SlotWrite] = []
         for c in slots.keys.sorted() {
             let mine = slots[c]!
             var mask = 0
-            if !delete { for t in s.targets where t.controller == c && t.blind < ports { mask |= 1 << t.blind } }
+            let n = ports[c] ?? ControllerLimits.fallback.ports
+            if !delete { for t in s.targets where t.controller == c && t.blind < n { mask |= 1 << t.blind } }
             let holding = mine.indices.filter { mine[$0].mask != 0 && id(of: mine[$0], controller: c, index: $0) == s.id }
             var clears = holding
             if mask != 0 {

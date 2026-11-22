@@ -14,6 +14,7 @@
 #include "motion.h"
 #include "sec.h"
 #include "fwkey.h"
+#include "wire.h"
 #include <mbedtls/sha256.h>
 #include <mbedtls/ecdsa.h>
 #ifdef TILT_RELEASE
@@ -40,29 +41,7 @@ bool timeValid() { return time(nullptr) > 1700000000; }
 
 #include "schedules.h"
 
-// ---- small helpers
-void ap(std::string &j, const char *fmt, ...) {
-  char b[256];
-  va_list a;
-  va_start(a, fmt);
-  vsnprintf(b, sizeof b, fmt, a);
-  va_end(a);
-  j += b;
-}
-std::string jq(const char *s) {
-  std::string o = "\"";
-  for (; *s; s++) {
-    if (*s == '"' || *s == '\\') { o += '\\'; o += *s; }
-    else if ((unsigned char)*s >= 32) o += *s;
-  }
-  return o + "\"";
-}
-std::string jn(float v, int dp) {
-  if (isnan(v)) return "null";
-  char b[24];
-  snprintf(b, sizeof b, "%.*f", dp, v);
-  return b;
-}
+// ---- small helpers (ap, jq, jn: wire.h)
 std::string arg(httpd_req_t *r, const char *key) {       // a value from the address's ?a=b&c=d part, decoded
   char q[600], v[300];
   if (secQuery) { if (httpd_query_key_value(secQuery, key, v, sizeof v) != ESP_OK) return ""; }      // a secured command
@@ -172,13 +151,13 @@ esp_err_t hDev(httpd_req_t *r) {
 }
 esp_err_t hCfg(httpd_req_t *r) {
   Lock l;
-  std::string j;
-  ap(j, "{\"name\":%s,\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"battMode\":1,\"checkin\":0,\"tx\":%d,\"tz\":%s,\"tzn\":%s,\"hksep\":%d,\"b\":[", jq(cfg.name).c_str(), cfg.closeUp, syncMode, parMode, cfg.txPower, jq(cfg.tz).c_str(), jq(cfg.tzName).c_str(), hkSeparate);
-  for (int i = 0; i < PORTS; i++) ap(j, "%s{\"name\":%s,\"hid\":%d,\"speed\":%d,\"fav\":%d}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, cfg.b[i].speed, cfg.b[i].fav);
-  j += "],\"sched\":[";
-  for (int i = 0; i < SCHEDS; i++) ap(j, "%s{\"on\":%d,\"days\":%d,\"mask\":%d,\"min\":%d,\"tilt\":%d,\"kind\":%d,\"off\":%d,\"ramp\":%d,\"gid\":%lu}", i ? "," : "", cfg.sched[i].on, cfg.sched[i].days, cfg.sched[i].mask, cfg.sched[i].minute, cfg.sched[i].tilt, sx.x[i].kind, sx.x[i].off, sx.x[i].ramp, (unsigned long)sx.x[i].gid);
-  ap(j, "],\"lat\":%s,\"lon\":%s,\"sun\":[%lu,%lu]}", jn(sx.lat, 3).c_str(), jn(sx.lon, 3).c_str(), (unsigned long)sunEvent(time(nullptr), true), (unsigned long)sunEvent(time(nullptr), false));
-  return sendJson(r, j);
+  WireBlind b[PORTS];
+  WireSlot sl[SCHEDS];
+  for (int i = 0; i < PORTS; i++) b[i] = {cfg.b[i].name, cfg.b[i].hidden, cfg.b[i].speed, cfg.b[i].fav};
+  for (int i = 0; i < SCHEDS; i++) { const Sched &s = cfg.sched[i]; sl[i] = {s.on, s.days, s.mask, s.minute, s.tilt, sx.x[i].kind, sx.x[i].off, sx.x[i].ramp, sx.x[i].gid}; }
+  time_t now = time(nullptr);
+  WireCfg c = {cfg.name, cfg.closeUp, syncMode, parMode, cfg.txPower, cfg.tz, cfg.tzName, hkSeparate, b, PORTS, sl, SCHEDS, sx.lat, sx.lon, sunEvent(now, true), sunEvent(now, false)};
+  return sendJson(r, cfgJson(c));
 }
 esp_err_t hLog(httpd_req_t *r) {
   Lock l;
@@ -238,16 +217,10 @@ esp_err_t hSched(httpd_req_t *r) {
   Lock l;
   int i = argi(r, "i");
   if (i < 0 || i >= SCHEDS) return fail(r, "no such schedule");
+  WireSlot w = slotOfArgs([&](const char *k) { return arg(r, k); }, PORTS);
   Sched &s = cfg.sched[i];
-  s.on = argi(r, "on") ? 1 : 0;
-  s.days = argi(r, "days") & 0x7F;
-  s.mask = argi(r, "mask") & 0x07;
-  s.minute = constrain(argi(r, "min"), 0, 1439);
-  s.tilt = constrain(argi(r, "tilt"), -100, 100);
-  sx.x[i].kind = constrain(argi(r, "kind"), 0, 2);
-  sx.x[i].off = constrain(argi(r, "off"), -180, 180);
-  sx.x[i].ramp = constrain(argi(r, "ramp"), 0, 60);
-  sx.x[i].gid = strtoul(arg(r, "gid").c_str(), nullptr, 10);
+  s.on = w.on; s.days = w.days; s.mask = w.mask; s.minute = w.min; s.tilt = w.tilt;
+  sx.x[i] = {(uint8_t)w.kind, (uint8_t)w.ramp, (int16_t)w.off, w.gid};
   sxSave();
   cfgSave();
   lastSched = time(nullptr);
