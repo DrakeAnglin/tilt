@@ -12,10 +12,13 @@ import json
 import os
 import re
 import shutil
-import struct
 import subprocess
+import sys
 import tempfile
 import zipfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from orient import PARTS, copies, read  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRINT = os.path.join(REPO, 'hardware/mechanical/stl/tilter/print')
@@ -32,23 +35,27 @@ TWEAKS = {'filament_colour': ['#FFFFFF', '#FFFFFF'], 'wall_loops': '4', 'sparse_
           'filament_map': ['1', '2'], 'curr_bed_type': 'Textured PEI Plate',
           'enable_support': '1', 'support_type': 'tree(auto)', 'support_on_build_plate_only': '0',
           'support_threshold_angle': '30'}
-PETG = {'carrier', 'cluster', 'sensor_sleeve', 'magnet_gear'}
+PETG = {n for n, p in PARTS.items() if p[1] == 'PETG'}
 PLATE_STEP = 420.0                 # Bambu Studio lays plates out 1.2 bed widths apart (H2D bed: 350 mm)
-ROWS_PLA = [['case_right', 'case_left', 'bearing_shell', 'motor_shell', 'tray', 'tray_lid'],
-            ['ring_cup', 'sun_27t', 'worm_wheel', 'worm', 'motor_pinion', 'planet', 'planet_2', 'planet_3', 'planet_4']]
-ROWS_PETG = [['carrier', 'cluster', 'sensor_sleeve', 'magnet_gear']]
 GAP, BED = 7.0, (175.0, 160.0)
 LAYOUT = {}
 
 
+def rows(material):
+    """The plate's rows for one material (from orient.PARTS), each row a list of printed file names."""
+    out = []
+    for name, (_, mat, row, _, _) in PARTS.items():
+        if mat == material:
+            out += [[] for _ in range(row + 1 - len(out))]
+            out[row] += copies(name)
+    return out
+
+
 def size(name):
-    b = open(os.path.join(PRINT, name + '.stl'), 'rb').read()
-    n = struct.unpack('<I', b[80:84])[0]
-    xs, ys = [], []
-    for i in range(n):
-        t = struct.unpack('<12f', b[84 + 50 * i:84 + 50 * i + 48])
-        xs += [t[3], t[6], t[9]]
-        ys += [t[4], t[7], t[10]]
+    """Footprint (x, y) of a print-oriented STL."""
+    tris = read(os.path.join(PRINT, name + '.stl'))
+    xs = [t[j] for t in tris for j in (3, 6, 9)]
+    ys = [t[j] for t in tris for j in (4, 7, 10)]
     return max(xs) - min(xs), max(ys) - min(ys)
 
 
@@ -79,10 +86,7 @@ def flatten(kind, name):
 
 def main(only=None, out=OUT):
     """only=None: one project, two plates. only='PLA' / 'PETG': a one-plate project with just that material's parts."""
-    if isinstance(only, (set, list, tuple)):               # a one-plate project with just the named parts
-        names = [n for n in LAYOUT if n in only]
-    else:
-        names = [n for n in LAYOUT if only is None or (n in PETG) == (only == 'PETG')]
+    names = [n for n in LAYOUT if only is None or (n in PETG) == (only == 'PETG')]
     tmp = tempfile.mkdtemp()
     files = []
     for n, (kind, name) in enumerate(PRESETS):
@@ -115,16 +119,16 @@ def main(only=None, out=OUT):
 
     def material(m):
         return m.group(1) + ('2' if m.group(2) in PETG else '1') + '"/>'
-    cfg = re.sub(r'(<metadata key="name" value="([^"]+)\.stl"/>\s*<metadata key="extruder" value=")\d+"/>', material, cfg, )
+    cfg = re.sub(r'(<metadata key="name" value="([^"]+)\.stl"/>\s*<metadata key="extruder" value=")\d+"/>', material, cfg)
     # split the single plate into two: PLA parts stay on plate 1, PETG parts go to a new plate 2
     plate = re.search(r'  <plate>.*?  </plate>\n', cfg, re.S).group(0) if only is None else None
     if plate:
         head = plate[:plate.index('    <model_instance>')]
         inst = re.findall(r'    <model_instance>.*?    </model_instance>\n', plate, re.S)
-        def on(n, petg):
+        def on(petg):
             return ''.join(i for i in inst if (part_of[re.search(r'object_id" value="(\d+)"', i).group(1)] in PETG) == petg)
-        p1 = head + on(1, False) + '  </plate>\n'
-        p2 = (head.replace('plater_id" value="1"', 'plater_id" value="2"').replace('_1.png', '_2.png')) + on(2, True) + '  </plate>\n'
+        p1 = head + on(False) + '  </plate>\n'
+        p2 = (head.replace('plater_id" value="1"', 'plater_id" value="2"').replace('_1.png', '_2.png')) + on(True) + '  </plate>\n'
         p1 = p1.replace('plater_name" value=""', 'plater_name" value="PLA housing"')
         p2 = p2.replace('plater_name" value=""', 'plater_name" value="PETG sensor gears"')
         cfg = cfg.replace(plate, p1 + p2)
@@ -150,8 +154,8 @@ def main(only=None, out=OUT):
 
 
 if __name__ == '__main__':
-    LAYOUT.update(pack(ROWS_PLA))
-    LAYOUT.update(pack(ROWS_PETG))
+    LAYOUT.update(pack(rows('PLA')))
+    LAYOUT.update(pack(rows('PETG')))
     main(None, OUT)
     main('PLA', OUT.replace('PLA_PETG', 'PLA_only'))
     main('PETG', OUT.replace('PLA_PETG', 'PETG_only'))

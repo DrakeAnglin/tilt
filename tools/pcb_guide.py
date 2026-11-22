@@ -26,8 +26,10 @@ CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
 S = 9.0                              # px per mm
 MX, MY = 60, 70                      # margins
-BW, BL = 47.0, 125.0                 # board: 47 across the jack strip (x), 125 long (y)
-W, HGT = int(MX * 2 + BL * S + 40), int(MY + BW * S + 60)
+# v2.1 outline (47 across the jack strip, 125 long, jack edge at y = 0): this guide is for the hand-trimmed v2.1 boards,
+# while board.py now builds v2.2 with the jack edge already 3.5 mm in (TRIM)
+V21_W, V21_L, V21_BODY_W, V21_BAR_D = 47.0, 125.0, 27.0, 47.0
+W, HGT = int(MX * 2 + V21_L * S + 40), int(MY + V21_W * S + 60)
 mm = pcbnew.ToMM
 
 board = pcbnew.LoadBoard(PCB)
@@ -37,7 +39,7 @@ NOTE = {ref: (val, note) for ref, val, _, _, note in N.PARTS}
 
 def V(x, y):
     """Board mm (x across, y along, y down) -> picture px: turned 90 deg so end A is on the left (top view, not mirrored)."""
-    return MX + y * S, MY + (BW - x) * S
+    return MX + y * S, MY + (V21_W - x) * S
 
 
 def pt(p):
@@ -45,7 +47,7 @@ def pt(p):
 
 
 # ------------------------------------------------------------------ the steps (lowest parts first)
-PORT_R = {k: ('R%d' % (9 + 4 * (k - 1)), 'R%d' % (10 + 4 * (k - 1)), 'R%d' % (11 + 4 * (k - 1)), 'R%d' % (8 + 4 * (k - 1)))
+PORT_R = {k: tuple(N.PORT_R[k][sig] for sig in ('IN2', 'EN', 'PD', 'IN1'))
           for k in (1, 2, 3)}       # behind each jack, left to right on the board: IN2 220, EN 10, pull-down 100k, IN1 220
 STEPS = [
     ('Resistors, power and angle filters', ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'], '#e8a33a'),
@@ -66,8 +68,6 @@ BANDS = {'1M': ('brown black green gold', 'brown black black yellow brown'),
          '220': ('red red brown gold', 'red red black black brown'),
          '10': ('brown black black gold', 'brown black black gold brown'),
          '100k': ('brown black yellow gold', 'brown black black orange brown')}
-SILK = {'1M': '1M', '1k': '1k', '100nF': '100n', '10uF': '10u', '1N5819': '1N5819', '1N5920B 6.2V 3W': '6V2 3W Z',
-        '220': '220', '10': '10', '100k': '100k', '470uF 10V': '470u', '0.75A PTC': 'PTC'}
 
 
 def fab_items(fp):
@@ -149,7 +149,7 @@ def text(x, y, s, size=11, col='#222', weight='normal', anchor='middle', rot=0, 
 def base():
     o = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" font-family="Helvetica,Arial">' % (W, HGT),
          '<rect width="100%" height="100%" fill="#fff"/>']
-    pts = [(0, 0), (BW, 0), (BW, 47.0), (27.0, 47.0), (27.0, BL), (0, BL)]
+    pts = [(0, 0), (V21_W, 0), (V21_W, V21_BAR_D), (V21_BODY_W, V21_BAR_D), (V21_BODY_W, V21_L), (0, V21_L)]
     o.append('<polygon points="%s" fill="#2f6b3a" stroke="#1d4426" stroke-width="2"/>' % ' '.join('%.1f,%.1f' % V(x, y) for x, y in pts))
     # silkscreen: the board's own lines and words, faint, so the picture looks like the board
     for d in board.GetDrawings():
@@ -166,14 +166,14 @@ def base():
             if isinstance(g, pcbnew.PCB_SHAPE) and g.GetLayer() == pcbnew.F_SilkS:
                 o.append(shape_svg(g, '#cfdccf', 1.0))
     # the trim band at the jack edge (step 0): 3-4 mm comes off for the V5 box
-    (tx0, ty0), (tx1, ty1) = V(BW, 0), V(0, 4.0)
+    (tx0, ty0), (tx1, ty1) = V(V21_W, 0), V(0, 4.0)
     o.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#d62728" opacity="0.25"/>' % (tx0, ty0, tx1 - tx0, ty1 - ty0))
     for yy in (3.0, 4.0):
-        (lx0, ly0), (lx1, ly1) = V(BW, yy), V(0, yy)
+        (lx0, ly0), (lx1, ly1) = V(V21_W, yy), V(0, yy)
         o.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#d62728" stroke-width="1.2" stroke-dasharray="5 3"/>' % (lx0, ly0, lx1, ly1))
     o.append(text(tx0 + 18, ty0 - 6, 'trim 3–4 mm', 11, '#d62728', 'bold', halo=False))
-    o.append(text(MX - 10, MY + BW * S / 2, 'END A: ports', 13, '#333', 'bold', rot=-90, halo=False))
-    o.append(text(MX + BL * S + 24, MY + (BW - 13.5) * S, 'END B: USB-C', 13, '#333', 'bold', rot=-90, halo=False))
+    o.append(text(MX - 10, MY + V21_W * S / 2, 'END A: ports', 13, '#333', 'bold', rot=-90, halo=False))
+    o.append(text(MX + V21_L * S + 24, MY + (V21_W - 13.5) * S, 'END B: USB-C', 13, '#333', 'bold', rot=-90, halo=False))
     return o
 
 
@@ -199,7 +199,7 @@ def draw_part(o, ref, mode, col):
 def label(o, ref, step_idx):
     fp = FPS[ref]
     x, y, w, h = bbox(fp)
-    val = SILK.get(fp.GetValue(), '')
+    val = N.SHORT.get(fp.GetValue(), '')
     cx, cy = x + w / 2, y + h / 2
     if ref.startswith('R') and step_idx == 1:            # the jack resistors are thin and close: ref above, value inside
         o.append(text(cx, cy + 4, '%s  %s' % (ref, val), 10, '#000', 'bold'))

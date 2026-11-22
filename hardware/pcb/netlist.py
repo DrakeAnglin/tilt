@@ -8,7 +8,7 @@ one; the three RJ12 jacks sit on the board edge. All parts through-hole, hand-so
 
 v2 (after review): per-port 0.75 A PTC on battery +, 220 ohm series resistors on IN1 / IN2 (10 ohm on EN, which also
 powers the AS5600), 100 k pull-downs on EN, charger header pinned so a misplaced battery plug can't short,
-470 uF bulk on battery +, 5 W zener, 100 nF on the input-power divider, test pads, a 3V3 test point.
+470 uF bulk on battery +, 3 W zener (1N5920B), 100 nF on the input-power divider, test pads, a 3V3 test point.
 
 Pin plan (ESP turned so its USB faces away from the ports; each port's pins are on its own side):
   port 1: IN1 GPIO14, IN2 GPIO18, EN GPIO7, angle GPIO6
@@ -16,7 +16,13 @@ Pin plan (ESP turned so its USB faces away from the ports; each port's pins are 
   port 3: IN1 GPIO16 (TX), IN2 GPIO17 (RX), EN GPIO1, angle GPIO2
   battery voltage GPIO3 (1 M / 1 M + 100 n), input-power voltage GPIO0 (1 M / 1 M + 100 n)
 RJ12 pinout (both ends, straight cord): 1 battery +, 2 IN1, 3 GND, 4 angle, 5 EN, 6 IN2.
+
+  python3 hardware/pcb/netlist.py           # list the nets
+  python3 hardware/pcb/netlist.py --check   # compare the ESP pins with the firmware's config.h
 """
+import os
+import re
+import sys
 
 # footprints from the KiCad standard libraries
 FP = {
@@ -73,6 +79,8 @@ PARTS = [
     ('TP3', '3V3', 'TP', {1: '+3V3'}, 'test pad'), ('TP4', 'PWR', 'TP', {1: 'PWR'}, 'test pad'),
     ('TP5', 'GND', 'TP', {1: 'GND'}, 'test pad'),
 ]
+# the four resistors behind each port's jack: IN1 series, IN2 series, EN series, EN pull-down
+PORT_R = {k: {sig: 'R%d' % (8 + i + 4 * (k - 1)) for i, sig in enumerate(('IN1', 'IN2', 'EN', 'PD'))} for k in (1, 2, 3)}
 for k in (1, 2, 3):
     PARTS += [
         ('J%d' % (8 + k), 'RJ12 port %d' % k, 'RJ12',
@@ -80,13 +88,18 @@ for k in (1, 2, 3):
         ('F%d' % k, '0.75A PTC', 'PTC', {1: 'VBAT', 2: 'P%d_VBAT' % k}, 'resettable fuse, port %d battery +' % k),
         ('R%d' % (4 + k), '1k', 'R', {1: 'P%d_ANG' % k, 2: 'P%d_ADC' % k}, 'angle filter'),
         ('C%d' % (2 + k), '100nF', 'C', {1: 'P%d_ADC' % k, 2: 'GND'}, 'angle filter'),
-        ('R%d' % (8 + 4 * (k - 1)), '220', 'R', {1: 'P%d_IN1' % k, 2: 'P%d_IN1_E' % k}, 'series, port %d IN1' % k),
-        ('R%d' % (9 + 4 * (k - 1)), '220', 'R', {1: 'P%d_IN2' % k, 2: 'P%d_IN2_E' % k}, 'series, port %d IN2' % k),
+        (PORT_R[k]['IN1'], '220', 'R', {1: 'P%d_IN1' % k, 2: 'P%d_IN1_E' % k}, 'series, port %d IN1' % k),
+        (PORT_R[k]['IN2'], '220', 'R', {1: 'P%d_IN2' % k, 2: 'P%d_IN2_E' % k}, 'series, port %d IN2' % k),
         # EN also powers the tilter's AS5600 (~6.5 mA): only 10 ohm here, or the sensor's supply would sag
-        ('R%d' % (10 + 4 * (k - 1)), '10', 'R', {1: 'P%d_EN' % k, 2: 'P%d_EN_E' % k}, 'series, port %d EN' % k),
-        ('R%d' % (11 + 4 * (k - 1)), '100k', 'R', {1: 'P%d_EN' % k, 2: 'GND'}, 'pull-down, port %d EN' % k),
+        (PORT_R[k]['EN'], '10', 'R', {1: 'P%d_EN' % k, 2: 'P%d_EN_E' % k}, 'series, port %d EN' % k),
+        (PORT_R[k]['PD'], '100k', 'R', {1: 'P%d_EN' % k, 2: 'GND'}, 'pull-down, port %d EN' % k),
     ]
 PARTS += [('H%d' % k, 'M3', 'HOLE', {}, 'mounting hole') for k in (1, 2, 3)]
+
+# short part values for the silkscreen and the build guide
+SHORT = {'1M': '1M', '1k': '1k', '100nF': '100n', '10uF': '10u', '1N5819': '1N5819', '1N5920B 6.2V 3W': '6V2 3W Z',
+         '220': '220', '10': '10', '100k': '100k', '470uF 10V': '470u', '0.75A PTC': 'PTC'}
+CONFIG_H = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../firmware/blinds_matter/main/config.h')
 
 
 def nets():
@@ -98,6 +111,30 @@ def nets():
     return out
 
 
+def check(path=CONFIG_H):
+    """Mismatches between the firmware's pin numbers (config.h, read only) and the ESP pins in ESP_NET."""
+    with open(path) as f:
+        src = f.read()
+    gpio = {net: int(pin[4:]) for pin, net in ESP_NET.items() if pin.startswith('GPIO')}
+    want = {'P_IN1': 'P%d_IN1_E', 'P_IN2': 'P%d_IN2_E', 'P_EN': 'P%d_EN_E', 'P_ANG': 'P%d_ADC',
+            'PIN_VBAT': 'VDIV', 'PIN_VIN': 'PSENSE'}
+    bad = []
+    for name, net in want.items():
+        m = re.search(r'\b%s(?:\[\w*\])?\s*=\s*(\{[^}]*\}|\d+)' % name, src)
+        if not m:
+            bad.append('%s: not found in config.h' % name)
+            continue
+        fw = [int(v) for v in re.findall(r'\d+', m.group(1))]
+        board = [gpio.get(net % k) for k in (1, 2, 3)] if '%d' in net else [gpio.get(net)]
+        if fw != board:
+            bad.append('%s: config.h %s, netlist %s' % (name, fw, board))
+    return bad
+
+
 if __name__ == '__main__':
+    if '--check' in sys.argv:
+        bad = check()
+        print('\n'.join(bad) or 'ESP pins match config.h')
+        sys.exit(1 if bad else 0)
     for net, conns in sorted(nets().items()):
         print('%-10s %s' % (net, ' '.join('%s.%s' % c for c in conns)))

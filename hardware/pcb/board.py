@@ -64,9 +64,8 @@ PLACE = {
 for _k, _ox in enumerate(JACK_X):
     PLACE['F%d' % (_k + 1)] = (_ox - 7.4, 22.6, 0)                     # PTC behind each jack
     # behind each jack, left to right: IN2 series, EN series, EN pull-down, IN1 series (all standing in a row, pad 1 up)
-    r_in1, r_in2, r_en, r_pd = 8 + 4 * _k, 9 + 4 * _k, 10 + 4 * _k, 11 + 4 * _k
-    for _ref, _dx in ((r_in2, -8.6), (r_en, -5.4), (r_pd, -2.2), (r_in1, 1.0)):
-        PLACE['R%d' % _ref] = (_ox + _dx, 28.0, 270)
+    for _sig, _dx in (('IN2', -8.6), ('EN', -5.4), ('PD', -2.2), ('IN1', 1.0)):
+        PLACE[N.PORT_R[_k + 1][_sig]] = (_ox + _dx, 28.0, 270)
 
 
 def outline(board):
@@ -124,8 +123,6 @@ def build():
     return board
 
 
-SHORT = {'1M': '1M', '1k': '1k', '100nF': '100n', '10uF': '10u', '1N5819': '1N5819', '1N5920B 6.2V 3W': '6V2 3W Z',
-         '220': '220', '10': '10', '100k': '100k', '470uF 10V': '470u', '0.75A PTC': 'PTC'}
 LABELS = [  # (text, x, y, size, angle): connector names and orientation marks on the top silkscreen
     ('PORT 1', 3.0, 20.4, 0.9, 0), ('PORT 2', 18.5, 20.4, 0.9, 0), ('PORT 3', 34.0, 20.4, 0.9, 0),
     ('ESP32-C6: chip up, USB this way', 13.1, 75.6, 0.8, 0),
@@ -150,7 +147,7 @@ def silk(board):
         if ref[0] in 'RCDF':
             val = pcbnew.PCB_TEXT(board)
             board.Add(val)
-            val.SetText(SHORT.get(fp.GetValue(), fp.GetValue()))
+            val.SetText(N.SHORT.get(fp.GetValue(), fp.GetValue()))
             val.SetLayer(pcbnew.F_SilkS)
             val.SetTextSize(pcbnew.VECTOR2I(MM(0.8), MM(0.8)))
             val.SetTextThickness(MM(0.13))
