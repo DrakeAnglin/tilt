@@ -52,8 +52,7 @@ class GearTrain(unittest.TestCase):
 
 class RodBores(unittest.TestCase):
     def test_square_bores_fit_the_rod(self):
-        self.assertGreater(FIT.ROD + FIT.ROD_CLEAR, FIT.ROD)                    # carrier's hub
-        self.assertGreater(FIT.ROD_SOCK_SLEEVE, FIT.ROD)                       # sensor sleeve
+        self.assertGreater(FIT.ROD_BORE, FIT.ROD)                                 # every square bore
 
     def test_round_bores_clear_a_turning_rod(self):
         for r in (FIT.ROD_HOLE_R, g['sun_bore'], g['nose_r'], g['wheel_bore_hub'], GG.P['barrel_r']):
@@ -61,11 +60,11 @@ class RodBores(unittest.TestCase):
 
     def test_sleeve_runs_inside_the_sun(self):
         self.assertGreater(g['sun_bore'], g['nose_r'])
-        self.assertGreater(g['nose_r'], FIT.ROD_SOCK_SLEEVE * math.sqrt(2) / 2)   # wall round the square bore
+        self.assertGreater(g['nose_r'], FIT.ROD_BORE * math.sqrt(2) / 2)   # wall round the square bore
 
     def test_carrier_hub_inside_the_wheel(self):
         self.assertGreater(g['wheel_bore_hub'], g['hub_r'])
-        self.assertGreater(g['hub_r'], (FIT.ROD + FIT.ROD_CLEAR) * math.sqrt(2) / 2)
+        self.assertGreater(g['hub_r'], FIT.ROD_BORE * math.sqrt(2) / 2)
 
 
 class Worm(unittest.TestCase):
@@ -110,7 +109,8 @@ class Fits(unittest.TestCase):
     def test_inserts(self):
         self.assertGreater(FIT.INSERT_R, FIT.M3_R)
         for n in (FIT.INSERT_LEN, FIT.INSERT_LEN_TILTER):
-            self.assertTrue(5.0 < n < 8.0)
+            self.assertGreaterEqual(n, FIT.INSERT_LEN_MIN)                     # the inserts need 6.7 at least
+            self.assertLess(n, 8.0)
 
     def test_rod_inside_the_rail(self):
         self.assertLess(FIT.ROD_Z + FIT.ROD_CORNER_R, FIT.RAIL_H - FIT.LIP_H)

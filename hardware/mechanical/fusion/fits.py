@@ -11,15 +11,15 @@ LIP_IN, LIP_H = 4.5, 3.0                        # the lips along the rail's top:
 ROD_Z = 24.0                                    # tilt rod's axis above the rail floor
 ROD = 4.0                                       # square tilt rod
 ROD_CORNER_R = ROD * math.sqrt(2) / 2           # half its diagonal (2.83): what a turning rod sweeps
-ROD_CLEAR = 0.25                                # square bore = ROD + ROD_CLEAR (the carrier's hub)
-ROD_SOCK_SLEEVE = 4.3                           # the sensor sleeve's square bore: 0.05 looser than ROD + ROD_CLEAR
+ROD_BORE = 4.3                                  # every square bore the rod slides through (carrier hub, sensor sleeve)
 ROD_HOLE_R = 3.2                                # round hole a long rod passes through (clears its corners)
 
 # ---- M3 bolts and heat-set inserts
 M3_R = 1.7                                      # clearance hole (Ø3.4)
 INSERT_R = 2.0                                  # heat-set insert hole (Ø4.0)
+INSERT_LEN_MIN = 6.7                            # the bought M3 inserts need a hole at least this deep
 INSERT_LEN = 6.7                                # insert hole depth: Controller
-INSERT_LEN_TILTER = 6.9                         # Tilter: differs from 6.7, check which inserts are bought
+INSERT_LEN_TILTER = 6.9                         # Tilter: 0.2 deeper than the minimum (room for melted plastic)
 CSINK_R, CSINK_H = 3.4, 1.7                     # Tilter: 90° countersink Ø6.8, 1.7 deep (a Ø6 head sits 0.4 under)
 CSINK_CTRL_R, CSINK_CTRL_R_TOP, CSINK_CTRL_H = 3.1, 1.45, 1.65   # Controller: cone Ø6.2 -> Ø2.9 over 1.65 (differs)
 

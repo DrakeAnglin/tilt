@@ -95,7 +95,7 @@ def make_parts(S):
     out['Ring cup'] = cup
     # carrier: disc + long hub (inside the wheel's bore) with the square bore, 4 dowel pockets
     car = S.U(S.cyl(ROD, g['disc_r'], X['disc0'], X['disc1']), S.cyl(ROD, g['hub_r'], X['disc0'], g['hub_end_x']))
-    h = (FIT.ROD + FIT.ROD_CLEAR) / 2
+    h = FIT.ROD_BORE / 2
     S.D(car, S.box(g['hub_end_x'] + 1, X['disc1'] - 1, -h, h, RZ - h, RZ + h))
     for pc in planet_centers():
         S.D(car, S.cyl(pc, g['pin_d'] / 2 - g['pin_press'], X['disc1'] - 1, X['disc1'] + g['pin_pocket']))
@@ -541,7 +541,7 @@ def rod_gear(S):
     lugs = S.cyl(ROD, nr, xn - 0.5, xl)
     S.tbm.booleanOperation(lugs, S.U(S.box(xn, xl + 1, -lw, lw, RZ - 5, RZ + 5), S.box(xn, xl + 1, -5, 5, RZ - lw, RZ + lw)), B.IntersectionBooleanType)
     S.U(b, lugs)
-    k = FIT.ROD_SOCK_SLEEVE / 2
+    k = FIT.ROD_BORE / 2
     S.D(b, S.box(xl + 1, XGR - 1, -k, k, RZ - k, RZ + k))  # the rod's bore, plain at both ends
     return b
 
