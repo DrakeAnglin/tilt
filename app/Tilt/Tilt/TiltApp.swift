@@ -9,6 +9,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {}
+    /// Info.plist allows every orientation (Apple requires that for iPad multitasking). A screen with room turns
+    /// freely (iPad, a Duo opened flat); an ordinary iPhone screen is too short for the app in landscape, so it stays
+    /// upright.
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        let screen = window?.windowScene?.screen.bounds.size ?? .zero
+        return min(screen.width, screen.height) >= 600 ? .all : .portrait
+    }
 }
 
 @main
