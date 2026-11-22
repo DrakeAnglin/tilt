@@ -16,6 +16,7 @@ const float EN_DROP_V = 0.26f;
 
 // ---- power
 const float VIN_ON = 3.8f, VIN_OFF = 3.3f;      // input power present (USB or strong sun) / gone. USB reads ~4.3 V here.
+const float VBAT_CUTOFF = 3.35f;                // motor cut-off: no moves below this (resting) unless charging
 
 // ---- network
 #ifdef TILT_RELEASE

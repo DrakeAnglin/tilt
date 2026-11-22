@@ -200,10 +200,11 @@ int main() {
   CHECK(!movableRule(true, true, true, true), "hidden: not movable");
   CHECK(!movableRule(false, false, true, true), "not set up: not movable");
   CHECK(!movableRule(false, true, true, false), "tilter missing: not movable");
-  CHECK(!cannotMoveWhy(true, true, true), "can move");
-  CHECK(!strcmp(cannotMoveWhy(false, true, false), "not set up yet"), "set up is checked first");
-  CHECK(!strcmp(cannotMoveWhy(true, true, false), "no tilter plugged in"), "then the tilter");
-  CHECK(!cannotMoveWhy(true, false, false), "a tilter never seen is not missing");
+  CHECK(!cannotMoveWhy(true, true, true, true), "can move");
+  CHECK(!strcmp(cannotMoveWhy(false, true, false, false), "not set up yet"), "set up is checked first");
+  CHECK(!strcmp(cannotMoveWhy(true, true, false, false), "no tilter plugged in"), "then the tilter");
+  CHECK(!strcmp(cannotMoveWhy(true, false, false, false), "battery too low"), "then the motor cut-off");
+  CHECK(!cannotMoveWhy(true, false, false, true), "a tilter never seen is not missing");
   CHECK(battLevel(9) == BATT_CRITICAL && battLevel(10) == BATT_LOW && battLevel(19) == BATT_LOW && battLevel(20) == BATT_OK, "Battery levels");
   CHECK(battLevel(5, true) == BATT_OK, "on the charger the battery is OK");
 

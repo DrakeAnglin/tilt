@@ -231,7 +231,7 @@ bool beginMove(int kind, int p) {             // leaves cur on port p
 // Go to a tilt. Returns nullptr if accepted, else why not.
 const char *startTilt(int p, float t) {
   if (p < 0 || p >= PORTS) return "no such blind";
-  if (const char *e = cannotMoveWhy(calibrated(p), bs[p].seen, bs[p].present)) return e;   // logic.h
+  if (const char *e = cannotMoveWhy(calibrated(p), bs[p].seen, bs[p].present, battOkToMove())) return e;   // logic.h
   t = constrain(t, -100.0f, 100.0f);
   bool others = false;
   for (int i = 0; i < PORTS; i++) if (i != p && mvs[i].kind != MV_NONE) others = true;
@@ -250,6 +250,7 @@ const char *startTilt(int p, float t) {
 }
 const char *startAngle(int p, float deg) {    // developer: go to a raw sensor angle
   if (p < 0 || p >= PORTS) return "no such blind";
+  if (!battOkToMove()) return "battery too low";
   Use u(p);
   beginMove(MV_ANGLE, p);
   MVX.tgt = fmodf(deg + 360.0f, 360.0f);
@@ -257,6 +258,7 @@ const char *startAngle(int p, float deg) {    // developer: go to a raw sensor a
 }
 const char *jog(int p, int d, int pct, uint32_t ms) {   // hold-to-run: call again before the time is up
   if (p < 0 || p >= PORTS) return "no such blind";
+  if (!battOkToMove()) return "battery too low";
   ms = min(ms, (uint32_t)2000);
   Use u(p);
   if (MVX.kind == MV_JOG && MVX.jogDir == d) { MVX.deadline = millis() + ms; MVX.pct = pct; return nullptr; }

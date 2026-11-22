@@ -46,7 +46,7 @@ let low = ControllerState.Battery(v: 3.6, pct: 15, st: "battery", low: 0), ok = 
 let chargingLow = ControllerState.Battery(v: 3.6, pct: 15, st: "charging", low: 0), empty = ControllerState.Battery(v: 3.3, pct: 2, st: "charging", low: 1)
 check(low.isLow && !ok.isLow, "under 20% on battery is low")
 check(!chargingLow.isLow, "charging is not low")
-check(empty.isLow && empty.isCritical, "Critical battery is low even while charging")
+check(empty.isLow && empty.tooLowToMove, "too low to move is low even while charging")
 
 // ---- asleep / not reachable wording
 let seenAt = Date(timeIntervalSince1970: 1_800_000_000)

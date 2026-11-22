@@ -97,7 +97,11 @@ _Avoid_: charge, power (for this)
 Battery level under 20%. Warns in the app and in Apple Home; changes nothing else.
 
 **Critical battery**:
-Battery level under 10%. The controller still moves blinds when told, but stops scheduled moves and reports it.
+Battery level under 10% while not charging. Schedules pause and it is reported; blinds still move when told, until the Motor cut-off.
+
+**Motor cut-off**:
+Resting cell voltage under 3.35 V (about 3% Battery level) while not charging. No motor runs at all, whoever asks, so the cell is never drained that low; moves come back once it charges.
+_Avoid_: dead battery, empty
 
 **Charge source**:
 Where the cell is topped up from: USB-C (charge only) or the optional solar panel. The user sees only the Battery level, not a charge state. A cell that stays too hot to charge (about 45 C) surfaces only as a warning.

@@ -53,4 +53,5 @@ const char *chargeState() {
   if (!powered) return "battery";
   return vbatRest >= 4.12f ? "full" : "charging";
 }
+bool battOkToMove() { return powered || vbatRest >= VBAT_CUTOFF; }   // the motor cut-off
 bool battCritical() { return battLevel(battPercent(vbatRest), powered) == BATT_CRITICAL; }   // logic.h: Schedules pause

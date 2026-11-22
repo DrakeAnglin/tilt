@@ -33,17 +33,19 @@ inline float xOfTiltMarks(const Marks &m, float t) {
   return t >= 0 ? t / 100.0f * fabsf(angDiff(m.up, m.open)) : t / 100.0f * fabsf(angDiff(m.down, m.open));
 }
 
-// ---- can a blind be moved? Set up (all three marks good) and its tilter not missing. nullptr = yes, else why not.
-// The battery never stops a move someone asked for; at Critical battery only Schedules pause (request.h).
-inline const char *cannotMoveWhy(bool calibrated, bool seen, bool present) {
+// ---- can a blind be moved? Set up (all three marks good), its tilter not missing, and the battery above the motor
+// cut-off (CONTEXT.md: under 3.35 V resting and not charging, no motor runs, whoever asks). nullptr = yes, else why not.
+inline const char *cannotMoveWhy(bool calibrated, bool seen, bool present, bool battOk) {
   if (!calibrated) return "not set up yet";
   if (seen && !present) return "no tilter plugged in";
+  if (!battOk) return "battery too low";
   return nullptr;
 }
-// Movable: the same, and shown (not hidden in the app).
-inline bool movableRule(bool hidden, bool calibrated, bool seen, bool present) { return !hidden && !cannotMoveWhy(calibrated, seen, present); }
+// Movable: the same, and shown (not hidden in the app). Battery is left to the move itself (it gives the reason).
+inline bool movableRule(bool hidden, bool calibrated, bool seen, bool present) { return !hidden && !cannotMoveWhy(calibrated, seen, present, true); }
 
 // ---- Battery level (CONTEXT.md): Low under 20 % warns; Critical under 10 % also pauses Schedules. On the charger: OK.
+// (The motor cut-off, VBAT_CUTOFF in config.h, is lower still: no motor moves at all below it.)
 const int BATT_LOW_PCT = 20, BATT_CRITICAL_PCT = 10;
 enum BattLevel { BATT_OK, BATT_LOW, BATT_CRITICAL };
 inline BattLevel battLevel(int pct, bool powered = false) {
