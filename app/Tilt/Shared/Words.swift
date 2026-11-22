@@ -56,8 +56,8 @@ extension ControllerState.Battery {
     /// Below this, on battery, Tilt warns that the battery is low.
     static let lowPercent = 20
     var charging: Bool { st != "battery" }
-    /// The controller says it is too low to move the blinds.
-    var tooLowToMove: Bool { low == 1 }
-    /// Worth a warning: too low to move, or on battery and under lowPercent.
-    var isLow: Bool { tooLowToMove || (!charging && pct < Self.lowPercent) }
+    /// Critical battery: the controller has paused its Schedules (moves you ask for still go).
+    var isCritical: Bool { low == 1 }
+    /// Worth a warning: Critical, or on battery and under lowPercent.
+    var isLow: Bool { isCritical || (!charging && pct < Self.lowPercent) }
 }

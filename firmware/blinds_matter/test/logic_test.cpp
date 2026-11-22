@@ -47,6 +47,8 @@ struct RecMoves : MoveSeam {
     log += "g" + std::to_string(p) + ":" + std::to_string((int)from) + ">" + std::to_string((int)to) + "/" + std::to_string(ms) + " ";
   }
   void stopGentle() override { log += "x "; }
+  bool crit = false;
+  bool batteryCritical() override { return crit; }
 };
 static void requestTests() {
   { RecMoves s; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
@@ -69,6 +71,12 @@ static void requestTests() {
     CHECK(s.log == "x " && r.started == 0 && !strcmp(r.why, "unknown position"), "app: unknown word refused"); }
   { RecMoves s; s.cur[2] = NAN; MoveResult r = moveRequest(moveAsk(FROM_APP, -1, 80, 600000), s);
     CHECK(s.log == "x g0:0>80/600000 g1:0>80/600000 n2:80 " && r.started == 3, "app: gently, straight there when the tilt is not known"); }
+  { RecMoves s; s.crit = true; MoveResult r = moveRequest(moveAsk(FROM_SCHEDULE, -1, 30, 0, 0x07), s);
+    CHECK(r.started == 0 && r.why && strstr(r.why, "Schedules paused") && s.log.empty(), "Critical battery pauses Schedules"); }
+  { RecMoves s; s.crit = true; MoveResult r = moveRequest(moveAsk(FROM_APP, 0, 30), s);
+    CHECK(r.started == 1, "Critical battery: a move from the app still goes"); }
+  { RecMoves s; s.crit = true; MoveResult r = moveRequest(moveAsk(FROM_HOME, -1, 30), s);
+    CHECK(r.started == 3, "Critical battery: a move from Home still goes"); }
   { RecMoves s; s.fol = true; s.mov[2] = false; MoveResult r = moveRequest(moveAsk(FROM_SCHEDULE, -1, 30, 0, 0x06), s);
     CHECK(s.log == "n1:30 " && r.started == 1, "schedule: its blinds that can move, no follow, gentle moves kept"); }
   { RecMoves s; moveRequest(moveAsk(FROM_SCHEDULE, -1, 30, 120000, 0x01), s);
@@ -192,10 +200,12 @@ int main() {
   CHECK(!movableRule(true, true, true, true), "hidden: not movable");
   CHECK(!movableRule(false, false, true, true), "not set up: not movable");
   CHECK(!movableRule(false, true, true, false), "tilter missing: not movable");
-  CHECK(!cannotMoveWhy(true, true, true, true), "can move");
-  CHECK(!strcmp(cannotMoveWhy(false, true, false, false), "not set up yet"), "set up is checked first");
-  CHECK(!strcmp(cannotMoveWhy(true, true, false, false), "no tilter plugged in"), "then the tilter");
-  CHECK(!strcmp(cannotMoveWhy(true, false, false, false), "battery too low"), "then the battery");
+  CHECK(!cannotMoveWhy(true, true, true), "can move");
+  CHECK(!strcmp(cannotMoveWhy(false, true, false), "not set up yet"), "set up is checked first");
+  CHECK(!strcmp(cannotMoveWhy(true, true, false), "no tilter plugged in"), "then the tilter");
+  CHECK(!cannotMoveWhy(true, false, false), "a tilter never seen is not missing");
+  CHECK(battLevel(9) == BATT_CRITICAL && battLevel(10) == BATT_LOW && battLevel(19) == BATT_LOW && battLevel(20) == BATT_OK, "Battery levels");
+  CHECK(battLevel(5, true) == BATT_OK, "on the charger the battery is OK");
 
   // ---- Move requests
   requestTests();

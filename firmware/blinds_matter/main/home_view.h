@@ -57,4 +57,4 @@ inline HomeSend homeSendOf(const HomeView &v, bool force, int lastLift, int last
 
 // ---- battery attributes from Battery level (percent)
 inline uint8_t homeBatPercent(int pct) { return (uint8_t)(pct * 2); }   // Matter counts half percents
-inline uint8_t homeChargeLevel(int pct) { return pct < 10 ? 2 : pct < 20 ? 1 : 0; }   // 2 Critical, 1 Low, 0 OK
+inline uint8_t homeChargeLevel(int pct) { return (uint8_t)battLevel(pct); }   // Matter: 2 Critical, 1 Low, 0 OK

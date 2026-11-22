@@ -30,6 +30,7 @@ struct MoveSeam {                                     // what a request needs fr
   virtual const char *now(int p, float t) = 0;        // start the move now: nullptr, or why not
   virtual void gently(int p, float from, float to, uint32_t ms) = 0;
   virtual void stopGentle() = 0;                      // end every gentle move
+  virtual bool batteryCritical() = 0;                 // Critical battery (logic.h battLevel)
 };
 
 // Is blind p one of the blinds this request is for? (Before the can-move rule.)
@@ -48,6 +49,7 @@ inline const char *moveOne(const MoveAsk &a, MoveSeam &s, int p) {
   return s.now(p, a.tilt[p]);                         // (also when the Current tilt is not known: straight there)
 }
 inline MoveResult moveRequest(const MoveAsk &a, MoveSeam &s) {
+  if (a.from == FROM_SCHEDULE && s.batteryCritical()) return {0, "battery critical: Schedules paused"};   // asked-for moves still go
   if (a.from == FROM_APP || a.from == FROM_HOME) s.stopGentle();      // a command ends a gentle move
   int started = 0;
   const char *err = nullptr;

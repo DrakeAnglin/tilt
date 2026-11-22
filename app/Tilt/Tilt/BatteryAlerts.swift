@@ -34,7 +34,7 @@ enum BatteryAlerts {
         UserDefaults.standard.set(now, forKey: key)
         let c = UNMutableNotificationContent()
         c.title = "\(name): battery low"
-        c.body = battery.tooLowToMove ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(battery.pct)%. Plug in the charging cable soon."
+        c.body = battery.isCritical ? "The battery is almost empty, so Schedules are paused. Plug in the charging cable." : "The battery is at \(battery.pct)%. Plug in the charging cable soon."
         c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
     }
