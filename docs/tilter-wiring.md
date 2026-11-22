@@ -84,8 +84,8 @@ Meter in beep mode, nothing connected:
 - DRV8833 EEP to VCC: megohms or open (no jumper, no pull-up). Nothing on ULT.
 
 ## 4. Final assembly
-At final assembly, solder the white pair's free ends to the N20's two tabs (either way round; swap them if the
-motor turns the wrong way), then fit the boards into the tray as the
+At final assembly, solder the white pair's free ends to the N20's two tabs (either way round: the controller
+learns the motor's direction on its first moves), then fit the boards into the tray as the
 [tilter build](../hardware/mechanical/stl/tilter/README.md#assembly) describes.
 
 ## Next

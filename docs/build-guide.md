@@ -87,5 +87,6 @@ one for the room; changing it restarts the controller.
 
 ## If something is wrong
 - PCB readings: [PCB build, "If something reads wrong"](pcb-build.md#if-something-reads-wrong).
-- A blind moves the wrong way: swap its two motor leads at the N20.
+- A blind moves the wrong way: nothing to rewire. The motor leads can go either way round; on its first moves the
+  controller sees which way the angle changes, turns the motor the other way if needed, and remembers it.
 - Open problems and planned work: [GitHub issues](https://github.com/DrakeAnglin/tilt/issues).
