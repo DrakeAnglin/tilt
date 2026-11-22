@@ -182,6 +182,7 @@ esp_err_t hCfg(httpd_req_t *r) {
 }
 esp_err_t hLog(httpd_req_t *r) {
   Lock l;
+  LogLock ll;
   uint32_t since = strtoul(arg(r, "since").c_str(), nullptr, 10), first = logSeq > LOG_N ? logSeq - LOG_N : 0;
   if (since < first || since > logSeq) since = first;
   std::string j;

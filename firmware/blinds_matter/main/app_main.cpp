@@ -168,6 +168,7 @@ void blindsTask(void *)
 
 extern "C" void app_main()
 {
+    logBegin();
     nvs_flash_init();
 #if CONFIG_PM_ENABLE
     esp_pm_config_t pm = {.max_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, .min_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, .light_sleep_enable = true};

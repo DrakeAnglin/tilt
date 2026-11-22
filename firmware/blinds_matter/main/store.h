@@ -2,6 +2,7 @@
 #pragma once
 #include "ardu.h"
 #include "config.h"
+#include "freertos/semphr.h"
 
 struct BlindCfg {
   char name[20];
@@ -123,9 +124,17 @@ void cleanText(char *dst, size_t n, const String &src) {
 }
 
 // ---- event log (RAM): the last lines, for the developer page
+// event() is called from every task (the blinds task, the web server, Bluetooth, Matter), so the lines have their own
+// small lock. It is the innermost lock (see lock.h): held only to store or copy lines, never while taking another.
 const int LOG_N = 60;
 String logLines[LOG_N];
 uint32_t logSeq = 0;
+SemaphoreHandle_t logMx = nullptr;
+void logBegin() { logMx = xSemaphoreCreateMutex(); }    // first thing at start: before it there is only one task
+struct LogLock {
+  LogLock() { if (logMx) xSemaphoreTake(logMx, portMAX_DELAY); }
+  ~LogLock() { if (logMx) xSemaphoreGive(logMx); }
+};
 void event(const char *fmt, ...) {
   char buf[128], line[160];
   va_list ap;
@@ -139,7 +148,10 @@ void event(const char *fmt, ...) {
     snprintf(line, sizeof line, "%02d:%02d:%02d  %s", tm.tm_hour, tm.tm_min, tm.tm_sec, buf);
   } else snprintf(line, sizeof line, "+%lus  %s", (unsigned long)(millis() / 1000), buf);
   for (char *p = line; *p; p++) if (*p == '"' || *p == '\\' || (unsigned char)*p < 32) *p = '\'';
-  logLines[logSeq % LOG_N] = line;
-  logSeq++;
+  {
+    LogLock l;
+    logLines[logSeq % LOG_N] = line;
+    logSeq++;
+  }
   ESP_LOGI("blinds", "%s", line);
 }
