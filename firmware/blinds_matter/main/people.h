@@ -105,7 +105,9 @@ esp_err_t hRecover(httpd_req_t *r) {             // POST /x/recover: the same JS
   int p = -1;
   for (int i = 0; i < PORTS && p < 0; i++) if (movable(i)) p = i;
   if (p < 0) return plain(r, "409 Conflict", "{\"err\":\"no blind is set up, so there is nothing to turn\"}");
-  if (recover.slot >= 0) return plain(r, "429 Too Many Requests", "{\"err\":\"a recovery is already under way. Try again in two minutes.\"}");
+  bool busy;
+  { KeysLock kl; busy = recover.slot >= 0; }
+  if (busy) return plain(r, "429 Too Many Requests", "{\"err\":\"a recovery is already under way. Try again in two minutes.\"}");
   std::string out;
   const char *st = pairDo(body(r, 600), out, true);
   if (strcmp(st, "200 OK")) return plain(r, st, out);
@@ -124,7 +126,10 @@ esp_err_t hRecover(httpd_req_t *r) {             // POST /x/recover: the same JS
 }
 esp_err_t hRecoverState(httpd_req_t *r) {        // GET /x/recstate: how far the turning has got (0..3), seconds left
   std::string j;
-  ap(j, "{\"on\":%d,\"step\":%d,\"left\":%d}", recover.slot >= 0 ? 1 : 0, recover.slot >= 0 ? recover.step : 0, recover.slot >= 0 ? (int)((int32_t)(recover.until - millis()) / 1000) : 0);
+  Recover now;
+  { KeysLock kl; now = recover; }                // a copy under the lock: recoverTick changes it in the blinds task
+  bool on = now.slot >= 0;
+  ap(j, "{\"on\":%d,\"step\":%d,\"left\":%d}", on ? 1 : 0, on ? now.step : 0, on ? (int)((int32_t)(now.until - millis()) / 1000) : 0);
   return plain(r, "200 OK", j);
 }
 esp_err_t hMakeOwner(httpd_req_t *r) {           // owner: give another phone the owner's rights too
