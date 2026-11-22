@@ -1,5 +1,6 @@
-// Tests for main/logic.h, run on the Mac: tools/firmware_tests.sh. No hardware, no ESP-IDF.
+// Tests for main/logic.h and main/home_view.h, run on the Mac: tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
+#include "../main/home_view.h"
 #include <cstdio>
 #include <ctime>
 
@@ -89,6 +90,62 @@ int main() {
   CHECK(permitRule(true, false, false, false, "/api/keyname", me, me) == nullptr, "user may rename themself");
   CHECK(permitRule(true, false, false, false, "/api/keyname", them, me) != nullptr, "user may not rename others");
   CHECK(permitRule(true, false, false, false, "/api/keyname", "", me) != nullptr, "rename with no id refused");
+
+  // ---- Apple Home: what Home asked for
+  CHECK(near(tiltOfHomeLift(10000, true), 100, 1e-4) && near(tiltOfHomeLift(10000, false), -100, 1e-4), "closed: up or down by closeUp");
+  CHECK(near(tiltOfHomeLift(2500, true), 25, 1e-4) && near(tiltOfHomeLift(2500, false), -25, 1e-4), "quarter closed, both ways");
+  CHECK(near(tiltOfHomeLift(0, true), 0, 1e-4) && near(tiltOfHomeLift(0, false), 0, 1e-4), "open is level either way");
+  CHECK(homeLiftValid(0) && homeLiftValid(10000), "0 and 10000 are targets");
+  CHECK(!homeLiftValid(HOME_LIFT_NULL) && !homeLiftValid(10001), "a null target is ignored, not a full close");
+  CHECK(homeAskIsStop(true, 4000, 4000) && homeAskIsStop(true, 4099, 4000) && homeAskIsStop(true, 3901, 4000), "moving, asked for where it is: stop");
+  CHECK(!homeAskIsStop(true, 4100, 4000) && !homeAskIsStop(true, 3900, 4000), "moving, asked 1 % away: a new target");
+  CHECK(!homeAskIsStop(false, 4000, 4000), "at rest, asked for where it is: not a stop");
+
+  // ---- Apple Home: what Home sees
+  BlindNow one[1] = {{-50, false, NAN}};
+  HomeView hv = homeViewOf(one, 1);
+  CHECK(hv.any && hv.lift == 5000 && hv.op == 0, "half closed down: 50 % closed, still");
+  one[0].tilt = 50;
+  CHECK(homeViewOf(one, 1).lift == 5000, "half closed up: also 50 % closed");
+  one[0].tilt = 94; CHECK(homeViewOf(one, 1).lift == 10000, "at rest at 94: closed");
+  one[0].tilt = -93.9f; CHECK(homeViewOf(one, 1).lift == 9400, "at rest at 93.9: as it is");
+  one[0].tilt = 6; CHECK(homeViewOf(one, 1).lift == 0, "at rest at 6: open");
+  one[0].tilt = 6.5f; CHECK(homeViewOf(one, 1).lift == 700, "at rest at 6.5: as it is (rounded)");
+  one[0].tilt = 120; CHECK(homeViewOf(one, 1).lift == 10000, "past the end: closed");
+  BlindNow mv[1] = {{97, true, 100}};
+  hv = homeViewOf(mv, 1);
+  CHECK(hv.lift == 9700 && hv.op == 2, "moving: true value, closing");
+  mv[0] = {3, true, 0};
+  hv = homeViewOf(mv, 1);
+  CHECK(hv.lift == 300 && hv.op == 1, "moving toward open: opening");
+  mv[0] = {-40, true, 80};
+  CHECK(homeViewOf(mv, 1).op == 2, "closing the other way counts as closing");
+  mv[0] = {40, true, NAN};
+  CHECK(homeViewOf(mv, 1).op == 0, "busy with no target: still");
+  BlindNow three[3] = {{20, false, NAN}, {-60, false, NAN}, {NAN, false, NAN}};
+  hv = homeViewOf(three, 3);
+  CHECK(hv.any && hv.lift == 4000, "average of the known blinds, unknown left out");
+  BlindNow none[1] = {{NAN, false, NAN}};
+  CHECK(!homeViewOf(none, 1).any && !homeViewOf(none, 0).any, "nothing known: nothing to show");
+
+  // ---- Apple Home: what to send
+  HomeView still{true, 5000, 0}, closing{true, 5000, 2};
+  HomeSend hs = homeSendOf(still, false, -1, -1);
+  CHECK(hs.lift && hs.target && hs.op && hs.opBits == 0, "first report: everything");
+  hs = homeSendOf(still, false, 4900, 0);
+  CHECK(hs.lift && hs.target && !hs.op, "a change of 1 %: sent");
+  hs = homeSendOf(HomeView{true, 5000, 0}, false, 5000, 0);
+  CHECK(!hs.lift && !hs.target && !hs.op, "no change: nothing sent");
+  CHECK(homeSendOf(still, true, 5000, 0).lift, "forced: sent anyway");
+  hs = homeSendOf(closing, false, 4000, 0);
+  CHECK(hs.lift && !hs.target && hs.op && hs.opBits == 0x0A, "moving: current only, status closing");
+  CHECK(homeSendOf(HomeView{true, 0, 1}, false, -1, 0).opBits == 0x05, "status opening");
+  CHECK(!homeSendOf(HomeView{false, 0, 0}, true, -1, -1).lift, "nothing known: nothing sent, even forced");
+
+  // ---- Apple Home: battery
+  CHECK(homeBatPercent(0) == 0 && homeBatPercent(37) == 74 && homeBatPercent(100) == 200, "half percents");
+  CHECK(homeChargeLevel(9) == 2 && homeChargeLevel(10) == 1, "Critical below 10 %");
+  CHECK(homeChargeLevel(19) == 1 && homeChargeLevel(20) == 0, "Low below 20 %");
 
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;

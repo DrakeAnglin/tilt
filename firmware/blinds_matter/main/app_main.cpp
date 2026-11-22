@@ -21,6 +21,7 @@
 #include "ardu.h"
 #include "web.h"
 #include "ble.h"
+#include "home_view.h"
 #include <app/server/CommissioningWindowManager.h>
 
 static const char *TAG = "blinds";
@@ -52,7 +53,7 @@ int lastLift[PORTS], lastOp[PORTS];
 bool selfUpd = false;
 esp_pm_lock_handle_t awake;
 
-float tiltOfLift(int lift) { return (cfg.closeUp ? 1.0f : -1.0f) * lift / 100.0f; }
+float tiltOfLift(int lift) { return tiltOfHomeLift(lift, cfg.closeUp); }
 float liveTilt(int p) { return (movingPort(p) && !isnan(mvs[p].live)) ? tiltOf(p, mvs[p].live) : bs[p].tilt; }
 
 static esp_err_t attr_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id,
@@ -60,7 +61,7 @@ static esp_err_t attr_cb(attribute::callback_type_t type, uint16_t endpoint_id, 
 {
     if (type != PRE_UPDATE || selfUpd || cluster_id != WindowCovering::Id) return ESP_OK;
     if (attribute_id != WindowCovering::Attributes::TargetPositionLiftPercent100ths::Id) return ESP_OK;
-    if (val->type == ESP_MATTER_VAL_TYPE_NULLABLE_UINT16 || val->type == ESP_MATTER_VAL_TYPE_UINT16)
+    if ((val->type == ESP_MATTER_VAL_TYPE_NULLABLE_UINT16 || val->type == ESP_MATTER_VAL_TYPE_UINT16) && homeLiftValid(val->val.u16))
         for (int e = 0; e < nEp; e++) if (epId[e] == endpoint_id) { pend[e] = val->val.u16; pokeBlinds(); }
     return ESP_OK;
 }
@@ -91,11 +92,11 @@ void pokeBlinds() { if (blindsTaskH) xTaskNotifyGive(blindsTaskH); }
 void reportBattery()                           // every few minutes
 {
     static int lastPct = -1, lastLvl = -1;
-    int pct = battPercent(vbatRest), lvl = pct < 10 ? 2 : pct < 20 ? 1 : 0;
+    int pct = battPercent(vbatRest), lvl = homeChargeLevel(pct);
     if (pct == lastPct && lvl == lastLvl) return;
     lastPct = pct; lastLvl = lvl;
     for (int e = 0; e < nEp; e++) {
-        Upd *a = new Upd{epId[e], PowerSource::Attributes::BatPercentRemaining::Id, esp_matter_nullable_uint8(nullable<uint8_t>((uint8_t)(pct * 2)))};
+        Upd *a = new Upd{epId[e], PowerSource::Attributes::BatPercentRemaining::Id, esp_matter_nullable_uint8(nullable<uint8_t>(homeBatPercent(pct)))};
         Upd *b = new Upd{epId[e], PowerSource::Attributes::BatChargeLevel::Id, esp_matter_enum8((uint8_t)lvl)};
         for (Upd *u : {a, b})
             chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t x) { Upd *u = (Upd *)x; attribute::update(u->ep, PowerSource::Id, u->attr, &u->v); delete u; }, (intptr_t)u);
@@ -104,31 +105,20 @@ void reportBattery()                           // every few minutes
 void report(bool force)
 {
     for (int e = 0; e < nEp; e++) {
-        float sum = 0;
-        int n = 0, op = 0;
-        for (int p = 0; p < PORTS; p++) {
-            if ((epPort[e] >= 0 && epPort[e] != p) || !movable(p)) continue;
-            float t = liveTilt(p);
-            if (isnan(t)) continue;
-            float c = min(fabsf(t), 100.0f);
-            // A blind at rest within its stopping band of an end IS at that end: a move to "closed" may stop at 97 to 99,
-            // and Home would show "1 % open" for good. While it moves, the true value is sent.
-            if (!movingPort(p) && !bs[p].queued) { if (c >= 94.0f) c = 100.0f; else if (c <= 6.0f) c = 0.0f; }
-            sum += c;
-            n++;
-            if (!isnan(bs[p].target) && (bs[p].queued || movingPort(p)))
-                op = fabsf(bs[p].target) > fabsf(t) ? 2 : 1;             // 2 closing, 1 opening
+        BlindNow b[PORTS];
+        int n = 0;
+        for (int p = 0; p < PORTS; p++)
+            if ((epPort[e] < 0 || epPort[e] == p) && movable(p)) b[n++] = {liveTilt(p), movingPort(p) || bs[p].queued, bs[p].target};
+        HomeView v = homeViewOf(b, n);
+        HomeSend s = homeSendOf(v, force, lastLift[e], lastOp[e]);
+        if (s.lift) {
+            lastLift[e] = v.lift;
+            setAttr(e, WindowCovering::Attributes::CurrentPositionLiftPercent100ths::Id, esp_matter_nullable_uint16(nullable<uint16_t>((uint16_t)v.lift)));
+            if (s.target) setAttr(e, WindowCovering::Attributes::TargetPositionLiftPercent100ths::Id, esp_matter_nullable_uint16(nullable<uint16_t>((uint16_t)v.lift)));
         }
-        if (!n) continue;
-        int lift = (int)lroundf(sum / n) * 100;
-        if (force || abs(lift - lastLift[e]) >= 100) {
-            lastLift[e] = lift;
-            setAttr(e, WindowCovering::Attributes::CurrentPositionLiftPercent100ths::Id, esp_matter_nullable_uint16(nullable<uint16_t>((uint16_t)lift)));
-            if (!op) setAttr(e, WindowCovering::Attributes::TargetPositionLiftPercent100ths::Id, esp_matter_nullable_uint16(nullable<uint16_t>((uint16_t)lift)));
-        }
-        if (op != lastOp[e]) {
-            lastOp[e] = op;
-            setAttr(e, WindowCovering::Attributes::OperationalStatus::Id, esp_matter_bitmap8((uint8_t)(op | (op << 2))));
+        if (s.op) {
+            lastOp[e] = v.op;
+            setAttr(e, WindowCovering::Attributes::OperationalStatus::Id, esp_matter_bitmap8(s.opBits));
         }
     }
 }
@@ -150,7 +140,7 @@ void blindsTask(void *)
             if (v < 0) continue;
             pend[e] = -1;
             rampCancel();                        // a command from Home ends a gentle move
-            if (moving() && abs(v - lastLift[e]) < 100) { stopAll("stopped"); continue; }   // "stop" arrives as: go to where you are
+            if (homeAskIsStop(moving(), v, lastLift[e])) { stopAll("stopped"); continue; }   // "stop" arrives as: go to where you are
             int started = 0;
             for (int p = 0; p < PORTS; p++) {
                 bool mine = epPort[e] < 0 || epPort[e] == p || syncMode;
@@ -231,7 +221,7 @@ extern "C" void app_main()
         ps.power_source.feature_flags = cluster::power_source::feature::battery::get_id();
         if (endpoint::power_source::add(ep, &ps) == ESP_OK) {
             cluster_t *pc = cluster::get(ep, PowerSource::Id);
-            if (pc) cluster::power_source::attribute::create_bat_percent_remaining(pc, nullable<uint8_t>((uint8_t)(battPercent(vbatRest) * 2)), nullable<uint8_t>((uint8_t)0), nullable<uint8_t>((uint8_t)200));
+            if (pc) cluster::power_source::attribute::create_bat_percent_remaining(pc, nullable<uint8_t>(homeBatPercent(battPercent(vbatRest))), nullable<uint8_t>((uint8_t)0), nullable<uint8_t>((uint8_t)200));
         }
         epId[nEp] = endpoint::get_id(ep);
         epPort[nEp] = hkSeparate ? i : -1;
