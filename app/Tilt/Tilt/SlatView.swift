@@ -64,34 +64,6 @@ struct SlatView: View, Animatable {
     }
 }
 
-enum TiltWords {
-    static func long(_ t: Double?) -> String {
-        guard let t else { return "" }
-        let a = abs(t)
-        if a < 8 { return "Open" }
-        if a > 92 { return t > 0 ? "Closed, slats up" : "Closed, slats down" }
-        return "\(Int(a.rounded()))% toward \(t > 0 ? "up" : "down")"
-    }
-    static func status(_ b: BlindState) -> String {
-        if b.seen == 1 && b.pres == 0 { return "Not connected" }
-        if b.cal == 0 { return "Not set up yet" }
-        if b.mov == 1 { return "Moving to \(long(b.tgt).lowercased())" }
-        if b.q == 1 { return "Waiting its turn" }
-        if b.stuck { return "Did not move" }
-        return long(b.tilt)
-    }
-    /// One line for a whole room.
-    static func room(_ s: ControllerState) -> String {
-        let ready = s.b.filter(\.ready)
-        if ready.isEmpty { return "Needs setup" }
-        if s.mv >= 0 { return "Moving" }
-        let tilts = ready.compactMap(\.tilt)
-        guard let first = tilts.first else { return "\(ready.count) blind\(ready.count == 1 ? "" : "s")" }
-        let same = tilts.allSatisfy { abs($0 - first) < 12 }
-        return same ? long(first) : "Mixed positions"
-    }
-}
-
 #Preview {
     HStack { SlatView(tilt: 0); SlatView(tilt: 55); SlatView(tilt: -100) }.frame(height: 160).padding().background(AppBackground())
 }

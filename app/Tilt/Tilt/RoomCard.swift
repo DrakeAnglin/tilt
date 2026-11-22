@@ -148,12 +148,12 @@ struct RoomCard: View {
 struct BatteryPill: View {
     let battery: ControllerState.Battery
     var body: some View {
-        let charging = battery.st != "battery"
+        let charging = battery.charging
         HStack(spacing: 5) {
-            Image(systemName: charging ? "bolt.fill" : battery.pct < 20 ? "battery.25percent" : "battery.75percent").font(.caption2)
+            Image(systemName: charging ? "bolt.fill" : battery.pct < ControllerState.Battery.lowPercent ? "battery.25percent" : "battery.75percent").font(.caption2)
             Text("\(battery.pct)%").font(.caption.weight(.semibold)).monospacedDigit()
         }
-        .foregroundStyle(battery.low == 1 || (!charging && battery.pct < 20) ? Palette.danger : charging ? Palette.good : Color.secondary)
+        .foregroundStyle(battery.isLow ? Palette.danger : charging ? Palette.good : Color.secondary)
         .padding(.horizontal, 9).padding(.vertical, 5)
         .background(Palette.surface, in: Capsule())
         .accessibilityLabel("Battery \(battery.pct) percent\(charging ? ", charging" : "")")

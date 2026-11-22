@@ -28,13 +28,13 @@ enum BatteryAlerts {
     static func askPermission() { UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in } }
 
     static func check(id: String, name: String, battery: ControllerState.Battery) {
-        guard battery.st == "battery", battery.low == 1 || battery.pct < 20 else { return }
+        guard !battery.charging, battery.isLow else { return }
         let key = "lowbatt.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
         guard now - last > 86400 else { return }
         UserDefaults.standard.set(now, forKey: key)
         let c = UNMutableNotificationContent()
         c.title = "\(name): battery low"
-        c.body = battery.low == 1 ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(battery.pct)%. Plug in the charging cable soon."
+        c.body = battery.tooLowToMove ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(battery.pct)%. Plug in the charging cable soon."
         c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
     }

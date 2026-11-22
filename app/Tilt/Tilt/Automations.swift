@@ -24,7 +24,7 @@ struct Schedule: Identifiable, Equatable {
         let base = kind == 1 ? "Sunrise" : "Sunset"
         return offset == 0 ? base : "\(abs(offset)) min \(offset > 0 ? "after" : "before") \(base.lowercased())"
     }
-    var actionText: String { tilt == 0 ? "Open" : tilt == 100 ? "Close up" : tilt == -100 ? "Close down" : TiltWords.long(Double(tilt)) }
+    var actionText: String { TiltWords.action(tilt) }
     var daysText: String {
         switch days { case 127: return "Every day"; case 62: return "Weekdays"; case 65: return "Weekends"; case 0: return "Never"
         default: return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated().filter { days >> $0.offset & 1 == 1 }.map(\.element).joined(separator: " ") }

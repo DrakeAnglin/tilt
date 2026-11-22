@@ -87,13 +87,7 @@ enum TiltActions {
         WidgetCenter.shared.reloadAllTimelines()
     }
     /// One line for a room, for the widget.
-    static func words(_ s: ControllerState) -> String {
-        let tilts = s.b.filter(\.ready).compactMap(\.tilt)
-        if tilts.isEmpty { return "Needs setup" }
-        if s.mv >= 0 { return "Moving" }
-        let a = tilts.map { abs($0) }.reduce(0, +) / Double(tilts.count)
-        return a < 8 ? "Open" : a > 92 ? "Closed" : "\(Int(a.rounded()))% closed"
-    }
+    static func words(_ s: ControllerState) -> String { TiltWords.short(s) }
 }
 
 struct OpenBlindsIntent: AppIntent {
