@@ -26,7 +26,7 @@
 #endif
 #include <mdns.h>
 
-#define FW_VERSION "2.2.1-dev1"
+#define FW_VERSION "2.2.1-dev2"
 SemaphoreHandle_t mx;                    // the blinds' state is touched by the web server and by the blinds task
 uint32_t lastWeb = 0;                    // millis of the last request (0 = none yet)
 bool otaPending = false, restartSoon = false;
@@ -593,12 +593,11 @@ esp_err_t hRevoke(httpd_req_t *r) {              // owner: remove a phone. "all"
   keysSave();
   return sendJson(r, std::string("{\"ok\":1,\"proof\":\"") + proof + "\"}");
 }
-esp_err_t hKeyName(httpd_req_t *r) {             // rename a phone in the People list: your own, or any as an owner
+esp_err_t hKeyName(httpd_req_t *r) {             // rename a phone in the People list (who may: permit() in sec.h)
   Lock l;
   uint8_t id[8];
   if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, id, 8)) {
-    if (i != secClient && !(secClient >= 0 && keys[secClient].role)) return fail(r, "only the owner can do that");
     char nm[sizeof keys[i].name];
     cleanText(nm, sizeof nm, arg(r, "name"));
     if (!nm[0]) return fail(r, "a name is needed");
@@ -714,20 +713,20 @@ esp_err_t hOpenApi(httpd_req_t *r) { Lock l; openApi = argi(r, "v") ? 1 : 0; nvs
 // only the secured connection answers.
 esp_err_t hGuard(httpd_req_t *r) {
   const Route *rt = (const Route *)r->user_ctx;
-  if (rt->fn != hUpdate && !openApi && owned()) return plain(r, "401 Unauthorized", "{\"err\":\"use the app\"}");
+  if (const char *why = permit(rt, rt->uri, "", Caller{false, false, nullptr})) return plain(r, "401 Unauthorized", std::string("{\"err\":\"") + why + "\"}");
   return rt->fn(r);
 }
 
 esp_err_t hRoot(httpd_req_t *r);
 esp_err_t hUpdate(httpd_req_t *r);
 const Route routes[] = {
-  {"/", HTTP_GET, hRoot, false}, {"/api/s", HTTP_GET, hState, false}, {"/api/dev", HTTP_GET, hDev, false}, {"/api/cfg", HTTP_GET, hCfg, false}, {"/api/log", HTTP_GET, hLog, false},
-  {"/api/hist", HTTP_GET, hHist, false}, {"/api/set", HTTP_GET, hSet, false}, {"/api/sched", HTTP_GET, hSched, false}, {"/api/go", HTTP_GET, hGo, false}, {"/api/stop", HTTP_GET, hStop, false},
-  {"/api/jog", HTTP_GET, hJog, false}, {"/api/angle", HTTP_GET, hAngle, false}, {"/api/mark", HTTP_GET, hMark, false}, {"/api/reset", HTTP_GET, hReset, true}, {"/api/reboot", HTTP_GET, hReboot, false},
-  {"/api/scan", HTTP_GET, hScan, false}, {"/api/wifi", HTTP_POST, hNotYet, false}, {"/api/awake", HTTP_GET, hAwake, false}, {"/api/sleepnow", HTTP_GET, hNotYet, false}, {"/api/update", HTTP_POST, hUpdate, false},
-  {"/api/keep", HTTP_GET, hKeep, false}, {"/api/watch", HTTP_GET, hWatch, false}, {"/api/trace", HTTP_GET, hTrace, false},
-  {"/api/setwifi", HTTP_GET, hSetWifi, true}, {"/api/wifistate", HTTP_GET, hWifiState, false}, {"/api/homeopen", HTTP_GET, hHomeOpen, true},
-  {"/api/keys", HTTP_GET, hKeys, false}, {"/api/revoke", HTTP_GET, hRevoke, true}, {"/api/approve", HTTP_GET, hApprove, true}, {"/api/keyname", HTTP_GET, hKeyName, false}, {"/api/makeowner", HTTP_GET, hMakeOwner, true}, {"/api/openapi", HTTP_GET, hOpenApi, true}, {"/api/otaopen", HTTP_GET, hOtaOpen, true},
+  {"/", HTTP_GET, hRoot}, {"/api/s", HTTP_GET, hState}, {"/api/dev", HTTP_GET, hDev}, {"/api/cfg", HTTP_GET, hCfg}, {"/api/log", HTTP_GET, hLog},
+  {"/api/hist", HTTP_GET, hHist}, {"/api/set", HTTP_GET, hSet}, {"/api/sched", HTTP_GET, hSched}, {"/api/go", HTTP_GET, hGo}, {"/api/stop", HTTP_GET, hStop},
+  {"/api/jog", HTTP_GET, hJog}, {"/api/angle", HTTP_GET, hAngle}, {"/api/mark", HTTP_GET, hMark}, {"/api/reset", HTTP_GET, hReset}, {"/api/reboot", HTTP_GET, hReboot},
+  {"/api/scan", HTTP_GET, hScan}, {"/api/wifi", HTTP_POST, hNotYet}, {"/api/awake", HTTP_GET, hAwake}, {"/api/sleepnow", HTTP_GET, hNotYet}, {"/api/update", HTTP_POST, hUpdate},
+  {"/api/keep", HTTP_GET, hKeep}, {"/api/watch", HTTP_GET, hWatch}, {"/api/trace", HTTP_GET, hTrace},
+  {"/api/setwifi", HTTP_GET, hSetWifi}, {"/api/wifistate", HTTP_GET, hWifiState}, {"/api/homeopen", HTTP_GET, hHomeOpen},
+  {"/api/keys", HTTP_GET, hKeys}, {"/api/revoke", HTTP_GET, hRevoke}, {"/api/approve", HTTP_GET, hApprove}, {"/api/keyname", HTTP_GET, hKeyName}, {"/api/makeowner", HTTP_GET, hMakeOwner}, {"/api/openapi", HTTP_GET, hOpenApi}, {"/api/otaopen", HTTP_GET, hOtaOpen},
 };
 const int routeCount = sizeof routes / sizeof routes[0];
 

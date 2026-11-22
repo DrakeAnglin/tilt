@@ -177,13 +177,35 @@ std::string askCode(const ClientKey &k) {
 
 
 // ---- commands
-struct Route { const char *uri; httpd_method_t m; esp_err_t (*fn)(httpd_req_t *); bool ownerOnly; };
+struct Route { const char *uri; httpd_method_t m; esp_err_t (*fn)(httpd_req_t *); };
 extern const Route routes[];
 extern const int routeCount;
-// What a user (not an owner) may do: see the blinds and move them. Settings, setup, schedules and people are the owners'.
-bool userMay(const std::string &p) {
-  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/keys", "/api/keyname", "/api/wifistate"}) if (p == ok) return true;
-  return false;
+// ---- who may do what: the one place every request is decided (plain HTTP, and secured over Wi-Fi or Bluetooth)
+struct Caller {
+  bool secure;                                   // came over the secured connection (else: plain HTTP)
+  bool owner;                                    // secured: the phone is an owner (else a user)
+  const uint8_t *id;                             // secured: the phone's 8-byte id
+};
+extern uint8_t openApi;
+esp_err_t hUpdate(httpd_req_t *r);
+std::string qarg(const std::string &query, const char *key) {
+  char v[80] = "";
+  return httpd_query_key_value(query.c_str(), key, v, sizeof v) == ESP_OK ? std::string(v) : std::string();
+}
+// nullptr: allowed. Otherwise the reason it is refused. Rules about the target (you cannot remove yourself, the last
+// owner stays) live in the handlers; who the caller is and what that lets them do is decided only here.
+const char *permit(const Route *rt, const std::string &path, const std::string &query, const Caller &c) {
+  if (!c.secure) {
+    if (rt->fn == hUpdate) return nullptr;       // checks its own signature (or password) and the owner's update window
+    if (!owned() || openApi) return nullptr;     // before any phone is paired, or with the developer switch on
+    return "use the app";
+  }
+  if (c.owner) return nullptr;
+  // A user may see the blinds and move them, see the people, and rename only themself. Settings, setup, schedules,
+  // people and updates are the owners'.
+  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/keys", "/api/wifistate"}) if (path == ok) return nullptr;
+  if (path == "/api/keyname" && qarg(query, "cid") == hexOf(c.id, 8)) return nullptr;
+  return "only the owner can do that";
 }
 // The answer is sealed bytes when the status is "200 OK", plain JSON otherwise.
 const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
@@ -221,7 +243,7 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
   const Route *rt = nullptr;
   for (int i = 0; i < routeCount; i++) if (path == routes[i].uri && routes[i].m == HTTP_GET && !path.compare(0, 5, "/api/")) rt = &routes[i];
   if (!rt) out = "{\"ok\":0,\"err\":\"unknown command\"}";
-  else if ((rt->ownerOnly || !userMay(path)) && !owner) out = "{\"ok\":0,\"err\":\"only the owner can do that\"}";
+  else if (const char *why = permit(rt, path, query, Caller{true, owner, p})) out = std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
   else {
     xSemaphoreTake(secMx, portMAX_DELAY);
     bool still;                                  // removed by a command that ran just before this one?
