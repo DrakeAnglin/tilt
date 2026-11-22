@@ -3,8 +3,8 @@
 What is still needed before Tilt can go to TestFlight and the App Store, and the answers to give.
 
 ## Steps only the owner can do (Apple account)
-1. **App Store Connect:** create the app record for bundle ID `app.tilt.blinds` (name Tilt, primary language English).
-2. **CloudKit:** in the CloudKit Console, open container `iCloud.app.tilt.blinds`, Development, and use
+1. ~~App Store Connect record~~ done 2026-11-21: "Tilt: Smart Blinds" (the name Tilt was taken), bundle ID `app.tilt.blinds`, SKU TILT001. The home-screen name stays Tilt.
+2. ~~CloudKit~~ done 2026-11-21 (`Gone` added; schema deployed to Production). Was: in the CloudKit Console, open container `iCloud.app.tilt.blinds`, Development, and use
    "Deploy Schema Changes" to copy the record types `Join` and `Gone` to Production. Add a query index on `Join.topic`
    (queryable) if the console asks.
 3. **Privacy policy URL:** once the repo is public on GitHub, use the link to `docs/privacy-policy.md`.
@@ -23,10 +23,11 @@ What is still needed before Tilt can go to TestFlight and the App Store, and the
 - Everything else: not collected.
 
 ## Export compliance (encryption)
-Tilt uses standard encryption from Apple's CryptoKit (P-256 key agreement, AES-256-GCM) to secure the connection to
-the user's own controller, and HTTPS. To confirm before the first upload: this is expected to be "uses encryption,
-exempt (standard algorithms, mass market)". `ITSAppUsesNonExemptEncryption` is not set yet, so App Store Connect will
-ask at upload.
+Tilt's only encryption is Apple's CryptoKit (P-256 key agreement, AES-256-GCM, to secure the link to the user's own
+controller) and HTTPS. It implements no encryption of its own and uses no third-party crypto library, so it only
+"uses or accesses the encryption within Apple's operating system", which Apple treats as exempt.
+`ITSAppUsesNonExemptEncryption` is set to false in Info.plist, so App Store Connect does not ask on each upload.
+(The controller's firmware uses its own crypto library, but it is not part of the app.)
 
 ## Notes for App Review
 > Tilt controls a small battery-powered controller for window blinds. You do not need one to review the app: on the

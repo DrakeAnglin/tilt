@@ -2,6 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Encryption: only Apple's own CryptoKit and HTTPS, which Apple treats as exempt (docs/app-store.md). -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSHomeKitUsageDescription</key>
 	<string>Tilt uses Apple Home to add your blinds controller as an accessory.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
