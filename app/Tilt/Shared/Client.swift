@@ -85,7 +85,7 @@ struct ControllerClient: Sendable {
     func goAll(to word: String, gently minutes: Int = 0) async throws { try await send(Api.goAll(to: word, gently: minutes)) }
     func stop() async throws { try await send(Api.stop) }
     /// Hold-to-turn: one short push.
-    func jog(blind: Int, dir: Int, percent: Int) async { _ = try? await transport.call(Api.jog(blind: blind, dir: dir, percent: percent)) }
+    func jog(blind: Int, dir: Int, percent: Int, ms: Int = 450) async { _ = try? await transport.call(Api.jog(blind: blind, dir: dir, percent: percent, ms: ms)) }
     func restart() async throws { try await send(Api.reboot) }
 
     // ---- setting up a blind

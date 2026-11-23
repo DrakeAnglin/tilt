@@ -1,4 +1,5 @@
-// Teaching a blind its three positions. You turn the blind by hand to each one and save it.
+// Teaching a blind its three marks. First the motor turns a little each way, so the controller learns which way it is
+// wired; then you turn the blind by hand to each mark and save it.
 import SwiftUI
 
 struct SetupWizard: View {
@@ -6,7 +7,7 @@ struct SetupWizard: View {
     let controller: Controller
     let index: Int
     let name: String
-    @State private var step = 0
+    @State private var step = -1                // -1: check the motor first
     @State private var problem: String?
     @State private var busy = false
     @State private var lastAngle: Double?
@@ -23,7 +24,19 @@ struct SetupWizard: View {
         let blind = controller.state?.b[safe: index]
         NavigationStack {
             VStack(spacing: 0) {
-                if step < 3 {
+                if step < 0 {
+                    Text("FIRST").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+                    Text("Check the motor").font(.system(size: 30, weight: .bold, design: .rounded)).padding(.top, 2)
+                    SlatView(tilt: 50, slats: 11).frame(maxWidth: 300).frame(height: 300).padding(.vertical, 20)
+                    Text("Turn the wand so the slats are about halfway, not shut. Then tap Check Motor: the blind turns a little one way and back, so the controller learns which way its motor is wired.")
+                        .font(.body).multilineTextAlignment(.center).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).padding(.top, 12) }
+                    Spacer(minLength: 12)
+                    Button { checkMotor() } label: {
+                        HStack { if busy { ProgressView().tint(Palette.onAccent) }; Text(busy ? "Turning…" : "Check Motor").font(.headline) }.frame(maxWidth: .infinity).padding(.vertical, 6)
+                    }
+                    .buttonStyle(.glassProminent).controlSize(.large).disabled(busy || blind?.pres == 0)
+                } else if step < 3 {
                     let s = steps[step]
                     HStack(spacing: 6) {
                         ForEach(0..<3, id: \.self) { i in Capsule().fill(i <= step ? Palette.accent : Color.primary.opacity(0.15)).frame(height: 5) }
@@ -93,6 +106,13 @@ struct SetupWizard: View {
         .interactiveDismissDisabled()
     }
 
+    private func checkMotor() {
+        busy = true; problem = nil
+        Task {
+            defer { busy = false }
+            if let p = await MotorCheck.run(controller, blind: index) { problem = p } else { step = 0 }
+        }
+    }
     private func mark(_ which: String) {
         busy = true; problem = nil
         Task {
@@ -130,5 +150,39 @@ struct HoldButton: View {
             }
             .sensoryFeedback(.impact, trigger: held)
             .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Which way a blind's motor is wired: it turns a little one way and back, and the controller learns the direction
+/// from how its angle moved (it keeps it, so swapped motor wires never send a blind the wrong way).
+enum MotorCheck {
+    /// nil when it worked, else what to tell the user.
+    static func run(_ c: Controller, blind i: Int) async -> String? {
+        // One way until the angle has clearly moved; if that way is against an end stop, the other way.
+        for dir in [1, -1] {
+            guard let moved = await turn(c, blind: i, dir: dir) else { return "The controller did not answer. Try again." }
+            if abs(moved) >= 6 {
+                _ = await turn(c, blind: i, dir: -dir)        // back to where it was
+                return nil
+            }
+        }
+        return "The blind did not turn. Turn the wand so the slats are about halfway, check the cable, and try again."
+    }
+    /// Holds the motor one way (up to 5 s) until the angle has moved 8 degrees. Returns how far it moved, nil if no answer.
+    private static func turn(_ c: Controller, blind i: Int, dir: Int) async -> Double? {
+        guard let a0 = try? await c.client.state().b[safe: i]?.ang else { return nil }
+        let start = Date()
+        while Date().timeIntervalSince(start) < 5 {
+            await c.client.jog(blind: i, dir: dir, percent: 80, ms: 700)
+            if let a = try? await c.client.state().b[safe: i]?.ang, abs(diff(a0, a)) >= 8 { break }
+        }
+        try? await Task.sleep(for: .seconds(1.5))           // stops and settles; the controller learns the direction now
+        guard let a1 = try? await c.client.state().b[safe: i]?.ang else { return nil }
+        return diff(a0, a1)
+    }
+    private static func diff(_ a: Double, _ b: Double) -> Double {
+        var d = (b - a).truncatingRemainder(dividingBy: 360)
+        if d > 180 { d -= 360 } else if d < -180 { d += 360 }
+        return d
     }
 }

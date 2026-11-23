@@ -17,7 +17,7 @@
 #include "update.h"
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev13"
+#define FW_VERSION "2.3.0-dev14"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 

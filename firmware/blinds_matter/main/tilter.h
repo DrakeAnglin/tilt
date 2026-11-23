@@ -20,6 +20,9 @@ const uint32_t RAMP_MS = 150, SETTLE_MS = 120;  // soft start; wait after brakin
 const int MAX_NUDGES = 8;
 const uint32_t POST_MS = 400;                   // after a move: keep the sensor on this long and take the final position then
 const float END_STALL_DEG = 10.0f;              // a stall this close to a closed mark counts as "at the end stop"
+// Farther from the target than at the start of the run by this much (after the gear play): the motor turns the wrong
+// way (its wires swapped since the direction was learned). More than a hand on the wand would do in one go.
+const float WRONG_WAY_DEG = 20.0f;
 
 enum { MV_NONE, MV_TILT, MV_ANGLE, MV_JOG };
 enum { MS_WAKE, MS_RUN, MS_SETTLE, MS_PULSE, MS_POST };
@@ -35,6 +38,7 @@ struct Move {
   float spRef = 0, slowest = 999, stallRef = 0, startErr = 0, runErr = 0, startAng = 0, live = NAN;
   int angDir = 0, travel = 0, nudges = 0, rawDir = 0;
   bool stalled = false, flipped = false, refSet = false, graceSet = false, fromRun = false;
+  int8_t signBefore = 0;        // the motor direction before this move turned round (put back if that did not help)
   uint32_t grace = 8000;
   float lastA = NAN;
   int lastDir = 0, turnBacks = 0;
@@ -100,7 +104,7 @@ inline void finishMove(Move &m, Tilter &t, const char *msg) {
   if (m.kind != MV_JOG) {
     int8_t &sign = t.motSign();
     bool better = fabsf(moveErr(m, t, m.noted)) < m.startErr - 3.0f;
-    if (m.flipped && !better) sign = -sign;                         // the flip did not help: undo it
+    if (m.flipped && !better) sign = m.signBefore;                  // turning round did not help: as it was
     else if (better && abs(sign) != 2) {                            // it went the right way: direction is now known
       sign = msignOf(t) * 2;
       t.keep();
@@ -129,11 +133,15 @@ inline void beginRun(Move &m, Tilter &t, float a) {
   m.angDir = 0;
 }
 inline void endMove(Move &m, Tilter &t, const char *msg) { drive(m, t, 0, 0); m.endMsg = msg; m.st = MS_POST; m.ts = t.ms(); }
-inline bool tryFlip(Move &m, Tilter &t, float a) {   // direction never seen to be right: the motor may be the other way round, try once
-  if (m.flipped || m.kind == MV_JOG || abs(t.motSign()) == 2) return false;
+// The motor may turn the other way round from what is stored (never learned, or its wires swapped since): try the other
+// direction once. Stored only if that brings the blind closer (finishMove); otherwise the old direction is put back.
+inline bool tryFlip(Move &m, Tilter &t, float a) {
+  if (m.flipped || m.kind == MV_JOG) return false;
   m.flipped = true;
-  t.motSign() = -t.motSign();
+  m.signBefore = t.motSign();
+  t.motSign() = -msignOf(t);                     // not "seen to be so" until this move proves it
   t.say("going the wrong way, trying the other direction");
+  drive(m, t, 0, 0);
   beginRun(m, t, a);
   return true;
 }
@@ -196,6 +204,8 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
       sp = s.speed;                            // no slowing near the target: the drive is slow and stops dead
       if (el < RAMP_MS) sp = std::min(sp, (int)(START_DUTY + (sp - START_DUTY) * (int)el / (int)RAMP_MS));
       drive(m, t, m.angDir * msignOf(t), sp);
+      // Clearly going the wrong way (not a hand on the wand: that is one jump, this keeps growing): turn round.
+      if (el > m.grace && fabsf(moveErr(m, t, m.fAng)) > m.runErr + WRONG_WAY_DEG && tryFlip(m, t, a)) return;
     }
     if (el > m.grace && now - m.spT >= 500) {           // speed, for the log (after the gear play is taken up)
       float v = fabsf(angDiff(m.fAng, m.spRef)) * 1000.0f / (now - m.spT);

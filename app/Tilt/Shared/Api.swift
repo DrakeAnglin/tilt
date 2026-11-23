@@ -19,7 +19,7 @@ enum Api {
     /// Every blind to a named position. `gently`: take this many minutes.
     static func goAll(to word: String, gently minutes: Int = 0) -> String { "/api/go?b=all&to=\(word)" + (minutes > 0 ? "&ramp=\(minutes)" : "") }
     /// Hold-to-turn: one short push.
-    static func jog(blind: Int, dir: Int, percent: Int) -> String { "/api/jog?b=\(blind)&d=\(dir)&p=\(percent)&ms=450" }
+    static func jog(blind: Int, dir: Int, percent: Int, ms: Int = 450) -> String { "/api/jog?b=\(blind)&d=\(dir)&p=\(percent)&ms=\(ms)" }
 
     // ---- setting up a blind
     static func watch(blind: Int) -> String { "/api/watch?b=\(blind)" }

@@ -162,8 +162,12 @@ static void tilterTests() {
   { SimTilter s; s.phys = -1; s.hi = 320; float t = s.go(50);     // wired the other way round
     CHECK(s.log.find("going the wrong way") != std::string::npos, "wrong way: tries the other direction");
     CHECK(s.endMsg == "reached" && near(t, 50, 5) && s.sign == -2 && s.keeps == 1, "direction learned and kept"); }
-  { SimTilter s; s.sign = 2; s.phys = -1; s.hi = 320; s.go(50);   // a confirmed direction is not flipped
-    CHECK(s.endMsg == "blocked (stalled)" && s.sign == 2 && s.keeps == 0, "confirmed direction stays"); }
+  { SimTilter s; s.sign = 2; s.phys = -1; s.hi = 320; float t = s.go(50);   // learned, then the motor wires were swapped
+    CHECK(s.endMsg == "reached" && near(t, 50, 5) && s.sign == -2 && s.keeps == 1, "swapped wires: a learned direction is corrected and kept"); }
+  { SimTilter s; s.sign = 2; s.phys = -1; s.go(50);               // swapped, no end stop in the way: caught while running
+    CHECK(s.endMsg == "reached" && s.sign == -2, "swapped wires: caught while running, before any end stop"); }
+  { SimTilter s; s.sign = 2; s.lo = 270; s.go(50);                // right direction, but something blocks the blind
+    CHECK(s.endMsg == "blocked (stalled)" && s.sign == 2 && s.keeps == 0, "blocked: the learned direction stays"); }
   { SimTilter s; s.wandAt = 6000; s.wandBy = 12; float t = s.go(50);
     CHECK(s.endMsg == "reached" && near(t, 50, 5), "a wand turn during the move: still reaches"); }
   { SimTilter s; s.set.marks = Marks{300, 10, 100}; s.rod = s.gear = 50; s.blindLo = 351; s.blindHi = 4;
