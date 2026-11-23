@@ -157,3 +157,9 @@ CONFIG_ENABLE_TEST_SETUP_PARAMS=n
 
 # Bluetooth stays on after Apple Home has added the hub: it looks for new controllers
 CONFIG_USE_BLE_ONLY_FOR_COMMISSIONING=n
+
+# Built for size (not the debug default), and new hub firmware runs on trial: back to the last one if it fails
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_CHIP_LOG_DEFAULT_LEVEL_ERROR=y          # Matter: errors only (its progress messages took ~100 KB); the hub's own log stays

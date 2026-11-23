@@ -19,11 +19,16 @@ static const ble_uuid128_t BLINDS_SVC = BLE_UUID128_INIT(0xF0, 0xE5, 0xD4, 0x91,
 static const ble_uuid128_t BLINDS_RX = BLE_UUID128_INIT(0xF0, 0xE5, 0xD4, 0x91, 0x2A, 0x6C, 0x0D, 0x9E, 0x52, 0x4F, 0x3C, 0x7A, 0x02, 0x00, 0x1D, 0xB1);
 static const ble_uuid128_t BLINDS_TX = BLE_UUID128_INIT(0xF0, 0xE5, 0xD4, 0x91, 0x2A, 0x6C, 0x0D, 0x9E, 0x52, 0x4F, 0x3C, 0x7A, 0x03, 0x00, 0x1D, 0xB1);
 static std::string bleAnswer = "2{}";
+static uint16_t bleAnswerConn = 0xFFFF;          // the connection the answer belongs to: nobody else can read it
 static uint16_t bleTxHandle = 0;
 
-static int bleAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt *c, void *arg)
+static int bleAccess(uint16_t conn, uint16_t, struct ble_gatt_access_ctxt *c, void *arg)
 {
-    if (c->op == BLE_GATT_ACCESS_OP_READ_CHR) return os_mbuf_append(c->om, bleAnswer.data(), bleAnswer.size()) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    if (c->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        static const std::string none = "4{\"err\":\"no answer for you\"}";
+        const std::string &a = conn == bleAnswerConn ? bleAnswer : none;
+        return os_mbuf_append(c->om, a.data(), a.size()) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
     if (c->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
     uint16_t n = OS_MBUF_PKTLEN(c->om), got = 0;
     if (n < 1 || n > 2300) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
@@ -35,6 +40,7 @@ static int bleAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt *c, void *a
     else if (in[0] == 'X') st = secDo(in.substr(1), out, nullptr);
     else out = "{\"err\":\"unknown request\"}";
     bleAnswer = std::string(1, st[0]) + out;
+    bleAnswerConn = conn;
     return 0;
 }
 static const struct ble_gatt_chr_def bleChrs[] = {

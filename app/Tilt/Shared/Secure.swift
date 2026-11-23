@@ -83,7 +83,10 @@ enum Secure {
               let check = j["check"] as? String else { throw TiltError((j["err"] as? String) ?? "Pairing was refused.") }
         let shared = try priv.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: pub))
         let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
-        let mine = Data(HMAC<SHA256>.authenticationCode(for: Data("confirm".utf8), using: key)).prefix(8).hex
+        // The check is made without the hub's setup code (so the answer to one pairing says nothing about the code);
+        // a wrong code shows up at the first command instead.
+        let checkKey = salt.isEmpty ? key : shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: Data(), sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
+        let mine = Data(HMAC<SHA256>.authenticationCode(for: Data("confirm".utf8), using: checkKey)).prefix(8).hex
         guard mine == check else { throw TiltError("The controller's key did not match. Pairing was cancelled.") }
         return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1, waiting: (j["wait"] as? Int) == 1, topic: (j["topic"] as? String) ?? "", blindName: (j["blindName"] as? String) ?? "")
     }

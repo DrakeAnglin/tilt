@@ -60,26 +60,41 @@ The protocol between hub and controller is described at the top of `../blinds_ma
 ```
 
 Wi-Fi comes from `main/secrets.h` (copy `main/secrets.h.example`) until Apple Home gives the hub its network. The USB log prints
-`HUB DATASET <hex>` (the Thread network, for `/api/hubjoin`) and `HUB SETUP CODE` (for Apple Home). Both stay on
-the USB log only. Use `app-flash` to update without forgetting the Thread network, the setup code or the tiles.
+`HUB DATASET <hex>` (the Thread network) and `HUB SETUP CODE` (for Apple Home). Both stay on the USB log only. A
+plain `flash` keeps what the hub has learned (Thread network, people, tiles, backups); only `erase-flash` clears it.
 
-## Move a controller onto the hub
+## Update the hub (no cable)
 
-1. While it is on Wi-Fi, give it the network: `blinds_client.py --ip <controller> --as owner get "/api/hubjoin?ds=<HUB DATASET>"`.
-2. `tools/flash_thread.sh <controller id>`: builds the Thread firmware and installs it. If the controller cannot
-   reach the hub within 5 minutes it goes back to Wi-Fi by itself. Run it again for later updates: on Thread it
-   sends the file through the hub (`VIA_WIFI=1`: switch to its Wi-Fi firmware first and send over Wi-Fi).
-   Or use the app: setup does all of this for a new controller.
-3. Let "Tilt Hub" in from the app (People), as a user.
-4. Remove the controller's old tile from Apple Home: Home now sees it through the hub.
+```bash
+tools/flash_hub.sh
+```
 
-`http://<hub>/hub` lists the controllers the hub knows (no keys).
+Raise `PROJECT_VER` in `CMakeLists.txt` first. The hub has two firmware slots: the signed file goes into the spare
+one over Wi-Fi (owner-allowed, signature and version checked), the hub restarts on it on trial and keeps it once Wi-Fi
+and Apple Home have worked for a minute, otherwise it goes back by itself. About a minute in all. The spare slot is
+also where a controller's update waits while the hub sends it. The setup code lives in the hub's flash (copied there
+from `main/setup_pin.h` at its first USB flash), so update files carry no code.
+
+## Add a controller
+
+Use the app: plug the controller in (it can be set up in its first 15 minutes after power-on), then Add a New Device.
+Setup pairs over Bluetooth, hands over the hub's Thread network, lets the hub in and tells the controller which key
+is the hub's. Its blinds then show up in Apple Home through the hub by themselves.
+
+## Update a controller from the bench
+
+```bash
+tools/flash.sh <controller id>
+```
+
+Builds, signs and sends it through the hub: a patch when `~/.tilt/fw/` has the image the controller runs (about a
+minute), else the whole file (`FULL=1` forces that; about 7 minutes). The tool needs owner keys, once:
+`blinds_client.py --ip <hub>/hub --as hub-owner ask` and `blinds_client.py --ip <hub>/c/<id> --as <name> ask`, each
+let in as an owner from the app; then `TILT_AS=<name> tools/flash.sh <id>`.
 
 ## Known limits (bench)
 
 - One C6 for both radios: Espressif rates Wi-Fi plus a Thread network on one chip as "supported but unstable".
   The plan is to stay with one chip. A second chip (ESP32-S3 + ESP32-H2, `docs/research/thread-border-router-chips.md`
   on its research branch) is only the fallback if response times through the hub fall short.
-- One firmware slot (plus the staging area): no update over the air for the hub itself yet.
-- A controller whose firmware predates the always-on radio takes small pieces: about 90 minutes for one update.
 - The app is only 3 % short of the 2 MB firmware slot: keep an eye on the size.

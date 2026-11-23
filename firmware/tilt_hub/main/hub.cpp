@@ -34,6 +34,7 @@
 #include <esp_mac.h>
 #include <esp_coexist.h>
 #include <esp_partition.h>
+#include <esp_ota_ops.h>
 #include <driver/gpio.h>
 #include <host/ble_hs.h>
 #include <host/ble_gap.h>
@@ -61,7 +62,13 @@
 #include "logic.h"                               // battLevel (the controller's own rules)
 #include "home_view.h"                           // what Home sees, the same rules as a controller on Wi-Fi
 #include "secrets.h"                             // WIFI_SSID, WIFI_PASSWORD (bench: until Apple Home gives the network)
-#include "setup_pin.h"                           // HUB_SETUP_PIN: on the hub's label; made by build.sh, never in the repo
+// HUB_SETUP_PIN: on the hub's label; made by build.sh, never in the repo. It is copied to flash at the first start, so
+// update files (built with TILT_RELEASE) carry no code at all.
+#if __has_include("setup_pin.h") && !defined(TILT_RELEASE)
+#include "setup_pin.h"
+#else
+#define HUB_SETUP_PIN ""
+#endif
 #include "fwkey.h"                               // FW_SIGN_PUB: the key Tilt firmware is signed with (blinds_matter/main)
 #include <mbedtls/sha256.h>
 #include <mbedtls/ecdsa.h>
@@ -115,14 +122,21 @@ struct Ctrl {
   SemaphoreHandle_t mx;                          // one request to this controller at a time
 };
 static Ctrl ctrls[MAX_CTRL];
+// Per controller (flash "proof"): it has sent a proven push (from then on only proven ones count), and the boot count
+// of the newest one (an older boot's push is never taken again).
+struct Proof { uint8_t on; uint32_t bn; };
+static Proof proofs[MAX_CTRL];
+static void proofsSave();
 static uint32_t constrain_u(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 struct OtaAck { bool ok, num; uint32_t next; };   // a controller's answer to a firmware piece (num: it gave an offset)
 static QueueHandle_t otaAcks;
+static bool hubTrial = false;                    // the hub runs new firmware it has not kept yet
 static volatile int otaFor = -1;                 // the controller being updated (one at a time)
 static std::string homeManual, homeQr;           // the code to type and the QR text (USB log, and to the controllers)
 static volatile bool inHome = false;             // added to Apple Home (or another Matter home)
 static SemaphoreHandle_t stateMx;              // ctrls[] (not the per-controller request lock)
 static nvs_handle_t nv;
+static void proofsSave() { nvs_set_blob(nv, "proof", proofs, sizeof proofs); nvs_commit(nv); }
 static void saveCtrls() {
   Saved all[MAX_CTRL] = {};
   for (int i = 0; i < MAX_CTRL; i++) if (ctrls[i].used) all[i] = ctrls[i].s;
@@ -130,6 +144,7 @@ static void saveCtrls() {
   nvs_commit(nv);
 }
 static void loadCtrls() {
+  { size_t pn = sizeof proofs; if (nvs_get_blob(nv, "proof", proofs, &pn) != ESP_OK || pn != sizeof proofs) memset(proofs, 0, sizeof proofs); }
   Saved all[MAX_CTRL] = {};
   size_t n = sizeof all;
   if (nvs_get_blob(nv, "ctrls", all, &n) != ESP_OK || n != sizeof all) {   // the first layout (no sep): keep the keys
@@ -279,7 +294,7 @@ static std::string ctrlCommand(int c, const std::string &cmd) {
     int st = ask(c, 'X', pkt, ans);
     if (st == 409) { k.bootOk = false; continue; }  // the controller restarted (new boot id): once more
     if (st == 403 && ans.find("waiting") != std::string::npos) { ESP_LOGW(TAG, "%s: Tilt Hub is waiting to be let in (Tilt app, People)", k.s.id); return ""; }
-    if (st != 200 || ans.size() < 28) { ESP_LOGW(TAG, "%s: command %s failed (%d) %s", k.s.id, cmd.c_str(), st, st == 200 ? "" : ans.c_str()); if (st == 401) { k.s.keyState = 0; saveCtrls(); } return ""; }
+    if (st != 200 || ans.size() < 28) { ESP_LOGW(TAG, "%s: command %s failed (%d) %s", k.s.id, cmd.c_str(), st, st == 200 ? "" : ans.c_str()); if (st == 401) { k.s.keyState = 0; proofs[c] = {}; saveCtrls(); proofsSave(); } return ""; }
     std::string out(ans.size() - 28, 0);
     uint8_t aad2[30];
     memcpy(aad2, "blinds-v1r", 10); memcpy(aad2 + 10, k.s.cid, 8); memcpy(aad2 + 18, p + 8, 12);
@@ -462,7 +477,10 @@ static void udpTask(void *) {
         ctrls[i].announced = false;
         ctrls[i].seen = 0;
         ctrls[i].hello.clear();
-        ESP_LOGI(TAG, "%s left for Wi-Fi", ctrls[i].s.id);
+        // It forgot everything: the hub's key there is gone too. Ask to join again once it is set up anew.
+        ctrls[i].s.keyState = 0; proofs[i] = {};
+        saveCtrls(); proofsSave();
+        ESP_LOGI(TAG, "%s was reset: it is new again", ctrls[i].s.id);
       }
       xSemaphoreGive(stateMx);
       continue;
@@ -542,16 +560,22 @@ static void udpTask(void *) {
     xSemaphoreTake(stateMx, portMAX_DELAY);
     int c = findCtrl(id);
     bool isNew = c < 0;
-    if (c >= 0 && ctrls[c].s.keyState == 2) {    // let the hub in: only a proven push counts, and never an old one again
+    if (c >= 0 && ctrls[c].s.keyState == 2) {    // let the hub in: a proven push, never an old one (boot count, then count)
       size_t dot = tail.find('.');
       uint32_t pn = dot == std::string::npos ? 0 : strtoul(tail.c_str(), nullptr, 10);
-      bool fresh = strcmp(pb, ctrls[c].pushBoot) || pn > ctrls[c].pushN;
-      if (!pn || !fresh || !macOk(c, "ctl-push" + std::string((const char *)boot, 4) + json + std::to_string(pn), tail.substr(dot + 1))) {
+      cJSON *bnj = cJSON_GetObjectItem(j, "bn");
+      uint32_t bn = cJSON_IsNumber(bnj) ? (uint32_t)bnj->valuedouble : 0;
+      bool proven = pn && macOk(c, "ctl-push" + std::string((const char *)boot, 4) + json + std::to_string(pn), tail.substr(dot + 1));
+      bool fresh = bn > proofs[c].bn || (bn == proofs[c].bn && (strcmp(pb, ctrls[c].pushBoot) || pn > ctrls[c].pushN));
+      if (proven && fresh) {
+        ctrls[c].pushN = pn;
+        if (!proofs[c].on || bn != proofs[c].bn) { proofs[c].on = 1; proofs[c].bn = bn; proofsSave(); }
+      } else if (proofs[c].on || proven) {       // once it proves its pushes, nothing else counts (nor an old one)
         static uint32_t told = 0;
         if (ms() - told > 60000) { told = ms(); ESP_LOGW(TAG, "%s: a push without a good proof was ignored", id); }
         xSemaphoreGive(stateMx); cJSON_Delete(j); continue;
       }
-      ctrls[c].pushN = pn;
+      // (not proven yet: it has not been told which key is the hub's; taken as before setup)
     }
     if (isNew) {
       for (int i = 0; i < MAX_CTRL && c < 0; i++) if (!ctrls[i].used) c = i;
@@ -690,6 +714,14 @@ static void careTask(void *) {
   }
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(ms() < 90000 ? 5000 : 15000));   // quicker just after a start: find the controllers again
+    if (hubTrial) {                              // new hub firmware: keep it once Wi-Fi and Apple Home are up for a minute
+      static uint32_t upSince = 0;
+      bool up = hubIp() != "0.0.0.0" && matterUp;
+      if (up && !upSince) upSince = ms() ? ms() : 1;
+      if (!up) upSince = 0;
+      if (upSince && ms() - upSince > 60000) { esp_ota_mark_app_valid_cancel_rollback(); hubTrial = false; ESP_LOGI(TAG, "new hub firmware %s kept", esp_app_get_description()->version); }
+      else if (ms() > 300000) { ESP_LOGE(TAG, "new hub firmware did not get Wi-Fi and Apple Home up: going back"); vTaskDelay(pdMS_TO_TICKS(200)); esp_ota_mark_app_invalid_rollback_and_reboot(); }
+    }
     static uint32_t lastScan = 0;
     if (ms() - lastScan > 30000) { lastScan = ms(); bleScan(); }
     // Not in a home yet: keep the pairing window open (Matter closes it after 15 minutes).
@@ -711,6 +743,9 @@ static void careTask(void *) {
                  ci.mExtAddress.m8[3], (unsigned long)ci.mAge, (unsigned long)ci.mTimeout, ci.mRxOnWhenIdle, ci.mIsStateRestoring);
       }
       uint8_t ch = otLinkGetChannel(ot);
+      otExtAddress kidAddr[8];
+      int kidN = 0;
+      for (uint16_t i = 0; i < otThreadGetMaxAllowedChildren(ot) && kidN < 8; i++) if (otThreadGetChildInfoByIndex(ot, i, &ci) == OT_ERROR_NONE) kidAddr[kidN++] = ci.mExtAddress;
       esp_openthread_lock_release();
       static int lastKids = -1, lastRole = -1;
       // A device is attached that the hub has not heard from lately: say hello to it, at its own link-local address
@@ -718,14 +753,13 @@ static void careTask(void *) {
       // (a multicast would be missed by a sleeping one). A controller answers with its id and learns where the hub is.
       bool quiet = true;
       for (int c = 0; c < MAX_CTRL; c++) if (ctrls[c].used && ctrls[c].addrOk && ms() - ctrls[c].seen < 60000) quiet = false;
-      for (uint16_t i = 0; quiet && i < otThreadGetMaxAllowedChildren(ot); i++) {
-        if (otThreadGetChildInfoByIndex(ot, i, &ci) != OT_ERROR_NONE) continue;
+      for (int i = 0; quiet && i < kidN; i++) {
         sockaddr_in6 d = {};
         d.sin6_family = AF_INET6;
         d.sin6_port = htons(HUB_PORT);
         uint8_t *a = (uint8_t *)&d.sin6_addr;
         a[0] = 0xfe; a[1] = 0x80;
-        memcpy(a + 8, ci.mExtAddress.m8, 8);
+        memcpy(a + 8, kidAddr[i].m8, 8);
         a[8] ^= 0x02;
         d.sin6_scope_id = esp_netif_get_netif_impl_index(esp_openthread_get_netif());
         const char h[] = {'H', 0, 0};
@@ -798,6 +832,8 @@ static bool newNearby(uint32_t withinMs = 300000) {
 
 // ---- a controller's firmware through the hub: the app uploads the signed file here (fast, Wi-Fi), the hub keeps it
 // in its staging area and feeds it to the controller over Thread (protocol: blinds_matter/main/hub_link.h).
+// The hub's spare firmware slot: a controller's file is kept here while it is sent, and the hub's own next firmware
+// is written here. (So nothing else uses it while the hub tries new firmware: then it is the way back.)
 static const esp_partition_t *stage;
 static uint32_t stageSize;
 static bool stageDelta;                           // the staged file is a patch (blinds_matter/main/hub_link.h)
@@ -809,8 +845,8 @@ static void otaTask(void *arg) {
   Ctrl &k = ctrls[c];
   uint32_t CH = otaCh, WIN = otaWin;               // a controller that keeps its radio on takes big pieces
   std::string ans;
-  ctrlCommand(c, "/api/s");                        // its boot id is fresh (the begin carries a proof made with it)
-  std::string sz = std::to_string(stageSize) + (stageDelta ? ",d" : ""), mac = k.bootOk ? macOf(c, "hub-ota" + std::string((const char *)k.boot, 4) + sz) : "";
+  if (ctrlCommand(c, "/api/s").empty()) { otaFail(k, "the controller did not answer"); otaFor = -1; vTaskDelete(nullptr); return; }   // fresh boot id
+  std::string sz = std::to_string(stageSize) + (stageDelta ? ",d" : "") + "@" + std::to_string((long)time(nullptr)), mac = k.bootOk ? macOf(c, "hub-ota" + std::string((const char *)k.boot, 4) + sz) : "";
   if (mac.empty()) { otaFail(k, "the hub has no key on this controller yet"); otaFor = -1; vTaskDelete(nullptr); return; }
   int st = ask(c, 'B', sz + "." + mac, ans, 45000);   // an older controller erases its whole slot first
   if (st != 200) { otaFail(k, st == 403 ? "updates are locked (allow them first)" : st ? "the controller refused to start" : "no answer"); otaFor = -1; vTaskDelete(nullptr); return; }
@@ -852,31 +888,39 @@ static void otaTask(void *arg) {
   otaFor = -1;
   vTaskDelete(nullptr);
 }
-// The file in the staging area: signed with the Tilt release key, and (a full file) not older than what the
-// controller runs. A patch is signed as a file too; the controller checks the image it makes and its version.
-static const char *stageCheck(const Ctrl &k) {
-  static const char MAGIC[8] = {'T', 'I', 'L', 'T', 'S', 'I', 'G', '1'}, DMAGIC[8] = {'T', 'I', 'L', 'T', 'D', 'L', 'T', '1'};
-  if (stageSize < 1000) return "that is not a firmware file";
-  uint8_t tail[72], hash[32], head[4];
-  esp_partition_read(stage, 0, head, 4);
-  stageDelta = head[0] == 0x10 && head[1] == 0xde && head[2] == 0xcd && head[3] == 0xfc;
-  esp_partition_read(stage, stageSize - 72, tail, 72);
-  if (memcmp(tail + 64, stageDelta ? DMAGIC : MAGIC, 8)) return "the file is not signed";
+// A file written to a partition as it came (its last 72 bytes: signature (64) and magic (8)): signed with the Tilt
+// release key over everything before the signature.
+static bool fileSigned(const esp_partition_t *p, uint32_t size, const char magic[8]) {
+  if (size < 1000) return false;
+  uint8_t tail[72], hash[32];
+  esp_partition_read(p, size - 72, tail, 72);
+  if (memcmp(tail + 64, magic, 8)) return false;
   mbedtls_sha256_context sh;
   mbedtls_sha256_init(&sh); mbedtls_sha256_starts(&sh, 0);
   static uint8_t buf[4096];
-  for (uint32_t o = 0, end = stageSize - 72; o < end;) {
+  for (uint32_t o = 0, end = size - 72; o < end;) {
     uint32_t n = end - o < sizeof buf ? end - o : sizeof buf;
-    esp_partition_read(stage, o, buf, n);
+    esp_partition_read(p, o, buf, n);
     mbedtls_sha256_update(&sh, buf, n);
     o += n;
   }
   mbedtls_sha256_finish(&sh, hash); mbedtls_sha256_free(&sh);
-  mbedtls_ecp_group grp; mbedtls_ecp_point q; mbedtls_mpi r, s;
-  mbedtls_ecp_group_init(&grp); mbedtls_ecp_point_init(&q); mbedtls_mpi_init(&r); mbedtls_mpi_init(&s);
+  mbedtls_ecp_group grp; mbedtls_ecp_point q; mbedtls_mpi r, sv;
+  mbedtls_ecp_group_init(&grp); mbedtls_ecp_point_init(&q); mbedtls_mpi_init(&r); mbedtls_mpi_init(&sv);
   bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_ecp_point_read_binary(&grp, &q, FW_SIGN_PUB, 65) == 0 &&
-            mbedtls_mpi_read_binary(&r, tail, 32) == 0 && mbedtls_mpi_read_binary(&s, tail + 32, 32) == 0 && mbedtls_ecdsa_verify(&grp, hash, 32, &q, &r, &s) == 0;
-  mbedtls_ecp_group_free(&grp); mbedtls_ecp_point_free(&q); mbedtls_mpi_free(&r); mbedtls_mpi_free(&s);
+            mbedtls_mpi_read_binary(&r, tail, 32) == 0 && mbedtls_mpi_read_binary(&sv, tail + 32, 32) == 0 && mbedtls_ecdsa_verify(&grp, hash, 32, &q, &r, &sv) == 0;
+  mbedtls_ecp_group_free(&grp); mbedtls_ecp_point_free(&q); mbedtls_mpi_free(&r); mbedtls_mpi_free(&sv);
+  return ok;
+}
+static const char SIG_MAGIC[8] = {'T', 'I', 'L', 'T', 'S', 'I', 'G', '1'}, DLT_MAGIC[8] = {'T', 'I', 'L', 'T', 'D', 'L', 'T', '1'};
+// The file in the staging area: signed, and (a full file) not older than what the controller runs. A patch is
+// signed as a file too; the controller checks the image it makes and its version.
+static const char *stageCheck(const Ctrl &k) {
+  if (stageSize < 1000) return "that is not a firmware file";
+  uint8_t head[4];
+  esp_partition_read(stage, 0, head, 4);
+  stageDelta = head[0] == 0x10 && head[1] == 0xde && head[2] == 0xcd && head[3] == 0xfc;
+  bool ok = fileSigned(stage, stageSize, stageDelta ? DLT_MAGIC : SIG_MAGIC);
   if (!ok) return "the file's signature is not valid";
   if (stageDelta) return nullptr;
   esp_app_desc_t d;                                // after the image header (24 bytes) and the first segment header (8)
@@ -886,10 +930,47 @@ static const char *stageCheck(const Ctrl &k) {
   if (k.fw[0] && fwIsOlder(d.version, k.fw)) return "that firmware is older than the one it runs";
   return nullptr;
 }
+// ---- the hub's own firmware, over Wi-Fi: POST /hub/api/update, in the 5 minutes after its owner allowed it (sealed
+// /api/hubupdate). The signed file goes into the spare slot; the hub checks the signature and that it is not older,
+// then starts it on trial. Kept once Wi-Fi and Apple Home have worked for a minute; otherwise it goes back by itself.
+static uint32_t hubUpdUntil = 0;
+static esp_err_t hHubUpdate(httpd_req_t *r) {
+  auto no = [&](const char *st, const char *why) { httpd_resp_set_status(r, st); return httpd_resp_sendstr(r, (std::string("{\"ok\":0,\"err\":\"") + why + "\"}").c_str()); };
+  if (!hubUpdUntil || (int32_t)(ms() - hubUpdUntil) > 0) return no("403 Forbidden", "the Tilt Hub's owner has to allow this update first");
+  if (hubTrial) return no("409 Conflict", "the hub is still trying the last update");
+  if (otaFor >= 0) return no("409 Conflict", "the hub is updating a controller");
+  if (!stage || r->content_len < 100000 || r->content_len > stage->size) return no("400 Bad Request", "that is not a hub firmware file");
+  hubUpdUntil = 0;
+  otaFor = MAX_CTRL;                             // nothing else writes the spare slot meanwhile
+  esp_partition_erase_range(stage, 0, (r->content_len + 4095) & ~4095u);
+  static char buf[4096];
+  uint32_t got = 0;
+  while (got < r->content_len) {
+    int n = httpd_req_recv(r, buf, sizeof buf);
+    if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+    if (n <= 0) { otaFor = -1; return ESP_FAIL; }
+    esp_partition_write(stage, got, buf, n);
+    got += n;
+  }
+  otaFor = -1;
+  if (!fileSigned(stage, got, SIG_MAGIC)) return no("403 Forbidden", "the file's signature is not valid");
+  esp_app_desc_t d;
+  esp_partition_read(stage, 32, &d, sizeof d);   // after the image header (24) and the first segment header (8)
+  d.version[sizeof d.version - 1] = 0;
+  if (d.magic_word != ESP_APP_DESC_MAGIC_WORD || strncmp(d.project_name, "tilt_hub", sizeof d.project_name)) return no("400 Bad Request", "that is not a hub firmware file");
+  if (fwIsOlder(d.version, esp_app_get_description()->version)) return no("403 Forbidden", "that firmware is older than the one the hub runs");
+  if (esp_ota_set_boot_partition(stage) != ESP_OK) return no("500 Internal Server Error", "the file was not accepted");
+  ESP_LOGW(TAG, "hub firmware %s accepted: restarting", d.version);
+  httpd_resp_set_type(r, "application/json");
+  httpd_resp_sendstr(r, (std::string("{\"ok\":1,\"fw\":\"") + d.version + "\"}").c_str());
+  xTaskCreate([](void *) { vTaskDelay(pdMS_TO_TICKS(1500)); esp_restart(); }, "restart", 2048, nullptr, 3, nullptr);
+  return ESP_OK;
+}
 // POST /c/<id>/api/update: the signed file. Only just after the hub's owner allowed it (sealed /api/upload?id=), so
 // nobody else on the Wi-Fi can fill the hub or keep a controller busy. Answers once it is stored and checked; the
 // progress is in /hub ("ota").
 static esp_err_t hUpload(httpd_req_t *r, int c) {
+  if (hubTrial) { httpd_resp_set_status(r, "409 Conflict"); return httpd_resp_sendstr(r, "{\"ok\":0,\"err\":\"the Tilt Hub is trying its own new firmware: try again in a few minutes\"}"); }
   if (!uploadUntil[c] || (int32_t)(ms() - uploadUntil[c]) > 0) { httpd_resp_set_status(r, "403 Forbidden"); return httpd_resp_sendstr(r, "{\"ok\":0,\"err\":\"the Tilt Hub's owner has to allow this update first\"}"); }
   if (!stage) { httpd_resp_set_status(r, "500 Internal Server Error"); return httpd_resp_sendstr(r, "{\"ok\":0,\"err\":\"the hub has no room for firmware\"}"); }
   if (otaFor >= 0) { httpd_resp_set_status(r, "409 Conflict"); return httpd_resp_sendstr(r, "{\"ok\":0,\"err\":\"the hub is updating another controller\"}"); }
@@ -1124,6 +1205,7 @@ static uint64_t hlast[8];
 static uint8_t hboot[4], htopic[16];
 static SemaphoreHandle_t keyMx;
 static void keysSave() { nvs_set_blob(nv, "hkeys", hkeys, sizeof hkeys); nvs_commit(nv); }
+static void pinBegin();
 static void keysBegin() {
   keyMx = xSemaphoreCreateMutex();
   size_t n = sizeof hkeys;
@@ -1131,6 +1213,15 @@ static void keysBegin() {
   n = sizeof htopic;
   if (nvs_get_blob(nv, "htopic", htopic, &n) != ESP_OK || n != sizeof htopic) { esp_fill_random(htopic, sizeof htopic); nvs_set_blob(nv, "htopic", htopic, sizeof htopic); nvs_commit(nv); }
   esp_fill_random(hboot, sizeof hboot);
+  pinBegin();
+}
+static char setupPin[12];                        // the code on the label (flash "pin")
+static void pinBegin() {
+  size_t n = sizeof setupPin;
+  if (nvs_get_str(nv, "pin", setupPin, &n) == ESP_OK && setupPin[0]) return;
+  strlcpy(setupPin, HUB_SETUP_PIN, sizeof setupPin);
+  if (setupPin[0]) { nvs_set_str(nv, "pin", setupPin); nvs_commit(nv); }
+  else ESP_LOGE(TAG, "no setup code: build once over USB with main/setup_pin.h");
 }
 static bool hubOwned() { for (auto &k : hkeys) if (k.used == 1 && k.role == 1) return true; return false; }
 static std::string hubId() { uint8_t m[6]; esp_read_mac(m, ESP_MAC_WIFI_STA); return "hub" + hexOf(m, 6); }
@@ -1174,7 +1265,7 @@ static int pairDo(const std::string &b, std::string &out, bool ask) {
   if (ask) lastAsk = ms();
   mbedtls_ecp_group grp; mbedtls_mpi d, z; mbedtls_ecp_point Q, Qp;
   mbedtls_ecp_group_init(&grp); mbedtls_mpi_init(&d); mbedtls_mpi_init(&z); mbedtls_ecp_point_init(&Q); mbedtls_ecp_point_init(&Qp);
-  uint8_t dpub[65], shared[32], okm[32], info[9 + 130];
+  uint8_t dpub[65], shared[32], okm[32], okm0[32], info[9 + 130];   // okm0: the same without the setup code (for the check)
   size_t dn = 0;
   bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_ecdh_gen_public(&grp, &d, &Q, rng, nullptr) == 0 &&
             mbedtls_ecp_point_read_binary(&grp, &Qp, cpub, 65) == 0 && mbedtls_ecp_check_pubkey(&grp, &Qp) == 0 &&
@@ -1183,8 +1274,9 @@ static int pairDo(const std::string &b, std::string &out, bool ask) {
   if (ok) {
     memcpy(info, "blinds-v1", 9); memcpy(info + 9, cpub, 65); memcpy(info + 74, dpub, 65);
     // The first owner's key also takes the setup code (as the HKDF salt): the phone must know it.
-    const char *salt = first ? HUB_SETUP_PIN : "";
-    ok = mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), (const uint8_t *)salt, strlen(salt), shared, 32, info, sizeof info, okm, 32) == 0;
+    const char *salt = first ? setupPin : "";
+    ok = mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), (const uint8_t *)salt, strlen(salt), shared, 32, info, sizeof info, okm, 32) == 0 &&
+         mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), nullptr, 0, shared, 32, info, sizeof info, okm0, 32) == 0;
   }
   mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&d); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&Q); mbedtls_ecp_point_free(&Qp);
   if (!ok) { out = "{\"err\":\"key exchange failed\"}"; return 400; }
@@ -1210,7 +1302,7 @@ static int pairDo(const std::string &b, std::string &out, bool ask) {
   keysSave();
   if (ask) ESP_LOGI(TAG, "%s asked to join the hub", k.name); else ESP_LOGI(TAG, "%s is connecting (owner, once its code is right)", k.name);
   uint8_t chk[32], pb[100];
-  mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), okm, 32, (const uint8_t *)"confirm", 7, chk);
+  mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), okm0, 32, (const uint8_t *)"confirm", 7, chk);   // never from the code
   size_t pn = 0;
   mbedtls_base64_encode(pb, sizeof pb, &pn, dpub, 65);
   out = std::string("{\"pub\":\"") + std::string((char *)pb, pn) + "\",\"cid\":\"" + hexOf(k.id, 8) + "\",\"check\":\"" + hexOf(chk, 8) + "\",\"owner\":" + (first ? "1" : "0") +
@@ -1288,6 +1380,7 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     return r;
   }
   if (path == "/api/net") return netJson();
+  if (path == "/api/hubupdate") { hubUpdUntil = (ms() + 300000) | 1; return "{\"ok\":1}"; }   // one hub update, 5 minutes
   if (path == "/api/upload") {                   // allow one firmware upload for this controller, for 5 minutes
     xSemaphoreTake(stateMx, portMAX_DELAY);
     int c = findCtrl(qv(q, "id").c_str());
@@ -1375,11 +1468,12 @@ static void httpBegin() {
   hc.lru_purge_enable = true;
   hc.max_open_sockets = 5;
   hc.max_uri_handlers = 12;
+  hc.recv_wait_timeout = 30;                     // a firmware file can be slow to arrive
   httpd_handle_t srv = nullptr;
   if (httpd_start(&srv, &hc) != ESP_OK) { ESP_LOGE(TAG, "web server did not start"); return; }
   httpd_uri_t u[] = {{"/c/*", HTTP_GET, hRelay, nullptr}, {"/c/*", HTTP_POST, hRelay, nullptr}, {"/hub", HTTP_GET, hInfo, nullptr},
                      {"/hub/x/hello", HTTP_GET, hHello, nullptr}, {"/hub/x/pair", HTTP_POST, hPair, nullptr}, {"/hub/x/ask", HTTP_POST, hAsk, nullptr},
-                     {"/hub/x", HTTP_POST, hSecure, nullptr}};
+                     {"/hub/x", HTTP_POST, hSecure, nullptr}, {"/hub/api/update", HTTP_POST, hHubUpdate, nullptr}};
   for (auto &x : u) httpd_register_uri_handler(srv, &x);
 }
 
@@ -1515,7 +1609,12 @@ extern "C" void app_main() {
   newMx = xSemaphoreCreateMutex();
   keysBegin();
   otaAcks = xQueueCreate(16, sizeof(OtaAck));
-  stage = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, (esp_partition_subtype_t)0x40, "fwstage");
+  stage = esp_ota_get_next_update_partition(nullptr);
+  {
+    esp_ota_img_states_t st;
+    hubTrial = esp_ota_get_state_partition(esp_ota_get_running_partition(), &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
+    if (hubTrial) ESP_LOGW(TAG, "new hub firmware on trial: kept once Wi-Fi and Apple Home are up for a minute");
+  }
   pendMx = xSemaphoreCreateMutex();
   for (auto &p : pend) p.sem = xSemaphoreCreateBinary();
   for (auto &k : ctrls) {

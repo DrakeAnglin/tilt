@@ -63,7 +63,5 @@ one to each controller.
 
 ## Smaller items left from the 2026-11 review
 
-- Bluetooth setup answers are kept in one shared buffer (`ble.h`); another nearby phone could read the last answer.
-  Keep one answer per connection.
 - A user (not an owner) can read a controller's backup, which includes the home's latitude and longitude. Users are
   trusted; strip the location if that changes.
