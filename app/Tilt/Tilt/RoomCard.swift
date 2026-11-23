@@ -157,10 +157,10 @@ private struct NextStep: View {
         let todo = state.b.indices.first { state.b[$0].listed && state.b[$0].cal == 0 }
         if let i = todo, controller.record.owner {
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(state.b[i].name) is plugged in. Set its marks once, and it is ready to use.")
+                Text("\(state.b[i].name) is plugged in. Finish its setup once, and it is ready to use.")
                     .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button { wizard = i } label: {
-                    Label("Set Marks", systemImage: "slider.horizontal.below.rectangle").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity)
+                    Label("Start Setup", systemImage: "slider.horizontal.below.rectangle").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
             }
@@ -168,7 +168,7 @@ private struct NextStep: View {
                 SetupWizard(controller: controller, index: w.id, name: state.b[safe: w.id]?.name ?? "Blind")
             }
         } else if todo != nil {
-            Label("An owner needs to set these blinds' marks before they can move.", systemImage: "lock").font(.subheadline).foregroundStyle(.secondary)
+            Label("An owner needs to finish setup for these blinds before they can move.", systemImage: "lock").font(.subheadline).foregroundStyle(.secondary)
         } else {
             Label("No blind plugged in yet. Plug one into the controller and it shows up here.", systemImage: "cable.connector").font(.subheadline).foregroundStyle(.secondary)
         }

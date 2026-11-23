@@ -92,7 +92,7 @@ struct ControllerSettingsView: View {
                         }
                     }
                 } header: { Text("Blinds") } footer: {
-                    Text("One row per port on the controller. A blind moves once its marks are set: tap it, then Set Up Marks.")
+                    Text("One row per port on the controller. A blind moves once its setup is done: tap it, then Start Setup.")
                 }
               }
                 if devMode && developerBuild { Section {
@@ -114,7 +114,7 @@ struct ControllerSettingsView: View {
                             Button("Remove", role: .destructive) { remove(reset: false) }
                         }
                     } message: {
-                        Text(controller.record.owner ? "Reset makes the controller forget every iPhone, so it can be set up again as new. Schedules and marks are kept."
+                        Text(controller.record.owner ? "Reset makes the controller forget every iPhone, so it can be added again as new. Schedules and blind setup are kept."
                                                      : "The blinds keep working. To use them here again you will need a new sharing code.")
                     }
             }
@@ -152,7 +152,7 @@ struct ControllerSettingsView: View {
         let s = controller.state?.b[safe: i]
         if b.hid == 1 { return "Port \(i + 1) · hidden" }
         if let s, s.seen == 1, s.pres == 0 { return "Port \(i + 1) · nothing plugged in" }
-        if blindNeedsSetup(i, b) { return "Port \(i + 1) · marks not set yet" }
+        if blindNeedsSetup(i, b) { return "Port \(i + 1) · Setup required" }
         return "Port \(i + 1)"
     }
     /// Plugged in (or not yet checked) and shown, but its open and closed positions are not marked.
@@ -300,7 +300,7 @@ struct BlindSettingsView: View {
             } footer: { Text("Turn off for a port with nothing plugged in.") }
             Section {
                 Button("Start Setup", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
-            } footer: { Text("Mark where this blind is closed up, open, and closed down. Its first move after that checks which way the motor turns.") }
+            } footer: { Text("Setup saves where this blind is closed up, open, and closed down. Its first move after that checks which way the motor turns.") }
         }
             .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }

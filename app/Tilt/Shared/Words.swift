@@ -20,7 +20,7 @@ enum TiltWords {
     }
     static func status(_ b: BlindState) -> String {
         if b.seen == 1 && b.pres == 0 { return "Not connected" }
-        if b.cal == 0 { return "Not set up yet" }
+        if b.cal == 0 { return "Setup required" }
         if b.mov == 1 { return "Moving to \(long(b.tgt).lowercased())" }
         if b.q == 1 { return "Waiting its turn" }
         if b.stuck { return "Did not move" }

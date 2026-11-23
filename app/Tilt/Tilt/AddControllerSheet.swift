@@ -39,7 +39,7 @@ struct AddControllerSheet: View {
                         NavigationLink(value: d) { Label("Blinds Controller", systemImage: "blinds.horizontal.closed") }
                     }
                 } header: { Text("New, over Bluetooth") } footer: {
-                    Text("A new controller can be set up in its first 15 minutes after it is plugged in. If yours is not listed, unplug it and plug it back in.")
+                    Text("A new controller can be added in its first 15 minutes after it is plugged in. If yours is not listed, unplug it and plug it back in.")
                 }
                 Section {
                     if fresh.isEmpty { Label(hub.answering == true ? "None waiting to be added" : "Looking on your Tilt Hub…", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(.secondary) }

@@ -82,9 +82,10 @@ J3 (a 6-way socket for a separate USB-C board) is not used: USB plugs into the 6
 | M3 heat-set insert | 3 | from the tilter's 100 | |
 | M3 × 10 flat-head screw | 3 | from the M3 kit below | |
 | M2 × 6 self-tapping screw (charger) | 2 | 1 small pack | search "M2 x 6 self tapping screw" |
-| **Clear stick-on silicone bumper, about 8 mm across and 2 mm tall** | **4** | 1 pack (they come 50 to 200 to a sheet) | search "clear rubber bumper feet 8 mm" |
+| **Stick-on pad, about 8 mm across and 1.5 to 2 mm tall: felt, rubber or a clear silicone bumper** | **4** | 1 pack (they come 50 to 200 to a sheet) | search "felt pads 8 mm" or "clear rubber bumper feet 8 mm" |
 
-The bumpers lift the box off the rail floor so it does not pinch the blind's lift cord. Where they go:
+The pads lift the box off the rail floor so it does not pinch the blind's lift cord, which runs down the middle of the
+rail: one pad in each corner, none in the middle. Where they go:
 [controller box, step 8](../docs/controller-box.md#assembly).
 
 ### Solar (optional)
@@ -95,6 +96,13 @@ panel on J8.
 |---|---|---|---|
 | 6 V 0.8 W mono ETFE solar panel, 70 × 69 mm (3-pack) | 1 | 1 pack | [B0H1LQFFPN](https://www.amazon.com/dp/B0H1LQFFPN) |
 | JST-ZH 1.5 mm 2-pin plugs (20 + 20) | 1 | 1 pack | [B0D9SMKFNS](https://www.amazon.com/dp/B0D9SMKFNS) |
+
+## Tilt Hub (×1)
+| Part | Per hub | Buy | Link |
+|---|---|---|---|
+| Printed box (white) | 1 | | [hub box](../docs/hub-box.md) |
+| ESP32-C6 SuperMini, **no pins soldered** | 1 | from the controllers' 5-pack | [B0GD19KJ4B](https://www.amazon.com/dp/B0GD19KJ4B) |
+| USB-C male-to-male adapter | 1 | 1 | [B0HFHVN7B6](https://www.amazon.com/dp/B0HFHVN7B6) |
 
 ## Shared supplies
 | Part | Buy | Link |

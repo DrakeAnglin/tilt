@@ -44,7 +44,7 @@ struct SettingsTab: View {
                     }
                     Button("Add a New Device", systemImage: "plus") { adding = true }.listRowBackground(RowGlass()).selectionDisabled()
                 } header: { Text("Devices") } footer: {
-                    Text("Tap a device for its settings: blind names and marks, people and Apple Home.")
+                    Text("Tap a device for its settings: blind names and setup, people and Apple Home.")
                 }
                 Section {
                     LabeledContent { TextField("Name", text: $myName).multilineTextAlignment(.trailing).onSubmit { model.rename(to: myName) } } label: { Label("Display Name", systemImage: "person.crop.circle").lineLimit(1).fixedSize(horizontal: true, vertical: false) }.selectionDisabled()

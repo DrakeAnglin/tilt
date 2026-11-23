@@ -4,6 +4,8 @@
 |---|---|---|
 | [`Tilter/Tilter.py`](Tilter/Tilter.py) | The tilter: every printed part, with collision, gear-mesh and assembly checks | `tools/fusion_tilter.py`, `tools/fusion_thin.py` |
 | [`Controller/Controller.py`](Controller/Controller.py) | Controller box for the PCB | `tools/fusion_controller.py` |
+| [`Hub/Hub.py`](Hub/Hub.py) | Tilt Hub box | `tools/fusion_hub.py` |
+| [`Hub/Hub.py`](Hub/Hub.py) | Tilt Hub box, printed round the ESP | `tools/fusion_hub.py` |
 
 Run through the bridge: `python3 hardware/mechanical/fusion/fusion.py exec tools/<script>.py --timeout 1800`.
 
@@ -14,8 +16,19 @@ Shared pieces:
 - [`fusion_kit.py`](fusion_kit.py): fresh document, hide sketches and planes (used by the drivers in `tools/`).
 - `python3 -m unittest hardware/mechanical/fusion/test_geometry.py` checks the gear train and fits without Fusion.
 
-`fusion.py exec FILE` gives the code `__file__` and `REPO` (the repo root). A tilter build's result has `ok` and
+`fusion.py exec FILE` gives the code `__file__` and `REPO` (the repo root). Every build's result has `ok` and
 `failures`.
+
+## Review after every change
+A change to a printed part is not done until its build comes back `ok`. Every build runs these two:
+
+- **Collision check:** no two parts overlap.
+- **Stays-inside check** (`fusion_kit.stays_inside`): nothing reaches outside the outside shape the part was designed
+  to. Each generator states that shape (the box's `outline`; for the tilter, the housing's cross-section). It catches
+  what a collision check can't: a boss, saddle or screw that comes out through a wall or the floor, or a feature added
+  after a bevel was cut. Only things meant to stick out (a plug, a cable) are on its skip list.
+
+A new enclosure gets both checks before its first print file is written.
 
 ## FusionBridge: lets Claude Code drive Fusion
 An add-in that listens on **127.0.0.1:7655 only** and requires a random token, rewritten each time the add-in starts

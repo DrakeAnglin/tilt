@@ -116,5 +116,39 @@ class Fits(unittest.TestCase):
         self.assertLess(FIT.ROD_Z + FIT.ROD_CORNER_R, FIT.RAIL_H - FIT.LIP_H)
 
 
+
+class ControllerBox(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.T = _load(os.path.join(_HERE, 'Controller', 'tilt_in.py'))
+        cls.C = cls.T.C
+
+    def test_tilts_into_the_rail_without_prying(self):
+        self.assertLessEqual(self.T.min_spread(self.T.section(), STEP=0.5, ASTEP=2.0), 0.5)
+
+    def test_wall_behind_the_bottom_bevel(self):
+        c = self.C
+        self.assertGreaterEqual((c['wall'] + c['floor'] + c['bevel_fill'] - c['bevel_bot']) / math.sqrt(2), 1.5)
+
+    def test_rod_clears_the_groove(self):
+        c = self.C
+        self.assertGreaterEqual(FIT.ROD_Z - FIT.ROD_CORNER_R - c['groove_floor'], 1.75)     # room for the feet
+        # no bumpers: wherever the box sits across the rail, the rod must stay off the groove's sides
+        play = (FIT.RAIL_W - (c['out_hi'] - c['room_out'])) / 2
+        self.assertLess(play, c['groove_r'] - FIT.ROD_CORNER_R)
+        self.assertAlmostEqual(c['groove_y'], (c['room_out'] + c['out_hi']) / 2)
+
+    def test_groove_channel_clears_the_esp_pin_tips(self):
+        c, M = self.C, self.T.M
+        tips = c['esp_z0'] + c['esp_t'] + c['esp_tip']
+        y_in = M.K(19.74 + 0.32, 0)[1]                       # groove-side edge of the pin row nearest the groove
+        self.assertGreaterEqual(M.z_under(y_in, c['groove_t']) - tips, 0.2)
+
+    def test_solar_plug_fits_its_opening(self):
+        _, w, h = self.C['solar']
+        self.assertGreaterEqual(w, 4.5 + 1.0)       # JST-ZH 2-pin housing: 4.5 x 3.5
+        self.assertGreaterEqual(h, 3.5 + 1.0)
+
+
 if __name__ == '__main__':
     unittest.main()

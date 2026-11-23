@@ -1,6 +1,6 @@
 """The controller box in a fresh document: the PCB's own 3D export (KiCad STEP, every part on it), tray, lid, mock-ups of the
 parts the export doesn't have (RJ12 jacks, ESP32-C6, plugs, 18650, the Adafruit 6092 charger), rail + rod;
-exact interference check; STL export of tray, lid and an end-wall fit coupon. Renders only with RENDERS = True.
+exact interference check and stays-inside check (the result's `ok` is False when either fails); print-ready STL export of tray and lid (turned top face down). Renders only with RENDERS = True.
 
   K=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli
   $K pcb export step --subst-models -f -o hardware/pcb/controller/3d/controller.step hardware/pcb/controller/controller.kicad_pcb
@@ -73,13 +73,13 @@ def rbox(x0, x1, y0, y1, z0, z1, r):
 
 groups = M.build(bx, cyl, cone, uni, cut, rbox, obox)
 L = C['L']
-rh, rt = C['rail_w'] / 2, C['rail_wall']
-groups['Rail'] = [('Rail floor', bx(-20, L + 20, -rh - rt, rh + rt, -rt, 0)),
-                  ('Rail wall room', bx(-20, L + 20, -rh - rt, -rh, -rt, C['rail_h'])),
-                  ('Rail wall back', bx(-20, L + 20, rh, rh + rt, -rt, C['rail_h'])),
-                  ('Rail lip room', bx(-20, L + 20, -rh, -rh + C['lip_in'], C['rail_h'] - C['lip_h'], C['rail_h'])),
-                  ('Rail lip back', bx(-20, L + 20, rh - C['lip_in'], rh, C['rail_h'] - C['lip_h'], C['rail_h'])),
-                  ('Tilt rod sweep', cyl((-20, 0, C['rod_z']), (L + 20, 0, C['rod_z']), C['rod'] * math.sqrt(2) / 2))]
+rh, rt, gy = C['rail_w'] / 2, C['rail_wall'], C['groove_y']      # the rail, centered on the box (and its groove)
+groups['Rail'] = [('Rail floor', bx(-20, L + 20, gy - rh - rt, gy + rh + rt, -rt, 0)),
+                  ('Rail wall room', bx(-20, L + 20, gy - rh - rt, gy - rh, -rt, C['rail_h'])),
+                  ('Rail wall back', bx(-20, L + 20, gy + rh, gy + rh + rt, -rt, C['rail_h'])),
+                  ('Rail lip room', bx(-20, L + 20, gy - rh, gy - rh + C['lip_in'], C['rail_h'] - C['lip_h'], C['rail_h'])),
+                  ('Rail lip back', bx(-20, L + 20, gy + rh - C['lip_in'], gy + rh, C['rail_h'] - C['lip_h'], C['rail_h'])),
+                  ('Tilt rod sweep', cyl((-20, gy, C['rod_z']), (L + 20, gy, C['rod_z']), C['rod'] * math.sqrt(2) / 2))]
 groups['Screws'] = [('M3x%.0f %d' % (l, k), uni(cone((x, y, C['floor_z']), 2.95, (x, y, C['floor_z'] + 1.6), 1.45),
                                                  cyl((x, y, C['floor_z'] + 1.55), (x, y, C['floor_z'] + l), 1.45)))
                     for k, (x, y, l) in enumerate(M.SCREWS)]
@@ -189,6 +189,11 @@ for i in range(len(own)):
                 ni, nj, v, q.minPoint.x * 10, q.maxPoint.x * 10, q.minPoint.y * 10, q.maxPoint.y * 10, q.minPoint.z * 10, q.maxPoint.z * 10))
 
 
+# stays-inside check: no printed part, component, screw or wire may reach outside the box's outside shape
+# (the solar cable is meant to: it leaves through its opening)
+pokes = KIT.stays_inside(tbm, [(nm, b) for g, nm, b in own if g != 'Rail'], C['outline'], allow=('Solar cable',))
+
+
 # clearances to the lid (closest approach upward) for the tight spots
 def gap_up(name_part):
     lid = groups['Lid'][0][1]
@@ -278,7 +283,7 @@ def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
                 if on_outline(mid.x, mid.y):
                     sets[rr].add(e)
                 elif groove and zz == z_big and isinstance(e.geometry, adsk.core.Line3D) and \
-                        abs(abs(mid.y) - C['groove_top_hw'] / 10) < 0.002:
+                        abs(abs(mid.y - C['groove_y'] / 10) - C['groove_top_hw'] / 10) < 0.002:
                     sets[rr].add(e)
     done = {}
     for rr, col in sets.items():
@@ -295,7 +300,8 @@ def round_edges(comp, z_big, r_big, z_small, r_small, groove=False):
 
 
 # no rounding where the lid meets the tray (it shows as a groove round the box): only the bottom and top edges
-fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], C['edge_r'], C['zl'], None),
+# (the long edges are beveled in Controller.py; the tray's end edges get a small round that ends on the bevels)
+fil = {'Tray': round_edges(comps['Tray'], C['floor_z'], 0.8, C['zl'], None),
        'Lid': round_edges(comps['Lid'], C['top'], C['edge_r'], C['zl'], None, groove=True)}
 
 
@@ -342,28 +348,24 @@ def engrave(comp, z, lines, xc, yc, w, h, size=0.32):
 eng = {'Tray': engrave(comps['Tray'], C['floor_z'], TRAY_TEXT, L / 2, 0, 110, 18, 0.6),
        'Lid': engrave(comps['Lid'], C['zl'], LID_TEXT, 100, -17, 30, 10, 0.5)}
 files = []
-em = design.exportManager
-for g, nm in (('Tray', 'controller_tray'), ('Lid', 'controller_lid')):
-    path = os.path.join(STL, nm + '.stl')
-    opt = em.createSTLExportOptions(comps[g], path)
-    opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
-    em.execute(opt)
-    files.append(path)
-# fit coupon: just end wall A (first 12 mm of the tray), to check the plug fit against a real jack before the full print
-cb = tbm.copy(comps['Tray'].bRepBodies.item(0))
-tbm.booleanOperation(cb, bx(C['a0'] - 1, C['ia'] + 10, -30, 30, -1, 40), B.IntersectionBooleanType)
+# print files, each lying the way it prints with its lowest face on Z 0: tray floor down, lid turned over (top face down)
+flip = adsk.core.Matrix3D.create()
+flip.setToRotation(math.pi, adsk.core.Vector3D.create(1, 0, 0), P3(0, 0, C['top'] / 2))      # lid: top face to Z 0
+lid_print = tbm.copy(comps['Lid'].bRepBodies.item(0))
+tbm.transform(lid_print, flip)
 main_doc = app.activeDocument
-cdoc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)      # its own throwaway document
-cdes = adsk.fusion.Design.cast(app.activeProduct)
-cdes.designType = adsk.fusion.DesignTypes.DirectDesignType
-cdes.rootComponent.bRepBodies.add(cb)
-path = os.path.join(STL, 'controller_end_a_coupon.stl')
-opt = cdes.exportManager.createSTLExportOptions(cdes.rootComponent, path)
-opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
-cdes.exportManager.execute(opt)
-files.append(path)
-cdoc.close(False)
-main_doc.activate()
+for nm, body in (('controller_tray', tbm.copy(comps['Tray'].bRepBodies.item(0))), ('controller_lid', lid_print)):
+    cdoc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)      # its own throwaway document
+    cdes = adsk.fusion.Design.cast(app.activeProduct)
+    cdes.designType = adsk.fusion.DesignTypes.DirectDesignType
+    cdes.rootComponent.bRepBodies.add(body)
+    path = os.path.join(STL, nm + '.stl')
+    opt = cdes.exportManager.createSTLExportOptions(cdes.rootComponent, path)
+    opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
+    cdes.exportManager.execute(opt)
+    files.append(path)
+    cdoc.close(False)
+    main_doc.activate()
 
 # ------------------------------------------------------------------ renders
 ui.activeSelections.clear()
@@ -469,7 +471,8 @@ for i in range(root.occurrences.count):
         o.component.bRepBodies.item(j).isLightBulbOn = True
 vis(hide=('Rail', 'Lid', 'Screws')); res.append(shot('controller-bay-top.png', (146, 0, 260), (146, 0, 0)))
 vis(hide=('Rail', 'Wires'))
-result = {'box': 'L %.1f x W %.1f x H %.1f' % (C['box_l'], C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
+failures = (['interference: %d pairs' % len(hits)] if hits else []) + (['pokes out of the box: %d bodies' % len(pokes)] if pokes else [])
+result = {'ok': not failures, 'failures': failures, 'pokes out of the box': pokes or 'none', 'box': 'L %.1f x W %.1f x H %.1f' % (C['box_l'], C['out_hi'] - C['room_out'], C['top']), 'notes': notes,
           'pcb board bbox (mm)': [round(v * 10, 2) for v in (bb0.minPoint.x, bb0.maxPoint.x, bb0.minPoint.y, bb0.maxPoint.y, bb0.minPoint.z, bb0.maxPoint.z)] if bb0 else None,
           'step bodies': len(step_bodies), 'interference': hits or 'none', 'room above (mm, first contact with lid)': gaps,
           'wire lengths (mm)': C.get('wire_lengths'), 'fillets': fil, 'engraving': eng, 'exported': files, 'renders': [r for r in res if r]}

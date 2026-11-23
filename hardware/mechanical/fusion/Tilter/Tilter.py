@@ -28,6 +28,7 @@ def _load(path):
 
 
 T4 = _load(os.path.join(_HERE, 'tilt_base.py'))
+KIT = _load(os.path.join(_HERE, '..', 'fusion_kit.py'))   # shared checks
 GG = T4.GG                                # gear_geom.py: dimensions and pure geometry
 FIT = GG.FIT                              # ../fits.py
 adsk = T4.adsk
@@ -713,6 +714,7 @@ def build(design, export_dir=None):
     parts.update(housing_parts(S))
     parts.update(case_halves(S, L))
     refs = ref_parts(S)
+    section = S.prism(F_CASE, -200, 200)                   # the housing's cross-section, for the stays-inside check
     S.done()                                               # before any placement (deleting resets transform2)
     comps = {}
     for nm, b in parts.items():
@@ -757,6 +759,15 @@ def build(design, export_dir=None):
             v, w = _vol(tbm, world[a], world[b])
             if v > OVERLAP_MM3:
                 static.append('%s / %s: %.3f mm3 at %s' % (a, b, v, w))
+    # stays-inside check: every bought part (motor, boards, bolts, dowels, magnet) lies inside the housing's
+    # cross-section, between the housing's two ends. The rod and the RJ12 plug are meant to stick out. (Not checked
+    # this way: the printed parts and the planet dowels inside the ring cup. The roof hump over the ring cup and the
+    # worm are outside the plain cross-section by design.)
+    hx = [world[nm].boundingBox for nm in ('Tray', 'Lid', 'Bearing shell', 'Motor shell', 'Case left', 'Case right')]
+    tbm.booleanOperation(section, S.box(min(q.minPoint.x for q in hx) * 10, max(q.maxPoint.x for q in hx) * 10, -60, 60, -20, 80),
+                         B.IntersectionBooleanType)
+    pokes = KIT.stays_inside(tbm, [(nm, world[nm]) for nm in refs if not nm.startswith(('Rail', 'Rod', 'RJ12 plug', 'Dowel'))], section,
+                             tol=OVERLAP_MM3)
     hits, worst = mesh_states(tbm, parts, world['Worm wheel'])
     # sensor gears: turn the pair (1 : 1, crossed axes) through two tooth pitches
     sg_hits = []
@@ -793,12 +804,14 @@ def build(design, export_dir=None):
         failures.append('sensor gears overlap in both directions: %s' % sg)
     if lumps:
         failures.append('more than one lump: %s' % lumps)
+    if pokes:
+        failures.append('parts poke out of the housing: %d' % len(pokes))
     return dict(
         ok=not failures, failures=failures,
         ratio=round(ratio, 2),
         axes={'P (Y, Z)': [round(v, 2) for v in CL], 'motor (Y, Z)': [round(v, 2) for v in MO], 'magnet gear (Y, Z)': [round(v, 2) for v in MG]},
         stations={k: round(v, 2) for k, v in list(X.items()) + list(XS.items())},
         sensor={'chip top Z': Z_CHIP, 'magnet face Z': Z_MAG, 'gear Z': (ZG0, ZG1),  'gear tip r': round(SG['ra'], 2)},
-        static_interference=static, mesh_interference=hits, mesh_worst_mm3=round(worst, 4),
+        static_interference=static, pokes_out_of_housing=pokes, mesh_interference=hits, mesh_worst_mm3=round(worst, 4),
         sensor_gear_worst_overlap_mm3_by_direction=sg,
         more_than_one_lump=lumps, extents=ext, exported=[os.path.basename(f) for f in files])

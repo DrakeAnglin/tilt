@@ -33,7 +33,7 @@ struct HubView: View {
                     }
                     Section {
                         if let n = i.new, !n.isEmpty {
-                            Label("\(n.count) new controller\(n.count == 1 ? "" : "s") nearby, waiting to be set up", systemImage: "sparkles")
+                            Label("\(n.count) new controller\(n.count == 1 ? "" : "s") nearby, waiting for setup", systemImage: "sparkles")
                         }
                         if i.c.isEmpty { Text("No controllers yet.").foregroundStyle(.secondary) }
                         ForEach(i.c) { m in
@@ -86,7 +86,7 @@ struct HubView: View {
                             }
                     }
                     Section {
-                        Text("Hold the hub's BOOT button (only that one, not RST) for 10 seconds: its light blinks slowly, then fast when it resets. It forgets Apple Home, its Thread network, its controllers and their backups, and starts again. Then remove the old Tilt Hub in the Home app, add it again (Apple Home, above), and set up each controller again.")
+                        Text("Hold the hub's BOOT button (only that one, not RST) for 10 seconds: its light blinks slowly, then fast when it resets. It forgets Apple Home, its Thread network, its controllers and their backups, and starts again. Then remove the old Tilt Hub in the Home app, add it again (Apple Home, above), and add each controller again.")
                             .font(.footnote).foregroundStyle(.secondary)
                     } header: { Text("Reset the Tilt Hub") }
 

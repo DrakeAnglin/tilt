@@ -175,7 +175,7 @@ final class AppModel {
         if c.record.waiting == true { waiting.append(c) } else { controllers.append(c) }
         c.changed = { [weak self, weak c] in
             guard let self, let c else { return }
-            if c.removed { self.notice = "\(c.record.name) is no longer set up with this phone: it was reset, or an owner removed you. It was taken off this phone; set it up again from Add."; self.remove(c); return }
+            if c.removed { self.notice = "\(c.record.name) is no longer on this iPhone: it was reset, or an owner removed you. To use it again, add it from Add."; self.remove(c); return }
             if c.record.waiting != true, let i = self.waiting.firstIndex(where: { $0.id == c.id }) { self.waiting.remove(at: i); self.controllers.append(c) }
             self.save()
         }

@@ -50,10 +50,10 @@ struct BlindSheet: View {
                 if blind.moving { Button(role: .destructive) { controller.stopAll() } label: { Label("Stop", systemImage: "stop.fill").frame(maxWidth: .infinity) }.buttonStyle(.glassProminent).tint(Palette.danger) }
             } else if let blind {
                 if blind.cal == 0 && !(blind.seen == 1 && blind.pres == 0) {
-                    Text("This blind has not been set up yet. Setup takes a minute: you turn it by hand to its three marks.")
+                    Text("This blind needs setup. It takes about a minute: you turn the blind by hand to three spots.")
                         .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     if controller.record.owner {
-                        Button { settingUp = true } label: { Text("Set Up Now").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6) }
+                        Button { settingUp = true } label: { Text("Start Setup").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6) }
                             .buttonStyle(.glassProminent).controlSize(.large)
                     } else {
                         Text("Ask an owner to set it up.").font(.subheadline.weight(.semibold))      // setup is an owner's job

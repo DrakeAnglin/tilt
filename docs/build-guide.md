@@ -31,8 +31,7 @@ output with the bench tool ([as5600_setup](../firmware/README.md#as5600_setup-se
 - **Tilter:** one set of parts per blind, white PLA and white PETG. The Bambu Studio project puts PLA and PETG on
   their own plates. Only the tray lid needs support (under its gear shelf).
   [Parts and how they sit](../hardware/mechanical/stl/tilter/README.md#printed-parts).
-- **Box:** tray and lid in white PLA, no supports. Print the end wall coupon first and check it against a PCB with
-  its jacks soldered ([controller box](controller-box.md)).
+- **Box:** tray and lid in white PLA, no supports ([controller box](controller-box.md)).
 
 ## 4. Build each tilter
 1. Wire the sensor module on the bench: RJ12 breakout, DRV8833, AS5600, motor leads

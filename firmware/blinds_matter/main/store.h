@@ -65,6 +65,54 @@ Stats stats;
 uint8_t battHist[BATT_HIST];   // (volts - 2.5) * 100, 0 = no reading; newest last
 Preferences nvs;
 
+#ifdef TILT_DEVLOG
+// Dev builds only: one line per hour for a week, to see the battery, the solar input and what used power over days.
+// Kept in NVS, so restarts and updates do not clear it. Read it with /api/powerlog (owner).
+struct PowerHour {
+  uint32_t at;          // epoch at the end of the hour
+  uint8_t rest;         // resting cell volts: (v - 2.5) * 100
+  uint8_t vinMax;       // highest input (solar or USB) in the hour: volts * 40
+  uint8_t poweredMin;   // minutes with input power
+  int8_t tempC;         // chip temperature
+  uint16_t motorS;      // motor seconds in the hour
+  uint8_t flags;        // 1: restarted in this hour, 2: new firmware started
+  uint8_t litMin;       // minutes the solar input showed any light (above SOLAR_LIT_V)
+  uint8_t vinAvg;       // average input over the hour: volts * 40 (with litMin: how much sun the panel gets)
+  uint8_t pad[2];
+};
+const float SOLAR_LIT_V = 1.0f;   // the panel's input is ~0 V in the dark; anything above this means some light
+const int PLOG_N = 168;
+PowerHour plog[PLOG_N];   // newest last; at == 0 is an empty slot
+struct PowerAcc { float vinMax; uint32_t poweredMs; uint32_t motorMs0; uint8_t flags; uint32_t litMs; float vinMsSum; uint32_t ms; } plogAcc = {0, 0, 0, 1, 0, 0, 0};
+void plogBegin() {
+  if (nvs.getBytes("plog", plog, sizeof plog) != sizeof plog) memset(plog, 0, sizeof plog);
+  plogAcc.motorMs0 = stats.motorMs;
+}
+// Called often: keep the hour's highest input and the time on input power.
+void plogTick(float vin, bool powered, uint32_t dtMs) {
+  if (vin > plogAcc.vinMax) plogAcc.vinMax = vin;
+  if (powered) plogAcc.poweredMs += dtMs;
+  if (vin >= SOLAR_LIT_V) plogAcc.litMs += dtMs;
+  plogAcc.vinMsSum += vin * dtMs;
+  plogAcc.ms += dtMs;
+}
+void plogPush(uint32_t at, float rest, float tempC) {
+  memmove(plog, plog + 1, sizeof(PowerHour) * (PLOG_N - 1));
+  PowerHour &h = plog[PLOG_N - 1];
+  h.at = at;
+  h.rest = (uint8_t)constrain((int)lroundf((rest - 2.5f) * 100.0f), 1, 255);
+  h.vinMax = (uint8_t)constrain((int)lroundf(plogAcc.vinMax * 40.0f), 0, 255);
+  h.poweredMin = (uint8_t)min<uint32_t>(plogAcc.poweredMs / 60000, 255);
+  h.tempC = (int8_t)constrain((int)lroundf(tempC), -100, 100);
+  h.motorS = (uint16_t)min<uint32_t>((stats.motorMs - plogAcc.motorMs0) / 1000, 65535);
+  h.flags = plogAcc.flags;
+  h.litMin = (uint8_t)min<uint32_t>(plogAcc.litMs / 60000, 255);
+  h.vinAvg = (uint8_t)constrain((int)lroundf(plogAcc.ms ? plogAcc.vinMsSum / plogAcc.ms * 40.0f : 0), 0, 255);
+  h.pad[0] = h.pad[1] = 0;
+  nvs.putBytes("plog", plog, sizeof plog);
+  plogAcc = {0, 0, stats.motorMs, 0, 0, 0, 0};
+}
+#endif
 void cfgDefaults() {
   memset(&cfg, 0, sizeof cfg);
   cfg.magic = CFG_MAGIC;
@@ -110,6 +158,9 @@ void storeBegin() {
   Tune t;
   if (nvs.getBytes("tune", &t, sizeof t) == sizeof t && t.magic == TUNE_MAGIC) tune = t;
   if (nvs.getBytes("bhist", battHist, sizeof battHist) != sizeof battHist) memset(battHist, 0, sizeof battHist);
+#ifdef TILT_DEVLOG
+  plogBegin();
+#endif
   stats.boots++;                                 // count this start, and why the last one ended
   esp_reset_reason_t rr = esp_reset_reason();
   if (rr == ESP_RST_BROWNOUT) stats.brownouts++;

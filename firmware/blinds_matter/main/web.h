@@ -131,6 +131,24 @@ esp_err_t hHist(httpd_req_t *r) {
   j += "]}";
   return sendJson(r, j);
 }
+#ifdef TILT_DEVLOG
+// The dev power log: one row per hour, oldest first. rest/vin/vinAvg in volts, on = minutes on input power (USB or
+// strong sun, enough to count as powered), lit = minutes the solar input saw any light, motor = seconds.
+esp_err_t hPowerLog(httpd_req_t *r) {
+  Lock l;
+  std::string j = "{\"cols\":[\"at\",\"rest\",\"vin\",\"on\",\"temp\",\"motor\",\"flags\",\"lit\",\"vinAvg\"],\"rows\":[";
+  bool any = false;
+  for (int i = 0; i < PLOG_N; i++) {
+    const PowerHour &h = plog[i];
+    if (!h.at) continue;
+    ap(j, "%s[%lu,%.2f,%.2f,%u,%d,%u,%u,%u,%.2f]", any ? "," : "", (unsigned long)h.at, 2.5f + h.rest / 100.0f, h.vinMax / 40.0f,
+       h.poweredMin, h.tempC, h.motorS, h.flags, h.litMin, h.vinAvg / 40.0f);
+    any = true;
+  }
+  j += "]}";
+  return sendJson(r, j);
+}
+#endif
 esp_err_t hSet(httpd_req_t *r) {
   Lock l;
   std::string k = arg(r, "k"), v = arg(r, "v");
@@ -296,6 +314,9 @@ const Route routes[] = {
   {"/api/home", HTTP_GET, hHome}, {"/api/hubjoin", HTTP_GET, hHubJoin}, {"/api/swapfw", HTTP_GET, hSwapFw}, {"/api/hubkey", HTTP_GET, hHubKey},
   {"/api/hubnet", HTTP_GET, hHubNet}, {"/api/factory", HTTP_GET, hFactory},
   {"/api/backup", HTTP_GET, hBackup}, {"/api/restore", HTTP_GET, hRestore},
+#ifdef TILT_DEVLOG
+  {"/api/powerlog", HTTP_GET, hPowerLog},
+#endif
 };
 const int routeCount = sizeof routes / sizeof routes[0];
 
@@ -334,7 +355,21 @@ void webTick() {
   recoverTick();
   static uint32_t lastHist = 0;
   uint32_t ep = time(nullptr);
-  if (lastHist > ep || ep - lastHist >= 3600) { lastHist = ep; histPush(vbatRest); }
+  if (lastHist > ep || ep - lastHist >= 3600) {
+    bool first = lastHist == 0;
+    lastHist = ep;
+    histPush(vbatRest);
+#ifdef TILT_DEVLOG
+    if (!first) { float t = 0; if (tsens) temperature_sensor_get_celsius(tsens, &t); plogPush(ep, vbatRest, t); }
+#endif
+  }
+#ifdef TILT_DEVLOG
+  static uint32_t lastPl = 0;
+  uint32_t nowMs = millis();
+  if (!lastPl && otaPending) plogAcc.flags |= 2;   // this start is new firmware on trial
+  if (lastPl) plogTick(vin, powered, nowMs - lastPl);
+  lastPl = nowMs ? nowMs : 1;
+#endif
   static bool wasPowered = powered;
   if (wasPowered != powered) { wasPowered = powered; event(powered ? "input power connected (%.2f V)" : "on battery (%.2f V)", powered ? vin : vbatRest); }
   if (restartSoon) { vTaskDelay(pdMS_TO_TICKS(600)); for (int i = 0; i < PORTS; i++) { motorRaw(i, 0, 0); digitalWrite(P_EN[i], LOW); } esp_restart(); }

@@ -56,3 +56,28 @@ def hide_helpers(design):
             cc.sketches.item(s).isLightBulbOn = False
         for s in range(cc.constructionPlanes.count):
             cc.constructionPlanes.item(s).isLightBulbOn = False
+
+
+def stays_inside(tbm, named_bodies, outline, allow=(), tol=0.01):
+    """The stays-inside check, for every enclosure: nothing may reach outside the outside shape it was designed to.
+    named_bodies = [(name, temporary B-rep body)], outline = the solid outside shape (no pockets or holes).
+    Returns one line per body with more than tol mm3 outside the outline; names starting with one of `allow` are
+    skipped (things meant to stick out: a plug, a cable). It catches what a collision check misses: a boss or screw
+    that runs out through a wall, a part hanging out of an opening, a feature added after a bevel was cut."""
+    B = adsk.fusion.BooleanTypes
+    out = []
+    for name, body in named_bodies:
+        if body is None or name.startswith(tuple(allow)):
+            continue
+        rest = tbm.copy(body)
+        try:
+            tbm.booleanOperation(rest, tbm.copy(outline), B.DifferenceBooleanType)
+            v = rest.volume * 1000 if rest.faces.count else 0.0
+        except Exception as ex:
+            out.append('%s: stays-inside check could not run (%s)' % (name, str(ex)[:60]))
+            continue
+        if v > tol:
+            q = rest.boundingBox
+            out.append('%s pokes out: %.2f mm3 at X %.1f..%.1f Y %.1f..%.1f Z %.1f..%.1f' % (
+                name, v, q.minPoint.x * 10, q.maxPoint.x * 10, q.minPoint.y * 10, q.maxPoint.y * 10, q.minPoint.z * 10, q.maxPoint.z * 10))
+    return out

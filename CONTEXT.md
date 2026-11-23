@@ -42,6 +42,7 @@ Only the raw sensor reading (0-360 degrees of the AS5600), never what the user s
 
 **Marks**:
 The calibration points the user sets that map a raw sensor reading onto a position. tilt has three (closed one way, open, closed the other way).
+An internal word (code, docs, the developer page): the app never shows it. To the user, setting them is **Setup** ("Setup required", "Start Setup").
 
 **Manual move**:
 The user moving a blind by hand: turning the wand. It always keeps working with the tilter fitted, and the app shows the new tilt at the next wake, with no re-homing.
@@ -77,8 +78,7 @@ Adding a controller to a Matter fabric (Apple Home, Alexa).
 A phone gaining its own secret key for one controller, over the app's secured channel.
 
 **Calibration**:
-Setting a blind's Marks.
-_Avoid_: setup (a UI flow name only, not a domain term)
+Setting a blind's Marks. In the app this is **Setup**, always one word ("Setup required", "Start Setup", "Redo Setup"); never "set up" or "Marks".
 
 ### Automation
 

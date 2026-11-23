@@ -198,10 +198,10 @@ struct NewControllerBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("New controller found", systemImage: "sparkles").font(.headline)
-            Text("Your Tilt Hub sees a blinds controller nobody has set up yet. Set it up now: it joins the hub and shows up in Apple Home by itself.")
+            Text("Your Tilt Hub sees a new blinds controller. Start its setup now: it joins the hub and shows up in Apple Home by itself.")
                 .font(.subheadline).foregroundStyle(.secondary)
             HStack {
-                Button("Set Up", action: setUp).buttonStyle(.glassProminent)
+                Button("Start Setup", action: setUp).buttonStyle(.glassProminent)
                 Button("Not Now", action: notNow).buttonStyle(.glass)
             }
         }

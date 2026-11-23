@@ -176,7 +176,7 @@ struct BluetoothSetupView: View {
                                 ForEach(backups) { b in Text("Restore \(b.name)").tag(b.id) }
                             }
                         } header: { Text("Replacing a controller?") } footer: {
-                            Text("Your Tilt Hub kept the settings of these controllers: blind names, marks, schedules. A restored controller also takes over the old one's place in Apple Home.")
+                            Text("Your Tilt Hub kept the settings of these controllers: blind names, blind setup, schedules. A restored controller also takes over the old one's place in Apple Home.")
                         }
                     }
                     Section {
@@ -191,7 +191,7 @@ struct BluetoothSetupView: View {
                 Section {
                     Label("\(hello?.name ?? "Your controller") is ready", systemImage: "checkmark.circle.fill").foregroundStyle(Palette.good).font(.headline)
                     Text(hub.inHome ? "It is on your Tilt Hub. It shows up in Apple Home by itself in a moment." : "It is on your Tilt Hub. Add the hub to Apple Home once (in the controller's settings) and all its blinds show up.").font(.subheadline).foregroundStyle(.secondary)
-                    if restoreFrom.isEmpty { Text("Next, open its room and use the gear to set each blind's marks.").font(.subheadline).foregroundStyle(.secondary) }
+                    if restoreFrom.isEmpty { Text("Next, open its room and use the gear to run setup for each blind.").font(.subheadline).foregroundStyle(.secondary) }
                 }
                 Section { Button("Done") { finished() } }
             }

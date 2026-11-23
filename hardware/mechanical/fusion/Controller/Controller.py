@@ -9,12 +9,15 @@ Layout, end A (ports) to end B (USB-C):
   * Charger bay past the PCB's end: the 6092 flat on four posts, two M2 self-tapping screws at its far end, two short
     indexing studs by end wall B. It goes in USB-C end first, angled down into a slot in end wall B, then drops onto
     the studs; its USB-C (the charge port) sits behind a stadium window. A 3-wire harness from the PCB's J5 runs over
-    the top to its pad row; the solar lead runs along the room-side wall.
-  * The rod's groove runs down the middle of the lid.
+    the top to its pad row; the solar lead comes in through an opening in end wall B (big enough for its plug) and
+    runs along the room-side wall.
+  * The rod's groove runs down the middle of the lid, centered between the box's two sides. Both long sides are beveled 45 deg, top and bottom, so the box
+    tilts in past the rail's lips.
 
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_controller.py --timeout 1800
 
 Coordinates (mm): X along the rail from end A's outer face, Y across (-Y room side), Z up from the rail floor.
+The box's middle, and so the rod and the rail's middle, is at Y = C['groove_y'] (-1.5), not Y 0.
 The PCB's KiCad coordinates (x across, y down from the jack edge) map to X = y + pcb_x, Y = x + pcb_y.
 """
 
@@ -35,13 +38,20 @@ C = dict(
     # 11.5 disc on ~11.9 mm legs (KiCad's model; B - A). Each is folded toward the ESP, legs bent 1.6 below the body,
     # so the disc lies flat over its own four resistors
     fuse_leg=11.9, fuse_bend=1.6, fuse_w=11.5, fuse_t=4.8, fuse_body=11.5,
-    # width: both walls 0.4 off the PCB's 47 mm jack strip (the widest thing in the box), so the box doesn't fill the
-    # rail: two low rounded bumpers on the back wall stop 0.4 short of the rail's wall (the room side is 0.35 off it),
-    # an easy fit that still keeps the rod off the groove's sides. Wires can run along the rail above the bumpers
-    bumper_x=(30.0, 135.0), bumper_w=2.4, bumper_gap=0.4, bumper_h=6.0,
-    # rod groove: a circle, r 5, its center 1.67 above the rod's axis: the 4 mm square rod's corners (sweep r 2.83) clear
-    # it by 0.5 at the bottom and ~1.9 each side at the axis. The channel under it is 2.0 thick, like the lid
-    groove_r=5.0, groove_floor=FIT.ROD_Z - FIT.ROD_CORNER_R - 0.5, groove_t=2.0,     # channel as thick as the lid
+    # width: both walls 0.4 off the PCB's 47 mm jack strip (the widest thing in the box). The box does not fill the rail
+    # and has nothing on its sides to center it: it sits about 1.85 off each wall and the groove keeps it under the rod,
+    # so one box fits rails of other widths too
+    # 45 deg bevels along both long sides, so the box tilts in past the rail's lips without prying (the box is 51.8
+    # wide, the gap between the lips 46.5): 2.6 on the bottom edges (0.2 short of the screws' countersinks), 3.0 on
+    # the top edges (the lid's 2.0 and the top 1.0 of the tray's wall). A 45 deg fill inside the tray's bottom corners
+    # keeps the wall 1.7 thick behind the bottom bevel. Checked by Controller/tilt_in.py
+    bevel_bot=2.6, bevel_top=3.0, bevel_fill=1.8,
+    # rod groove: a circle, r 5, centered between the box's sides (C['groove_y']), its center 0.37 above the rod's axis:
+    # the 4 mm square rod's corners (sweep r 2.83) clear it by 1.8 at the bottom (room for stick-on feet under the box)
+    # and ~2.2 each side at the axis, more than the box's play in the rail (1.85 a side), so the rod can't rub its sides.
+    # The channel under it is 1.1 thick: its underside is 0.2 above the ESP's nearer row of pin tips (what stops the
+    # groove going deeper) and 0.45 above the folded fuse F2
+    groove_r=5.0, groove_floor=FIT.ROD_Z - FIT.ROD_CORNER_R - 1.8, groove_t=1.1,
     # PCB: 2.4 mm above the full 1.2 floor (room for the RJ12 tails and the XH headers' tails), board 1.52 (as exported)
     pcb_gap=2.4, pcb_t=1.52, pcb_x=1.8, pcb_y=-25.0, pcb_len=125.0, pcb_bar=47.0, pcb_body=27.0,
     holes=((3.5, 41.0), (43.5, 43.3), (23.8, 121.5)),            # H1, H2, H3 (KiCad x, y)
@@ -72,12 +82,15 @@ C = dict(
     # G BAT 3V EN, VIN at the USB-C end) along one long edge, 2.54 in. Board coordinates: x from the USB-C edge, y from
     # the pad-row edge.
     c6_l=29.21, c6_w=19.05, c6_t=1.6, c6_holes=((2.54, 2.54), (26.67, 2.54), (2.54, 16.51), (26.67, 16.51)),
-    c6_post=3.0, c6_post_d=4.4, c6_pilot=1.6,     # posts 3 tall (room under the board for the pads' solder); pilot for M2 self-tapping screws
+    c6_post=4.0, c6_post_d=4.4, c6_pilot=1.6,     # posts 4 tall: room under the board for the pads' solder, and the M2 x 6 screws' tips stop 0.8 above the box's underside (at 3 tall they came out through the floor); pilot for M2 self-tapping screws
     c6_stud_d=2.1, c6_stud_up=0.8,                # studs in the two holes by end wall B: short, only for indexing (half the board)
     c6_bevel=1.0,                                 # 45 deg lead-in on the slot's top inner edge, so the board angles down and in
     c6_usb=(3.94, 9.525), c6_usb_w=8.94, c6_usb_h=3.26, c6_usb_len=7.35, c6_usb_over=1.0,
     c6_edge_in=1.4,      # the board's USB-C edge sits 1.4 inside end B's outer face (so the socket's mouth is 0.4 inside)
-    c6_yc=-9.4,          # board center across the box: room for the solar lead along the room-side wall, its slot clear of the corner's round
+    c6_yc=-6.4,          # board center across the box: room beside it for the solar opening in end wall B
+    # solar opening in end wall B: the lead's JST-ZH plug (4.5 x 3.5) goes through it, so the lead can be fitted and
+    # pulled with its plug on. (y center, width, height above the floor)
+    solar=(-20.4, 6.0, 4.7),
     c6_pads={'VIN': 5.715, 'VU': 8.255, 'G': 15.875, 'BAT': 18.415, '3V': 20.955, 'EN': 23.495}, c6_pad_y=2.54,
     c6_jst=(13.97, 14.1, 8.0, 6.0, 6.5), c6_term=(24.77, 9.525, 7.0, 7.8, 8.4),   # (x, y, along x, along y, height)
 )
@@ -85,6 +98,7 @@ c = C
 C['iw_lo'] = c['room_out'] + c['wall']                  # room-side inner face
 C['iw_hi'] = c['back_in']                              # back inner face
 C['out_hi'] = c['back_in'] + c['wall']
+C['groove_y'] = (c['room_out'] + C['out_hi']) / 2        # the groove runs down the box's middle
 C['g_zc'] = c['groove_floor'] + c['groove_r']          # groove's round top: center height
 C['groove_top_hw'] = math.sqrt(c['groove_r'] ** 2 - (C['g_zc'] - c['top']) ** 2) if c['top'] < C['g_zc'] else c['groove_r']
 C['fz'] = c['floor_z'] + c['floor']
@@ -107,13 +121,13 @@ C['bat_zc'] = C['fz'] + 0.5 + c['bat_d'] / 2
 C['esp_z0'] = C['zt'] + c['sock_h'] + c['spacer']    # ESP underside
 C['c6_z0'] = C['fz'] + c['c6_post']                    # the charger board's underside
 C['c6_zt'] = C['c6_z0'] + c['c6_t']                     # its top
-C['solar_y'] = -20.9                                   # the solar lead runs along the room-side wall
+C['solar_y'] = c['solar'][0]                           # the solar lead runs along the room-side wall
 L = C['L']
 
 
 def z_under(y, off):
-    """Lower edge of the groove (off 0) or of the channel under it (off = groove_t) at |y|; inf outside it."""
-    R, y = c['groove_r'] + off, abs(y)
+    """Lower edge of the groove (off 0) or of the channel under it (off = groove_t) at box Y = y; inf outside it."""
+    R, y = c['groove_r'] + off, abs(y - C['groove_y'])
     if y > R:
         return float('inf')
     return C['g_zc'] - math.sqrt(R * R - y * y)
@@ -141,21 +155,28 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
     in_b = C['in_b']
     out = {}
 
+    def slice_off(body, p, n):
+        """Cut away everything on the n side of the plane that runs along X through p; p and n are (y, z)."""
+        h = math.hypot(*n)
+        ny, nz = n[0] / h, n[1] / h
+        return cut(body, obox((L / 2, p[0] + ny * 20, p[1] + nz * 20), (1, 0, 0), (0, nz, -ny), L + 60, 120, 40))
+
     def groove(off, x0, x1):
         """The groove (off 0), or its outline grown by off: a circle, open above its center."""
         R, zc = c['groove_r'] + off, C['g_zc']
-        return uni(cyl((x0, 0, zc), (x1, 0, zc), R), bx(x0, x1, -R, R, zc, zc + 20))
+        gy = C['groove_y']
+        return uni(cyl((x0, gy, zc), (x1, gy, zc), R), bx(x0, x1, gy - R, gy + R, zc, zc + 20))
 
     # ================================================================ tray
     F0 = c['floor_z'] + 0.3                              # floor-standing features start inside the floor
     a0, ia = C['a0'], C['ia']
     tray = cut(rbox(a0, L, olo, ohi, c['floor_z'], zl, c['corner_r']),
                rbox(ia, in_b, ilo, ihi, fz, zl + 1, c['corner_r'] - c['wall']))
-    # rail bumpers on the back wall: rounded vertical fins out to 0.4 short of the rail's wall
-    ry = c['rail_w'] / 2 - c['bumper_gap'] - c['bumper_w'] / 2
-    for bxx in c['bumper_x']:
-        tray = uni(tray, bx(bxx - c['bumper_w'] / 2, bxx + c['bumper_w'] / 2, ohi - 0.5, ry, c['floor_z'], c['bumper_h']),
-                   cyl((bxx, ry, c['floor_z']), (bxx, ry, c['bumper_h']), c['bumper_w'] / 2))
+    # 45 deg fill inside both bottom corners (under the PCB and the cell), then the bevels along the long edges
+    # (the bevels themselves are cut last, so they also trim every boss, saddle and stop that reaches the wall)
+    w_ = c['bevel_fill']
+    for yw, s in ((ilo, 1), (ihi, -1)):
+        tray = uni(tray, slice_off(bx(ia - 0.01, in_b + 0.01, yw - s * 0.01, yw + s * w_, F0, fz + w_), (yw + s * w_, fz), (s, 1)))
     # reliefs in end A's inner corner fillets for the PCB's corners, up to the jacks' tops (jacks 1 and 3 reach into them)
     tray = cut(tray, bx(ia - 0.01, ia + 2.2, ilo - 0.01, ilo + 2.2, zb - 0.3, zt + c['rj_h'] + 0.4))
     tray = cut(tray, bx(ia - 0.01, ia + 2.2, ihi - 2.2, ihi + 0.01, zb - 0.3, zt + c['rj_h'] + 0.4))   # and the back one
@@ -229,12 +250,22 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
     uzc = C['c6_zt'] + c['c6_usb_h'] / 2
     tray = cut(tray, bx(in_b - 1, L + 1, uy - uhw, uy + uhw, uzc - ur, uzc + ur),
                cyl((in_b - 1, uy - uhw, uzc), (L + 1, uy - uhw, uzc), ur), cyl((in_b - 1, uy + uhw, uzc), (L + 1, uy + uhw, uzc), ur))
-    # --- the solar lead slot in end wall B (flat 2-core cable lying flat)
-    tray = cut(tray, bx(in_b - 1, L + 1, C['solar_y'] - 2.4, C['solar_y'] + 2.4, fz - 0.01, fz + 2.5))   # flat cable
+    # --- the solar opening in end wall B: big enough for the lead's plug
+    sy_, sw_, sh_ = c['solar']
+    tray = cut(tray, bx(in_b - 1, L + 1, sy_ - sw_ / 2, sy_ + sw_ / 2, fz - 0.01, fz + sh_))
     # --- screw holes + countersinks from below (all three)
     for sx, sy, _ in SCREWS:
         tray = cut(tray, cyl((sx, sy, -1), (sx, sy, zb + 1), FIT.M3_R),
                    cone((sx, sy, c['floor_z'] - 0.01), FIT.CSINK_CTRL_R, (sx, sy, c['floor_z'] + FIT.CSINK_CTRL_H), FIT.CSINK_CTRL_R_TOP))
+    def beveled(body):
+        for yw, s in ((olo, 1), (ohi, -1)):
+            body = slice_off(body, (yw + s * c['bevel_bot'], c['floor_z']), (-s, -1))
+            body = slice_off(body, (yw + s * c['bevel_top'], c['top']), (-s, 1))
+        return body
+
+    tray = beveled(tray)
+    # the box's outside shape: nothing of the tray or the lid may reach outside it (checked by the Fusion driver)
+    C['outline'] = beveled(rbox(a0, L, olo, ohi, c['floor_z'], c['top'], c['corner_r']))
     out['Tray'] = [('Tray', tray)]
 
     # ================================================================ lid
@@ -245,11 +276,12 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
     reg = cut(reg, bx(in_b - 2.0, in_b + 1, ilo - 1, ihi + 1, zl - 2, zl))
     lid = uni(lid, reg)
     # the channel under the groove (the groove itself is cut last, so it also trims every feature that reaches it)
-    lid = uni(lid, cut(groove(c['groove_t'], C['a0'], L), bx(C['a0'] - 1, L + 1, -20, 20, c['top'], c['top'] + 30)))
+    lid = uni(lid, cut(groove(c['groove_t'], C['a0'], L), bx(C['a0'] - 1, L + 1, -30, 30, c['top'], c['top'] + 30)))
     # posts with inserts: three on the PCB's holes (they clamp it)
     def root(px, py, r, top, want=2.0):
         """A 45 deg root fillet (cone) where a post meets the lid, as big as the room to the wall / groove allows."""
-        if z_under(abs(py) + r + want, c['groove_t']) < zl + 0.5:      # under the groove's channel: it merges into it
+        gy = C['groove_y']
+        if z_under(gy + max(abs(py - gy) - r - want, 0.0), c['groove_t']) < zl + 0.5:      # under the groove's channel: it merges into it
             return None
         room = (ihi if py > 0 else -ilo) - 0.6 - abs(py) - r
         f = min(want, room)
@@ -283,6 +315,7 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
     ex, ey = K(c['esp_xc'] - 4.0, c['esp_y0'] + 4.0)
     lid = uni(lid, bx(ex - 2, ex + 2, ey - 2, ey + 2, C['esp_z0'] + c['esp_t'] + 0.5, zl + 0.01))
     lid = cut(lid, groove(0, -1, L + 1))
+    lid = beveled(lid)
     out['Lid'] = [('Lid', lid)]
 
     # ================================================================ parts that are not in the PCB's 3D export
@@ -389,15 +422,15 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
     ptop = C['c6_zt'] + 0.35
     R = {}
     # harness over the top to the 6092's pad row. G and BAT leave the plug at 17.7 (over the plug and the solar cable),
-    # drop to 14.0 past X 132 (over the 6092's screw terminal and JST socket) and come in from the room side; PWR stays
+    # drop to 15.0 past X 132 (over the 6092's screw terminal and JST socket) and come in from the room side; PWR stays
     # at 19.4 over them. B+ and L+ join in one splice past the plug and go on as one wire to BAT
     px_, py_ = pad['G']
-    R['Harness G (G)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 17.7), (130.0, j5[1], 17.7), (132.5, j5[1], 14.0), (px_, j5[1], 14.0),
-                          (px_, py_ - 1.6, 14.0), (px_, py_, ptop)]
+    R['Harness G (G)'] = [(jx5, j5[1], PLUG), (jx5, j5[1], 17.7), (130.0, j5[1], 17.7), (132.5, j5[1], 15.0), (px_, j5[1], 15.0),
+                          (px_, py_ - 1.6, 15.0), (px_, py_, ptop)]
     px_, py_ = pad['BAT']
     sx_, sy_ = 124.0, -17.0
-    R['Harness BAT (B+ / L+ splice)'] = [(jx5, j5[2], PLUG), (jx5, j5[2], 17.7), (sx_, sy_, 17.7), (130.0, sy_, 17.7), (132.5, sy_, 14.0),
-                                         (px_, sy_, 14.0), (px_, py_ - 1.6, 14.0), (px_, py_, ptop)]
+    R['Harness BAT (B+ / L+ splice)'] = [(jx5, j5[2], PLUG), (jx5, j5[2], 17.7), (sx_, sy_, 17.7), (130.0, sy_, 17.7), (132.5, sy_, 15.0),
+                                         (px_, sy_, 15.0), (px_, py_ - 1.6, 15.0), (px_, py_, ptop)]
     R['Harness BAT leg (L+)'] = [(jx5, j5[4], PLUG), (jx5, j5[4], 17.7), (sx_, sy_, 17.7)]
     px_, py_ = pad['VIN']
     R['Harness PWR (P+)'] = [(jx5, j5[6], PLUG), (jx5, j5[6], 19.4), (px_, j5[6], 19.4), (px_, py_ - 3.0, 15.0), (px_, py_, ptop)]
@@ -406,12 +439,13 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
     ce = C['bat_x0'] + c['bat_l'] + 0.05
     j4x, j4a = K(0, 105.0)[0], K(17.5, 0)[1]
     j4b = K(20.0, 0)[1]
-    R['Cell lead -'] = [(ce + 0.85, by - 0.9, bc - 0.5), (ce + 2.0, by - 0.9, bc - 0.5), (ce + 0.9, 6.0, 14.4),
-                        (ce + 0.9, 2.7, 16.2), (118.6, 2.7, 16.2), (110.0, 2.7, 16.2), (104.0, -1.5, 16.2),
+    # Both cross under the groove's channel at 16.2 or lower, one round each end of the plug
+    R['Cell lead -'] = [(ce + 0.85, by - 0.9, bc - 0.5), (ce + 2.0, by - 0.9, bc - 0.5), (ce + 0.9, 6.0, 12.6),
+                        (ce + 0.9, 2.7, 14.4), (118.6, 2.7, 14.4), (110.0, 2.7, 14.4), (104.0, -1.5, 16.2),
                         (104.0, j4a, 17.7), (j4x, j4a, 17.7), (j4x, j4a, PLUG)]
-    R['Cell lead +'] = [(ce + 0.85, by + 0.9, bc + 0.5), (ce + 2.0, by + 0.9, bc + 0.5), (ce + 0.9, 6.0, 16.6),
-                        (ce + 0.9, 2.7, 18.1), (118.6, 2.7, 18.1), (110.0, 2.7, 18.1), (108.4, -0.8, 17.6),
-                        (j4x, j4b, 17.6), (j4x, j4b, PLUG)]          # under the groove's 2.0 channel
+    R['Cell lead +'] = [(ce + 0.85, by + 0.9, bc + 0.5), (ce + 2.0, by + 0.9, bc + 0.5), (ce + 0.9, 6.0, 14.6),
+                        (ce + 0.9, 2.7, 16.2), (118.6, 2.7, 16.2), (111.0, 2.7, 16.2), (111.0, -2.0, 16.2),
+                        (111.0, j4b, 17.7), (j4x, j4b, 17.7), (j4x, j4b, PLUG)]
     W = []
     for nm, pts in R.items():
         if nm == 'Harness BAT leg (L+)':
@@ -452,8 +486,8 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
 
 if __name__ == '__main__':
     print('Box %.1f x %.1f x %.1f mm' % (L, C['out_hi'] - c['room_out'], c['top']))
-    print('PCB underside Z %.2f, top %.2f; ESP underside %.2f, pin tips %.2f; channel underside %.2f at 0, %.2f at the ESP pin row' % (
-        C['zb'], C['zt'], C['esp_z0'], C['esp_z0'] + c['esp_t'] + c['esp_tip'], z_under(0, c['groove_t']), z_under(5.26, c['groove_t'])))
+    print('PCB underside Z %.2f, top %.2f; ESP underside %.2f, pin tips %.2f; channel underside %.2f at its middle, %.2f at the inner edge of the ESP pin row' % (
+        C['zb'], C['zt'], C['esp_z0'], C['esp_z0'] + c['esp_t'] + c['esp_tip'], z_under(C['groove_y'], c['groove_t']), z_under(K(19.74 + 0.32, 0)[1], c['groove_t'])))
     print('cell Y %.1f..%.1f; charger X %.1f..%.1f Y %.1f..%.1f, board top Z %.2f' % (C['bat_y'] - c['bat_d'] / 2, C['bat_y'] + c['bat_d'] / 2,
           C['c6_x0'], C['c6_x1'], C['c6_y0'], C['c6_y1'], C['c6_zt']))
     print('screws (from below):', ', '.join('(%.1f, %.1f) M3x%.0f' % (x, y, l) for x, y, l in SCREWS))
