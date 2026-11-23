@@ -80,7 +80,7 @@ struct ControllerClient: Sendable {
     }
 
     // ---- moving
-    func go(blind: Int, tilt: Int, solo: Bool = false) async throws { try await send(Api.go(blind: blind, tilt: tilt, solo: solo)) }
+    func go(blind: Int, tilt: Int) async throws { try await send(Api.go(blind: blind, tilt: tilt)) }
     func go(blind: Int, to word: String) async throws { try await send(Api.go(blind: blind, to: word)) }
     func goAll(to word: String, gently minutes: Int = 0) async throws { try await send(Api.goAll(to: word, gently: minutes)) }
     func stop() async throws { try await send(Api.stop) }

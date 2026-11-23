@@ -10,7 +10,6 @@ struct MoveAsk {
   MoveFrom from = FROM_APP;
   int one = -1;            // app: the blind asked for; Home: its covering's blind; hand: the blind that was turned. -1 = all
   uint8_t mask = 0x07;     // a Schedule: its blinds (bit n = port n)
-  bool solo = false;       // app: only this blind, even when blinds follow each other
   float tilt[PORTS];       // the Target for each blind (NAN: an unknown position word)
   uint32_t gentleMs = 0;   // > 0: gently, taking this long (app and Schedules)
 };
@@ -33,13 +32,14 @@ struct MoveSeam {                                     // what a request needs fr
   virtual bool batteryCritical() = 0;                 // Critical battery (logic.h battLevel)
 };
 
-// Is blind p one of the blinds this request is for? (Before the can-move rule.)
+// Is blind p one of the blinds this request is for? (Before the can-move rule.) Following is only for a hand on the
+// wand (docs/adr/0004): a blind moved from the app or Apple Home moves alone.
 inline bool movePicks(const MoveAsk &a, bool follow, int p) {
   switch (a.from) {
-    case FROM_APP: return a.one < 0 || p == a.one || (follow && !a.solo);
+    case FROM_APP: return a.one < 0 || p == a.one;
     case FROM_SCHEDULE: return (a.mask >> p) & 1;
-    case FROM_HOME: return a.one < 0 || p == a.one || follow;
-    case FROM_HAND: return p != a.one;                // the others follow the blind that was turned
+    case FROM_HOME: return a.one < 0 || p == a.one;
+    case FROM_HAND: return follow && p != a.one;      // the others follow the blind that was turned
   }
   return false;
 }

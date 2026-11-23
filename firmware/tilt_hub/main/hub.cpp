@@ -163,7 +163,8 @@ static int findCtrl(const char *id) { for (int i = 0; i < MAX_CTRL; i++) if (ctr
 
 // ---- UDP to the controllers: send one request, wait for its answer
 static int sock = -1;
-struct Pending { uint16_t seq; bool used, done; std::string ans; SemaphoreHandle_t sem; in6_addr to; };   // to: only its answer counts
+struct Pending { uint16_t seq; bool used, done; std::string ans; SemaphoreHandle_t sem; in6_addr to;   // to: only its answer counts
+                 std::string part[16]; uint16_t have; uint8_t count; };                             // a long answer, in pieces
 static Pending pend[8];
 static SemaphoreHandle_t pendMx;
 static uint16_t nextSeq = 1;
@@ -179,7 +180,12 @@ static int ask(int c, char type, const std::string &payload, std::string &ans, u
     for (int i = 0; i < 8; i++) if (!pend[i].used) { slot = i; break; }
     uint16_t seq = nextSeq++;
     if (!nextSeq) nextSeq = 1;
-    if (slot >= 0) { pend[slot].used = true; pend[slot].done = false; pend[slot].seq = seq; pend[slot].ans.clear(); pend[slot].to = k.addr.sin6_addr; xSemaphoreTake(pend[slot].sem, 0); }
+    if (slot >= 0) {
+      Pending &p = pend[slot];
+      p.used = true; p.done = false; p.seq = seq; p.ans.clear(); p.to = k.addr.sin6_addr; p.have = 0; p.count = 0;
+      for (auto &s : p.part) s.clear();
+      xSemaphoreTake(p.sem, 0);
+    }
     xSemaphoreGive(pendMx);
     if (slot < 0) break;
     std::string m(1, type);
@@ -527,6 +533,28 @@ static void udpTask(void *) {
       OtaAck a = {!memcmp(buf + 3, "200", 3), buf[6] >= '0' && buf[6] <= '9', (uint32_t)strtoul(buf + 6, nullptr, 10)};   // 3-digit status, then the offset
       if (!a.ok) { static int shown = 0; if (shown++ < 3) ESP_LOGW(TAG, "piece answer: '%.40s'", buf + 3); }
       if (otaAcks) xQueueSend(otaAcks, &a, 0);
+      continue;
+    }
+    if (t == '#' && n > 5) {                   // a piece of a long answer: '#' seq, piece, count, part
+      int i = (uint8_t)buf[3], count = (uint8_t)buf[4];
+      if (count < 2 || count > 16 || i >= count) continue;
+      xSemaphoreTake(pendMx, portMAX_DELAY);
+      for (auto &p : pend) {
+        if (!p.used || p.done || p.seq != seq || memcmp(&p.to, &from.sin6_addr, 16)) continue;
+        if (p.count && p.count != count) break;
+        p.count = count;
+        p.part[i].assign(buf + 5, n - 5);
+        p.have |= 1 << i;
+        if (p.have == (1 << count) - 1) {
+          p.ans.clear();
+          for (int k = 0; k < count; k++) { p.ans += p.part[k]; p.part[k].clear(); }
+          p.done = true;
+          xSemaphoreGive(p.sem);
+          for (auto &k : ctrls) if (k.used && k.addrOk && sameAddr(k.addr, from)) k.seen = ms() ? ms() : 1;
+        }
+        break;
+      }
+      xSemaphoreGive(pendMx);
       continue;
     }
     if (t != 'S') {                             // an answer to one of our requests

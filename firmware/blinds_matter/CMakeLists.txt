@@ -7,6 +7,9 @@ endif()
 # The version inside the image (what an update is checked against) is FW_VERSION from main/web.h: one place only.
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/main/web.h" FW_VERSION_LINE REGEX "^#define FW_VERSION ")
 string(REGEX REPLACE ".*\"([^\"]+)\".*" "\\1" PROJECT_VER "${FW_VERSION_LINE}")
+# Read it again whenever web.h changes (otherwise a new FW_VERSION only reaches the image after a clean build, and the
+# controller refuses the update as "not newer").
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/main/web.h")
 set(PROJECT_VER_NUMBER 4)
 # A dev build ("-devN") also keeps the hourly power log (main/store.h, /api/powerlog).
 if(PROJECT_VER MATCHES "-dev")

@@ -63,7 +63,7 @@ actor Demo: ControllerTransport {
             let all = q["b"] == "all", one = Int(q["b"] ?? "") ?? 0
             let word = q["to"]
             let target: Double = word == "open" ? 0 : word == "close" ? (closeUp == 1 ? 100 : -100) : Double(q["t"] ?? "") ?? 0
-            if all || (sync == 1 && q["solo"] == nil) { for i in blinds.indices where !blinds[i].hidden { go(i, target) } }
+            if all { for i in blinds.indices where !blinds[i].hidden { go(i, target) } }
             else if blinds.indices.contains(one) { go(one, target) }
         case Api.stop:
             for i in blinds.indices { let t = tilt(blinds[i], at: now); blinds[i].from = t; blinds[i].to = t; blinds[i].started = nil }

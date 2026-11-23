@@ -4,6 +4,8 @@
 // UDP on port 49100, one datagram each way:
 //   hub -> controller   type (1) | seq (2) | payload       H hello, X secured command (sec.h), A ask to join, P pair
 //   controller -> hub   type in lower case | seq | status (3 digits, "200") | answer
+//   controller -> hub   '#' | seq | piece (1) | count (1) | part   an answer longer than 1000 bytes (status and answer),
+//                                                        in up to 16 pieces; the hub joins them before passing it on
 //   controller -> hub   'S' | "00" | status JSON           pushed when something changed, and every 10 minutes
 //   controller -> hub   'L' | "00" | one event log line
 //   controller -> hub   'G' | "00"                          leaving (factory reset): the hub stops announcing it
@@ -55,6 +57,9 @@ static bool hubAddrOk = false;
 static sockaddr_in6 hubHelloAddr;                // where the hub's last hello came from (not proven: only for sending)
 static bool hubHelloOk = false;
 
+// One Thread message carries about 1.2 KB; a longer answer to the hub goes in pieces of this size (the hub joins them).
+const size_t HUB_PIECE = 1000;
+const int HUB_PIECES_MAX = 16;
 bool hubOk() { return hubSeen && millis() - hubSeen < 1200000; }   // heard from the hub in the last 20 minutes
 
 static uint32_t backupCrc();
@@ -476,11 +481,25 @@ static void hubTask(void *) {
         if (t == 'E') { lastESt = st; lastEOut = out; lastEAt = millis() ? millis() : 1; }
       }
     } else out = "{\"err\":\"unknown request\"}";
-    std::string rep(1, (char)tolower(t));
-    rep.append(buf + 1, 2);
-    rep.append(st, 3);
-    rep += out;
-    sendto(hubSock, rep.data(), rep.size(), 0, (sockaddr *)&from, fl);
+    std::string body(st, 3);
+    body += out;
+    if (body.size() <= HUB_PIECE) {                // most answers: one message
+      std::string rep(1, (char)tolower(t));
+      rep.append(buf + 1, 2);
+      rep += body;
+      sendto(hubSock, rep.data(), rep.size(), 0, (sockaddr *)&from, fl);
+    } else {                                       // a long one (the log, a backup): '#' seq, piece, count, then a part
+      int count = (int)((body.size() + HUB_PIECE - 1) / HUB_PIECE);
+      if (count > HUB_PIECES_MAX) { body = "500{\"err\":\"answer too long for the Tilt Hub\"}"; count = 1; }
+      for (int i = 0; i < count; i++) {
+        std::string rep(1, '#');
+        rep.append(buf + 1, 2);
+        rep += (char)i; rep += (char)count;
+        rep.append(body, i * HUB_PIECE, HUB_PIECE);
+        sendto(hubSock, rep.data(), rep.size(), 0, (sockaddr *)&from, fl);
+        if (i + 1 < count) vTaskDelay(pdMS_TO_TICKS(15));   // let the radio send it before queuing the next
+      }
+    }
   }
 }
 // After Matter has started.

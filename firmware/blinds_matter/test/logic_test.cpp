@@ -56,9 +56,7 @@ static void requestTests() {
   CHECK(fwIsOlder("2.2.0", "2.3.0-dev7") && !fwIsOlder("2.3.0", "2.3.0-dev7") && fwIsOlder("2.3.0-dev6", "2.3.0-dev7"), "firmware: older and newer");
   CHECK(!fwIsOlder("2.3.0-dev7", "2.3.0-dev7") && fwIsOlder("2.3.0-dev7", "2.3.0") && !fwIsOlder("10.0.0", "9.9.9") && fwIsOlder("junk", "2.3.0"), "firmware: same, release, junk");
   { RecMoves s; s.fol = true; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
-    CHECK(s.log == "x n1:50 n0:50 n2:50 " && r.started == 3, "app: follow mode takes the others along"); }
-  { RecMoves s; s.fol = true; MoveAsk a = moveAsk(FROM_APP, 1, 50); a.solo = true; moveRequest(a, s);
-    CHECK(s.log == "x n1:50 ", "app: solo leaves the others"); }
+    CHECK(s.log == "x n1:50 " && r.started == 1, "app: one blind moves alone, even with follow on"); }
   { RecMoves s; s.mov[0] = false; MoveResult r = moveRequest(moveAsk(FROM_APP, -1, -100), s);
     CHECK(s.log == "x n1:-100 n2:-100 " && r.started == 2, "app: all = every movable blind"); }
   { RecMoves s; s.mov[1] = false; s.refuse[1] = "not set up yet"; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
@@ -85,11 +83,13 @@ static void requestTests() {
     CHECK(s.log == "g0:0>30/120000 ", "schedule: gently"); }
   { RecMoves s; MoveResult r = moveRequest(moveAsk(FROM_HOME, 2, -40), s);
     CHECK(s.log == "x n2:-40 " && r.started == 1, "Home: its covering's blind"); }
-  { RecMoves s; s.fol = true; s.mov[2] = false; moveRequest(moveAsk(FROM_HOME, 2, -40), s);
-    CHECK(s.log == "x n0:-40 n1:-40 ", "Home: follow mode, can-move rule even for its own blind"); }
+  { RecMoves s; s.fol = true; moveRequest(moveAsk(FROM_HOME, 2, -40), s);
+    CHECK(s.log == "x n2:-40 ", "Home: its own blind moves alone, even with follow on"); }
   { RecMoves s; moveRequest(moveAsk(FROM_HOME, -1, 10), s);
     CHECK(s.log == "x n0:10 n1:10 n2:10 ", "Home: one covering for all"); }
-  { RecMoves s; s.cur[0] = 48; s.cur[2] = NAN; MoveResult r = moveRequest(moveAsk(FROM_HAND, 1, 50), s);
+  { RecMoves s; MoveResult r = moveRequest(moveAsk(FROM_HAND, 1, 50), s);
+    CHECK(s.log.empty() && r.started == 0, "hand, follow off: nobody follows"); }
+  { RecMoves s; s.fol = true; s.cur[0] = 48; s.cur[2] = NAN; MoveResult r = moveRequest(moveAsk(FROM_HAND, 1, 50), s);
     CHECK(s.log == "n2:50 " && r.started == 1, "hand: the others follow, unless already there; gentle moves kept"); }
 }
 
@@ -144,6 +144,15 @@ struct SimTilter : Tilter {
     return tiltOfMarks(set.marks, wrapped());
   }
 };
+static void sensorTests() {
+  CHECK(near(as5600Share(128 + 2048 * 4351 / 4351, 4351), 2048.0f / 4095.0f, 0.001f), "a good frame reads its angle");
+  CHECK(as5600Share(128, 4351) == 0.0f, "a frame at the sensor's zero reads 0");
+  CHECK(as5600Share(20, 4351) < 0, "a frame shorter than the lead-in is noise, not 0");
+  CHECK(as5600Share(4351, 4351) < 0, "a frame high the whole time is noise, not a full turn");
+  CHECK(as5600Share(500, 0) < 0, "no frame yet: no reading");
+  CHECK(pwmBlindSpot(3.0f / 360) && pwmBlindSpot(358.0f / 360), "no pulses just above or below zero: the blind spot");
+  CHECK(!pwmBlindSpot(252.0f / 360), "no pulses at 252 degrees: noise, not the blind spot");
+}
 static void tilterTests() {
   { SimTilter s; float t = s.go(50);
     CHECK(s.endMsg == "reached" && near(t, 50, 5), "reaches a Target through gear play and the high reading"); }
@@ -166,6 +175,11 @@ static void tilterTests() {
     CHECK(s.endMsg == "reached" && near(t, 50, 5) && s.sign == -2 && s.keeps == 1, "swapped wires: a learned direction is corrected and kept"); }
   { SimTilter s; s.sign = 2; s.phys = -1; s.go(50);               // swapped, no end stop in the way: caught while running
     CHECK(s.endMsg == "reached" && s.sign == -2, "swapped wires: caught while running, before any end stop"); }
+  { SimTilter s; s.set.marks = Marks{15.4f, 138.2f, 247.7f}; s.set.graceMs = 8000;   // Middle, 2026-11-23: wires
+    s.rod = s.gear = 251.6f; s.hi = 252; s.sign = 2; s.phys = -1;                   // swapped, resting on its down stop
+    float t = s.go(0);
+    CHECK(s.endMsg == "reached" && near(t, 0, 5) && s.sign == -2, "swapped wires, starting on the end stop: turns round and reaches Open");
+    if (s.endMsg != "reached") printf("    ended \"%s\" at tilt %.1f, log: %s\n", s.endMsg.c_str(), t, s.log.c_str()); }
   { SimTilter s; s.sign = 2; s.lo = 270; s.go(50);                // right direction, but something blocks the blind
     CHECK(s.endMsg == "blocked (stalled)" && s.sign == 2 && s.keeps == 0, "blocked: the learned direction stays"); }
   { SimTilter s; s.wandAt = 6000; s.wandBy = 12; float t = s.go(50);
@@ -217,6 +231,7 @@ int main() {
   requestTests();
 
   // ---- one blind's Move, on a simulated Tilter
+  sensorTests();
   tilterTests();
 
   // ---- battery

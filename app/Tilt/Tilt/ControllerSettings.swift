@@ -42,7 +42,7 @@ struct ControllerSettingsView: View {
                         Toggle("Move at the Same Time", isOn: Binding(get: { par == 1 }, set: { on in change { try await $0.setSameTime(on) } }))
                     }
                 } header: { Text("General") } footer: {
-                    Text("Follow Each Other: when one blind is moved, from here, from Apple Home or by turning its wand, the others go to the same tilt.\n\nMove at the Same Time: off moves them one after another, which is quieter and easier on the battery.")
+                    Text("Follow Each Other: when you turn one blind's wand by hand, the others go to the same tilt. A blind moved from the app or Apple Home moves alone.\n\nMove at the Same Time: off moves them one after another, which is quieter and easier on the battery.")
                 }
                 Section {
                     if !onHub { Button("Add to Apple Home", systemImage: "homekit") { openHome() } }

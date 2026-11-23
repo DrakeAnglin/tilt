@@ -12,8 +12,8 @@ enum Api {
 
     // ---- moving
     static let stop = "/api/stop"
-    /// One blind to a tilt (-100…100). `solo`: only this blind, even when the blinds follow each other.
-    static func go(blind: Int, tilt: Int, solo: Bool = false) -> String { "/api/go?b=\(blind)&t=\(tilt)" + (solo ? "&solo=1" : "") }
+    /// One blind to a tilt (-100…100). It moves alone: following is only for a turn of the wand.
+    static func go(blind: Int, tilt: Int) -> String { "/api/go?b=\(blind)&t=\(tilt)" }
     /// One blind to a named position: open, close, fav.
     static func go(blind: Int, to word: String) -> String { "/api/go?b=\(blind)&to=\(word)" }
     /// Every blind to a named position. `gently`: take this many minutes.

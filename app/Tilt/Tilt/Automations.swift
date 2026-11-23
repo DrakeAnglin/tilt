@@ -18,7 +18,7 @@ final class SceneStore {
     var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: Prefs.scenes)).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
     func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: Prefs.scenes) }
     func run(_ scene: BlindScene, controllers: [Controller]) {
-        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.go(blind: t.blind, tilt: tilt, solo: true) }
+        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.go(blind: t.blind, tilt: tilt) }
     }
 }
 
@@ -173,7 +173,7 @@ struct AutomationsTab: View {
     private func runNow(_ s: Schedule) {
         for t in s.targets {
             guard let c = model.controllers.first(where: { $0.id == t.controller }), c.state?.b[safe: t.blind]?.ready == true else { continue }
-            c.go(blind: t.blind, tilt: s.tilt, solo: true)
+            c.go(blind: t.blind, tilt: s.tilt)
         }
     }
     private func save(_ s: Schedule, delete: Bool = false) {

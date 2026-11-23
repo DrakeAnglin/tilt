@@ -64,7 +64,7 @@ float readAngle(int p) {
     uint32_t t = millis();
     if (sh >= 0) { capLast[p] = sh; capLastMs[p] = t ? t : 1; }
     else if (capLastMs[p] && t - capLastMs[p] < 200) sh = capLast[p];     // a few frames lost to noise: keep the last good one
-    bs[p].blind = sh < 0;
+    bs[p].blind = sh < 0 && (!capLastMs[p] || pwmBlindSpot(capLast[p]));
     // No pulses for a while: the sensor is within a few degrees of its zero (resting low just above it, or high just
     // below a full turn). Keep the last good reading, which is on the right side of zero; a flat 0 there could be read
     // as a jump of tens of degrees (a blind turning through zero then looked like it was going the wrong way).

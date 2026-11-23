@@ -124,12 +124,12 @@ final class Controller: Identifiable {
             do { try await action(client) } catch { lastError = error.localizedDescription }
         }
     }
-    func go(blind: Int, tilt: Int, solo: Bool = false) { run { try await $0.go(blind: blind, tilt: tilt, solo: solo) } }
+    func go(blind: Int, tilt: Int) { run { try await $0.go(blind: blind, tilt: tilt) } }
     func go(blind: Int, to word: String) { run { try await $0.go(blind: blind, to: word) } }
     /// `gently`: take this many minutes instead of going straight there.
     func goAll(to word: String, gently minutes: Int = 0) { run { try await $0.goAll(to: word, gently: minutes) } }
     /// Every blind that is set up, to one position.
-    func goAll(tilt: Int) { for (i, b) in (state?.b ?? []).enumerated() where b.ready { go(blind: i, tilt: tilt, solo: true) } }
+    func goAll(tilt: Int) { for (i, b) in (state?.b ?? []).enumerated() where b.ready { go(blind: i, tilt: tilt) } }
     func stopAll() { run { try await $0.stop() } }
     /// Hold-to-turn: one short push; send again within half a second to keep turning.
     func jog(blind: Int, dir: Int, percent: Int) { let client = client; Task { await client.jog(blind: blind, dir: dir, percent: percent) } }

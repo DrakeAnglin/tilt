@@ -55,7 +55,7 @@ check(TiltWords.away(lastSeen: nil) == "Unreachable", "never seen")
 check(TiltWords.away(lastSeen: seenAt.addingTimeInterval(-7200), now: seenAt).hasPrefix("Unreachable · last seen 2"), "unreachable, with when it was last seen")
 
 // ---- command strings
-check(Api.go(blind: 1, tilt: -100, solo: true) == "/api/go?b=1&t=-100&solo=1", "one blind, solo")
+check(Api.go(blind: 1, tilt: -100) == "/api/go?b=1&t=-100", "one blind")
 check(Api.goAll(to: "close", gently: 10) == "/api/go?b=all&to=close&ramp=10", "a gentle move for all")
 check(Api.goAll(to: "open") == "/api/go?b=all&to=open", "no ramp when not gentle")
 check(Api.set("name", "Den & Hall") == "/api/set?k=name&v=Den%20%26%20Hall", "values are escaped")
@@ -90,8 +90,8 @@ let ppl = try await fc.people()
 check(ppl.count == 2 && ppl[1].wait == 1 && ppl[1].code == "1234", "people are decoded")
 check((try await fc.revoke(cid: "bb")) == "abc", "remove returns the proof")
 do { try await fc.setName("Den"); check(false, "a refusal throws") } catch { check(error.localizedDescription == "Only the owner can do that", "the controller's reason is passed on") }
-try await fc.go(blind: 2, tilt: -40, solo: true)
-check(await fake.sent.last == "/api/go?b=2&t=-40&solo=1", "the client builds the command")
+try await fc.go(blind: 2, tilt: -40)
+check(await fake.sent.last == "/api/go?b=2&t=-40", "the client builds the command")
 
 // ---- typed settings: the names firmware web.h hSet knows
 func sentBy(_ what: (ControllerClient) async throws -> Void) async -> String? { try? await what(fc); return await fake.sent.last }

@@ -40,17 +40,19 @@ struct SetupWizard: View {
                         .padding(.vertical, 20)
                         .animation(.easeInOut(duration: 0.6), value: step)
                     Text(s.detail).font(.body).multilineTextAlignment(.center).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    Label(blind?.pres == 0 ? "No blind on this port" : steady ? "Holding still. Ready to save." : "Turning…",
-                          systemImage: blind?.pres == 0 ? "cable.connector.slash" : steady ? "checkmark.circle.fill" : "arrow.triangle.2.circlepath")
-                        .font(.subheadline.weight(.medium)).foregroundStyle(steady && blind?.pres != 0 ? Palette.good : Color.secondary)
-                        .padding(.horizontal, 14).padding(.vertical, 8).card(radius: 20).padding(.top, 16)
-                        .animation(.default, value: steady)
                     if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).padding(.top, 12) }
                     Spacer(minLength: 12)
+                    // One button says it all: it saves once the blind holds still, and says why it can't before that.
+                    let absent = blind?.pres == 0
                     Button { mark(s.mark) } label: {
-                        HStack { if busy { SlatLoader(size: 18).tint(Palette.onAccent) }; Text(busy ? "Saving…" : s.save).font(.headline) }.frame(maxWidth: .infinity).padding(.vertical, 6)
+                        HStack {
+                            if busy { SlatLoader(size: 18).tint(Palette.onAccent) }
+                            Text(busy ? "Saving…" : absent ? "No Blind on This Port" : steady ? s.save : "Turning…").font(.headline)
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
-                    .buttonStyle(.glassProminent).controlSize(.large).disabled(busy || blind?.pres == 0)
+                    .buttonStyle(.glassProminent).controlSize(.large).disabled(busy || absent || !steady)
+                    .animation(.default, value: steady)
                     .sensoryFeedback(.success, trigger: step)
                     Button("Back") { step -= 1; problem = nil }.padding(.top, 10).opacity(step > 0 ? 1 : 0).disabled(step == 0)
                 } else {
@@ -68,9 +70,9 @@ struct SetupWizard: View {
                     if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).padding(.top, 8) }
                     Text("Try each one. The blind moves by itself now.").font(.body).foregroundStyle(.secondary).padding(.top, 8)
                     HStack(spacing: 10) {
-                        PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.go(blind: index, tilt: -100, solo: true) }
-                        PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.go(blind: index, tilt: 0, solo: true) }
-                        PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.go(blind: index, tilt: 100, solo: true) }
+                        PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.go(blind: index, tilt: -100) }
+                        PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.go(blind: index, tilt: 0) }
+                        PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.go(blind: index, tilt: 100) }
                     }
                     .padding(.top, 24).disabled(checking)
                     Text(blind.map(TiltWords.status) ?? "").font(.subheadline).foregroundStyle(.secondary).padding(.top, 12)
@@ -113,7 +115,7 @@ struct SetupWizard: View {
         Task {
             defer { checking = false }
             do {
-                try await controller.client.go(blind: index, tilt: 0, solo: true)
+                try await controller.client.go(blind: index, tilt: 0)
                 let t0 = Date()
                 var seenMoving = false
                 while Date().timeIntervalSince(t0) < 30 {

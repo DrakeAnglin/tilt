@@ -48,6 +48,10 @@ An internal word (code, docs, the developer page): the app never shows it. To th
 The user moving a blind by hand: turning the wand. It always keeps working with the tilter fitted, and the app shows the new tilt at the next wake, with no re-homing.
 _Avoid_: override, hand mode
 
+**Follow**:
+A setting on a controller: when one of its blinds gets a Manual move, the others go to the same tilt. Only a Manual move is followed; a blind moved from the app, Apple Home, a Scene or a Schedule moves alone ([ADR 0004](docs/adr/0004-follow-is-for-the-wand.md)).
+_Avoid_: sync, solo
+
 **Window covering**:
 How Matter sees a blind: one endpoint. The firmware sends tilt over Matter's lift channel as "percent closed" (Matter's word; Tilt never raises a blind).
 

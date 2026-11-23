@@ -12,6 +12,18 @@ const int PORTS = 3;                                         // a controller has
 // ---- angles
 inline float angDiff(float to, float from) { return fmodf(to - from + 540.0f, 360.0f) - 180.0f; }   // shortest, -180..180
 inline float sgn(float v) { return v < 0 ? -1.0f : 1.0f; }
+// One AS5600 PWM frame as a share of a turn (0..1). The high time is 128 clocks of lead-in plus the angle in 4095 steps,
+// out of 4351 clocks. A frame outside that (a noise edge while the motor runs) is no reading: -1, never a clamped 0
+// (a clamped 0 looked like a jump to the sensor's zero and stopped moves, 2026-11-23).
+inline float as5600Share(uint32_t high, uint32_t period) {
+  if (!period) return -1.0f;
+  float s = ((float)high / (float)period * 4351.0f - 128.0f) / 4095.0f;
+  if (s < -0.01f || s > 1.01f) return -1.0f;
+  return s < 0 ? 0 : s > 1 ? 1 : s;
+}
+// No pulses means the sensor sits within a few degrees of its zero, but only if it was last seen near there. Anywhere
+// else, missing pulses are noise: keep the last good reading and keep checking for a stall.
+inline bool pwmBlindSpot(float lastShare) { return lastShare < 15.0f / 360.0f || lastShare > 345.0f / 360.0f; }
 
 // ---- a blind's three marks (sensor angles, degrees) and tilt (-100 closed down .. 0 open .. +100 closed up)
 const float MAX_HALF_SPAN = 170.0f, MIN_HALF_SPAN = 8.0f;   // open -> closed, each way (degrees of rod turn)

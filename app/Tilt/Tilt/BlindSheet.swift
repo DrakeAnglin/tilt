@@ -42,12 +42,23 @@ struct BlindSheet: View {
                     Slider(value: Binding(get: { shownTilt }, set: { drag = $0.rounded() }), in: -100...100, onEditingChanged: { if !$0 { commit() } }).accessibilityLabel("Tilt")
                     Image(systemName: "arrow.up.to.line").foregroundStyle(.secondary)
                 }
+                // While it moves, one Stop button takes the three buttons' place: same spot, same height, nothing shifts.
                 HStack(spacing: 10) {
                     PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.go(blind: index, tilt: -100) }
                     PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.go(blind: index, tilt: 0) }
                     PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.go(blind: index, tilt: 100) }
                 }
-                if blind.moving { Button(role: .destructive) { controller.stopAll() } label: { Label("Stop", systemImage: "stop.fill").frame(maxWidth: .infinity) }.buttonStyle(.glassProminent).tint(Palette.danger) }
+                .opacity(blind.moving ? 0 : 1).disabled(blind.moving)
+                .overlay {
+                    if blind.moving {
+                        Button(role: .destructive) { controller.stopAll() } label: {
+                            VStack(spacing: 6) { Image(systemName: "stop.fill").font(.title3).frame(height: 24); Text("Stop").font(.footnote.weight(.semibold)) }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .buttonStyle(.glassProminent).tint(Palette.danger)
+                    }
+                }
+                .animation(.default, value: blind.moving)
             } else if let blind {
                 if blind.cal == 0 && !(blind.seen == 1 && blind.pres == 0) {
                     Text("This blind needs setup. It takes about a minute: you turn the blind by hand to three spots.")

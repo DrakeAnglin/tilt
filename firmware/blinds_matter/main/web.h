@@ -17,7 +17,7 @@
 #include "update.h"
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev20"
+#define FW_VERSION "2.3.0-dev24"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 
@@ -204,7 +204,6 @@ esp_err_t hGo(httpd_req_t *r) {
   int one = b == "all" ? -1 : constrain(atoi(b.c_str()), 0, PORTS - 1);
   // ramp=N: gently, taking N minutes (the same slow move a schedule can make), instead of going straight there
   MoveAsk a = moveAsk(FROM_APP, one, NAN, (uint32_t)constrain(argi(r, "ramp"), 0, 60) * 60000u);
-  a.solo = argi(r, "solo");
   float tOne = one < 0 ? NAN : to.length() ? tiltWord(one, to) : (float)atof(arg(r, "t").c_str());
   for (int p = 0; p < PORTS; p++) a.tilt[p] = one >= 0 ? tOne : tiltWord(p, to);   // the others go where the named one goes
   MoveResult m = moveBlinds(a);
@@ -250,8 +249,10 @@ esp_err_t hTrace(httpd_req_t *r) {              // the recording of the last mov
   {
     Lock l;
     j.reserve(traceN * 14 + 80);
-    ap(j, "{\"n\":%d,\"moving\":%d,\"p\":[", traceN, moving() ? 1 : 0);
-    for (int i = 0; i < traceN; i++) ap(j, "%s[%u,%u,%u]", i ? "," : "", trace[i].t, trace[i].a, trace[i].st);
+    // In pages (?from=) of 300 points (about 4 KB), so a whole recording (up to 1500) is not one huge answer.
+    int from = constrain(argi(r, "from"), 0, traceN), to = std::min(traceN, from + 300);
+    ap(j, "{\"n\":%d,\"from\":%d,\"moving\":%d,\"p\":[", traceN, from, moving() ? 1 : 0);
+    for (int i = from; i < to; i++) ap(j, "%s[%u,%u,%u]", i > from ? "," : "", trace[i].t, trace[i].a, trace[i].st);
     j += "]}";
   }
   return sendJson(r, j);

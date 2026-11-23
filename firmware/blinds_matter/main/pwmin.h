@@ -8,6 +8,7 @@
 #pragma once
 #include "driver/mcpwm_cap.h"
 #include "ardu.h"
+#include "logic.h"
 
 #define CAP_N 3                                    // ports
 static mcpwm_cap_timer_handle_t capTimer = nullptr;
@@ -94,6 +95,5 @@ float capShare(int k) {
   int64_t at = capAt[k];
   portEXIT_CRITICAL(&capMux);
   if (!p || !at || esp_timer_get_time() - at > 40000) return -1.0f;
-  float s = ((float)h / (float)p * 4351.0f - 128.0f) / 4095.0f;
-  return s < 0 ? 0 : s > 1 ? 1 : s;
+  return as5600Share(h, p);
 }

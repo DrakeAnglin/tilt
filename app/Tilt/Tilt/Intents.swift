@@ -20,7 +20,7 @@ struct SetBlindsIntent: AppIntent {
         for (_, client) in TiltActions.clients() {
             guard let s = try? await client.state() else { continue }
             let t = (s.closeUp == 1 ? 1 : -1) * (100 - percent)
-            for (i, b) in s.b.enumerated() where b.ready { if (try? await client.go(blind: i, tilt: t, solo: true)) != nil { reached += 1 } }
+            for (i, b) in s.b.enumerated() where b.ready { if (try? await client.go(blind: i, tilt: t)) != nil { reached += 1 } }
         }
         if reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
         return .result()
@@ -47,7 +47,7 @@ struct RunSceneIntent: AppIntent {
         guard let sc = TiltActions.scenes().first(where: { $0.id == scene.id }) else { throw TiltError("That scene no longer exists.") }
         let clients = Dictionary(uniqueKeysWithValues: TiltActions.clients().map { ($0.0.id, $0.1) })
         var reached = 0
-        for (t, tilt) in sc.tilts { if let c = clients[t.controller], (try? await c.go(blind: t.blind, tilt: tilt, solo: true)) != nil { reached += 1 } }
+        for (t, tilt) in sc.tilts { if let c = clients[t.controller], (try? await c.go(blind: t.blind, tilt: tilt)) != nil { reached += 1 } }
         if reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
         return .result()
     }
