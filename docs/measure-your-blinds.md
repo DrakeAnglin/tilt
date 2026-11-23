@@ -25,16 +25,10 @@ Remove the blind from its brackets and photograph:
 - Inside the headrail end-to-end (top view)
 - The tilter (worm gear unit) and how it clips in
 - The tilt rod's cross-section (round, D, hex, square? what size?)
-- Cordless lift parts: spring motor unit(s), cord spools, any shaft connecting them (needed for [lift.md](lift.md))
 - Measure: headrail inner width/height, length, distance from the tilter to the end cap, free space at each end
-
-## 4. Lift (for later)
-- Blind width × drop, rough weight (bottom rail + slats)
-- Force needed to push the bottom rail up and pull it down (luggage scale on the bottom rail center)
-- Total travel distance (fully down to fully up)
 
 ## Results
 
-| Blind / room | W × H | Wand turns | Rod degrees | Max torque at wand (kg·cm) | Max torque at rod (kg·cm) | Rod shape | Lift push/pull (g) | Notes |
-|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
+| Blind / room | W × H | Wand turns | Rod degrees | Max torque at wand (kg·cm) | Max torque at rod (kg·cm) | Rod shape | Notes |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |

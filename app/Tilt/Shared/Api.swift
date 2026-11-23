@@ -9,7 +9,6 @@ enum Api {
     static let keys = "/api/keys"
     static let dev = "/api/dev"
     static let log = "/api/log"
-    static let wifiState = "/api/wifistate"
 
     // ---- moving
     static let stop = "/api/stop"
@@ -31,6 +30,14 @@ enum Api {
     /// The start of a schedule command for one slot; the caller adds the fields.
     static func schedule(slot: Int) -> String { "/api/sched?i=\(slot)&" }
     static let homeOpen = "/api/homeopen"
+    /// The Tilt Hub's Apple Home setup code, from a controller on that hub (owner).
+    /// The Tilt Hub's Thread network that a controller on it keeps (owner), to hand to a new controller.
+    static let backup = "/api/backup"
+    static func hubJoin(network: String) -> String { "/api/hubjoin?ds=\(network)" }
+    /// Go back to the firmware in the other slot, the one before the last update (the controller restarts).
+    static let swapFirmware = "/api/swapfw"
+    /// Put a settings backup back, one piece at a time (hex; end=1 on the last).
+    static func restore(offset: Int, hex: String, last: Bool) -> String { "/api/restore?o=\(offset)&d=\(hex)" + (last ? "&end=1" : "") }
     /// An owner allows a firmware upload for the next 5 minutes.
     static let otaOpen = "/api/otaopen"
     /// Keep the firmware that is on trial after an update (otherwise the next restart goes back to the old one).
@@ -47,8 +54,6 @@ enum Api {
     static let leave = "/api/leave"
 
     // ---- first setup
-    static func scan(fresh: Bool) -> String { "/api/scan" + (fresh ? "?new=1" : "") }
-    static func setWifi(ssid: String, password: String) -> String { "/api/setwifi?ssid=\(ssid.urlQuery)&pass=\(password.urlQuery)" }
 
     // ---- which firmware this version of the app needs
     /// The oldest controller firmware that has every command above.

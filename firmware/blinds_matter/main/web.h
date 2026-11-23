@@ -3,15 +3,12 @@
 #pragma once
 #include <esp_http_server.h>
 #include <esp_ota_ops.h>
-#include <esp_wifi.h>
 #include <esp_netif.h>
-#include <esp_netif_sntp.h>
 #include <esp_mac.h>
 #include <esp_chip_info.h>
 #include <esp_system.h>
 #include <driver/temperature_sensor.h>
-#include <mdns.h>
-#include "config.h"                              // WIFI_SSID
+#include "config.h"
 #include "motion.h"
 #include "sec.h"
 #include "wire.h"                                // the wire contract for /api/cfg and Schedule slots
@@ -20,7 +17,7 @@
 #include "update.h"
 #include "people.h"
 
-#define FW_VERSION "2.2.1-dev7"
+#define FW_VERSION "2.3.0-dev11"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 
@@ -44,6 +41,8 @@ float tiltWord(int p, const std::string &to) {
   return NAN;
 }
 
+std::string hubThreadJson();                     // hub_link.h
+bool hubJoined();
 // ---- pages
 esp_err_t hRoot(httpd_req_t *r) {
   lastWeb = millis() ? millis() : 1;
@@ -56,7 +55,7 @@ esp_err_t hState(httpd_req_t *r) {
   j.reserve(1200);
   ap(j, "{\"v\":\"" FW_VERSION "\",\"name\":%s,\"t\":%lu,\"tok\":%d,\"up\":%lu", jq(cfg.name).c_str(), (unsigned long)time(nullptr), timeValid() ? 1 : 0, (unsigned long)(millis() / 1000));
   ap(j, ",\"batt\":{\"v\":%.2f,\"pct\":%d,\"st\":\"%s\",\"vin\":%.2f,\"low\":%d}", vbatRest, battPercent(vbatRest), chargeState(), vin, battOkToMove() ? 0 : 1);   // low: 1 = below the motor cut-off, no moves
-  ap(j, ",\"pw\":{\"mode\":1,\"sleepIn\":-1,\"checkin\":0},\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"ap\":0,\"mv\":%d,\"log\":%lu,\"hk\":%d,\"asks\":%d,\"me\":%d,\"gentle\":%d,\"topic\":\"%s\",\"b\":[", cfg.closeUp, syncMode, parMode, firstMoving(), (unsigned long)logSeq, homesPaired(), asksWaiting(), secClient >= 0 ? keys[secClient].role : 1, rampAny() ? 1 : 0, secClient >= 0 ? hexOf(cloudTopic, 16).c_str() : "");
+  ap(j, ",\"pw\":{\"mode\":1,\"sleepIn\":-1,\"checkin\":0},\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"ap\":0,\"mv\":%d,\"log\":%lu,\"hk\":%d,\"asks\":%d,\"hkey\":%d,\"me\":%d,\"gentle\":%d,\"topic\":\"%s\",\"b\":[", cfg.closeUp, syncMode, parMode, firstMoving(), (unsigned long)logSeq, homesPaired(), asksWaiting(), hubSlot() >= 0 ? 1 : 0, secClient >= 0 ? keys[secClient].role : 1, rampAny() ? 1 : 0, secClient >= 0 ? hexOf(cloudTopic, 16).c_str() : "");
   for (int i = 0; i < PORTS; i++) {
     BlindCfg &c = cfg.b[i];
     bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
@@ -78,18 +77,11 @@ esp_err_t hDev(httpd_req_t *r) {
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
   float temp = 0;
   if (tsens) temperature_sensor_get_celsius(tsens, &temp);
-  wifi_ap_record_t apr = {};
-  bool up = esp_wifi_sta_get_ap_info(&apr) == ESP_OK;
-  esp_netif_ip_info_t ip = {};
-  esp_netif_t *nif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-  if (nif) esp_netif_get_ip_info(nif, &ip);
-  char ips[20];
-  snprintf(ips, sizeof ips, IPSTR, IP2STR(&ip.ip));
   ap(j, "{\"sys\":{\"fw\":\"" FW_VERSION "\",\"build\":\"" __DATE__ " " __TIME__ "\",\"core\":\"esp-matter 1.5\",\"idf\":%s,\"chip\":\"ESP32-C6\",\"rev\":%d,\"mhz\":160,\"flash\":4194304", jq(esp_get_idf_version()).c_str(), ci.revision);
   ap(j, ",\"app\":%lu,\"appMax\":%lu,\"part\":%s,\"md5\":\"\",\"heap\":%lu,\"heapMin\":%lu,\"temp\":%.1f,\"rst\":%s,\"up\":%lu,\"pending\":%d", (unsigned long)appSize, (unsigned long)(part ? part->size : 0),
      jq(part ? part->label : "?").c_str(), (unsigned long)esp_get_free_heap_size(), (unsigned long)esp_get_minimum_free_heap_size(), temp, jq(resetReason()).c_str(), (unsigned long)(millis() / 1000), otaPending ? 1 : 0);
   ap(j, ",\"mac\":\"%02X:%02X:%02X:%02X:%02X:%02X\"}", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  ap(j, ",\"wifi\":{\"ssid\":%s,\"cfg\":%s,\"own\":0,\"ip\":\"%s\",\"rssi\":%d,\"ch\":%d,\"host\":\"blinds-pcb.local\",\"tx\":%d,\"ap\":0}", jq(up ? (const char *)apr.ssid : "").c_str(), jq(WIFI_SSID).c_str(), ips, up ? apr.rssi : 0, up ? apr.primary : 0, cfg.txPower);
+  ap(j, ",\"thread\":%s", hubThreadJson().c_str());
   ap(j, ",\"pwr\":{\"vbat\":%.3f,\"rest\":%.3f,\"vin\":%.3f,\"vdd\":%.3f,\"powered\":%d,\"awakeS\":%lu,\"motorMs\":%lu,\"wakes\":0,\"since\":%lu,\"keep\":0,\"next\":%lu}", vbat, vbatRest, vin, vdd, powered ? 1 : 0,
      (unsigned long)stats.battAwakeS, (unsigned long)stats.battMotorMs, (unsigned long)stats.battSince, (unsigned long)schedNext());
   ap(j, ",\"st\":{\"boots\":%lu,\"brown\":%lu,\"crash\":%lu,\"wdt\":%lu,\"wakes\":0,\"checkins\":0,\"ota\":%lu,\"motorS\":%lu}", (unsigned long)stats.boots, (unsigned long)stats.brownouts, (unsigned long)stats.crashes,
@@ -247,74 +239,21 @@ esp_err_t hKeep(httpd_req_t *r) {
   if (otaPending) { esp_ota_mark_app_valid_cancel_rollback(); otaPending = false; stats.otaOk++; statsSave(); event("new firmware %s confirmed", FW_VERSION); }
   return ok(r);
 }
-// Wi-Fi networks in range, for first setup. The look-around itself runs in webTick; the app asks again until busy is 0.
-std::string scanJson = "{\"ok\":1,\"busy\":1,\"nets\":[]}";
-bool scanWanted = false;
-uint32_t scanAt = 0;
-esp_err_t hScan(httpd_req_t *r) {
-  if (argi(r, "new") || !scanAt) scanWanted = true;          // new=1: look again
-  return sendJson(r, scanWanted ? std::string("{\"ok\":1,\"busy\":1,\"nets\":[]}") : scanJson);
-}
-void scanRun() {
-  wifi_scan_config_t sc = {};
-  sc.show_hidden = false;
-  std::string j = "{\"ok\":1,\"busy\":0,\"nets\":[";
-  if (esp_wifi_scan_start(&sc, true) == ESP_OK) {
-    static wifi_ap_record_t recs[20];
-    uint16_t n = 20;
-    if (esp_wifi_scan_get_ap_records(&n, recs) != ESP_OK) n = 0;
-    int shown = 0;
-    for (int i = 0; i < n && j.length() < 400; i++) {            // strongest first; the answer must stay small for Bluetooth
-      const char *s = (const char *)recs[i].ssid;
-      if (!s[0]) continue;
-      bool dup = false;
-      for (int k = 0; k < i; k++) if (!strcmp((const char *)recs[k].ssid, s)) dup = true;
-      if (dup) continue;
-      ap(j, "%s{\"s\":%s,\"r\":%d,\"l\":%d}", shown++ ? "," : "", jq(s).c_str(), recs[i].rssi, recs[i].authmode == WIFI_AUTH_OPEN ? 0 : 1);
-    }
-  }
-  scanJson = j + "]}";
-  scanAt = millis() ? millis() : 1;
-}
 
 // ---- who may use this controller (the rules and openApi: sec.h)
 std::string ctrlId() { uint8_t m[6] = {0}; esp_read_mac(m, ESP_MAC_WIFI_STA); return hexOf(m, 6); }
-bool wifiUp(char *ip, size_t n, char *ssid, size_t sn) {
-  wifi_ap_record_t apr = {};
-  bool up = esp_wifi_sta_get_ap_info(&apr) == ESP_OK;
-  esp_netif_ip_info_t info = {};
-  esp_netif_t *nif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-  if (nif) esp_netif_get_ip_info(nif, &info);
-  snprintf(ip, n, IPSTR, IP2STR(&info.ip));
-  strlcpy(ssid, up ? (const char *)apr.ssid : "", sn);
-  return up && info.ip.addr != 0;
-}
+bool hubOk();                                    // hub_link.h
+void hubTick();
 std::string helloJson() {
   std::string j;
-  char ip[20], ssid[34];
-  bool up = wifiUp(ip, sizeof ip, ssid, sizeof ssid);
-  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"wifi\":%d,\"ip\":\"%s\",\"home\":%d}", ctrlId().c_str(), jq(cfg.name).c_str(), hexOf(bootId, 4).c_str(), owned() ? 1 : 0, openApi, up ? 1 : 0, up ? ip : "", homesPaired() ? 1 : 0);
+  // img: the running firmware's SHA-256 (as esptool shows it), so an update can be a patch made from exactly it.
+  static std::string img;
+  if (img.empty()) { uint8_t h[32]; if (esp_partition_get_sha256(esp_ota_get_running_partition(), h) == ESP_OK) img = hexOf(h, 32); }
+  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d}", ctrlId().c_str(),
+     jq(cfg.name).c_str(), img.c_str(), hexOf(bootId, 4).c_str(), owned() ? 1 : 0, openApi, homesPaired() ? 1 : 0, hubOk() ? 1 : 0);
   return j;
 }
 esp_err_t hHello(httpd_req_t *r) { return plain(r, "200 OK", helloJson()); }
-// Owner, over the secured connection (Bluetooth at first setup): join this Wi-Fi network.
-std::string newSsid, newPass;
-bool wifiChange = false;
-esp_err_t hSetWifi(httpd_req_t *r) {
-  Lock l;
-  std::string s = arg(r, "ssid"), p = arg(r, "pass");
-  if (s.empty() || s.length() > 32 || p.length() > 63) return fail(r, "bad network name or password");
-  newSsid = s; newPass = p; wifiChange = true;       // done by webTick, after this answer has gone out
-  event("Wi-Fi set to '%s'", s.c_str());
-  return ok(r);
-}
-esp_err_t hWifiState(httpd_req_t *r) {
-  char ip[20], ssid[34];
-  bool up = wifiUp(ip, sizeof ip, ssid, sizeof ssid);
-  std::string j;
-  ap(j, "{\"ok\":1,\"up\":%d,\"ssid\":%s,\"ip\":\"%s\"}", up ? 1 : 0, jq(ssid).c_str(), up ? ip : "");
-  return sendJson(r, j);
-}
 void openHomeWindow();                           // app_main.cpp
 std::string homeCodeJson();                      // home_code.h
 esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) add this controller in the next 10 minutes
@@ -322,21 +261,6 @@ esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) ad
   return sendJson(r, homeCodeJson());
 }
 esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = millis() + 300000; event("firmware updates allowed for 5 minutes"); return ok(r); }
-// Found by the app with Bonjour: _tilt._tcp, with this controller's id and address.
-void bonjourTick(bool up) {
-  static bool added = false;
-  static char lastIp[20] = "", lastOwned = 2;
-  if (!up) return;
-  char ip[20], ssid[34];
-  wifiUp(ip, sizeof ip, ssid, sizeof ssid);
-  char own = owned() ? 1 : 0;
-  if (added && !strcmp(ip, lastIp) && own == lastOwned) return;
-  std::string id = ctrlId();
-  mdns_txt_item_t txt[] = {{"id", id.c_str()}, {"ip", ip}, {"owned", own ? "1" : "0"}, {"name", cfg.name}};
-  if (!added) added = mdns_service_add(nullptr, "_tilt", "_tcp", 80, txt, 4) == ESP_OK;
-  else mdns_service_txt_set("_tilt", "_tcp", txt, 4);
-  if (added) { strlcpy(lastIp, ip, sizeof lastIp); lastOwned = own; }
-}
 esp_err_t hOpenApi(httpd_req_t *r) { Lock l; openApi = argi(r, "v") ? 1 : 0; nvs.putUChar("plainopen", openApi); return ok(r); }
 // Every plain (not secured) request comes through here: once a phone is paired and the plain side is switched off,
 // only the secured connection answers.
@@ -347,72 +271,57 @@ esp_err_t hGuard(httpd_req_t *r) {
 }
 
 esp_err_t hRoot(httpd_req_t *r);
-esp_err_t hUpdate(httpd_req_t *r);
+esp_err_t hHome(httpd_req_t *r);                // hub_link.h
+esp_err_t hHubJoin(httpd_req_t *r);
+esp_err_t hSwapFw(httpd_req_t *r);
+esp_err_t hHubKey(httpd_req_t *r);
+esp_err_t hHubNet(httpd_req_t *r);
+esp_err_t hFactory(httpd_req_t *r);
+esp_err_t hBackup(httpd_req_t *r);
+esp_err_t hRestore(httpd_req_t *r);
 const Route routes[] = {
   {"/", HTTP_GET, hRoot}, {"/api/s", HTTP_GET, hState}, {"/api/dev", HTTP_GET, hDev}, {"/api/cfg", HTTP_GET, hCfg}, {"/api/log", HTTP_GET, hLog},
   {"/api/hist", HTTP_GET, hHist}, {"/api/set", HTTP_GET, hSet}, {"/api/sched", HTTP_GET, hSched}, {"/api/go", HTTP_GET, hGo}, {"/api/stop", HTTP_GET, hStop},
   {"/api/jog", HTTP_GET, hJog}, {"/api/angle", HTTP_GET, hAngle}, {"/api/mark", HTTP_GET, hMark}, {"/api/reset", HTTP_GET, hReset}, {"/api/reboot", HTTP_GET, hReboot},
-  {"/api/scan", HTTP_GET, hScan}, {"/api/wifi", HTTP_POST, hNotYet}, {"/api/awake", HTTP_GET, hAwake}, {"/api/sleepnow", HTTP_GET, hNotYet}, {"/api/update", HTTP_POST, hUpdate},
+  {"/api/awake", HTTP_GET, hAwake},
   {"/api/keep", HTTP_GET, hKeep}, {"/api/watch", HTTP_GET, hWatch}, {"/api/trace", HTTP_GET, hTrace},
-  {"/api/setwifi", HTTP_GET, hSetWifi}, {"/api/wifistate", HTTP_GET, hWifiState}, {"/api/homeopen", HTTP_GET, hHomeOpen},
+  {"/api/homeopen", HTTP_GET, hHomeOpen},
   {"/api/keys", HTTP_GET, hKeys}, {"/api/revoke", HTTP_GET, hRevoke}, {"/api/approve", HTTP_GET, hApprove}, {"/api/keyname", HTTP_GET, hKeyName}, {"/api/makeowner", HTTP_GET, hMakeOwner}, {"/api/openapi", HTTP_GET, hOpenApi}, {"/api/otaopen", HTTP_GET, hOtaOpen},
+  {"/api/home", HTTP_GET, hHome}, {"/api/hubjoin", HTTP_GET, hHubJoin}, {"/api/swapfw", HTTP_GET, hSwapFw}, {"/api/hubkey", HTTP_GET, hHubKey},
+  {"/api/hubnet", HTTP_GET, hHubNet}, {"/api/factory", HTTP_GET, hFactory},
+  {"/api/backup", HTTP_GET, hBackup}, {"/api/restore", HTTP_GET, hRestore},
 };
 const int routeCount = sizeof routes / sizeof routes[0];
 
-// Starts the HTTP server. The state its handlers use is loaded before this (app_main.cpp, the start order).
+// The chip's temperature sensor, for the developer page. (No web server: everything comes over Bluetooth or through
+// the Tilt Hub, hub_link.h.)
 void webBegin() {
   temperature_sensor_config_t tc = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 80);
   if (temperature_sensor_install(&tc, &tsens) == ESP_OK) temperature_sensor_enable(tsens); else tsens = nullptr;
-
-  httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
-  hc.max_uri_handlers = 48;
-  hc.stack_size = 8192;
-  hc.lru_purge_enable = true;
-  hc.recv_wait_timeout = 15;
-  httpd_handle_t srv = nullptr;
-  if (httpd_start(&srv, &hc) != ESP_OK) { event("web server did not start"); return; }
-  for (int i = 0; i < routeCount; i++) {
-    httpd_uri_t u = {};
-    u.uri = routes[i].uri; u.method = routes[i].m; u.handler = hGuard; u.user_ctx = (void *)&routes[i];
-    httpd_register_uri_handler(srv, &u);
-  }
-  httpd_uri_t x[] = {{"/x/hello", HTTP_GET, hHello, nullptr}, {"/x/pair", HTTP_POST, hPair, nullptr}, {"/x/ask", HTTP_POST, hAsk, nullptr}, {"/x/recover", HTTP_POST, hRecover, nullptr}, {"/x/recstate", HTTP_GET, hRecoverState, nullptr}, {"/x", HTTP_POST, hSecure, nullptr}};
-  for (auto &u : x) httpd_register_uri_handler(srv, &u);
 }
 
+extern volatile uint32_t hubLinkSeen;            // hub_link.h
 // Once a second, from the blinds task (the lock is held).
 void webTick() {
-  static uint32_t upSince = 0;
   uint32_t now = millis();
-  wifi_ap_record_t apr;
-  bool up = esp_wifi_sta_get_ap_info(&apr) == ESP_OK;
-  if (up && !upSince) { upSince = now ? now : 1; esp_wifi_set_ps(WIFI_PS_MIN_MODEM); }   // radio dozes between beacons
-  if (!up) upSince = 0;
-  bonjourTick(up);
+  // A new firmware is on trial until Thread to the Tilt Hub has worked for a minute.
+  static uint32_t hubSince = 0;
+  bool linkUp = hubOk() || (hubLinkSeen && now - hubLinkSeen < 120000);
+  if (linkUp && !hubSince) hubSince = now ? now : 1;
+  if (!linkUp) hubSince = 0;
+  hubTick();
   if (otaPending) {
-    if (up && now - upSince > 600000) {            // nobody said keep or drop: after ten minutes on Wi-Fi, keep it
+    if (hubSince && now - hubSince > 60000) {
       esp_ota_mark_app_valid_cancel_rollback();
       otaPending = false;
       stats.otaOk++;
       statsSave();
       event("new firmware %s confirmed", FW_VERSION);
-    } else if (!up && now > 120000) {
-      event("new firmware could not join Wi-Fi: going back");
+    } else if (!hubSince && now > 300000 && hubJoined()) {   // it has a hub to reach (setup is done) and did not
+      event("new firmware could not reach the Tilt Hub: going back");
       vTaskDelay(pdMS_TO_TICKS(200));
       esp_ota_mark_app_invalid_rollback_and_reboot();
     }
-  }
-  if (scanWanted) { scanRun(); scanWanted = false; }
-  if (wifiChange) {                              // a new network from the app
-    wifiChange = false;
-    wifi_config_t wc = {};
-    strlcpy((char *)wc.sta.ssid, newSsid.c_str(), sizeof wc.sta.ssid);
-    strlcpy((char *)wc.sta.password, newPass.c_str(), sizeof wc.sta.password);
-    newPass.clear();
-    esp_wifi_set_storage(WIFI_STORAGE_FLASH);
-    esp_wifi_disconnect();
-    esp_wifi_set_config(WIFI_IF_STA, &wc);
-    esp_wifi_connect();
   }
   schedRun();
   rampTick();

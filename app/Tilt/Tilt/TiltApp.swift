@@ -23,6 +23,7 @@ struct TiltApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
     @State private var discovery = Discovery()
+    @State private var hub = HubWatch.shared
     @Environment(\.scenePhase) private var phase
     init() { UNUserNotificationCenter.current().delegate = NoticePresenter.shared }
 
@@ -34,10 +35,12 @@ struct TiltApp: App {
             RootView()
                 .environment(model)
                 .environment(discovery)
+                .environment(hub)
                 .onChange(of: phase, initial: true) { _, p in
-                    if p == .active { model.startAll(); discovery.start() } else if p == .background { model.stopAll(); discovery.stop(); BatteryAlerts.scheduleRefresh() }
+                    if p == .active { model.startAll(); discovery.start(); hub.start() } else if p == .background { model.stopAll(); discovery.stop(); hub.stop(); BatteryAlerts.scheduleRefresh() }
                 }
                 .onChange(of: discovery.found) { _, f in model.noteFound(f) }
+                .alert("Tilt Hub", isPresented: Binding(get: { hub.notice != nil }, set: { if !$0 { hub.notice = nil } })) { Button("OK") {} } message: { Text(hub.notice ?? "") }
             }
         }
         .backgroundTask(.appRefresh(BatteryAlerts.refreshId)) { await BatteryAlerts.backgroundCheck() }

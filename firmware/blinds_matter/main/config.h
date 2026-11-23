@@ -18,12 +18,4 @@ const float EN_DROP_V = 0.26f;
 const float VIN_ON = 3.8f, VIN_OFF = 3.3f;      // input power present (USB or strong sun) / gone. USB reads ~4.3 V here.
 const float VBAT_CUTOFF = 3.35f;                // motor cut-off: no moves below this (resting) unless charging
 
-// ---- network
-#ifdef TILT_RELEASE
-// A public release carries no secrets: Wi-Fi comes from Bluetooth setup, and updates must be signed.
-#define WIFI_SSID ""
-#define WIFI_PASSWORD ""
-#define OTA_PASSWORD ""
-#else
-#include "secrets.h"
-#endif
+// ---- network: none of its own. Thread through the Tilt Hub (hub_link.h); no secrets are built in.

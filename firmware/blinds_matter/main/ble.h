@@ -5,8 +5,8 @@
 //   RX       B11D0002-...   the app writes a request:  'H' hello | 'P' + pairing JSON | 'X' + sealed command
 //   TX       B11D0003-...   the app then reads the answer:  status digit ('2' good, '4' refused) + answer
 //
-// Pairing and commands are exactly the ones in sec.h, so the Wi-Fi password travels sealed with the phone's key
-// (/api/setwifi), never in the clear. A Bluetooth link by itself gives a stranger nothing once an owner exists.
+// Pairing and commands are exactly the ones in sec.h, so the hub's network travels sealed with the phone's key
+// (/api/hubjoin), never in the clear. A Bluetooth link by itself gives a stranger nothing once an owner exists.
 #pragma once
 #include <vector>
 #include <host/ble_hs.h>
@@ -41,8 +41,9 @@ static const struct ble_gatt_chr_def bleChrs[] = {
     {.uuid = &BLINDS_RX.u, .access_cb = bleAccess, .arg = nullptr, .descriptors = nullptr, .flags = BLE_GATT_CHR_F_WRITE, .min_key_size = 0, .val_handle = nullptr, .cpfd = nullptr},
     {.uuid = &BLINDS_TX.u, .access_cb = bleAccess, .arg = nullptr, .descriptors = nullptr, .flags = BLE_GATT_CHR_F_READ, .min_key_size = 0, .val_handle = &bleTxHandle, .cpfd = nullptr},
     {}};
-// Scan response: our service's UUID (so the app can scan for it) and a short name.
-static const uint8_t bleScanRsp[] = {17, 0x07, 0xF0, 0xE5, 0xD4, 0x91, 0x2A, 0x6C, 0x0D, 0x9E, 0x52, 0x4F, 0x3C, 0x7A, 0x01, 0x00, 0x1D, 0xB1, 7, 0x09, 'B', 'l', 'i', 'n', 'd', 's'};
+// Scan response: our service's UUID (so the app can scan for it) and a short name: "Tilt new" while nobody owns it
+// (a Tilt Hub nearby looks for that to tell the app a new controller is waiting), else "Tilt".
+static uint8_t bleScanRsp[] = {17, 0x07, 0xF0, 0xE5, 0xD4, 0x91, 0x2A, 0x6C, 0x0D, 0x9E, 0x52, 0x4F, 0x3C, 0x7A, 0x01, 0x00, 0x1D, 0xB1, 9, 0x09, 'T', 'i', 'l', 't', ' ', 'n', 'e', 'w'};
 
 void bleSetupBegin()                             // before Matter starts
 {
@@ -54,5 +55,7 @@ void bleSetupBegin()                             // before Matter starts
     svcs.push_back(s);
     auto &mgr = chip::DeviceLayer::Internal::BLEMgrImpl();
     mgr.ConfigureExtraServices(svcs, true);
-    mgr.ConfigureScanResponseData(chip::ByteSpan(bleScanRsp, sizeof bleScanRsp));
+    size_t n = sizeof bleScanRsp;
+    if (owned()) { bleScanRsp[18] = 5; n = 18 + 1 + 5; }   // "Tilt"
+    mgr.ConfigureScanResponseData(chip::ByteSpan(bleScanRsp, n));
 }

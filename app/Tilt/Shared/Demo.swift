@@ -89,7 +89,7 @@ actor Demo: ControllerTransport {
                     if p[1] == "name" { blinds[i].name = v } else if p[1] == "hid" { blinds[i].hidden = v == "1" }
                 }
             }
-        case Api.homeOpen:
+        case Api.homeOpen, Api.backup:
             out = ["ok": 0, "err": "Apple Home is not available in the demo."]
         case Api.dev:
             out = [:]

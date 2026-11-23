@@ -54,10 +54,43 @@ enum BatteryAlerts {
         r.earliestBeginDate = Date(timeIntervalSinceNow: 4 * 3600)
         try? BGTaskScheduler.shared.submit(r)
     }
-    /// Run by iOS now and then while the app is closed.
+    /// From what a Tilt Hub reports (no controller is woken for it).
+    static func checkPercent(id: String, name: String, pct: Int, tooLow: Bool) {
+        guard pct < 20 || tooLow else { return }
+        let key = "lowbatt.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
+        guard now - last > 86400 else { return }
+        UserDefaults.standard.set(now, forKey: key)
+        let c = UNMutableNotificationContent()
+        c.title = "\(name): battery low"
+        c.body = tooLow ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(pct)%. Plug in the charging cable soon."
+        c.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+    }
+    /// The hub has not heard from a controller for 25 minutes (unplugged, flat, or out of range of the hub).
+    static func notResponding(id: String, name: String) {
+        let key = "noresp.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
+        guard now - last > 43200 else { return }
+        UserDefaults.standard.set(now, forKey: key)
+        let c = UNMutableNotificationContent()
+        c.title = "\(name) is not responding"
+        c.body = "Your Tilt Hub has not heard from it for a while. Check that its battery is charged and that it is within reach of the hub."
+        c.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+    }
+
+    /// Run by iOS now and then while the app is closed. Controllers on a Tilt Hub are checked through the hub (it
+    /// knows their battery and when each last checked in), so none of them is woken; the others are asked directly.
     static func backgroundCheck() async {
         scheduleRefresh()
-        for (rec, client) in TiltActions.clients() {
+        var onHub: Set<String> = []
+        if let info = await HubWatch.fetchInfo() {
+            for m in info.c {
+                onHub.insert(m.id)
+                if m.pct >= 0 { checkPercent(id: m.id, name: m.name, pct: m.pct, tooLow: m.low == 1) }
+                if m.seenS > HubInfo.Member.silentAfter { notResponding(id: m.id, name: m.name) }
+            }
+        }
+        for (rec, client) in TiltActions.clients() where !onHub.contains(rec.id) {
             guard let s = try? await client.state() else { continue }
             check(id: rec.id, name: s.name, battery: s.batt)
             if rec.owner, (s.asks ?? 0) > 0 { JoinAlerts.notify(cid: "any.\(rec.id)", who: "Someone", room: s.name) }

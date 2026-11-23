@@ -27,6 +27,8 @@ struct ControllerState: Decodable, Equatable {
     let hk: Int?
     /// Phones that asked to join and wait for an owner.
     let asks: Int?
+    /// 1: the controller knows which key is the Tilt Hub's (only then it trusts the hub's messages).
+    let hkey: Int?
     /// 1 if this phone is an owner of the controller, 0 if a user.
     let me: Int?
     /// 1 while a gentle (slow, over minutes) move is under way.
@@ -100,4 +102,10 @@ struct CloseBlindsIntent: AppIntent {
     static var title: LocalizedStringResource = "Close Blinds"
     static var description = IntentDescription("Closes all your blinds.")
     func perform() async throws -> some IntentResult { try await TiltActions.all { try await $0.goAll(to: "close") }; return .result() }
+}
+
+extension ControllerRecord {
+    /// Through a Tilt Hub the address is "<hub>/c/<controller id>".
+    static let hubPath = "/c/"
+    var onHub: Bool { host.contains(Self.hubPath) }
 }

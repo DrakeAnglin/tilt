@@ -36,23 +36,37 @@ uint8_t bootId[4];
 // Only phones that have talked to the controller know it, so nobody else can send its owners a notice.
 uint8_t cloudTopic[16];
 // The command being handled. Only set and read while secMx is held: one secured command runs at a time, whether it
-// came over Wi-Fi or Bluetooth, so these never belong to two requests at once.
+// came over Bluetooth or through the hub, so these never belong to two requests at once.
 int secClient = -1;                            // which key the command came with (-1: not a secured one)
 const char *secQuery = nullptr;                // its "a=b&c=d" part, for arg()
 std::string *secOut = nullptr;                 // where its answer goes, for sendJson()
-SemaphoreHandle_t secMx = nullptr;             // one secured command at a time (Wi-Fi and Bluetooth share the handlers)
+SemaphoreHandle_t secMx = nullptr;             // one secured command at a time (Bluetooth and the hub share the handlers)
 // keys[] and lastCtr[] are guarded by the controller lock (mx, lock.h), the one every handler and the main loop
 // already hold when they touch shared state. Lock order: secMx, then mx; nothing holding mx may take secMx.
 struct KeysLock { KeysLock() { xSemaphoreTake(mx, portMAX_DELAY); } ~KeysLock() { xSemaphoreGive(mx); } };
 
+// The Tilt Hub's own key here (its id; set by an owner, /api/hubkey). Messages from the hub prove themselves with a key
+// made from it, so another device on the Thread network cannot pose as the hub.
+uint8_t hubKeyId[8];
+bool hubKeySet = false;
+int hubSlot() { if (!hubKeySet) return -1; for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && !memcmp(keys[i].id, hubKeyId, 8)) return i; return -1; }
+// When each request to join was made (this start): a new request may only take the place of one older than 10 minutes.
+uint32_t askAt[MAX_KEYS];
+// A controller nobody owns takes its first owner only in its first 15 minutes after power-on (unplug it to pair again).
+const uint32_t FIRST_PAIR_MS = 15 * 60 * 1000;
+bool firstPairOpen() { return esp_timer_get_time() / 1000 < FIRST_PAIR_MS; }
 uint8_t openApi = 0;                           // 1: the plain /api answers even once a phone is paired (owner's choice, off by default)
 static int secRng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
-void keysSave() { nvs.putBytes("keys", keys, sizeof keys); }
+void hubLinkRefresh();
+void keysSave() { nvs.putBytes("keys", keys, sizeof keys); hubLinkRefresh(); }
 void secBegin() {
   if (nvs.getBytes("keys", keys, sizeof keys) != sizeof keys) memset(keys, 0, sizeof keys);
   esp_fill_random(bootId, sizeof bootId);
   if (nvs.getBytes("topic", cloudTopic, sizeof cloudTopic) != sizeof cloudTopic) { esp_fill_random(cloudTopic, sizeof cloudTopic); nvs.putBytes("topic", cloudTopic, sizeof cloudTopic); }
   memset(lastCtr, 0, sizeof lastCtr);
+  memset(askAt, 0, sizeof askAt);
+  hubKeySet = nvs.getBytes("hubkey", hubKeyId, sizeof hubKeyId) == sizeof hubKeyId;
+  hubLinkRefresh();
   openApi = nvs.getUChar("plainopen", 0);     // new key: the old "openapi" defaulted to open, so it is ignored
   secMx = xSemaphoreCreateMutex();
 }
@@ -83,6 +97,31 @@ std::string jsonStr(const std::string &j, const char *key) {      // the string 
 bool hmac256(const uint8_t *key, size_t kn, const uint8_t *d, size_t dn, uint8_t out[32]) {
   return mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), key, kn, d, dn, out) == 0;
 }
+// The proof on a message between the hub and this controller: the first 16 bytes of HMAC-SHA256 with the link key
+// (HMAC of the hub's key with "tilt-hub-link"), over a label and the message, in hex. "" when there is no hub key.
+// The link key is kept ready (remade whenever the keys change, which happens under the controller lock), so making a
+// proof never needs the lock: it is made from the blinds task, which already holds it.
+static uint8_t hubLink[32];
+static volatile bool hubLinkOk = false;
+void hubLinkRefresh() {
+  int s = hubSlot();
+  if (s >= 0) hmac256(keys[s].key, 32, (const uint8_t *)"tilt-hub-link", 13, hubLink);
+  hubLinkOk = s >= 0;
+}
+std::string hubMac(const std::string &what) {
+  if (!hubLinkOk) return "";
+  uint8_t link[32], m[32];
+  memcpy(link, hubLink, 32);
+  hmac256(link, 32, (const uint8_t *)what.data(), what.size(), m);
+  return hexOf(m, 16);
+}
+bool hubMacOk(const std::string &what, const std::string &mac) {
+  std::string want = hubMac(what);
+  if (want.empty() || mac.size() != want.size()) return false;
+  uint8_t d = 0;
+  for (size_t i = 0; i < want.size(); i++) d |= want[i] ^ mac[i];
+  return d == 0;
+}
 bool gcm(bool enc, const uint8_t key[32], const uint8_t nonce[12], const uint8_t *aad, size_t an, const uint8_t *in, size_t n, uint8_t *out, uint8_t tag[16]) {
   mbedtls_gcm_context g;
   mbedtls_gcm_init(&g);
@@ -112,7 +151,7 @@ esp_err_t plain(httpd_req_t *r, const char *status, const std::string &j) {
 }
 
 // ---- pairing
-// Returns the HTTP-style status ("200 OK", ...) and fills out with the JSON answer. Used over Wi-Fi and Bluetooth.
+// Returns the HTTP-style status ("200 OK", ...) and fills out with the JSON answer. Used over Bluetooth and through the hub.
 const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
   std::string pubB64 = jsonStr(b, "pub");
   uint8_t cpub[65];
@@ -128,6 +167,7 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
     if (lastAsk && millis() - lastAsk < 10000) { out = "{\"err\":\"try again in a few seconds\"}"; return "429 Too Many Requests"; }
     lastAsk = millis();
   } else if (!first) { out = "{\"err\":\"this controller has an owner. Ask to join from the app.\"}"; return "403 Forbidden"; }
+  else if (!firstPairOpen()) { out = "{\"err\":\"setup is closed: unplug the controller, plug it back in, and set it up within 15 minutes\"}"; return "403 Forbidden"; }
   }
 
   mbedtls_ecp_group grp; mbedtls_mpi d, z; mbedtls_ecp_point Q, Qp;
@@ -148,7 +188,10 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
   KeysLock kl;                                 // the key is ready: claim a slot now (the slow part ran unlocked)
   if (!first != owned()) { out = "{\"err\":\"another phone paired at the same moment. Try again.\"}"; return "409 Conflict"; }
   int slot = -1;
-  if (ask && asksWaiting() >= 2) { for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2) { slot = i; break; } }   // at most two waiting: a new ask takes the place of an old one
+  if (ask && asksWaiting() >= 2) {               // at most two waiting: a new ask takes the place of one older than 10 minutes
+    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && (!askAt[i] || millis() - askAt[i] > 600000)) { slot = i; break; }
+    if (slot < 0) { out = "{\"err\":\"two requests are waiting already. Try again later.\"}"; return "429 Too Many Requests"; }
+  }
   else for (int i = 0; i < MAX_KEYS; i++) if (!keys[i].used) { slot = i; break; }
   if (slot < 0) { out = "{\"err\":\"no room for another phone\"}"; return "403 Forbidden"; }
   ClientKey &k = keys[slot];
@@ -160,6 +203,7 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
   if (!k.name[0]) strlcpy(k.name, "iPhone", sizeof k.name);
   keysSave();
   lastCtr[slot] = 0;
+  askAt[slot] = ask ? (millis() ? millis() : 1) : 0;
   event(ask ? "%s asked to join%s" : "%s paired%s", k.name, first ? " (owner)" : "");
   uint8_t chk[32], pb[100];
   hmac256(okm, 32, (const uint8_t *)"confirm", 7, chk);
@@ -183,13 +227,12 @@ std::string askCode(const ClientKey &k) {
 struct Route { const char *uri; httpd_method_t m; esp_err_t (*fn)(httpd_req_t *); };
 extern const Route routes[];
 extern const int routeCount;
-// ---- who may do what: the one place every request is decided (plain HTTP, and secured over Wi-Fi or Bluetooth)
+// ---- who may do what: the one place every request is decided (secured, over Bluetooth or through the hub)
 struct Caller {
   bool secure;                                   // came over the secured connection (else: plain HTTP)
   bool owner;                                    // secured: the phone is an owner (else a user)
   const uint8_t *id;                             // secured: the phone's 8-byte id
 };
-esp_err_t hUpdate(httpd_req_t *r);
 std::string qarg(const std::string &query, const char *key) {
   char v[80] = "";
   return httpd_query_key_value(query.c_str(), key, v, sizeof v) == ESP_OK ? std::string(v) : std::string();
@@ -197,11 +240,11 @@ std::string qarg(const std::string &query, const char *key) {
 // nullptr: allowed. Otherwise the reason it is refused. Rules about the target (you cannot remove yourself, the last
 // owner stays) live in the handlers; who the caller is and what that lets them do is decided only here.
 const char *permit(const Route *rt, const std::string &path, const std::string &query, const Caller &c) {
-  return permitRule(c.secure, c.owner, !owned() || openApi, rt->fn == hUpdate, path,
+  return permitRule(c.secure, c.owner, !owned() || openApi, false, path,
                     c.secure ? qarg(query, "cid") : std::string(), c.secure ? hexOf(c.id, 8) : std::string());
 }
 // The answer is sealed bytes when the status is "200 OK", plain JSON otherwise.
-const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
+const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool *fromHub = nullptr) {
   if (b.size() < 8 + 12 + 16 + 1) { resp = "{\"err\":\"short\"}"; return "400 Bad Request"; }
   const uint8_t *p = (const uint8_t *)b.data();
   const uint8_t *nonce = p + 8, *ct = p + 20;
@@ -223,6 +266,7 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r) {
     memcpy(key, keys[slot].key, 32);
     if (!gcm(false, key, nonce, aad, 17, ct, n, (uint8_t *)&cmd[0], (uint8_t *)(ct + n))) { resp = "{\"err\":\"bad key\"}"; return "401 Unauthorized"; }
     lastCtr[slot] = ctr;
+    if (fromHub) *fromHub = slot == hubSlot();
     if (keys[slot].used != 1) {                  // still waiting for an owner: the only thing it may do is take its request back
       if (cmd == "/api/leave") { event("%s took the request back", keys[slot].name); memset(&keys[slot], 0, sizeof keys[slot]); keysSave(); resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
       resp = "{\"err\":\"waiting\"}"; return "403 Forbidden";

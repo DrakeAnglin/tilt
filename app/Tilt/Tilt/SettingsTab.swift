@@ -1,8 +1,10 @@
-// App settings: how Tilt looks and behaves on this phone, plus a way into each room's own settings.
+// App settings: how Tilt looks and behaves on this iPhone, plus a way into each device's own settings.
 import SwiftUI
 
 struct SettingsTab: View {
     @Environment(AppModel.self) private var model
+    @Environment(HubWatch.self) private var hub
+    @State private var confirmErase = false
     @State private var adding = false
     @State private var selected: String?
     @Environment(\.horizontalSizeClass) private var wide
@@ -22,28 +24,36 @@ struct SettingsTab: View {
                 Section {
                     ForEach(model.controllers) { c in
                         NavigationLink(value: c.id) {
-                            HStack(spacing: 12) {
-                                SlatView(tilt: c.state?.b.first(where: \.ready)?.tilt ?? 0, known: c.state != nil, slats: 5).frame(width: 44, height: 44)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(c.state?.name ?? c.record.name).font(.body.weight(.medium))
-                                    Text("\(c.record.owner ? "Owner" : "User")\(c.reach == .online ? "" : c.reach == .asleep ? " · asleep" : " · not reachable")").font(.footnote).foregroundStyle(.secondary)
-                                }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(c.state?.name ?? c.record.name).font(.body.weight(.medium))
+                                Text("\(c.record.owner ? "Owner" : "User")\(c.reach == .online ? "" : c.reach == .asleep ? " · asleep" : " · not reachable")").font(.footnote).foregroundStyle(.secondary)
                             }
                             .padding(.vertical, 2)
                         }
+                        .listRowBackground(rowBackground(c.id))
                     }
-                    Button("Add a New Device", systemImage: "plus") { adding = true }
-                } header: { Text("Rooms") } footer: {
-                    Text("Blind names, positions, sharing and Apple Home live in each room's settings.")
+                    if hub.record != nil {              // only a hub this iPhone is connected to (or waiting to join)
+                        NavigationLink(value: Self.hubTag) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Tilt Hub").font(.body.weight(.medium))
+                                Text(hub.statusWord).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .listRowBackground(rowBackground(Self.hubTag))
+                    }
+                    Button("Add a New Device", systemImage: "plus") { adding = true }.listRowBackground(RowGlass()).selectionDisabled()
+                } header: { Text("Devices") } footer: {
+                    Text("Tap a device for its settings: blind names and positions, people and Apple Home.")
                 }
                 Section {
-                    LabeledContent { TextField("Name", text: $myName).multilineTextAlignment(.trailing).onSubmit { model.rename(to: myName) } } label: { Label("Display Name", systemImage: "person.crop.circle").lineLimit(1).fixedSize(horizontal: true, vertical: false) }
-                    LabeledContent { Text(cloud == nil ? "Checking…" : cloud == true ? "On" : "Off") } label: { Label("iCloud Notices", systemImage: "icloud") }
+                    LabeledContent { TextField("Name", text: $myName).multilineTextAlignment(.trailing).onSubmit { model.rename(to: myName) } } label: { Label("Display Name", systemImage: "person.crop.circle").lineLimit(1).fixedSize(horizontal: true, vertical: false) }.selectionDisabled()
+                    LabeledContent { Text(cloud == nil ? "Checking…" : cloud == true ? "On" : "Off") } label: { Label("iCloud Notices", systemImage: "icloud") }.selectionDisabled()
                     Picker(selection: $appearance) {
                         Text("Automatic").tag(0); Text("Light").tag(1); Text("Dark").tag(2)
                     } label: { Label("Appearance", systemImage: "circle.lefthalf.filled") }
                     Button { open(UIApplication.openNotificationSettingsURLString) } label: { Label("Notifications", systemImage: "bell.badge") }
-                } header: { Text("This Phone") } footer: {
+                } header: { Text("This iPhone") } footer: {
                     Text(cloud == false ? "Sign in to iCloud in the Settings app to be told when someone asks to join your blinds, even when Tilt is closed." : "Your display name is what other people see in People and when you ask to join their blinds. iCloud tells you when someone asks to join yours.")
                 }
                 // Never in an App Store build; also hidden when launched with "-demo" for App Store screenshots.
@@ -55,29 +65,44 @@ struct SettingsTab: View {
                             TextField("Firmware list address", text: $firmwareSource, prompt: Text("Default (GitHub releases)")).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
                         }
                     } footer: {
-                        Text("Shows sensor readings, motor tuning, logs and Install from File in each room's settings. Beta Firmware offers beta releases.")
+                        Text("Shows sensor readings, motor tuning, logs and Install from File in each controller's settings. Beta Firmware offers beta releases.")
                     }
                 }
+                Section {
+                    Button("Erase Tilt on This iPhone", role: .destructive) { confirmErase = true }
+                        .confirmationDialog("Erase Tilt on this iPhone?", isPresented: $confirmErase, titleVisibility: .visible) {
+                            Button("Erase", role: .destructive) { model.eraseAll() }
+                        } message: { Text("Every device and key on this iPhone is removed. Set the controllers up again from Add.") }
+                } footer: { Text("Removes every controller, key and unfinished setup from this iPhone. This iPhone stays connected to the Tilt Hub (remove that on the hub's page). Your controllers and the hub are not touched.") }
                 Section("About") {
-                    LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
+                    LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "").selectionDisabled()
                 }
             }
-            .listRowBackground(wide == .regular ? nil : RowGlass())      // glass rows on a phone; the iPad sidebar keeps its own look
+            .listRowBackground(RowGlass())      // the same glass rows on a phone and in the side column
         }
+            .listStyle(.insetGrouped)
             .skyPage()
             .navigationTitle("Settings")
             .onAppear { if wide == .regular, selected == nil { selected = model.controllers.first?.id } }
             .task { cloud = await Cloud.signedIn() }
             .onAppear { myName = AppModel.myName }
             .onDisappear { if myName != AppModel.myName { model.rename(to: myName) } }
-            .sheet(isPresented: $adding) { AddControllerSheet() }
+            .sheet(isPresented: $adding) { AddControllerSheet().presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
         } detail: {
             NavigationStack {
-                if let c = model.controllers.first(where: { $0.id == selected }) { ControllerSettingsView(controller: c).id(c.id) }
-                else { ContentUnavailableView("Pick a Room", systemImage: "blinds.horizontal.closed", description: Text("Its blinds, people and Apple Home settings show here.")).skyPage() }
+                if selected == Self.hubTag, hub.record != nil { HubView() }
+                else if let c = model.controllers.first(where: { $0.id == selected }) { ControllerSettingsView(controller: c).id(c.id) }
+                else { ContentUnavailableView("Pick a Device", systemImage: "blinds.horizontal.closed", description: Text("Its blinds, people and Apple Home settings show here.")).skyPage() }
             }
         }
-        .onChange(of: model.controllers.count) { _, _ in if !model.controllers.contains(where: { $0.id == selected }) { selected = wide == .regular ? model.controllers.first?.id : nil } }
+        .onChange(of: hub.record == nil) { _, gone in if gone, selected == Self.hubTag { selected = wide == .regular ? model.controllers.first?.id : nil } }
+        .onChange(of: model.controllers.count) { _, _ in if selected != Self.hubTag, !model.controllers.contains(where: { $0.id == selected }) { selected = wide == .regular ? model.controllers.first?.id : nil } }
+    }
+    /// The Tilt Hub's row in the device list (controllers are picked by their id).
+    static let hubTag = "tilt-hub"
+    /// The picked device's row is tinted in the side column; on a phone every row is plain glass.
+    @ViewBuilder private func rowBackground(_ tag: String) -> some View {
+        if wide == .regular, selected == tag { Palette.accent.opacity(0.22) } else { RowGlass() }
     }
     private func open(_ s: String) { if let u = URL(string: s) { UIApplication.shared.open(u) } }
 }

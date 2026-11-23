@@ -146,6 +146,7 @@ struct LogLock {
   LogLock() { if (logMx) xSemaphoreTake(logMx, portMAX_DELAY); }
   ~LogLock() { if (logMx) xSemaphoreGive(logMx); }
 };
+void (*eventHook)(const char *line) = nullptr;   // also keep it somewhere else (hub_link.h, the Thread build)
 void event(const char *fmt, ...) {
   char buf[128], line[160];
   va_list ap;
@@ -164,5 +165,6 @@ void event(const char *fmt, ...) {
     logLines[logSeq % LOG_N] = line;
     logSeq++;
   }
+  if (eventHook) eventHook(line);
   ESP_LOGI("blinds", "%s", line);
 }

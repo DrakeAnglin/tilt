@@ -1,0 +1,570 @@
+// The link to the Tilt Hub over Thread. The hub is Apple Home's Matter device for these blinds and
+// passes the app's secured commands along, so this controller can sleep: it only wakes to check in with the hub.
+//
+// UDP on port 49100, one datagram each way:
+//   hub -> controller   type (1) | seq (2) | payload       H hello, X secured command (sec.h), A ask to join, P pair
+//   controller -> hub   type in lower case | seq | status (3 digits, "200") | answer
+//   controller -> hub   'S' | "00" | status JSON           pushed when something changed, and every 10 minutes
+//   controller -> hub   'L' | "00" | one event log line
+//   controller -> hub   'G' | "00"                          leaving (factory reset): the hub stops announcing it
+//   hub -> controller   's' | seq | "200" | epoch "." mac   the hub's answer to a push: the time, for the Schedules
+//   hub -> controller   'B' | seq | size "." mac            begin a firmware file ('W' pieces, 'E' end follow)
+// Proof ("mac"): the hub's own key here (an owner marks it, /api/hubkey) makes a link key both sides know; each message
+// from the hub, and each push and goodbye from the controller, carries the first 16 bytes of an HMAC with it (sec.h
+// hubMac), over a label, this controller's boot id and the message. Only a message with a good proof (or a command
+// sealed with the hub's key) counts as the hub's: anything else on the Thread network is not trusted. Pushes carry a
+// count ("\n" N "." mac after the JSON), so an old one cannot be sent again.
+// After any message from the hub the controller checks in fast (Matter's active mode, 200 ms) for a few seconds.
+// The controller finds the hub with a link-local multicast (the hub is its parent), then uses the hub's own address. Commands are
+// sealed end to end with the sender's own key: the hub can pass a phone's command along but cannot read or change it.
+//
+#pragma once
+#include <string>
+#include <lwip/sockets.h>
+#include <esp_ota_ops.h>
+#include <nvs_flash.h>
+#include <esp_crc.h>
+#include <esp_openthread.h>
+#include <esp_openthread_lock.h>
+#include <esp_openthread_netif_glue.h>
+#include <esp_netif.h>
+#include <openthread/dataset.h>
+#include <openthread/thread.h>
+#include <openthread/ip6.h>
+#include <openthread/link.h>
+#include <app/server/Server.h>
+#include <app/icd/server/ICDNotifier.h>
+#include <app/server/CommissioningWindowManager.h>
+#include "api.h"
+#include "sec.h"
+#include "home_view.h"
+#include "update.h"                              // otaWindow, fwSignatureOk, otaPending
+#include <esp_delta_ota.h>
+
+const uint16_t HUB_PORT = 49100;
+volatile uint32_t hubSeen = 0;                   // millis of the last message from the hub (0 = none since this start)
+// Thread to the hub works (a hello from it, or a sealed command through it): enough to keep a new firmware on trial,
+// even before this controller knows which key is the hub's (an update does not wait for that).
+volatile uint32_t hubLinkSeen = 0;
+volatile bool hubWantsStatus = false;            // the hub said hello (it may have restarted): push the status now
+static int hubSock = -1;
+static sockaddr_in6 hubAddr;                     // where the hub last answered from (Thread build)
+static bool hubAddrOk = false;
+static sockaddr_in6 hubHelloAddr;                // where the hub's last hello came from (not proven: only for sending)
+static bool hubHelloOk = false;
+
+bool hubOk() { return hubSeen && millis() - hubSeen < 1200000; }   // heard from the hub in the last 20 minutes
+
+static uint32_t backupCrc();
+// What the hub needs to show the blinds in Apple Home. Whole numbers, so it only changes when a blind really moves.
+std::string hubStatusJson(int pct) {
+  std::string j;
+  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"boot\":\"%s\",\"sep\":%d,\"pct\":%d,\"low\":%d,\"closeUp\":%d,\"mv\":%d,\"cv\":%lu,\"own\":%d,\"b\":[", ctrlId().c_str(),
+     jq(cfg.name).c_str(), hexOf(bootId, 4).c_str(), hkSeparate, pct, battOkToMove() ? 0 : 1, cfg.closeUp, firstMoving(), (unsigned long)backupCrc(), owned() ? 1 : 0);
+  for (int i = 0; i < PORTS; i++) {
+    bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
+    ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, movable(i) ? 1 : 0,
+       jn(live ? tiltOf(i, mvs[i].live) : bs[i].tilt, 0).c_str(), jn(bs[i].target, 0).c_str(), (movingPort(i) || bs[i].queued) ? 1 : 0);
+  }
+  j += "]}";
+  return j;
+}
+
+// ---- the commands (owner; /api/home also for a user, so a hub let in as a user can move the blinds)
+// Apple Home through the hub: the move a Matter command makes. lift = percent closed, hundredths.
+esp_err_t hHome(httpd_req_t *r) {
+  Lock l;
+  std::string b = arg(r, "b");
+  int one = b == "all" || b.empty() ? -1 : constrain(atoi(b.c_str()), 0, PORTS - 1), lift = argi(r, "lift");
+  if (!homeLiftValid(lift)) return fail(r, "bad position");
+  MoveResult m = moveBlinds(moveAsk(FROM_HOME, one, tiltOfHomeLift(lift, cfg.closeUp)));
+  event("Home (hub): %d %% closed (%d blind%s)", lift / 100, m.started, m.started == 1 ? "" : "s");
+  return m.started ? ok(r) : fail(r, m.why);
+}
+// The hub's Thread network (its dataset, hex). Kept in flash; the Thread build joins it at once.
+void hubApply();
+esp_err_t hHubJoin(httpd_req_t *r) {
+  Lock l;
+  std::string hex = arg(r, "ds");
+  uint8_t tlv[254];
+  size_t n = hex.length() / 2;
+  if (n < 20 || n > sizeof tlv || !unhex(hex, tlv, n)) return fail(r, "bad network");
+  nvs.putBytes("hubds", tlv, n);
+  event("Tilt Hub network saved");
+  hubApply();
+  return ok(r);
+}
+// ---- settings backup: everything a replacement needs to carry on (names, schedules, marks, place, tuning, switches).
+// Layout: "TB1" | sizes (3 x uint16) | settings (the old Wi-Fi fields cleared) | tune | schedule extras | sync par hksep pwm.
+// A Tilt Hub keeps a copy (it fetches it when "cv", the checksum in the status push, changes) for the app to restore.
+static std::string backupBlob() {
+  Settings c = cfg;
+  memset(c.ssid, 0, sizeof c.ssid); memset(c.pass, 0, sizeof c.pass);
+  uint16_t sz[3] = {sizeof c, sizeof tune, sizeof sx};
+  std::string b("TB1", 3);
+  b.append((const char *)sz, sizeof sz);
+  b.append((const char *)&c, sizeof c);
+  b.append((const char *)&tune, sizeof tune);
+  b.append((const char *)&sx, sizeof sx);
+  uint8_t f[4] = {syncMode, parMode, hkSeparate, pwmSaved};
+  b.append((const char *)f, sizeof f);
+  return b;
+}
+static uint32_t backupCrc() { std::string b = backupBlob(); return esp_crc32_le(0, (const uint8_t *)b.data(), b.size()); }
+esp_err_t hBackup(httpd_req_t *r) {              // the owner, or the hub (a user): read only
+  Lock l;
+  std::string b = backupBlob();
+  return sendJson(r, "{\"ok\":1,\"cv\":" + std::to_string(esp_crc32_le(0, (const uint8_t *)b.data(), b.size())) + ",\"d\":\"" + hexOf((const uint8_t *)b.data(), b.size()) + "\"}");
+}
+// Owner: put a backup back, in pieces (o = offset in bytes, d = hex, end=1 on the last). It takes effect at the next
+// start (setup restarts the controller anyway).
+esp_err_t hRestore(httpd_req_t *r) {
+  Lock l;
+  static std::string in;
+  uint32_t o = strtoul(arg(r, "o").c_str(), nullptr, 10);
+  std::string hex = arg(r, "d");
+  if (o == 0) in.clear();
+  if (o != in.size() || hex.size() % 2 || in.size() + hex.size() / 2 > 2048) return fail(r, "pieces out of order");
+  std::string piece(hex.size() / 2, 0);
+  if (!unhex(hex, (uint8_t *)&piece[0], piece.size())) return fail(r, "bad piece");
+  in += piece;
+  if (arg(r, "end") != "1") return ok(r);
+  uint16_t sz[3];
+  if (in.size() < 9 || in.compare(0, 3, "TB1")) return fail(r, "not a Tilt backup");
+  memcpy(sz, in.data() + 3, sizeof sz);
+  if (sz[0] != sizeof cfg || sz[1] != sizeof tune || sz[2] != sizeof sx || in.size() != 9 + sizeof cfg + sizeof tune + sizeof sx + 4) return fail(r, "this backup is from a different firmware");
+  const char *p = in.data() + 9;
+  Settings c; memcpy(&c, p, sizeof c); p += sizeof c;
+  Tune t; memcpy(&t, p, sizeof t); p += sizeof t;
+  memcpy(&sx, p, sizeof sx); p += sizeof sx;
+  if (c.magic != CFG_MAGIC) return fail(r, "not a Tilt backup");
+  // The backup comes through the hub: end every string, and clean the names as if they were typed in the app.
+  c.tz[sizeof c.tz - 1] = 0; c.tzName[sizeof c.tzName - 1] = 0;
+  { std::string n(c.name, strnlen(c.name, sizeof c.name)); cleanText(c.name, sizeof c.name, n); }
+  for (int i = 0; i < PORTS; i++) { std::string n(c.b[i].name, strnlen(c.b[i].name, sizeof c.b[i].name)); cleanText(c.b[i].name, sizeof c.b[i].name, n); }
+  cfg = c; tune = t;
+  syncMode = p[0]; parMode = p[1]; hkSeparate = p[2]; pwmSaved = p[3];
+  cfgSave(); tuneSave(); sxSave(); syncSave(); nvs.putUChar("hksep", hkSeparate); nvs.putUChar("pwm", pwmSaved); nvs.putUChar("angv", 2);
+  in.clear();
+  event("settings restored from a backup");
+  return ok(r);
+}
+// Owner: the hub's Thread network this controller keeps, so the app can give it to a new controller.
+esp_err_t hHubNet(httpd_req_t *r) {
+  Lock l;
+  uint8_t tlv[254];
+  size_t n = nvs.getBytes("hubds", tlv, sizeof tlv);
+  if (!n) return fail(r, "no Tilt Hub network");
+  return sendJson(r, "{\"ok\":1,\"ds\":\"" + hexOf(tlv, n) + "\"}");
+}
+// Owner: back to how it came. Everything in flash is erased (owners, settings, marks, homes, the hub network); it
+// keeps the firmware it runs, and setup puts it on a hub again.
+esp_err_t hFactory(httpd_req_t *r) {
+  Lock l;
+  if (arg(r, "sure") != "yes") return fail(r, "add sure=yes");
+  event("factory reset");
+  if (hubSock >= 0 && hubAddrOk) {               // tell the hub: gone (with proof, so nobody else can say it)
+    std::string g = "G00" + hubMac("ctl-bye" + std::string((const char *)bootId, 4));
+    sendto(hubSock, g.data(), g.size(), 0, (sockaddr *)&hubAddr, sizeof hubAddr);
+  }
+  ok(r);
+  xTaskCreate([](void *) {
+    vTaskDelay(pdMS_TO_TICKS(1500));             // the answer goes out first
+    for (int i = 0; i < PORTS; i++) { motorRaw(i, 0, 0); digitalWrite(P_EN[i], LOW); }
+    nvs_flash_deinit();
+    nvs_flash_erase();
+    esp_restart();
+  }, "factory", 4096, nullptr, 3, nullptr);
+  return ESP_OK;
+}
+// Owner: mark which key is the Tilt Hub's (the app does this right after letting the hub in). From then on only
+// messages proven with it count as the hub's.
+esp_err_t hHubKey(httpd_req_t *r) {
+  Lock l;
+  uint8_t id[8];
+  if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
+  bool found = false;
+  for (int i = 0; i < MAX_KEYS; i++) found = found || (keys[i].used == 1 && !memcmp(keys[i].id, id, 8));
+  if (!found) return fail(r, "no such key");
+  memcpy(hubKeyId, id, 8);
+  hubKeySet = true;
+  nvs.putBytes("hubkey", id, 8);
+  hubLinkRefresh();
+  event("Tilt Hub key marked");
+  return ok(r);
+}
+// Go back to the firmware in the other slot (the one before the last update), without a cable.
+esp_err_t hSwapFw(httpd_req_t *r) {
+  Lock l;
+  const esp_partition_t *other = esp_ota_get_next_update_partition(nullptr);
+  esp_app_desc_t d;
+  if (!other || esp_ota_get_partition_description(other, &d) != ESP_OK) return fail(r, "no other firmware");
+  if (esp_ota_set_boot_partition(other) != ESP_OK) return fail(r, "could not switch");
+  event("switching to the other firmware (%s)", d.version);
+  restartSoon = true;
+  std::string j;
+  ap(j, "{\"ok\":1,\"fw\":%s}", jq(d.version).c_str());
+  return sendJson(r, j);
+}
+
+// Join the saved hub network (OpenThread keeps it; Matter then sees a configured Thread network and runs it).
+void hubApply() {
+  uint8_t tlv[254];
+  size_t n = nvs.getBytes("hubds", tlv, sizeof tlv);
+  if (!n) return;
+  esp_openthread_lock_acquire(portMAX_DELAY);
+  otInstance *ot = esp_openthread_get_instance();
+  otOperationalDatasetTlvs cur, ds;
+  bool same = otDatasetGetActiveTlvs(ot, &cur) == OT_ERROR_NONE && cur.mLength == n && !memcmp(cur.mTlvs, tlv, n);
+  if (!same) {
+    memcpy(ds.mTlvs, tlv, n);
+    ds.mLength = n;
+    otThreadSetEnabled(ot, false);
+    otDatasetSetActiveTlvs(ot, &ds);
+  }
+  if (!otIp6IsEnabled(ot)) otIp6SetEnabled(ot, true);
+  otThreadSetEnabled(ot, true);
+  esp_openthread_lock_release();
+}
+// Where the hub is: the address it last answered from. Until it has answered, every Thread device next to this one
+// (link-local all-nodes, ff02::1): the hub is this controller's parent, so it hears that, and answers from its own address.
+static bool hubDest(sockaddr_in6 &d) {
+  if (hubAddrOk && hubOk()) { d = hubAddr; return true; }
+  // Not proven yet (no hub key here, or just restarted): where the hub's hello came from. A sleepy device's multicast
+  // does not reliably reach its parent. Only status and log lines go this way; nothing is trusted from it.
+  if (hubHelloOk && hubLinkSeen && millis() - hubLinkSeen < 1200000) { d = hubHelloAddr; return true; }
+  memset(&d, 0, sizeof d);
+  d.sin6_family = AF_INET6;
+  d.sin6_port = htons(HUB_PORT);
+  uint8_t *a = (uint8_t *)&d.sin6_addr;
+  a[0] = 0xff; a[1] = 0x02; a[15] = 0x01;
+  d.sin6_scope_id = esp_netif_get_netif_impl_index(esp_openthread_get_netif());   // link-local: out of the Thread side
+  return true;
+}
+static bool hubTime(const std::string &s) {     // "epoch.mac"
+  static long lastT = 0;
+  size_t dot = s.find('.');
+  if (dot == std::string::npos) return false;
+  std::string ts = s.substr(0, dot);
+  if (!hubMacOk("hub-time" + std::string((const char *)bootId, 4) + ts, s.substr(dot + 1))) return false;
+  long t = atol(ts.c_str());
+  if (t < 1700000000 || t <= lastT) return false;   // never an older one again
+  lastT = t;
+  long d = t - (long)time(nullptr);
+  if (d > 2 || d < -2) { timeval tv = {t, 0}; settimeofday(&tv, nullptr); event("time set by the Tilt Hub"); }
+  return true;
+}
+// ---- a firmware file, through the hub. An owner allowed it (/api/otaopen) and the file carries a valid release
+// signature. The new firmware starts on trial.
+//   'B' size[",d"] "." mac   begin ("d": a patch)     'W' offset (4, big end) + bytes     'E' end: check, restart
+// Each 'W' is answered with the next offset wanted ("200" + offset, or "409" + offset when one was missed).
+// Two kinds of file:
+//   full    image | signature (64) | "TILTSIG1"
+//   patch   header (64: magic, the running image's SHA-256) | detools patch | signature of the new image (64) |
+//           signature of the patch file (64, for the hub) | "TILTDLT1"
+// A patch is only what changed since the firmware this controller runs (esp_delta_ota): usually a tenth of the size,
+// so it comes over Thread in about a minute. Either way the controller checks the signature of the image it ends up
+// with, so a patch can never make anything the full file could not.
+volatile bool hubOtaActive = false;
+static volatile uint32_t hubOtaLast = 0;         // set by the hub task, read by the blinds task
+bool hubOtaBusy() { return hubOtaActive && (int32_t)(millis() - hubOtaLast) < 30000; }
+static esp_ota_handle_t hubOtaH;
+static const esp_partition_t *hubOtaTo;
+static uint32_t hubOtaGot;
+static mbedtls_sha256_context hubOtaSha;        // of the image being written (for a patch: what the patch makes)
+static uint8_t hubOtaTail[136];                  // the end of the file, held back until 'E'
+static int hubOtaTailN;
+static bool hubOtaGood;
+static bool hubOtaDelta;
+static esp_delta_ota_handle_t hubDelta;
+static uint8_t hubDeltaHdr[64];
+static int hubDeltaHdrN;
+static const char DLT_MAGIC[8] = {'T', 'I', 'L', 'T', 'D', 'L', 'T', '1'};
+static int hubOtaTailLen() { return hubOtaDelta ? 136 : 72; }
+// Where the new image's bytes go (the file itself, or what the patch makes): flash, and the hash for the signature.
+static esp_err_t hubOtaOut(const uint8_t *b, size_t n, void *) {
+  if (esp_ota_write(hubOtaH, b, n) != ESP_OK) return ESP_FAIL;
+  mbedtls_sha256_update(&hubOtaSha, b, n);
+  return ESP_OK;
+}
+static esp_err_t hubDeltaSrc(uint8_t *b, size_t n, int off, void *) {
+  return esp_partition_read(esp_ota_get_running_partition(), off, b, n);
+}
+// The patch bytes as they come: first its header (made for this exact firmware?), then the patch itself.
+static bool hubDeltaFeed(const uint8_t *b, int n) {
+  if (hubDeltaHdrN < 64) {
+    int k = n < 64 - hubDeltaHdrN ? n : 64 - hubDeltaHdrN;
+    memcpy(hubDeltaHdr + hubDeltaHdrN, b, k);
+    hubDeltaHdrN += k; b += k; n -= k;
+    if (hubDeltaHdrN == 64) {
+      uint8_t mine[32];
+      uint32_t magic = hubDeltaHdr[0] | hubDeltaHdr[1] << 8 | hubDeltaHdr[2] << 16 | (uint32_t)hubDeltaHdr[3] << 24;
+      if (magic != 0xfccdde10 || esp_partition_get_sha256(esp_ota_get_running_partition(), mine) != ESP_OK || memcmp(mine, hubDeltaHdr + 4, 32)) {
+        event("update refused: the patch is for another firmware");
+        return false;
+      }
+    }
+  }
+  return n <= 0 || esp_delta_ota_feed_patch(hubDelta, b, n) >= 0;
+}
+static void hubOtaStop() {
+  if (hubOtaDelta && hubDelta) { esp_delta_ota_deinit(hubDelta); hubDelta = nullptr; }
+  esp_ota_abort(hubOtaH);
+}
+// While a file comes in, keep the radio on (like a mains-powered device) so the hub can send at full speed instead of
+// one piece per check-in; back to sleeping once it is done or stalls.
+static void hubRadioOn(bool on) {
+  esp_openthread_lock_acquire(portMAX_DELAY);
+  otInstance *ot = esp_openthread_get_instance();
+  otLinkModeConfig m = otThreadGetLinkMode(ot);
+  if (m.mRxOnWhenIdle != on) { m.mRxOnWhenIdle = on; otThreadSetLinkMode(ot, m); }
+  esp_openthread_lock_release();
+}
+static void hubFastPoll() {                      // check in quickly while the file comes in
+  chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) { chip::app::ICDNotifier::GetInstance().NotifyNetworkActivityNotification(); }, 0);
+}
+static const char *hubOta(char t, const std::string &in, std::string &out) {
+  hubOtaLast = millis();
+  if (t == 'B') {
+    size_t dot = in.find('.');
+    if (dot == std::string::npos || !hubMacOk("hub-ota" + std::string((const char *)bootId, 4) + in.substr(0, dot), in.substr(dot + 1))) {
+      out = "{\"err\":\"not from the Tilt Hub\"}"; return "403";
+    }
+    if (!openApi && (int32_t)(otaWindow - millis()) <= 0) { out = "{\"err\":\"updates are locked: the owner must allow them from the app\"}"; return "403"; }
+    if (hubOtaActive) hubOtaStop();
+    hubOtaActive = false;
+    { Lock l; stopAll("stopped"); }
+    hubOtaDelta = in.substr(0, dot).find(",d") != std::string::npos;
+    hubOtaTo = esp_ota_get_next_update_partition(nullptr);
+    // Erase as the pieces come in, not all at once: erasing 1.9 MB stops the radio for many seconds.
+    if (!hubOtaTo || esp_ota_begin(hubOtaTo, OTA_WITH_SEQUENTIAL_WRITES, &hubOtaH) != ESP_OK) { out = "{\"err\":\"could not start the update\"}"; return "500"; }
+    if (hubOtaDelta) {
+      esp_delta_ota_cfg_t dc = {};
+      dc.read_cb_with_user_data = hubDeltaSrc;
+      dc.write_cb_with_user_data = hubOtaOut;
+      hubDelta = esp_delta_ota_init(&dc);
+      hubDeltaHdrN = 0;
+      if (!hubDelta) { esp_ota_abort(hubOtaH); out = "{\"err\":\"could not start the patch\"}"; return "500"; }
+    }
+    mbedtls_sha256_init(&hubOtaSha); mbedtls_sha256_starts(&hubOtaSha, 0);
+    hubOtaGot = 0; hubOtaTailN = 0; hubOtaGood = true; hubOtaActive = true;
+    event("update through the hub: %s bytes%s", in.substr(0, in.find(',') < dot ? in.find(',') : dot).c_str(), hubOtaDelta ? " (a patch)" : "");
+    hubFastPoll();
+    hubRadioOn(true);
+    out = "0";
+    return "200";
+  }
+  if (!hubOtaActive) { out = "{\"err\":\"no update going\"}"; return "409"; }
+  if (t == 'W') {
+    hubFastPoll();
+    if (in.size() < 5) { out = std::to_string(hubOtaGot); return "400"; }
+    const uint8_t *b = (const uint8_t *)in.data();
+    uint32_t off = (uint32_t)b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3];
+    if (off != hubOtaGot) { out = std::to_string(hubOtaGot); return "409"; }   // missed one: send from here again
+    // The end of the file is the signatures, so it is held back until the end.
+    static uint8_t buf[1200 + 136];
+    int n = in.size() - 4, T = hubOtaTailLen();
+    if (n > 1200) { out = std::to_string(hubOtaGot); return "400"; }
+    memcpy(buf, hubOtaTail, hubOtaTailN);
+    memcpy(buf + hubOtaTailN, b + 4, n);
+    int have = hubOtaTailN + n, wr = have > T ? have - T : 0;
+    if (wr && hubOtaGood) hubOtaGood = hubOtaDelta ? hubDeltaFeed(buf, wr) : hubOtaOut(buf, wr, nullptr) == ESP_OK;
+    hubOtaTailN = have - wr;
+    memcpy(hubOtaTail, buf + wr, hubOtaTailN);
+    hubOtaGot += n;
+    out = std::to_string(hubOtaGot);
+    return hubOtaGood ? "200" : "500";
+  }
+  // 'E'
+  hubOtaActive = false;
+  hubRadioOn(false);
+  if (hubOtaDelta && hubOtaGood) hubOtaGood = esp_delta_ota_finalize(hubDelta) == ESP_OK;
+  if (hubOtaDelta && hubDelta) { esp_delta_ota_deinit(hubDelta); hubDelta = nullptr; }
+  int T = hubOtaTailLen();
+  bool signedFile = hubOtaGood && hubOtaTailN == T && !memcmp(hubOtaTail + T - 8, hubOtaDelta ? DLT_MAGIC : SIG_MAGIC, 8);
+  uint8_t hash[32];
+  mbedtls_sha256_finish(&hubOtaSha, hash); mbedtls_sha256_free(&hubOtaSha);
+  if (!hubOtaGood) { esp_ota_abort(hubOtaH); out = hubOtaDelta ? "{\"err\":\"the patch did not fit this firmware\"}" : "{\"err\":\"the update broke off\"}"; return "500"; }
+  // The image's signature is the first 64 bytes of the end, for both kinds.
+  if (!signedFile || !fwSignatureOk(hash, hubOtaTail)) { esp_ota_abort(hubOtaH); event("update refused: bad signature"); out = "{\"err\":\"the file's signature is not valid\"}"; return "403"; }
+  if (esp_ota_end(hubOtaH) != ESP_OK) { out = "{\"err\":\"the file was not accepted\"}"; return "500"; }
+  esp_app_desc_t nd;
+  if (esp_ota_get_partition_description(hubOtaTo, &nd) != ESP_OK || fwIsOlder(nd.version, FW_VERSION)) {
+    event("update refused: %s is older than %s", nd.version, FW_VERSION);
+    out = "{\"err\":\"that firmware is older than the one it runs\"}"; return "403";
+  }
+  if (esp_ota_set_boot_partition(hubOtaTo) != ESP_OK) { out = "{\"err\":\"the file was not accepted\"}"; return "500"; }
+  event("signed update accepted (through the hub)");
+  statsSave();
+  { Lock l; restartSoon = true; }
+  out = "{\"ok\":1}";
+  return "200";
+}
+static void hubTask(void *) {
+  hubSock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  sockaddr_in6 me = {};
+  me.sin6_family = AF_INET6;
+  me.sin6_port = htons(HUB_PORT);
+  me.sin6_addr = in6addr_any;
+  int no = 0;
+  setsockopt(hubSock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &no, sizeof no);   // never hear its own call for the hub
+  if (hubSock < 0 || bind(hubSock, (sockaddr *)&me, sizeof me) < 0) { event("hub link did not start (socket %d, errno %d)", hubSock, errno); vTaskDelete(nullptr); return; }
+  event("hub link listening");
+  static char buf[2400];
+  for (;;) {
+    sockaddr_in6 from;
+    socklen_t fl = sizeof from;
+    int n = recvfrom(hubSock, buf, sizeof buf, 0, (sockaddr *)&from, &fl);
+    if (n < 0) { vTaskDelay(pdMS_TO_TICKS(100)); continue; }   // never spin on an error
+    // Only what the hub sends. (Anything else, such as this controller's own multicast or an answer, is ignored:
+    // answering it could start an endless exchange.) Pairing as the first owner is Bluetooth only, never over Thread.
+    if (n < 3 || !strchr("HXABWEs", buf[0])) continue;
+    char t = buf[0];
+    std::string in(buf + 3, n - 3), out;
+    // The hub, proven (a good proof, or a command sealed with its key): where to send pushes, and "the hub is there".
+    auto heard = [&]() {
+      if (!hubSeen) event("first proven message from the hub ('%c')", t);
+      hubSeen = millis() ? millis() : 1;
+      hubAddr = from; hubAddrOk = true;
+    };
+    // Check in fast for a few seconds: the next message (the app's command after its hello, or more) comes soon. Only
+    // for a message that was accepted (anything else on the network must not keep the radio busy), and a hello at
+    // most every 20 seconds.
+    auto awake = []() { chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) { chip::app::ICDNotifier::GetInstance().NotifyNetworkActivityNotification(); }, 0); };
+    if (t == 's') { if (in.size() > 3 && hubTime(in.substr(3))) heard(); continue; }
+    const char *st = "400";
+    if (t == 'H') {
+      static uint32_t lastHello = 0;
+      out = helloJson(); st = "200";
+      hubLinkSeen = millis() ? millis() : 1;
+      hubHelloAddr = from; hubHelloOk = true;
+      if (!lastHello || millis() - lastHello > 20000) { lastHello = millis() ? millis() : 1; hubWantsStatus = true; awake(); }
+    } else if (t == 'X') {
+      bool fromHub = false;
+      st = secDo(in, out, nullptr, &fromHub);
+      if (st[0] == '2') { awake(); hubLinkSeen = millis() ? millis() : 1; if (fromHub) heard(); }
+    } else if (t == 'A') { st = pairDo(in, out, true); if (st[0] == '2') awake(); }
+    else if (t == 'B') { st = hubOta(t, in, out); if (st[0] == '2') { heard(); awake(); } }
+    else if (t == 'W' || t == 'E') {             // pieces only from where the proven begin came from
+      if (!hubOtaActive || !hubAddrOk || memcmp(&from.sin6_addr, &hubAddr.sin6_addr, 16)) { out = "{\"err\":\"no update going\"}"; st = "409"; }
+      else st = hubOta(t, in, out);
+    } else out = "{\"err\":\"unknown request\"}";
+    std::string rep(1, (char)tolower(t));
+    rep.append(buf + 1, 2);
+    rep.append(st, 3);
+    rep += out;
+    sendto(hubSock, rep.data(), rep.size(), 0, (sockaddr *)&from, fl);
+  }
+}
+// After Matter has started.
+void hubBegin() {
+  hubApply();
+  xTaskCreate(hubTask, "hub", 8192, nullptr, 5, nullptr);
+}
+static int hubRole() {
+  esp_openthread_lock_acquire(portMAX_DELAY);
+  int r = otThreadGetDeviceRole(esp_openthread_get_instance());
+  esp_openthread_lock_release();
+  return r;
+}
+// Once a second from webTick (the lock is held).
+void hubTick() {
+  static std::string last;
+  static uint32_t lastAt = 0, rejoinAt = 0, lastTry = 0, logSent = 0;
+  static int lastRole = -1;
+  static bool left = false;
+  if (hubSock < 0) return;
+  uint32_t now = millis();
+  int role = hubRole();
+  if (role != lastRole) {
+    static const char *names[] = {"off", "detached", "joined (child)", "router", "leader"};
+    event("Thread: %s", role >= 0 && role <= 4 ? names[role] : "?");
+    lastRole = role;
+  }
+  if (role < OT_DEVICE_ROLE_CHILD && now - lastTry > 60000) { lastTry = now; hubApply(); }   // not on the network: try again
+  // A controller on a hub is not in a home itself: the hub is. Matter forgets its network when it leaves its last
+  // home, so this waits until the hub has answered, then joins the hub's network again right away.
+  if (!left && hubOk() && homesPaired()) {
+    left = true;
+    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
+      auto &ft = chip::Server::GetInstance().GetFabricTable();
+      chip::FabricIndex idx[8];
+      int n = 0;
+      for (auto &f : ft) if (n < 8) idx[n++] = f.GetFabricIndex();
+      for (int i = 0; i < n; i++) ft.Delete(idx[i]);
+    }, 0);
+    event("left the home (the Tilt Hub shows these blinds now)");
+    rejoinAt = now + 3000;
+  }
+  if (rejoinAt && (int32_t)(now - rejoinAt) >= 0) { rejoinAt = 0; hubApply(); }
+  if (hubOtaActive && (int32_t)(now - hubOtaLast) > 30000) {   // the update stalled (signed: a piece may have come after "now")
+    hubOtaActive = false;
+    hubOtaStop();
+    hubRadioOn(false);
+    event("update through the hub stopped (nothing came for 30 s)");
+  }
+  // Nobody owns it yet (new, or just reset): keep it findable over Bluetooth until it is set up. Matter's window
+  // closes after 15 minutes; open it again (the Tilt service advertises with it).
+  static uint32_t lastOpen = 0;
+  if (!owned() && !hubOk() && firstPairOpen() && now - lastOpen > 60000) {
+    lastOpen = now;
+    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
+      auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+      chip::DeviceLayer::ConnectivityMgr().SetBLEAdvertisingEnabled(true);
+      if (!mgr.IsCommissioningWindowOpen()) mgr.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
+    }, 0);
+  }
+  // On a hub this controller is never added to a home itself: stop offering it for Matter pairing (Apple Home would
+  // try to add it over Thread and spin). Checked every minute: Matter opens the window again after a start.
+  static uint32_t lastClose = 0;
+  if (hubOk() && now - lastClose > 60000) {
+    lastClose = now;
+    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
+      auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+      if (mgr.IsCommissioningWindowOpen()) { mgr.CloseCommissioningWindow(); event("Matter pairing closed (the Tilt Hub is this controller's home)"); }
+      chip::DeviceLayer::ConnectivityMgr().SetBLEAdvertisingEnabled(false);
+    }, 0);
+  }
+  sockaddr_in6 d;
+  if (role < OT_DEVICE_ROLE_CHILD || !hubDest(d)) return;
+  // The event log, for whoever watches the hub's USB log (a controller on Thread has no other way to show it).
+  {
+    LogLock ll;
+    if (logSent > logSeq || logSeq - logSent > LOG_N) logSent = logSeq > LOG_N ? logSeq - LOG_N : 0;
+    for (int k = 0; k < 3 && logSent < logSeq; k++, logSent++) {
+      std::string m = std::string("L00") + logLines[logSent % LOG_N].c_str();
+      sendto(hubSock, m.data(), m.size(), 0, (sockaddr *)&d, sizeof d);
+    }
+  }
+  // The status, when it changed, and every 10 minutes. The battery percent jitters by a point: it only counts as a
+  // change once it has moved by 3 (else every reading would wake the hub and cost battery).
+  static int lastPct = -100;
+  int pct = battPercent(vbatRest);
+  if (abs(pct - lastPct) < 3) pct = lastPct;
+  std::string j = hubStatusJson(pct);
+  if (j == last && lastAt && now - lastAt < (hubOk() ? 600000u : 5000u) && !hubWantsStatus) return;   // no answer yet: again in 5 s
+  lastPct = pct;
+  hubWantsStatus = false;
+  static uint32_t pushN = 0;
+  std::string m = "S00" + j, mac = hubMac("ctl-push" + std::string((const char *)bootId, 4) + j + std::to_string(++pushN));
+  if (!mac.empty()) m += "\n" + std::to_string(pushN) + "." + mac;   // no hub key yet (setup): the hub takes it without
+  int sent = sendto(hubSock, m.data(), m.size(), 0, (sockaddr *)&d, sizeof d);
+  static int fails = 0;
+  if (sent != (int)m.size() && fails++ < 3) event("status to hub not sent (errno %d)", errno);
+  last = j; lastAt = now ? now : 1;
+}
+
+bool hubJoined() { uint8_t t[4]; return nvs.getBytes("hubds", t, sizeof t) > 0; }   // setup gave it a hub network
+// For the developer page: where it is on Thread.
+std::string hubThreadJson() {
+  esp_openthread_lock_acquire(portMAX_DELAY);
+  otInstance *ot = esp_openthread_get_instance();
+  int role = otThreadGetDeviceRole(ot), ch = otLinkGetChannel(ot);
+  int8_t rssi = 0;
+  otThreadGetParentAverageRssi(ot, &rssi);
+  uint16_t rloc = otThreadGetRloc16(ot);
+  esp_openthread_lock_release();
+  std::string j;
+  ap(j, "{\"role\":%d,\"ch\":%d,\"parentRssi\":%d,\"rloc\":%u,\"hub\":%d}", role, ch, rssi, rloc, hubOk() ? 1 : 0);
+  return j;
+}

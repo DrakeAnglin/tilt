@@ -1,6 +1,6 @@
-// First setup of a brand-new controller over Bluetooth: find it, become its owner, put it on Wi-Fi.
-// This file is only the Bluetooth radio; the protocol (firmware ble.h) is BluetoothWire in Shared/Bluetooth.swift, and
-// Wi-Fi setup goes through the controller client. The Wi-Fi password is sealed with this phone's new key before it is sent.
+// First setup of a brand-new controller over Bluetooth: find it, become its owner, then put it on the Tilt Hub (it
+// hands over the hub's Thread network, sealed with this phone's new key).
+// This file is the Bluetooth radio and the screens; the protocol (firmware ble.h) is BluetoothWire in Shared/Bluetooth.swift.
 @preconcurrency import CoreBluetooth
 import CryptoKit
 import SwiftUI
@@ -46,7 +46,7 @@ final class BleSetup: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         central.scanForPeripherals(withServices: [Self.svc], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
         for _ in 0..<40 where fresh == nil { try? await Task.sleep(for: .milliseconds(200)) }
         central.stopScan()
-        guard let p = fresh else { throw TiltError("The controller is not in setup mode any more. Unplug it, plug it back in, and try again.") }
+        guard let p = fresh else { throw TiltError("The controller is not in setup mode anymore. Unplug it, plug it back in, and try again.") }
         peripheral = p; p.delegate = self; stage = "connecting"
         let timeout = Task { do { try await Task.sleep(for: .seconds(15)) } catch { return }; self.fail(TiltError("Bluetooth got stuck while \(self.stage). [\(self.trace.joined(separator: ", "))]")) }
         defer { timeout.cancel() }
@@ -137,26 +137,23 @@ final class BleSetup: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 }
 
-/// The screens: connect, Wi-Fi name and password, joining, done.
+/// The screens: connect, the Tilt Hub (and an optional restore), joining, done.
 struct BluetoothSetupView: View {
     @Environment(AppModel.self) private var model
+    @Environment(HubWatch.self) private var hub
     let ble: BleSetup
     let device: BleSetup.Found
     let finished: () -> Void
-    enum Step { case connecting, wifi, joining, done }
+    enum Step { case connecting, choose, hubJoining, done }
     @State private var step = Step.connecting
     @State private var hello: Hello?
     @State private var paired: Paired?
-    @State private var ssid = ""
-    @State private var password = ""
     @State private var problem: String?
+    @State private var moved = false                        // it took the hub's network and left Bluetooth
     @State private var client: ControllerClient?            // sealed commands over Bluetooth, once paired
-    @State private var nets: [WifiNetwork] = []
-    @State private var scanning = false
-    @State private var chosen: String?
-    @State private var asking = false
-    @State private var typed = ""
-    @FocusState private var typing: Bool
+    @State private var hubStatus = ""
+    @State private var backups: [HubWatch.Backup] = []
+    @State private var restoreFrom = ""                       // "" = start fresh
 
     var body: some View {
         Form {
@@ -164,44 +161,37 @@ struct BluetoothSetupView: View {
             switch step {
             case .connecting:
                 Section { if problem == nil { HStack(spacing: 12) { SlatLoader(size: 22); Text("Connecting over Bluetooth…") } } }
-            case .wifi:
-                if let net = chosen {
+            case .choose:
+                if !hub.isOwner {
                     Section {
-                        LabeledContent("Network", value: net)
-                        SecureField("Password", text: $password).focused($typing)
-                    } footer: { Text("The password is sent sealed, over Bluetooth, to the controller only.") }
-                    Section {
-                        Button("Join Wi-Fi") { join() }
-                        Button("Choose Another Network") { chosen = nil; password = "" }
+                        Label(hub.record == nil ? "Connect to your Tilt Hub first" : "Only the hub's owner can add controllers", systemImage: "point.3.connected.trianglepath.dotted").font(.headline)
+                        Text(hub.record == nil ? "Blinds controllers connect through a Tilt Hub. On the Blinds page, connect to your hub (it shows up there when it is plugged in and this iPhone is on the same Wi-Fi), then come back here." : "Ask the hub's owner to add this controller, or to make you an owner of the hub.").font(.subheadline).foregroundStyle(.secondary)
+                        Button("Check Again", systemImage: "arrow.clockwise") { Task { await lookForHub() } }
                     }
                 } else {
-                    Section {
-                        if scanning { HStack(spacing: 12) { SlatLoader(size: 22); Text("Looking for networks…").foregroundStyle(.secondary) } }
-                        ForEach(nets) { n in
-                            Button { pick(n.ssid, locked: n.locked) } label: {
-                                HStack {
-                                    Text(n.ssid).foregroundStyle(.primary)
-                                    Spacer()
-                                    if n.locked { Image(systemName: "lock.fill").font(.footnote).foregroundStyle(.secondary) }
-                                    Image(systemName: "wifi", variableValue: n.rssi > -60 ? 1 : n.rssi > -72 ? 0.6 : 0.3).foregroundStyle(.secondary)
-                                }
+                    if !backups.isEmpty {
+                        Section {
+                            Picker("Settings", selection: $restoreFrom) {
+                                Text("Start fresh").tag("")
+                                ForEach(backups) { b in Text("Restore \(b.name)").tag(b.id) }
                             }
+                        } header: { Text("Replacing a controller?") } footer: {
+                            Text("Your Tilt Hub kept the settings of these controllers: blind names, open and closed positions, schedules. A restored controller also takes over the old one's place in Apple Home.")
                         }
-                        if !scanning && nets.isEmpty { Text("No networks found.").foregroundStyle(.secondary) }
-                    } header: { Text("Choose your Wi-Fi") } footer: {
-                        Text("These are the networks the controller can see. It only uses 2.4 GHz, so a 5 GHz-only network will not be listed.")
                     }
                     Section {
-                        if !scanning { Button("Look Again", systemImage: "arrow.clockwise") { Task { await scan(again: true) } } }
-                        Button("Other Network…", systemImage: "ellipsis") { asking = true }
-                    }
+                        Button { joinHub() } label: { Label("Connect to the Tilt Hub", systemImage: "point.3.connected.trianglepath.dotted").font(.body.weight(.semibold)) }
+                    } footer: { Text("It joins the hub over Thread and shows up in Apple Home through the hub, with no extra setup.") }
                 }
-            case .joining:
-                Section { HStack(spacing: 12) { SlatLoader(size: 22); Text("Joining “\(ssid)”… This can take half a minute.") } }
+            case .hubJoining:
+                Section {
+                    HStack(spacing: 12) { SlatLoader(size: 22); Text(hubStatus) }
+                } footer: { ProgressWords(steps: ["This can take a minute.", "Still working: the controller checks in with the hub about once a second.", "Hang on, nearly there…"]) }
             case .done:
                 Section {
                     Label("\(hello?.name ?? "Your controller") is ready", systemImage: "checkmark.circle.fill").foregroundStyle(Palette.good).font(.headline)
-                    Text("Next, open its room and use the gear to set each blind's open and closed positions.").font(.subheadline).foregroundStyle(.secondary)
+                    Text(hub.inHome ? "It is on your Tilt Hub. It shows up in Apple Home by itself in a moment." : "It is on your Tilt Hub. Add the hub to Apple Home once (in the controller's settings) and all its blinds show up.").font(.subheadline).foregroundStyle(.secondary)
+                    if restoreFrom.isEmpty { Text("Next, open its room and use the gear to set each blind's open and closed positions.").font(.subheadline).foregroundStyle(.secondary) }
                 }
                 Section { Button("Done") { finished() } }
             }
@@ -212,16 +202,9 @@ struct BluetoothSetupView: View {
                 }
             }
         }
-            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }
-        .skyPage()
         .navigationTitle("New Controller").navigationBarTitleDisplayMode(.inline)
         .task { await begin() }
-        .alert("Network Name", isPresented: $asking) {
-            TextField("Name", text: $typed).textInputAutocapitalization(.never).autocorrectionDisabled()
-            Button("Cancel", role: .cancel) {}
-            Button("OK") { if !typed.isEmpty { pick(typed, locked: true) } }
-        }
     }
 
     private func begin() async {
@@ -240,38 +223,74 @@ struct BluetoothSetupView: View {
             }
             guard let boot = Data(hex: h.boot), boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }
             hello = h; paired = p; client = wire.client(p, boot: boot)
-            if h.wifi == 1, let ip = h.ip, !ip.isEmpty { finish(ip) } else { step = .wifi; await scan(again: false) }
+            await lookForHub()
+            step = .choose
         } catch { problem = error.localizedDescription }
     }
-    private func scan(again: Bool) async {
-        guard let client else { return }
-        scanning = true; defer { scanning = false }
-        nets = (try? await client.networks(again: again)) ?? nets
+    private func lookForHub() async {
+        hub.start()
+        await hub.refresh()
+        guard hub.isOwner, let h = hello else { return }
+        let mine = Set(model.controllers.map(\.id))
+        // This controller's own backup (it was reset), or one of a controller that is gone (it is replaced).
+        backups = await hub.backups().filter { $0.id == h.id || !mine.contains($0.id) }
+        if backups.contains(where: { $0.id == h.id }) { restoreFrom = h.id }
     }
-    private func pick(_ name: String, locked: Bool) {
-        ssid = name; chosen = name; password = ""
-        if locked { typing = true } else { join() }
-    }
-    private func join() {
-        guard let client else { return }
-        problem = nil; step = .joining
+    /// Onto the Tilt Hub: give the controller the hub's network (and, if asked, an old controller's settings), wait for
+    /// it on the hub, then let the hub in (it asks to join the controller as "Tilt Hub", like a phone would).
+    private func joinHub() {
+        guard let h = hello, let p = paired, hub.isOwner, let hubHost = hub.host else {
+            problem = hub.isOwner ? "The Tilt Hub is not on your Wi-Fi right now. Check it is plugged in, then try again." : "Only the Tilt Hub's owner can add controllers to it."
+            return
+        }
+        problem = nil; step = .hubJoining
         Task {
             do {
-                let ip = try await client.joinWifi(ssid: ssid, password: password)
-                finish(ip)
-            } catch { problem = error.localizedDescription; step = .wifi }
+                let onThread = h.net == "thread"           // older controllers started on Wi-Fi firmware and switch over
+                if !moved {                                 // a second try after it left Bluetooth only waits for it again
+                    guard let client else { throw TiltError("The Bluetooth link to the controller was lost. Start the setup again.") }
+                    hubStatus = "Getting the hub's network…"
+                    let network = try await hub.network()
+                    if !restoreFrom.isEmpty {
+                        hubStatus = "Restoring its settings…"
+                        try await client.restore(backup: try await hub.backup(restoreFrom))
+                    }
+                    hubStatus = "Joining the hub…"
+                    try await client.moveToHub(network: network, onThread: onThread)
+                    if onThread && !restoreFrom.isEmpty { try? await client.restart() }   // the restored settings take effect
+                    ble.stop()
+                    moved = true
+                }
+                hubStatus = "Waiting for it on the hub…"
+                let host = "\(hubHost)/c/\(h.id)"
+                var there = false
+                for _ in 0..<60 where !there {
+                    try? await Task.sleep(for: .seconds(2))
+                    if let n = try? await Secure.hello(host), n.net == "thread", n.boot != h.boot || onThread { there = true }
+                }
+                guard there else { throw TiltError("It did not reach the hub. Check that it is within reach of the hub, unplug it and plug it back in, and try again.") }
+                model.adopt(h, host: host, paired: p)
+                Pending.clear(h.id)
+                hubStatus = "Letting the hub in…"
+                if let c = model.controllers.first(where: { $0.id == h.id }) {
+                    for _ in 0..<30 {                     // the hub asks within a few seconds; it says which request is its own
+                        if let hubCid = await hub.hubCid(for: h.id), let ask = try? await c.client.people().first(where: { $0.wait == 1 && $0.cid == hubCid }) {
+                            try? await c.client.approve(cid: ask.cid, true, owner: false)
+                            try? await c.client.markHubKey(cid: hubCid)
+                            break
+                        }
+                        try? await Task.sleep(for: .seconds(2))
+                    }
+                }
+                if !restoreFrom.isEmpty && restoreFrom != h.id { await hub.replace(old: restoreFrom, new: h.id) }
+                hub.justAdded()
+                step = .done
+            } catch { problem = error.localizedDescription; step = .choose }
         }
-    }
-    private func finish(_ ip: String) {
-        guard let h = hello, let p = paired else { return }
-        model.adopt(h, host: ip, paired: p)
-        Pending.clear(h.id)
-        ble.stop()
-        step = .done
     }
 }
 
-/// A pairing made over Bluetooth whose setup is not finished yet (the controller is not on Wi-Fi).
+/// A pairing made over Bluetooth whose setup is not finished yet (the controller is not on the hub).
 enum Pending {
     static func save(_ id: String, _ p: Paired) {
         Keychain.save("pending-" + id, p.key.withUnsafeBytes { Data($0) })
@@ -282,4 +301,17 @@ enum Pending {
         return Paired(cid: cid, key: SymmetricKey(data: k), owner: true)
     }
     static func clear(_ id: String) { Keychain.delete("pending-" + id); UserDefaults.standard.removeObject(forKey: "pending.cid." + id) }
+}
+
+/// A line under a long wait that changes every few seconds, so it is clear the app is still working.
+struct ProgressWords: View {
+    let steps: [String]
+    @State private var i = 0
+    var body: some View {
+        Text(steps[min(i, steps.count - 1)])
+            .foregroundStyle(.secondary)
+            .contentTransition(.opacity)
+            .animation(.easeInOut, value: i)
+            .task { while !Task.isCancelled { try? await Task.sleep(for: .seconds(4)); if i < steps.count - 1 { i += 1 } } }
+    }
 }

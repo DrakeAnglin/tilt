@@ -89,9 +89,11 @@ struct SlatLoader: View {
         VStack(spacing: size * 0.32) {
             VStack(spacing: size * 0.15) {
                 ForEach(0..<3, id: \.self) { i in
-                    Capsule().fill(.tint)
-                        .frame(width: size, height: size * 0.16)
-                        .rotationEffect(.degrees(on ? 20 : -6))
+                    // A slat tilts about its long side, toward and away from you, like a real blind opening and
+                    // closing (not a seesaw turn in the plane of the screen).
+                    RoundedRectangle(cornerRadius: size * 0.04).fill(.tint)
+                        .frame(width: size, height: size * 0.2)
+                        .rotation3DEffect(.degrees(on ? 72 : 8), axis: (x: 1, y: 0, z: 0), perspective: 0.4)
                         .animation(calm ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true).delay(0.12 * Double(i)), value: on)
                 }
             }

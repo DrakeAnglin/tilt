@@ -1,6 +1,6 @@
 // The first-setup protocol over Bluetooth, without Bluetooth itself (that is Tilt/BluetoothSetup.swift).
 // It mirrors firmware/blinds_matter/main/ble.h: the app writes one request, then reads one answer.
-//   request: 'H' hello | 'P' + pairing JSON | 'X' + sealed command (the same packet as over Wi-Fi, see Frame)
+//   request: 'H' hello | 'P' + pairing JSON | 'X' + sealed command (the same packet as through the hub, see Frame)
 //   answer:  status digit ('2' good, '4' refused, '5' failed) + body
 import Foundation
 
@@ -28,7 +28,7 @@ struct BluetoothWire: Sendable {
     }
 }
 
-/// Sealed commands over Bluetooth: the same seam as the Wi-Fi Link and the demo room.
+/// Sealed commands over Bluetooth: the same seam as the hub Link and the demo room.
 actor BluetoothLink: ControllerTransport {
     nonisolated let host = "bluetooth"
     private let wire: BluetoothWire

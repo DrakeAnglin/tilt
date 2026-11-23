@@ -21,6 +21,7 @@ hardware/pcb/controller/*.svg
 
 # Wi-Fi / update passwords
 firmware/**/secrets.h
+firmware/**/setup_pin.h
 firmware/bin/
 firmware/build/
 tools/.blinds_client.json
@@ -41,3 +42,14 @@ firmware/blinds-settings-backup.json
 
 # App Store screenshots: made again with the demo room (see docs/app-store.md)
 app/Tilt/AppStore/
+
+# Thread build of the controller
+build-thread/
+sdkconfig.thread
+build-release-thread/
+sdkconfig.release-thread
+sdkconfig.release
+
+# Claude Code scratch
+.claude/worktrees/
+.claude/settings.local.json

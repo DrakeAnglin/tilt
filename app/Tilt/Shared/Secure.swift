@@ -11,8 +11,12 @@ struct TiltError: LocalizedError {
 
 struct Hello: Decodable {
     let id: String, name: String, fw: String, boot: String
+    /// The running firmware's SHA-256 (newer controllers), so an update can be a patch made from exactly it.
+    let img: String?
     let owned: Int
-    let wifi: Int?, ip: String?, home: Int?
+    let home: Int?
+    /// "thread" (every controller now; older firmware said "wifi"), and whether it heard from its hub lately.
+    let net: String?, hub: Int?
 }
 
 struct Paired {
@@ -56,8 +60,9 @@ enum Secure {
     }
 
     /// Make this phone's key on a controller. The first phone becomes an owner; later ones ask to join and wait.
-    static func pair(host: String, phoneName: String, how: Joining) async throws -> Paired {
-        try await pair(phoneName: phoneName) { try await http(host, how.rawValue, body: $0) }
+    /// salt: the Tilt Hub's setup code (from its label) when connecting as its first owner; empty otherwise.
+    static func pair(host: String, phoneName: String, how: Joining, salt: Data = Data()) async throws -> Paired {
+        try await pair(phoneName: phoneName, salt: salt) { try await http(host, how.rawValue, body: $0) }
     }
     /// The three ways in: the first phone of a new controller, asking an owner, or proving you are at the window.
     enum Joining: String { case first = "/x/pair", ask = "/x/ask", recover = "/x/recover" }
@@ -68,7 +73,7 @@ enum Secure {
         return (r.step, r.left)
     }
     /// The same, through any channel that carries the request and brings back (status, answer).
-    static func pair(phoneName: String, via: (Data) async throws -> (Int, Data)) async throws -> Paired {
+    static func pair(phoneName: String, salt: Data = Data(), via: (Data) async throws -> (Int, Data)) async throws -> Paired {
         let priv = P256.KeyAgreement.PrivateKey()
         let cpub = priv.publicKey.x963Representation
         let body: [String: String] = ["pub": cpub.base64EncodedString(), "name": phoneName]
@@ -77,7 +82,7 @@ enum Secure {
         guard st == 200, let pub = (j["pub"] as? String).flatMap({ Data(base64Encoded: $0) }), let cid = (j["cid"] as? String).flatMap(Data.init(hex:)),
               let check = j["check"] as? String else { throw TiltError((j["err"] as? String) ?? "Pairing was refused.") }
         let shared = try priv.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: pub))
-        let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: Data(), sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
+        let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
         let mine = Data(HMAC<SHA256>.authenticationCode(for: Data("confirm".utf8), using: key)).prefix(8).hex
         guard mine == check else { throw TiltError("The controller's key did not match. Pairing was cancelled.") }
         return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1, waiting: (j["wait"] as? Int) == 1, topic: (j["topic"] as? String) ?? "", blindName: (j["blindName"] as? String) ?? "")
@@ -100,7 +105,7 @@ enum Frame {
     }
 }
 
-/// Seals commands for one paired controller, over Wi-Fi or Bluetooth. The counter must rise with every command
+/// Seals commands for one paired controller, through the Tilt Hub or over Bluetooth. The counter must rise with every command
 /// (sec.h nonceFresh): it is the time in milliseconds, or one more than the last one if that is later.
 struct Sealer: Sendable {
     let cid: Data, key: SymmetricKey
@@ -136,7 +141,7 @@ actor Link: ControllerTransport {
             let (st, d) = try await Secure.http(host, "/x", body: packet)
             if st == 200, d.count >= 28 { return try sealer.open(d, nonce: nonce) }
             if st == 409, attempt == 0 { self.boot = nil; continue }          // the controller restarted: get its new number
-            if st == 401 { throw LinkProblem.notPaired }
+            if st == 401 || st == 410 { throw LinkProblem.notPaired }   // 410: the Tilt Hub does not know it (it was reset)
             if st == 403 { throw LinkProblem.waiting }
             throw TiltError("The controller refused the command.")
         }

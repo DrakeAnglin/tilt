@@ -59,7 +59,7 @@ struct RoomView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink { ControllerSettingsView(controller: controller) } label: { Label("Room Settings", systemImage: "gearshape") }
+                NavigationLink { ControllerSettingsView(controller: controller) } label: { Label("Settings", systemImage: "gearshape") }
             }
         }
         .sheet(item: Binding(get: { open.map(Idx.init) }, set: { open = $0?.id })) { i in

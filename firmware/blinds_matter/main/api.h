@@ -1,5 +1,5 @@
 // What every web handler uses to read a request and answer it, whether it came as plain HTTP or as a secured
-// command (sec.h) over Wi-Fi or Bluetooth. Also the handlers' lock (Lock) and the request bookkeeping beside it.
+// command (sec.h) over Bluetooth or through the Tilt Hub. Also the handlers' lock (Lock) and the request bookkeeping beside it.
 #pragma once
 #include <esp_http_server.h>
 #include "ardu.h"

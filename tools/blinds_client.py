@@ -4,6 +4,7 @@ Needs the 'cryptography' package (it is in the ESP-IDF python: . ~/esp/esp-idf/e
 
   blinds_client.py hello                     who is there
   blinds_client.py pair [name]               first phone: become the owner
+  blinds_client.py ask [name]                ask to join (an owner lets it in from the app)
   blinds_client.py join <inv> <secret> [name]  pair with an invite the owner made
   blinds_client.py get '/api/s'              a command (any /api path with its ?query)
 The key is kept in tools/.blinds_client.json (never commit it). --as NAME picks another saved identity; --ip sets the
@@ -61,7 +62,7 @@ def open_reply(key, cid, pkt, raw):
     return AESGCM(key).decrypt(raw[:12], raw[12:], b'blinds-v1r' + cid + pkt[8:20]).decode()
 
 
-def pair(name, inv=None, secret=None):
+def pair(name, inv=None, secret=None, ask=False):
     priv = ec.generate_private_key(ec.SECP256R1())
     cpub = priv.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
     body = {'pub': base64.b64encode(cpub).decode(), 'name': name}
@@ -69,14 +70,15 @@ def pair(name, inv=None, secret=None):
     if inv:
         salt = bytes.fromhex(secret)
         body['inv'] = inv; body['mac'] = hmac.new(salt, cpub, hashlib.sha256).hexdigest()
-    st, raw = http('/x/pair', json.dumps(body).encode())
+    st, raw = http('/x/ask' if ask else '/x/pair', json.dumps(body).encode())
     if st != 200: raise SystemExit('pairing refused: %d %s' % (st, raw.decode()))
     r = json.loads(raw); dpub = base64.b64decode(r['pub'])
     shared = priv.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), dpub))
     key = derive_key(shared, salt, cpub, dpub)
     if confirm(key) != r['check']: raise SystemExit('the controller derived a different key: not trusted')
     d = load(); d[WHO] = {'cid': r['cid'], 'key': key.hex(), 'ctr': 0}; save(d)
-    print('paired as %s%s' % (name, ' (owner)' if r['owner'] else ''))
+    if r.get('wait'): print('asked to join as %s: an owner lets it in (code %s)' % (name, r.get('code') or '?'))
+    else: print('paired as %s%s' % (name, ' (owner)' if r['owner'] else ''))
 
 
 def call(cmd, raw_out=False, replay=None):
@@ -106,6 +108,7 @@ def main(args):
     c = args[0] if args else 'hello'
     if c == 'hello': print(http('/x/hello')[1].decode())
     elif c == 'pair': pair(args[1] if len(args) > 1 else 'Mac test')
+    elif c == 'ask': pair(args[1] if len(args) > 1 else 'Mac test', ask=True)
     elif c == 'join':
         if len(args) < 3: raise SystemExit('usage: blinds_client.py join <inv> <secret> [name]')
         pair(args[3] if len(args) > 3 else 'Mac guest', args[1], args[2])

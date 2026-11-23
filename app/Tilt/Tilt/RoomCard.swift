@@ -32,7 +32,7 @@ struct WaitingCard: View {
 struct FirmwareNotice: View {
     let controller: Controller
     var body: some View {
-        Label("This controller runs firmware \(controller.state?.v ?? ""). This version of Tilt needs \(Api.minFirmware) or newer, so some things may not work until it is updated. An owner can update it under About in this room's settings.", systemImage: "arrow.triangle.2.circlepath")
+        Label("This controller runs firmware \(controller.state?.v ?? ""). This version of Tilt needs \(Api.minFirmware) or newer, so some things may not work until it is updated. An owner can update it under About in this controller's settings.", systemImage: "arrow.triangle.2.circlepath")
             .font(.footnote).foregroundStyle(Palette.warning)
     }
 }
@@ -107,6 +107,8 @@ struct RoomCard: View {
           }
           .buttonStyle(.plain)
             // In the side column the buttons fold away inside the card (taken out, they would hang below it as it shrinks).
+            // Nothing can move yet: say exactly what is missing, on this card.
+            if let s, !s.b.contains(where: \.ready), !compact { NextStep(controller: controller, state: s) }
             if let s, s.b.contains(where: \.ready) {
                 MoveBar(controllers: [controller], open: "Open", close: "Close", title: s.name)
                     .frame(height: compact ? 0 : nil, alignment: .top).opacity(compact ? 0 : 1).clipped()
@@ -142,6 +144,34 @@ struct RoomCard: View {
             }
            }
            .contentShape(Rectangle())
+    }
+}
+
+/// A controller with no blind ready to move: either nothing is plugged in, or a blind's open and closed positions
+/// are not marked yet (then the button opens that blind's setup straight away).
+private struct NextStep: View {
+    let controller: Controller
+    let state: ControllerState
+    @State private var wizard: Int?
+    var body: some View {
+        let todo = state.b.indices.first { state.b[$0].listed && state.b[$0].cal == 0 }
+        if let i = todo, controller.record.owner {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(state.b[i].name) is plugged in. Mark its open and closed positions once, and it is ready to use.")
+                    .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Button { wizard = i } label: {
+                    Label("Mark Positions", systemImage: "slider.horizontal.below.rectangle").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+            }
+            .fullScreenCover(item: Binding(get: { wizard.map(RoomView.Idx.init) }, set: { wizard = $0?.id })) { w in
+                SetupWizard(controller: controller, index: w.id, name: state.b[safe: w.id]?.name ?? "Blind")
+            }
+        } else if todo != nil {
+            Label("An owner needs to mark these blinds' positions before they can move.", systemImage: "lock").font(.subheadline).foregroundStyle(.secondary)
+        } else {
+            Label("No blind plugged in yet. Plug one into the controller and it shows up here.", systemImage: "cable.connector").font(.subheadline).foregroundStyle(.secondary)
+        }
     }
 }
 

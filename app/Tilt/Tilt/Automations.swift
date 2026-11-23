@@ -258,9 +258,8 @@ struct ScheduleEditor: View {
                 }
                 if !isNew { Section { Button("Delete Schedule", role: .destructive) { done(schedule, true); dismiss() } } }
             }
-            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }
-            .skyPage().navigationTitle(isNew ? "New Schedule" : "Schedule").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(isNew ? "New Schedule" : "Schedule").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { var s = schedule; if all { s.targets = everyBlind }; done(s, false); dismiss() }.disabled(schedule.days == 0 || (!all && schedule.targets.isEmpty)) }
@@ -320,9 +319,8 @@ struct SceneEditor: View {
                     }
                 }
             }
-            .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }
-            .skyPage().navigationTitle("Scene").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Scene").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { done(scene); dismiss() }.disabled(scene.tilts.isEmpty || scene.name.isEmpty) }

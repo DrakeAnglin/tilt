@@ -21,7 +21,7 @@ thin plastic walls.
 | Free length, end cap to first tilt drum | 110 mm (the tilter's pocket) |
 | Clearance above the installed headrail | about 6.5 mm: nothing may stick up more than about 5 mm |
 | Tilt travel | 11–12 wand turns closed to closed, about 250–270° of rod. Tilt torque is low |
-| Lift | a separate, self-contained module (two cord spools with spring drums), not connected to the tilt rod ([lift](../../docs/lift.md)) |
+| Lift module | the blind's own spring module, 21.75 mm tall, screwed to the floor under the tilt rod. Tilt leaves it alone ([ADR 0002](../../docs/adr/0002-no-lift.md)) |
 
 ## Reference photos
 In [`docs/reference/`](../../docs/reference/):

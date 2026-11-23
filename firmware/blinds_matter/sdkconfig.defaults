@@ -7,8 +7,6 @@ CONFIG_BT_NIMBLE_ENABLED=y
 #disable BT connection reattempt
 CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT=n
 
-#enable lwip ipv6 autoconfig
-CONFIG_LWIP_IPV6_AUTOCONFIG=y
 
 # Use a custom partition table
 CONFIG_PARTITION_TABLE_CUSTOM=y
@@ -17,17 +15,12 @@ CONFIG_PARTITION_TABLE_OFFSET=0xC000
 
 # Enable chip shell
 
-CONFIG_ENABLE_WIFI_AP=n
 
-#enable lwIP route hooks
-CONFIG_LWIP_HOOK_IP6_ROUTE_DEFAULT=y
-CONFIG_LWIP_HOOK_ND6_GET_GW_DEFAULT=y
 
 
 # Button
 
 # disable softap by default
-CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
 
 # Enable OTA Requestor
 CONFIG_ENABLE_OTA_REQUESTOR=y
@@ -35,9 +28,6 @@ CONFIG_ENABLE_OTA_REQUESTOR=y
 # Enable HKDF in mbedtls
 CONFIG_MBEDTLS_HKDF_C=y
 
-# Increase LwIP IPv6 address number to 6 (MAX_FABRIC + 1)
-# unique local addresses for fabrics(MAX_FABRIC), a link local address(1)
-CONFIG_LWIP_IPV6_NUM_ADDRESSES=6
 
 # Exclude unused clusters to optimize flash and memory usage
 CONFIG_SUPPORT_ACCOUNT_LOGIN_CLUSTER=n
@@ -137,11 +127,10 @@ CONFIG_SUPPORT_COMMODITY_METERING_CLUSTER=n
 CONFIG_SUPPORT_COMMODITY_TARIFF_CLUSTER=n
 CONFIG_SUPPORT_PUSH_AV_STREAM_TRANSPORT_CLUSTER=n
 
-# ---- blinds (Matter over Wi-Fi). The Thread version of this file is sdkconfig.defaults.thread.
+# ---- blinds
 CONFIG_IDF_TARGET="esp32c6"
 CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=4
 CONFIG_ENABLE_CHIP_SHELL=n
-CONFIG_OPENTHREAD_ENABLED=n
 # logs over the chip's own USB port
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 # clusters a blind does not use
@@ -152,26 +141,62 @@ CONFIG_SUPPORT_SCENES_MANAGEMENT_CLUSTER=n
 CONFIG_SUPPORT_THREAD_NETWORK_DIAGNOSTICS_CLUSTER=n
 CONFIG_SUPPORT_THREAD_BORDER_ROUTER_MANAGEMENT_CLUSTER=n
 CONFIG_SUPPORT_THREAD_NETWORK_DIRECTORY_CLUSTER=n
-# a new firmware is on trial until it has joined Wi-Fi; a reset before that goes back to the old one
+# a new firmware is on trial until it has heard from the Tilt Hub; a reset before that goes back to the old one
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
-# the web app
-CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
-CONFIG_HTTPD_MAX_URI_LEN=512
-
-# ---- low power on battery: the chip dozes between Wi-Fi beacons
-CONFIG_PM_ENABLE=y
-CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
-CONFIG_FREERTOS_HZ=1000
 CONFIG_PM_SLP_IRAM_OPT=y
 CONFIG_PM_RTOS_IDLE_OPT=y
-CONFIG_ESP_WIFI_SLP_IRAM_OPT=y
 CONFIG_ESP_PHY_MAC_BB_PD=y
-CONFIG_BT_LE_SLEEP_ENABLE=y
-CONFIG_BT_LE_LP_CLK_SRC_MAIN_XTAL=y
-
-# Matter uses the standard mDNS responder, so the controller can also announce itself to the app (_tilt._tcp)
 CONFIG_USE_MINIMAL_MDNS=n
-
 # Each controller makes its own Apple Home setup code on its first start (main/home_code.h), not the public test code
 CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER=y
 CONFIG_ENABLE_TEST_SETUP_PARAMS=n
+
+# ---- Thread: a sleepy device on the Tilt Hub's Thread network. No Wi-Fi.
+CONFIG_OPENTHREAD_ENABLED=y
+CONFIG_OPENTHREAD_MTD=y
+CONFIG_OPENTHREAD_SRP_CLIENT=y
+CONFIG_OPENTHREAD_LOG_LEVEL_DYNAMIC=n
+CONFIG_OPENTHREAD_LOG_LEVEL_NOTE=y
+CONFIG_OPENTHREAD_CLI=n
+CONFIG_ENABLE_WIFI_STATION=n
+CONFIG_ENABLE_OTA_REQUESTOR=n
+
+# lwIP for Thread. IPv4 stays in (web.h still asks for a Wi-Fi address and gets none).
+CONFIG_LWIP_IPV6_AUTOCONFIG=n
+CONFIG_LWIP_IPV6_NUM_ADDRESSES=8
+CONFIG_LWIP_MULTICAST_PING=y
+# a status answer can be bigger than one Thread packet
+CONFIG_LWIP_IP6_FRAG=y
+CONFIG_LWIP_IP6_REASSEMBLY=y
+
+# Sleepy device: check in with the hub once a second (a tap moves the blind in about half a second),
+# faster for a few seconds after any message.
+CONFIG_ENABLE_ICD_SERVER=y
+CONFIG_SUPPORT_ICD_MANAGEMENT_CLUSTER=y
+CONFIG_ICD_SLOW_POLL_INTERVAL_MS=1000
+CONFIG_ICD_FAST_POLL_INTERVAL_MS=200
+CONFIG_ICD_IDLE_MODE_INTERVAL_SEC=60
+CONFIG_ICD_ACTIVE_MODE_INTERVAL_MS=1000
+CONFIG_ICD_ACTIVE_MODE_THRESHOLD_MS=3000
+CONFIG_IEEE802154_SLEEP_ENABLE=y
+
+# Light sleep
+CONFIG_PM_ENABLE=y
+CONFIG_PM_DFS_INIT_AUTO=y
+CONFIG_PM_POWER_DOWN_PERIPHERAL_IN_LIGHT_SLEEP=y
+CONFIG_ESP_SLEEP_POWER_DOWN_FLASH=y
+CONFIG_FREERTOS_HZ=1000
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+CONFIG_RTC_CLK_SRC_EXT_CRYS=n
+
+# Bluetooth (setup only) keeps time on the chip's own slow clock, not the 40 MHz crystal: the crystal kept on in
+# light sleep costs about 3.3 mA (issue #6).
+CONFIG_BT_LE_SLEEP_ENABLE=y
+CONFIG_BT_LE_LP_CLK_SRC_MAIN_XTAL=n
+CONFIG_BT_LE_LP_CLK_SRC_DEFAULT=y
+
+CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
+CONFIG_MBEDTLS_HKDF_C=y
+
+# room for Matter, mDNS and the hub link (no web server on this build)
+CONFIG_LWIP_MAX_SOCKETS=16

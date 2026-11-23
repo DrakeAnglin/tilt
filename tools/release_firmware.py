@@ -3,13 +3,16 @@
 
   python3 tools/release_firmware.py [stable|beta] [--notes "What changed"]
 
-Builds a public release with no secrets in it (no Wi-Fi, no update password: idf.py -DTILT_RELEASE=1, into
+Builds a public release with no secrets in it (idf.py -DTILT_RELEASE=1, into
 firmware/blinds_matter/build-release), checks none of secrets.h's values ended up in it, signs it with
 ~/.tilt/firmware-signing-key.pem, and writes into firmware/releases/:
   tilt-<version>.bin   the image | signature (64 bytes) | "TILTSIG1"  (the controller checks the signature)
+  tilt-<version>-from-<old>.patch   only what changed since an earlier release (esp_delta_ota): header | patch |
+                       the new image's signature | the patch file's signature | "TILTDLT1". A controller running
+                       exactly <old> takes it in about a minute over Thread instead of seven.
   firmware.json        {"stable": {...}, "beta": {...}}  the newest version on each channel; the file name is relative
 Publish both on the public site repo (the app reads its latest release):
-  gh release create firmware-<version> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/tilt-<version>.bin
+  gh release create firmware-<version> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/tilt-<version>.bin firmware/releases/tilt-<version>-from-*.patch
 """
 import argparse, hashlib, json, os, re, subprocess, sys
 
@@ -30,37 +33,73 @@ def der_to_raw(der):
         i += 2 + n
     return out
 
+def sign(data):
+    der = subprocess.run(['openssl', 'dgst', '-sha256', '-sign', KEY], input=data, capture_output=True, check=True).stdout
+    return der_to_raw(der)
+
+def make_patch(base, new):
+    """A signed patch that turns the image `base` into the image `new` (both as built, without our signature).
+    Its header names base by the SHA-256 esptool appends to every image (its last 32 bytes): the controller only
+    applies it to exactly that firmware."""
+    import io, detools
+    out = io.BytesIO()
+    detools.create_patch(io.BytesIO(base), io.BytesIO(new), out, compression='heatshrink')
+    body = (0xfccdde10).to_bytes(4, 'little') + base[-32:] + bytes(28) + out.getvalue() + sign(new)
+    return body + sign(body) + b'TILTDLT1'
+
+def image_of(signed):
+    """A file as published (image | signature | "TILTSIG1") back to the image."""
+    return signed[:-72] if signed.endswith(b'TILTSIG1') else signed
+
+def build_signed(version):
+    """Build the public release with no secrets in it, sign it, write it to OUT."""
+    log = open(os.path.join(FW, 'build-release.log'), 'w')
+    env = dict(os.environ, BUILD_DIR='build-release', SDKCONFIG_FILE='sdkconfig.release')
+    if subprocess.run([os.path.join(FW, 'build.sh'), '-DTILT_RELEASE=1', 'build'], cwd=FW, stdout=log, stderr=log, env=env).returncode:
+        sys.exit('the release build failed: see firmware/blinds_matter/build-release.log')
+    image = open(os.path.join(FW, 'build-release', 'blinds_matter.bin'), 'rb').read()
+    for secrets in [os.path.join(FW, 'main', 'secrets.h'), os.path.join(ROOT, 'firmware', 'tilt_hub', 'main', 'secrets.h')]:
+        if os.path.exists(secrets):              # never publish a file with a password in it
+            for v in re.findall(r'#define \w+ "([^"]{4,})"', open(secrets).read()):
+                if v.encode() in image: sys.exit('a value from %s is inside the release build: not published' % secrets)
+    signed = image + sign(image) + b'TILTSIG1'
+    name = 'tilt-%s.bin' % version
+    open(os.path.join(OUT, name), 'wb').write(signed)
+    return name, signed
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('channel', nargs='?', default='beta', choices=['stable', 'beta'])
     ap.add_argument('--notes', default='')
     ap.add_argument('--sign', metavar='BIN', help='only sign this file (a developer build) and write BIN.signed; no release')
+    ap.add_argument('--patch-from', metavar='BASE', help='with --sign: also write BIN.patch, from the image BASE')
     a = ap.parse_args()
     if not os.path.exists(KEY): sys.exit('no signing key at ' + KEY)
     if a.sign:
         image = open(a.sign, 'rb').read()
-        der = subprocess.run(['openssl', 'dgst', '-sha256', '-sign', KEY], input=image, capture_output=True, check=True).stdout
-        open(a.sign + '.signed', 'wb').write(image + der_to_raw(der) + b'TILTSIG1')
+        open(a.sign + '.signed', 'wb').write(image + sign(image) + b'TILTSIG1')
+        if a.patch_from:
+            p = make_patch(image_of(open(a.patch_from, 'rb').read()), image)
+            open(a.sign + '.patch', 'wb').write(p)
+            print('patch: %d bytes (the full file is %d)' % (len(p), len(image) + 72))
         return
-    log = open(os.path.join(FW, 'build-release.log'), 'w')
-    if subprocess.run([os.path.join(FW, 'build.sh'), '-B', 'build-release', '-DTILT_RELEASE=1', 'build'], cwd=FW, stdout=log, stderr=log).returncode:
-        sys.exit('the release build failed: see firmware/blinds_matter/build-release.log')
-    a.bin = os.path.join(FW, 'build-release', 'blinds_matter.bin')
-    secrets = os.path.join(FW, 'main', 'secrets.h')
-    if os.path.exists(secrets):                  # never publish a file with a password in it
-        data = open(a.bin, 'rb').read()
-        for v in re.findall(r'#define \w+ "([^"]{4,})"', open(secrets).read()):
-            if v.encode() in data: sys.exit('a value from secrets.h is inside the release build: not published')
     version = re.search(r'#define FW_VERSION "([^"]+)"', open(os.path.join(FW, 'main', 'web.h')).read()).group(1)
-    image = open(a.bin, 'rb').read()
-    der = subprocess.run(['openssl', 'dgst', '-sha256', '-sign', KEY], input=image, capture_output=True, check=True).stdout
-    signed = image + der_to_raw(der) + b'TILTSIG1'
     os.makedirs(OUT, exist_ok=True)
-    name = 'tilt-%s.bin' % version
-    open(os.path.join(OUT, name), 'wb').write(signed)
+    name, signed = build_signed(version)
     path = os.path.join(OUT, 'firmware.json')
     listing = json.load(open(path)) if os.path.exists(path) else {}
     entry = {'version': version, 'file': name, 'size': len(signed), 'sha256': hashlib.sha256(signed).hexdigest(), 'notes': a.notes}
+    # Patches from the last few releases: the app uses one when the controller runs exactly that firmware ("from":
+    # the image's SHA-256, which the controller's hello shows as "img").
+    olds = sorted((f for f in os.listdir(OUT) if re.fullmatch(r'tilt-[^-]+(-[a-z0-9]+)?\.bin', f) and f != name), key=lambda f: os.path.getmtime(os.path.join(OUT, f)))[-3:]
+    entry['patches'] = []
+    for old in olds:
+        base = image_of(open(os.path.join(OUT, old), 'rb').read())
+        p = make_patch(base, image_of(signed))
+        pname = 'tilt-%s-from-%s.patch' % (version, old[5:-4])
+        open(os.path.join(OUT, pname), 'wb').write(p)
+        entry['patches'].append({'from': base[-32:].hex(), 'file': pname, 'size': len(p), 'sha256': hashlib.sha256(p).hexdigest()})
+        print('  patch from %s: %d bytes' % (old, len(p)))
     listing[a.channel] = entry
     if a.channel == 'stable' and 'beta' not in listing: listing['beta'] = entry
     json.dump(listing, open(path, 'w'), indent=2)

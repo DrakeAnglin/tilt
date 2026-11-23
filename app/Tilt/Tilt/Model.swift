@@ -16,7 +16,7 @@ final class Controller: Identifiable {
     private var seenSaved = Date.distantPast
     enum Reach: Equatable { case online, asleep, unreachable }
     /// Online: answering. Asleep: not answering, but on battery and seen in the last 15 minutes, so most likely dozing.
-    /// Unreachable: not on this Wi-Fi, switched off, or gone.
+    /// Unreachable: this iPhone is not on the home Wi-Fi, or the hub has not heard from it.
     var reach: Reach {
         if online { return .online }
         guard let t = lastSeen, state?.batt.charging == false, Date().timeIntervalSince(t) < 15 * 60 else { return .unreachable }
@@ -64,7 +64,12 @@ final class Controller: Identifiable {
                     if let t = s.topic, !t.isEmpty, t != self.record.topic { self.record.topic = t; self.changed?() }
                     if let t = self.record.topic { if self.record.owner { await Cloud.watch(topic: t) } else { await Cloud.unwatch(topic: t) } }      // owners get a push when someone asks to join
                     if let m = s.me, (m == 1) != self.record.owner { self.record.owner = m == 1; self.changed?() }
-                    if self.record.owner, (s.asks ?? 0) != self.requests.count { await self.loadRequests() }
+                    if self.record.owner, (s.asks ?? 0) != self.asked { await self.loadRequests() }
+                    // Set up before the controller knew which key is the hub's: tell it (once per start of the app).
+                    if self.record.owner, self.record.onHub, s.hkey == 0, !self.hubKeyTold {
+                        self.hubKeyTold = true
+                        if let hc = await HubWatch.shared.hubCid(for: self.id) { try? await self.client.markHubKey(cid: hc) }
+                    }
                 } catch LinkProblem.waiting {
                     self.online = true
                     try? await Task.sleep(for: .seconds(2))
@@ -88,9 +93,20 @@ final class Controller: Identifiable {
         if Date().timeIntervalSince(seenSaved) > 60 { seenSaved = Date(); UserDefaults.standard.set(lastSeen, forKey: Prefs.lastSeen(id)) }
     }
 
+    /// Requests the controller listed last, the hub's own included (so a hub request still open does not reload every poll).
+    private var asked = 0
+    private var hubKeyTold = false
     func loadRequests() async {
         guard let people = try? await client.people() else { return }
-        requests = people.filter { $0.wait == 1 }
+        var asks = people.filter { $0.wait == 1 }
+        asked = asks.count
+        // The Tilt Hub asks to join each of its controllers (to move the blinds for Apple Home). The hub tells this
+        // app which request is its own (by its key, not its name): an owner lets exactly that one in, unseen.
+        if record.onHub, !asks.isEmpty, let hubCid = await HubWatch.shared.hubCid(for: id), let own = asks.first(where: { $0.cid == hubCid }) {
+            if record.owner, (try? await client.approve(cid: own.cid, true, owner: false)) != nil { try? await client.markHubKey(cid: hubCid) }
+            asks.removeAll { $0.cid == hubCid }
+        }
+        requests = asks
     }
     /// Let a phone that asked to join in (as an owner or a user), or turn it down.
     func answer(_ r: PhoneKey, approve: Bool, owner: Bool = false) async {
@@ -159,7 +175,7 @@ final class AppModel {
         if c.record.waiting == true { waiting.append(c) } else { controllers.append(c) }
         c.changed = { [weak self, weak c] in
             guard let self, let c else { return }
-            if c.removed { self.notice = "You no longer have access to \(c.record.name). It was removed from this phone."; self.remove(c); return }
+            if c.removed { self.notice = "\(c.record.name) is no longer set up with this phone: it was reset, or an owner removed you. It was taken off this phone; set it up again from Add."; self.remove(c); return }
             if c.record.waiting != true, let i = self.waiting.firstIndex(where: { $0.id == c.id }) { self.waiting.remove(at: i); self.controllers.append(c) }
             self.save()
         }
@@ -211,7 +227,7 @@ final class AppModel {
         adopt(h, host: host, paired: p)
         return p.blindName
     }
-    /// Keep a controller this phone just paired with (over Wi-Fi or Bluetooth setup).
+    /// Keep a controller this phone just paired with (through the hub or Bluetooth setup).
     func adopt(_ h: Hello, host: String, paired p: Paired) {
         if let old = (controllers + waiting).first(where: { $0.id == h.id }) { remove(old) }
         let rec = ControllerRecord(id: h.id, name: h.name, host: host, cid: p.cid.hex, owner: p.owner, waiting: p.waiting ? true : nil, code: p.waiting ? p.code : nil, topic: p.topic.isEmpty ? nil : p.topic)
@@ -237,6 +253,14 @@ final class AppModel {
     func setOwner(_ c: Controller, _ owner: Bool) {
         guard c.record.owner != owner else { return }
         c.record.owner = owner
+        save()
+    }
+    /// Start over on this iPhone: every room, its key and any unfinished setup is removed (the controllers and the hub
+    /// are not touched; set them up again from Add).
+    func eraseAll() {
+        for c in controllers + waiting { remove(c) }
+        let d = UserDefaults.standard
+        for k in d.dictionaryRepresentation().keys where k.hasPrefix("pending.cid.") { Pending.clear(String(k.dropFirst("pending.cid.".count))) }
         save()
     }
     func remove(_ c: Controller) {

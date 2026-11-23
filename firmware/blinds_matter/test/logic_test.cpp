@@ -53,6 +53,8 @@ struct RecMoves : MoveSeam {
 static void requestTests() {
   { RecMoves s; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
     CHECK(s.log == "x n1:50 " && r.started == 1 && !r.why, "app: one blind, gentle moves end"); }
+  CHECK(fwIsOlder("2.2.0", "2.3.0-dev7") && !fwIsOlder("2.3.0", "2.3.0-dev7") && fwIsOlder("2.3.0-dev6", "2.3.0-dev7"), "firmware: older and newer");
+  CHECK(!fwIsOlder("2.3.0-dev7", "2.3.0-dev7") && fwIsOlder("2.3.0-dev7", "2.3.0") && !fwIsOlder("10.0.0", "9.9.9") && fwIsOlder("junk", "2.3.0"), "firmware: same, release, junk");
   { RecMoves s; s.fol = true; MoveResult r = moveRequest(moveAsk(FROM_APP, 1, 50), s);
     CHECK(s.log == "x n1:50 n0:50 n2:50 " && r.started == 3, "app: follow mode takes the others along"); }
   { RecMoves s; s.fol = true; MoveAsk a = moveAsk(FROM_APP, 1, 50); a.solo = true; moveRequest(a, s);
@@ -258,9 +260,9 @@ int main() {
   CHECK(permitRule(false, false, true, false, "/api/set", "", "") == nullptr, "plain open before pairing or with the switch");
   CHECK(permitRule(false, false, false, true, "/api/update", "", "") == nullptr, "update checks its own signature");
   CHECK(permitRule(true, true, false, false, "/api/set", "", me) == nullptr, "owner may change settings");
-  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/keys", "/api/wifistate"})
+  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"})
     CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move");
-  for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/setwifi", "/api/homeopen"})
+  for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen"})
     CHECK(permitRule(true, false, false, false, p, "", me) != nullptr, "user refused owner-only command");
   CHECK(permitRule(true, false, false, false, "/api/keyname", me, me) == nullptr, "user may rename themself");
   CHECK(permitRule(true, false, false, false, "/api/keyname", them, me) != nullptr, "user may not rename others");

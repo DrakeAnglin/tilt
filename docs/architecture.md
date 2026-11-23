@@ -11,13 +11,15 @@ Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md]
   Adafruit 6092 charger with its own USB-C, and 3 RJ12 ports, in a box that slides into a headrail.
   Build: [PCB](pcb-build.md), [box](controller-box.md).
 - **Cord**: a white, straight-wired RJ12 phone cord from each tilter to a port.
-- **Phone**: the **Tilt** iPhone app talks straight to each controller on the home Wi-Fi. **Apple Home** sees each
-  controller as a Matter device over Wi-Fi.
+- **Tilt Hub** (one per home): an ESP32-C6 on a USB wall plug ([firmware/tilt_hub](../firmware/tilt_hub/README.md)).
+  The controllers talk to it over Thread and sleep between check-ins. **Apple Home** adds the hub once (Matter over
+  Wi-Fi) and sees every blind through it.
+- **Phone**: the **Tilt** iPhone app reaches each controller through the hub, on the home Wi-Fi.
 
 ```
  USB-C ─► Adafruit 6092 ─VIN─┐                      ┌───────────────────────────────┐
  solar (optional) ─J8─D2─────┴─ PWR (6.2 V zener)   │ ESP32-C6 SuperMini            │
-                  6092 BAT ═══ 18650 (protected)    │ Matter over Wi-Fi, BLE setup  │
+                  6092 BAT ═══ 18650 (protected)    │ Thread to the hub, BLE setup  │
                      │                              │ GPIO: IN1, IN2, EN, angle ×3  │
                      └─ BAT+ ──D3──► ESP 5V pin      │ ADC: battery, PWR             │
                      │                              └──┬──────┬──────┬──────────────┘
@@ -30,10 +32,10 @@ Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md]
 ## Why it is built this way
 - **No cloud.** The app talks to controllers directly, and Apple Home covers voice and away-from-home control
   ([ADR 0001](adr/0001-no-cloud-local-first.md)).
-- **Matter over Wi-Fi.** It works with Apple Home today with no hub. Wi-Fi costs more battery than Thread would; the
-  controller dozes between jobs (Wi-Fi power save), so it often answers a little slowly. Thread through a hub is a later
-  goal.
-- **ESP32-C6 SuperMini.** Small (about 22.5 × 18 mm), Wi-Fi 6, Thread and Bluetooth (Bluetooth for first setup),
+- **Thread only, through a Tilt Hub** ([ADR 0003](adr/0003-thread-only-tilt-hub.md)). A sleeping Thread device uses
+  about a tenth of the battery of Wi-Fi power save, and a tap reacts in about half a second. The hub is Apple Home's
+  Matter device for every blind, so no Apple Thread border router is needed.
+- **ESP32-C6 SuperMini.** Small (about 22.5 × 18 mm), Thread and Bluetooth (Bluetooth for first setup),
   enough pins for 3 ports. It plugs into sockets, so it can be swapped.
 - **Motor driver in each tilter.** The cord carries battery power and logic, not motor current switching at 20 kHz.
   So the flat, untwisted cord does not couple motor noise into the angle wire, and a tilter is a complete unit (motor,
@@ -70,13 +72,12 @@ come from [#6 (battery life)](https://github.com/DrakeAnglin/tilt/issues/6) and 
 
 | Load | mAh a day (estimate) |
 |---|---|
-| ESP32-C6 on Wi-Fi in power save, plus regulator and charger standby | about 70–150 |
+| ESP32-C6 asleep on Thread (one check-in a second), plus regulator and charger standby | about 7–15 (research estimate; on Wi-Fi it was about 70–150) |
 | Motors: 12 moves × about 3 s × about 250 mA from the cell | about 3–5 |
 | AS5600, one at a time, only while moving | under 1 |
 
-The Wi-Fi radio is most of it. If the estimate holds, a 2600 mAh cell (about 2300 mAh usable) lasts weeks, not
-months, without charging. That is why the battery life is measured before anything else is decided about solar or
-the cell size.
+The radio is most of it. If the estimate holds, a 2600 mAh cell (about 2300 mAh usable) lasts several months without
+charging (on Wi-Fi it was weeks). It is still to be measured.
 
 ## Pins
 From `firmware/blinds_matter/main/config.h` (PCB v2):
@@ -118,8 +119,9 @@ A reversed cord would put battery + on IN2, so the continuity check matters.
   target, stops on a stall, follows a blind turned by hand. Schedules run on the controller, so they work with the
   phone away.
 - **App** ([app/README.md](../app/README.md)): SwiftUI, with a widget and Control Center buttons. No server. It sets up
-  a new controller over Bluetooth (the Wi-Fi password goes sealed, to the controller only), then talks to it over a
-  secured channel on Wi-Fi with a key per phone (Owner and Guests). It adds the controller to Apple Home with the
-  controller's own setup code.
-- **Firmware updates**: signed release files on the public `DrakeAnglin/tilt-site` repo; the app installs them
+  a new controller over Bluetooth and hands it the hub's Thread network (sealed, to the controller only), then talks to
+  it through the hub over a secured channel with a key per phone (Owner and Guests); the hub cannot read it. Apple
+  Home sees the blinds through the hub (added once, with the hub's own setup code).
+- **Firmware updates**: signed release files on the public `DrakeAnglin/tilt-site` repo; the app hands them to the hub,
+  which feeds them to the controller over Thread
   ([app-store.md](app-store.md)).

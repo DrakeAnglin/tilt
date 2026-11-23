@@ -7,7 +7,7 @@
 > ([#6](https://github.com/DrakeAnglin/tilt/issues/6)). The must-test list below still stands. "V5" below means
 > the current controller box.
 
-One board that carries everything: the cell, charger, USB-C, solar input, three tilter ports and a lifter port, and the
+One board that carries everything: the cell, charger, USB-C, solar input, three tilter ports, and the
 ESP32-C6. The case is then just a shell with openings. This is the parts proposal for review, before the schematic and
 routing.
 
@@ -24,7 +24,7 @@ power monitor) are gone; they are listed at the bottom only so the reasons stay 
 3. **Everything hand-solderable.** Through-hole parts and off-the-shelf modules only. The PCB gives each module its
    mounting points: header holes (or pads for its wires), screw or standoff holes where the module has mounting holes,
    and a keep-out under it. Each module's footprint is drawn from the real part once it's measured.
-4. Three tilter ports and one lifter port (RJ45, below), the ESP32-C6 on sockets so it stays replaceable.
+4. Three tilter ports, the ESP32-C6 on sockets so it stays replaceable.
 
 ## What's on the board
 | Function | Part | How it's mounted | Notes |
@@ -37,10 +37,9 @@ power monitor) are gone; they are listed at the bottom only so the reasons stay 
 | Solar | **3.5 × 1.35 mm barrel jack, SHOU HAN DC003-1.3** (LCSC C668594) | through-hole | 9 × 6.3 × 5 mm, round 4 mm opening in the end wall. The panel lead gets a 3.5 × 1.35 plug (common). Tracked in [#8](https://github.com/DrakeAnglin/tilt/issues/8) |
 | Source OR-ing | **1N5822** Schottky × 2 (3 A) | through-hole | USB and solar into the charger's single input: both can stay plugged in, neither back-feeds the other |
 | **Power monitor** | **An INA3221 3-channel module** (common breakout, about 25 × 20 mm, I²C) | header pins | USB in, solar in and battery: current and voltage of each, separately. See below |
-| Battery current shunt | **0.025 Ω 3 W through-hole current-sense resistor** (e.g. Vishay LVR03 series) | through-hole | across the INA3221 module's battery channel, so lifter peaks stay in range with no rework on the module. See below |
+| Battery current shunt | **0.025 Ω 3 W through-hole current-sense resistor** (e.g. Vishay LVR03 series) | through-hole | across the INA3221 module's battery channel, so motor peaks stay in range with no rework on the module. See below |
 | Tilter ports | 3 × RJ12 87180-066LF (yours) | through-hole | V5's plug-shaped openings carry over |
-| **Lifter port** | **RJ45 8P8C**, right angle, unshielded | through-hole | see below |
-| Port fuses | **Radial PTCs**: Bel 0ZRE0075FF (0.75 A) × 3, one 2 A for the lifter | through-hole | as on V2.1; folded flat over their resistors, as in V5 |
+| Port fuses | **Radial PTCs**: Bel 0ZRE0075FF (0.75 A) × 3 | through-hole | as on V2.1; folded flat over their resistors, as in V5 |
 | ESP32-C6 SuperMini | female header sockets | through-hole | stays replaceable |
 | Resistors, capacitors | 1/4 W axial resistors, radial / disc capacitors | through-hole | as on V2.1 |
 
@@ -48,7 +47,6 @@ power monitor) are gone; they are listed at the bottom only so the reasons stay 
 USB-C board VBUS --[INA ch1]--|>|--+                         OUT --> ESP 5V pin (its LDO makes 3.3 V)
                                    +--> charger module IN ---+
 solar jack + ------[INA ch2]--|>|--+   (zener 6.2 V on IN)   BAT --+--> 0.75 A PTC x3 --> RJ12 tilters (pin 1)
-                                                                   +--> 2 A PTC --> RJ45 lifter (2 x BAT+, 2 x GND)
                                                                    |
                                                                [INA ch3] --> protected 18650
 INA3221 module (I2C to the ESP): ch1 = USB, ch2 = solar, ch3 = battery (+ charging / - discharging)
@@ -58,10 +56,9 @@ NTC on the cell --> charger THERM
 Where the motor ports tap off (the charger's BAT side or its OUT side) gets settled with the module picked: the motor
 current has to stay inside what the module's power path can pass.
 
-**GPIO:** 4 ports × (IN1, IN2, EN, angle) = 16, plus **I²C (SDA, SCL) to the INA3221 module** = **18 of the SuperMini's 18
+**GPIO:** 3 ports × (IN1, IN2, EN, angle) = 12, plus **I²C (SDA, SCL) to the INA3221 module** = **14 of the SuperMini's 18
 free pins**. The module replaces V2.1's battery and input-power dividers: it reads the cell's voltage directly, and the
-sign of the battery current says charging or not. The 4 angle inputs fit GPIO0–6. If the lifter needs more signals later,
-its own small driver/MCU at the lifter can share the same I²C bus over 2 of the RJ45's wires.
+sign of the battery current says charging or not. The 3 angle inputs fit GPIO0–6.
 
 ## Power monitoring: USB, solar and battery separately
 The INA3221 module measures three paths, each through its own shunt resistor, and reports volts and amps on each over I²C
@@ -91,22 +88,11 @@ can both stay connected with the cell, and neither can push current back into th
 - The cell stays on the charger's BAT side the whole time, and the module's power path runs the ESP while it charges.
   Unplugging either source, or both, needs no action.
 
-## The lifter port
-Raising slats means lifting the stack, roughly **6–15 W** for small blind motors (about 1 A at 12 V). From a
-3.7 V cell that's **3–4 A peaks**, more than an RJ12's thin wires should carry. So the 4th port is an RJ45:
-- **pins 1, 2:** battery +. **Pins 3, 6:** GND. Two wires each way, about 2 A on 24 AWG cable, fused at 2 A.
-- **pins 4, 5, 7, 8:** IN1, IN2, EN and angle/sensor, the same signals as a tilter. The lifter can have the tilter's
-  driver + AS5600 arrangement, or its own driver (and a boost to 12 V if it needs one) at the motor end.
-
-The energy is no problem: 2 lifts a day at 12 W for 15 s is 0.1 Wh against the cell's ~9 Wh. Only the peak current
-matters, and a high-drain 18650 handles it (below). If the lifter design ends up needing much more, we revisit it then.
-The port and its wiring are reserved now, so no new board is needed.
-
 ## Is the 18650 right?
 | Option | Capacity | Fits? | Verdict |
 |---|---|---|---|
-| **18650, high-drain, protected** (e.g. Molicel P28A 2800 mAh / 35 A, Samsung 25R 2500 mAh / 20 A, with a protection board) | 9–10 Wh | yes | **recommended**: standard, cheap ($5–8 protected), holders everywhere, easily handles lifter peaks. Protected cells are ~2–3 mm longer: check the holder's length range |
-| 21700 (4000–5000 mAh, 30–45 A) | 15–18 Wh | +3.5 mm wide, +2.6 mm tall, +4 mm long | worth it only if the ESP has to stay always-on without solar, or the lifter is heavy |
+| **18650, high-drain, protected** (e.g. Molicel P28A 2800 mAh / 35 A, Samsung 25R 2500 mAh / 20 A, with a protection board) | 9–10 Wh | yes | **recommended**: standard, cheap ($5–8 protected), holders everywhere, easily handles motor peaks. Protected cells are ~2–3 mm longer: check the holder's length range |
+| 21700 (4000–5000 mAh, 30–45 A) | 15–18 Wh | +3.5 mm wide, +2.6 mm tall, +4 mm long | worth it only if the ESP has to stay always-on without solar, |
 | LiPo pouch | any | flat | no standard size or holder, swells in heat (a sunny window), easy to puncture: no |
 | LiFePO4 18650 | ~5 Wh | yes | safest in heat, but 3.2 V makes the N20s weaker (already torque-limited): no |
 | AA NiMH ×2–3 | 2.4–3.6 V | — | too low a voltage for the motors: no |
@@ -140,7 +126,7 @@ layout, the Fusion fit check and the case get redone once both modules are picke
   are bought ready-made; the PCB gives them header holes / pads, mounting holes and a keep-out.
 - **Protected cells only:** the board has no protection of its own.
 - Solar: 3.5 × 1.35 mm barrel jack.
-- Port split: doesn't matter. 1 + USB-C + solar at end A; 2 + lifter at end B.
+- Port split: doesn't matter. 1 + USB-C + solar at end A; 2 + 3 at end B.
 
 ## Must test on the v2 board before ordering v3
 Found on the first v2 board (2026-11-07). **v3 is not ordered until each of these is tested on the real board.**
@@ -171,7 +157,7 @@ Found on the first v2 board (2026-11-07). **v3 is not ordered until each of thes
 ## Next
 1. Pick the charger module: ideally one with power path that takes the panel's ~7 V directly (no zener); otherwise the
    MCP73871 module you have, with the zener. Pick an INA3221 module. Measure both.
-2. Your OK on the 18650 recommendation and the lifter port.
+2. Your OK on the 18650 recommendation.
 3. Schematic, then a KiCad board generated like v2 (netlist → placement → routing → DRC / ERC / parity), then the PCB's 3D
    export into the Fusion fit check, then the V6 case around it.
 4. Bare PCB order, **only after every item in "Must test on the v2 board" passes.**

@@ -1,11 +1,11 @@
-// Blinds controller with Matter over Thread: Apple Home (and Alexa) see the blinds as window coverings.
+// Blinds controller on Thread, through a Tilt Hub: the hub shows the blinds in Apple Home (and Alexa) as window
+// coverings, and passes the app's sealed commands along. Bluetooth for first setup. No Wi-Fi.
 //
 //   One covering for all blinds by default (they move together). Setting "hksep" = 1: one covering per blind.
 //   Apple Home's slider: 100 % open = slats level, 0 % = closed in the "Close" direction (cfg.closeUp).
 //   Matter counts the other way round ("percent closed", in hundredths): lift 0 = open, 10000 = closed.
 //
-// The moves, marks, stall rules and settings are the same code as the Wi-Fi firmware (config.h, store.h, power.h,
-// motion.h), running on ardu.h instead of Arduino.
+// The moves, marks, stall rules and settings live in config.h, store.h, power.h and motion.h, on ardu.h.
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_pm.h>
@@ -13,10 +13,8 @@
 #include <esp_matter.h>
 #include <common_macros.h>
 #include <app/server/Server.h>
-#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
 #include <platform/ESP32/OpenthreadLauncher.h>
 #include "ot_config.h"
-#endif
 #include <driver/usb_serial_jtag.h>
 #include "ardu.h"
 #include "store.h"
@@ -29,6 +27,7 @@
 #include "ble.h"
 #include "home_code.h"
 #include "home_view.h"
+#include "hub_link.h"
 #include <app/server/CommissioningWindowManager.h>
 
 static const char *TAG = "blinds";
@@ -154,11 +153,11 @@ void blindsTask(void *)
         bool busy = moving() || bs[0].queued || bs[1].queued || bs[2].queued;
         // Dozing switches the chip's USB port off (no logs, no flashing). So: stay awake for the first minute after
         // every start, and for as long as a computer is connected by USB.
-        // With nothing to do, the chip dozes between Wi-Fi beacons (USB charger and solar too; it still hears the router, so Home and the
+        // With nothing to do, the chip dozes between check-ins with the hub (USB charger and solar too; Home and the
         // web app still reach it). It stays fully awake: while moving, for a minute after a start, while
         // a computer is on its USB port, while someone uses the web app, or when asked to (/api/awake).
         bool stay = DEV_STAY_AWAKE || busy || now < 60000 || usb_serial_jtag_is_connected() ||
-                    (lastWeb && now - lastWeb < 15000) || (int32_t)(keepAwakeUntil - now) > 0;
+                    (lastWeb && now - lastWeb < 15000) || (int32_t)(keepAwakeUntil - now) > 0 || hubOtaBusy();
         if (!stay && held) { esp_pm_lock_release(awake); held = false; }
         static uint32_t lastS = 0;
         if (now - lastS >= 10000) {   // a status line for whoever is watching the USB log
@@ -223,36 +222,19 @@ extern "C" void app_main()
         nEp++;
     }
 
-#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
     esp_openthread_platform_config_t config = {
         .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
         .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
         .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
     };
     set_openthread_platform_config(&config);
-#endif
     homeCodeBegin();                             // 10. this controller's own Apple Home setup code (before the radio is on)
     bleSetupBegin();                             // 11. the transports: our Bluetooth service, then Matter (its BLE too)
     esp_err_t err = esp_matter::start(event_cb);
     ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Matter did not start: %d", err));
 
-    // Wi-Fi: Matter owns the radio. The first time, give it the home network from secrets.h and restart, so the web app
-    // is reachable before (and without) pairing with a home.
-    wifi_config_t wcfg = {};
-    // (Only the development controller gets the built-in network. Any other board starts with none and is set up from
-    // the app over Bluetooth.)
-    if (WIFI_SSID[0] && ctrlId() == "9888e0710610" && esp_wifi_get_config(WIFI_IF_STA, &wcfg) == ESP_OK && !wcfg.sta.ssid[0]) {
-        strlcpy((char *)wcfg.sta.ssid, WIFI_SSID, sizeof wcfg.sta.ssid);
-        strlcpy((char *)wcfg.sta.password, WIFI_PASSWORD, sizeof wcfg.sta.password);
-        esp_wifi_set_storage(WIFI_STORAGE_FLASH);
-        esp_wifi_set_config(WIFI_IF_STA, &wcfg);
-        ESP_LOGI(TAG, "Wi-Fi network saved, restarting once");
-        vTaskDelay(pdMS_TO_TICKS(500));
-        esp_restart();
-    }
-    esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    esp_netif_sntp_init(&sntp);
-    webBegin();                                  // 12. HTTP
+    webBegin();                                  // 12. the temperature sensor
+    hubBegin();                                  // 12b. the Tilt Hub link (Thread build)
     ::event("start %s (%s), battery %.2f V, input %.2f V, %d covering%s for Home", FW_VERSION, resetReason(), vbatRest, vin, nEp, nEp == 1 ? "" : "s");
     xTaskCreate(blindsTask, "blinds", 6144, NULL, 5, &blindsTaskH);   // 13. the blinds task
 }

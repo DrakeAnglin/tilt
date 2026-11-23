@@ -2,35 +2,35 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Encryption: only Apple's own CryptoKit and HTTPS, which Apple treats as exempt (docs/app-store.md). -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>app.tilt.blinds.refresh</string>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>NSHomeKitUsageDescription</key>
-	<string>Tilt uses Apple Home to add your blinds controller as an accessory.</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Tilt uses Bluetooth to set up a new blinds controller and put it on your Wi-Fi.</string>
-	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIColorName</key>
-		<string>LaunchBG</string>
-	</dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Tilt uses Bluetooth to set up a new blinds controller and connect it to your Tilt Hub.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_tilt._tcp</string>
+		<string>_tilthub._tcp</string>
 	</array>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>app.tilt.blinds.refresh</string>
-	</array>
+	<key>NSHomeKitUsageDescription</key>
+	<string>Tilt uses Apple Home to add your Tilt Hub and its blinds as accessories.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBG</string>
+	</dict>
 </dict>
 </plist>

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct BlindsTab: View {
     @Environment(AppModel.self) private var model
+    @Environment(HubWatch.self) private var hub
     @State private var adding = false
     @State private var path: [String] = []
     @State private var width: CGFloat = 400
@@ -32,13 +33,15 @@ struct BlindsTab: View {
                                 Spacer(minLength: 0)
                                 if split { Button("Hide Rooms", systemImage: "sidebar.left") { withAnimation(.smooth(duration: 0.3)) { sideHidden = true } }.labelStyle(.iconOnly).buttonStyle(.glass).padding(.top, 6) }
                             }
+                            HubCard()
+                            if hub.showBanner(added: Set(model.controllers.map(\.id))) { NewControllerBanner(setUp: { adding = true }, notNow: { hub.quietUntil = Date().addingTimeInterval(600) }) }
                             if model.controllers.isEmpty && model.waiting.isEmpty {
                                 VStack(spacing: 16) {
                                     SlatView(tilt: 30).frame(width: 150, height: 170)
                                     Text("Bring your blinds to life").font(.title2.weight(.semibold))
                                     Text("Add your first blinds controller to open, close and schedule your blinds from here.").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                                     Button { adding = true } label: { Label("Add a New Device", systemImage: "plus").padding(.horizontal, 8) }.buttonStyle(.glassProminent).controlSize(.large)
-                                    Button("No controller yet? Try the Demo") { withAnimation { model.addDemo() } }.font(.subheadline)
+                                    if hub.record == nil { Button("No controller yet? Try the Demo") { withAnimation { model.addDemo() } }.font(.subheadline) }
                                 }
                                 .frame(maxWidth: .infinity).padding(28).card()
                             }
@@ -128,7 +131,81 @@ struct BlindsTab: View {
         }
         .onChange(of: opened) { _, o in if let o { lastOpened = o } }
         .onChange(of: path) { _, p in if let l = p.last { lastOpened = l } }
-        .sheet(isPresented: $adding) { AddControllerSheet() }
+        .sheet(isPresented: $adding) { AddControllerSheet().presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
+    }
+}
+
+/// The Tilt Hub on the Blinds page: a hub found on the Wi-Fi that this iPhone is not connected to yet (new: Connect;
+/// someone else's: Ask to Join), a request waiting for its owner, or people asking to join a hub this iPhone owns.
+struct HubCard: View {
+    @Environment(HubWatch.self) private var hub
+    @State private var busy = false
+    @State private var problem: String?
+    @State private var askingCode = false
+    @State private var code = ""
+    var body: some View {
+        switch hub.status {
+        case .newHub:
+            card("New Tilt Hub found", "Connect to it to add your blinds controllers and Apple Home. This iPhone becomes its owner. You need the setup code on the hub's label.") {
+                Button { code = ""; askingCode = true } label: { busyLabel("Connect") }.buttonStyle(.glassProminent).disabled(busy)
+                    .alert("Tilt Hub Setup Code", isPresented: $askingCode) {
+                        TextField("1234-5678", text: $code).keyboardType(.numberPad)
+                        Button("Connect") { let c = code; run { try await hub.connect(code: c) } }
+                        Button("Cancel", role: .cancel) {}
+                    } message: { Text("Type the 8-digit code from the label on the hub.") }
+            }
+        case .someoneElses:
+            card("Tilt Hub found", "It already has an owner. Ask to join: they let you in from their Tilt app.") {
+                Button { run { try await hub.askToJoin() } } label: { busyLabel("Ask to Join") }.buttonStyle(.glassProminent).disabled(busy)
+            }
+        case .waiting:
+            card("Waiting for the hub's owner", "Your request to join the Tilt Hub is with its owner. Their app shows the code \(hub.record?.code ?? "") — it should match.") {
+                Button("Take the Request Back") { run { try await hub.leave() } }.buttonStyle(.glass)
+            }
+        case .connected:
+            if hub.isOwner, let a = hub.asks.first {
+                card("\(a.name) asks to join your Tilt Hub", "Their phone shows the code \(a.code ?? ""). Let them in if it matches.") {
+                    HStack {
+                        Button("Let In") { run { try await hub.approve(cid: a.cid, true) } }.buttonStyle(.glassProminent).disabled(busy)
+                        Button("Decline") { run { try await hub.approve(cid: a.cid, false) } }.buttonStyle(.glass).disabled(busy)
+                    }
+                }
+            }
+        case .none:
+            EmptyView()
+        }
+    }
+    private func card<B: View>(_ title: String, _ text: String, @ViewBuilder buttons: () -> B) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: "point.3.connected.trianglepath.dotted").font(.headline)
+            Text(text).font(.subheadline).foregroundStyle(.secondary)
+            if let problem { Label(problem, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(Palette.warning) }
+            buttons()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(18).card()
+    }
+    private func busyLabel(_ t: String) -> some View { HStack(spacing: 8) { if busy { SlatLoader(size: 16) }; Text(t) } }
+    private func run(_ f: @escaping () async throws -> Void) {
+        busy = true; problem = nil
+        Task { defer { busy = false }; do { try await f() } catch { problem = error.localizedDescription } }
+    }
+}
+
+/// The Tilt Hub sees a controller nobody owns yet (just plugged in): offer to set it up.
+struct NewControllerBanner: View {
+    let setUp: () -> Void
+    let notNow: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("New controller found", systemImage: "sparkles").font(.headline)
+            Text("Your Tilt Hub sees a blinds controller nobody has set up yet. Set it up now: it joins the hub and shows up in Apple Home by itself.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            HStack {
+                Button("Set Up", action: setUp).buttonStyle(.glassProminent)
+                Button("Not Now", action: notNow).buttonStyle(.glass)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(18).card()
     }
 }
 

@@ -17,7 +17,6 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | F-8 | Could | **Physical button** on the controller (pairing/reset) | — |
 | F-9 | Should | **Groups and scenes** (e.g. "living room blinds") | Through the ecosystem or the app |
 | F-10 | Should | **Schedules** (time, sunrise/sunset), stored on the device so they work without the cloud | — |
-| F-11 | Should | **Lift**: raise and lower cordless blinds (see [lift.md](lift.md)). Not built yet | — |
 | F-12 | Must | **Manual use**: the wand still tilts the blind by hand; the position updates at the next wake | Turn the wand; the app shows the new angle |
 
 ## Connectivity & integrations
@@ -75,7 +74,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | E-3 | Must | A stalled motor never browns out the ESP32 (one motor runs at a time; stall stop) |
 | E-4 | Must | Solar input clamped; fuse on each port; protected cells only. Charging stops when the cell is hot: open (the v2 board has no probe on the cell) |
 | E-5 | Should | Motor cables up to 3 m from the controller to each blind |
-| E-6 | Must | No exposed pinch points that could catch fingers; child safety for any cords (lift); the box must not pinch the blind's lift cord |
+| E-6 | Must | No exposed pinch points that could catch fingers; the box must not pinch the blind's lift cord |
 
 ## Distribution
 

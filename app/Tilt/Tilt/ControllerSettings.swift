@@ -1,10 +1,11 @@
-// One controller's settings: its blinds, general options, Apple Home, sharing, developer.
+// One controller's settings: general options, Apple Home, people, its blinds, firmware.
 import CoreImage.CIFilterBuiltins
 import HomeKit
 import SwiftUI
 
 struct ControllerSettingsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(HubWatch.self) private var hub
     @Environment(\.dismiss) private var dismiss
     let controller: Controller
     @State private var cfg: ControllerConfig?
@@ -20,7 +21,9 @@ struct ControllerSettingsView: View {
     @State private var retried = false
     @AppStorage(Prefs.devMode) private var devMode = false
 
-    struct HomeInfo: Identifiable { let code: String; let qr: String; var id: String { qr } }
+    struct HomeInfo: Identifiable { let code: String; let qr: String; var hub = false; var inHome = false; var id: String { qr } }
+    /// On a Tilt Hub the app reaches the controller through the hub ("<hub>/c/<id>"), and Apple Home sees its blinds there.
+    private var onHub: Bool { controller.record.onHub }
 
     var body: some View {
         List {
@@ -29,18 +32,6 @@ struct ControllerSettingsView: View {
             if controller.needsUpdate { Section { FirmwareNotice(controller: controller) } }
             if let cfg {
               if controller.record.owner {       // settings, setup and Apple Home are the owners'
-                Section("Blinds") {
-                    ForEach(Array(cfg.b.enumerated()), id: \.offset) { i, b in
-                        NavigationLink {
-                            BlindSettingsView(controller: controller, index: i, blind: b) { await load() }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(b.name)
-                                Text(blindNote(i, b)).font(.footnote).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
                 Section {
                     TextField("Name", text: $name).onSubmit { let n = name; change { try await $0.setName(n) } }.submitLabel(.done)
                     Picker("\u{201C}Close\u{201D} tilts the slats", selection: Binding(get: { cfg.closeUp }, set: { v in change { try await $0.setCloseUp(v == 1) } })) {
@@ -54,10 +45,11 @@ struct ControllerSettingsView: View {
                     Text("Follow Each Other: when one blind is moved, from here, from Apple Home or by turning its wand, the others go to the same position.\n\nMove at the Same Time: off moves them one after another, which is quieter and easier on the battery.")
                 }
                 Section {
-                    Button("Add to Apple Home", systemImage: "homekit") { openHome() }
+                    if !onHub { Button("Add to Apple Home", systemImage: "homekit") { openHome() } }
                     Toggle("Show each blind separately", isOn: Binding(get: { cfg.hksep == 1 }, set: { on in change { try await $0.setHomeSeparate(on) } }))
                 } header: { Text("Apple Home") } footer: {
-                    Text((controller.state?.hk ?? 0) > 0 ? "Added to Apple Home. Changing how blinds are shown restarts the controller." : "Not added to Apple Home yet.")
+                    if onHub { Text("Apple Home sees these blinds through the Tilt Hub. Changing how they are shown can take a minute to appear in Home.") }
+                    else { Text((controller.state?.hk ?? 0) > 0 ? "Added to Apple Home. Changing how blinds are shown restarts the controller." : "Not added to Apple Home yet.") }
                 }
               }
                 Section {
@@ -65,12 +57,12 @@ struct ControllerSettingsView: View {
                         if p.wait == 1 {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("\(p.name) wants to join").font(.body.weight(.medium))
-                                Text("Their phone shows the code \(p.code ?? "").").font(.footnote).foregroundStyle(.secondary)
+                                Text("Their iPhone shows the code \(p.code ?? "").").font(.footnote).foregroundStyle(.secondary)
                                 if controller.record.owner { Button("Review") { review = JoinAsk(controller: controller, phone: p) }.buttonStyle(.borderedProminent) }
                             }
                         } else {
                             Button { if p.me == 1 || controller.record.owner { newName = p.name; renaming = p } } label: {
-                                LabeledContent(p.name + (p.me == 1 ? " (this phone)" : ""), value: p.owner == 1 ? "Owner" : "User").contentShape(Rectangle())
+                                LabeledContent(p.name + (p.me == 1 ? " (this iPhone)" : ""), value: p.owner == 1 ? "Owner" : "User").contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)                // names in the normal text color, not as links
                             .swipeActions {
@@ -81,12 +73,28 @@ struct ControllerSettingsView: View {
                             }
                             .confirmationDialog("Remove \(p.name)?", isPresented: Binding(get: { removing?.cid == p.cid }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
                                 Button("Remove", role: .destructive) { revoke(p) }
-                            } message: { Text("That phone will no longer control these blinds. It can ask to join again.") }
+                            } message: { Text("That iPhone will no longer control these blinds. It can ask to join again.") }
                         }
                     }
                 } header: { Text("People") } footer: {
-                    Text("Tap a name to change it. To add someone: on your Wi-Fi, they open Tilt, tap Add, and ask to join. You approve it here." + (controller.record.owner ? " Swipe left on someone to remove them or change their role." : ""))
+                    Text("Tap a name to change it. To add someone: on your home Wi-Fi, they open Tilt, tap Add, and ask to join. You approve it here." + (controller.record.owner ? " Swipe left on someone to remove them or change their role." : ""))
                 }
+              if controller.record.owner {
+                Section {
+                    ForEach(Array(cfg.b.enumerated()), id: \.offset) { i, b in
+                        NavigationLink {
+                            BlindSettingsView(controller: controller, index: i, blind: b) { await load() }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(b.name)
+                                Text(blindNote(i, b)).font(.footnote).foregroundStyle(blindNeedsSetup(i, b) ? Palette.warning : .secondary)
+                            }
+                        }
+                    }
+                } header: { Text("Blinds") } footer: {
+                    Text("One row per port on the controller. A blind moves once its open and closed positions are marked: tap it, then Set Up Positions.")
+                }
+              }
                 if devMode && developerBuild { Section {
                     NavigationLink { DeveloperView(controller: controller) } label: { Label("Developer", systemImage: "chevron.left.forwardslash.chevron.right") }
                 } }
@@ -97,16 +105,16 @@ struct ControllerSettingsView: View {
             if cfg == nil, problem == nil { Section { HStack(spacing: 10) { SlatLoader(size: 20); Text("Loading…").foregroundStyle(.secondary) } } }
             if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
             Section {
-                Button("Remove from This Phone", role: .destructive) { confirmRemove = true }
-                    .confirmationDialog("Remove this controller from this phone?", isPresented: $confirmRemove, titleVisibility: .visible) {
+                Button("Remove from This iPhone", role: .destructive) { confirmRemove = true }
+                    .confirmationDialog("Remove this controller from this iPhone?", isPresented: $confirmRemove, titleVisibility: .visible) {
                         if controller.record.owner {
                             Button("Remove and Reset Controller", role: .destructive) { remove(reset: true) }
-                            Button("Remove from This Phone Only", role: .destructive) { remove(reset: false) }
+                            Button("Remove from This iPhone Only", role: .destructive) { remove(reset: false) }
                         } else {
                             Button("Remove", role: .destructive) { remove(reset: false) }
                         }
                     } message: {
-                        Text(controller.record.owner ? "Reset makes the controller forget every phone, so it can be set up again as new. Schedules and blind positions are kept."
+                        Text(controller.record.owner ? "Reset makes the controller forget every iPhone, so it can be set up again as new. Schedules and blind positions are kept."
                                                      : "The blinds keep working. To use them here again you will need a new sharing code.")
                     }
             }
@@ -128,7 +136,7 @@ struct ControllerSettingsView: View {
             TextField("Name", text: $newName)
             Button("Save") { rename(p) }
             Button("Cancel", role: .cancel) {}
-        } message: { p in Text(p.me == 1 ? "What other people see for this phone." : "What this phone is called in the list.") }
+        } message: { p in Text(p.me == 1 ? "What other people see for this iPhone." : "What this iPhone is called in the list.") }
         .sheet(item: $home) { HomeSheet(info: $0, roomName: controller.state?.name ?? controller.record.name).presentationDetents([.large]) }
     }
 
@@ -144,14 +152,20 @@ struct ControllerSettingsView: View {
         let s = controller.state?.b[safe: i]
         if b.hid == 1 { return "Port \(i + 1) · hidden" }
         if let s, s.seen == 1, s.pres == 0 { return "Port \(i + 1) · nothing plugged in" }
-        if let s, s.cal == 0 { return "Port \(i + 1) · not set up" }
+        if blindNeedsSetup(i, b) { return "Port \(i + 1) · positions not marked yet" }
         return "Port \(i + 1)"
+    }
+    /// Plugged in (or not yet checked) and shown, but its open and closed positions are not marked.
+    private func blindNeedsSetup(_ i: Int, _ b: ControllerConfig.Blind) -> Bool {
+        guard let s = controller.state?.b[safe: i] else { return false }
+        return s.listed && s.cal == 0
     }
     private func load() async {
         do {
             let c = try await controller.client.config()
             cfg = c; name = c.name; problem = nil
-            let list = ((try? await controller.client.people()) ?? []).sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
+            let hubKey = onHub ? await hub.hubCid(for: controller.id) : nil
+            let list = ((try? await controller.client.people()) ?? []).filter { $0.cid != hubKey }.sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
             withAnimation { phones = list }
             if let me = phones.first(where: { $0.me == 1 }) { model.setOwner(controller, me.owner == 1) }      // the owner may have changed
         } catch {
@@ -221,7 +235,9 @@ struct HomeSheet: View {
                     // The quick way: Apple's own add-accessory page, opened here with the code already filled in.
                     Button { addHere() } label: { Label("Add to Apple Home", systemImage: "homekit").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 4) }
                         .buttonStyle(.borderedProminent).controlSize(.large)
-                    Text("When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The controller accepts this for the next 10 minutes.")
+                    if info.inHome { Label("The Tilt Hub is in Apple Home already.", systemImage: "checkmark.circle").font(.footnote).foregroundStyle(.secondary) }
+                    Text(info.hub ? "When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The hub accepts this until it is in a home."
+                                  : "When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The controller accepts this for the next 10 minutes.")
                         .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     if let note { Label(note, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(Palette.warning) }
 
@@ -233,7 +249,8 @@ struct HomeSheet: View {
                             Button { if let u = URL(string: "com.apple.home://") { openURL(u) } } label: { Label("Open Home", systemImage: "arrow.up.forward.app").frame(maxWidth: .infinity) }
                         }
                         .buttonStyle(.bordered)
-                        Text("In Home tap +, Add Accessory, More Options. Pick this controller, or tap \u{201C}My Accessory Isn\u{2019}t Shown Here\u{201D} and paste the code.")
+                        Text(info.hub ? "In Home tap +, Add Accessory, More Options, tap \u{201C}My Accessory Isn\u{2019}t Shown Here\u{201D} and paste the code."
+                                      : "In Home tap +, Add Accessory, More Options. Pick this controller, or tap \u{201C}My Accessory Isn\u{2019}t Shown Here\u{201D} and paste the code.")
                             .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(16).background(Palette.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -247,7 +264,6 @@ struct HomeSheet: View {
                 }
                 .padding()
             }
-            .skyPage()
             .navigationTitle("Add to Apple Home").navigationBarTitleDisplayMode(.inline)
             .sensoryFeedback(.success, trigger: copied)
         }

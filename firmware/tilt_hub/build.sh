@@ -1,0 +1,15 @@
+#!/bin/sh
+# Build the Tilt Hub firmware. Extra arguments go to idf.py (for example: ./build.sh -p /dev/cu.usbmodemXXXX flash monitor).
+# Wi-Fi comes from ../blinds_matter/main/secrets.h (not in Git) until Apple Home gives the hub its network.
+cd "$(dirname "$0")"
+. ~/esp/esp-idf/export.sh > /dev/null 2>&1
+. ~/esp/esp-matter/export.sh > /dev/null 2>&1
+[ -f sdkconfig ] || idf.py set-target esp32c6 > build-setup.log 2>&1
+# The hub's setup code (8 digits): the first owner types it in the app. Made once, kept in main/setup_pin.h (not in
+# Git). Put it on a label on the hub.
+if [ ! -f main/setup_pin.h ]; then
+  PIN=$(LC_ALL=C tr -dc 0-9 < /dev/urandom | head -c 8)
+  printf '// The Tilt Hub setup code: on its label. Made by build.sh; never commit it.\n#pragma once\n#define HUB_SETUP_PIN "%s"\n' "$PIN" > main/setup_pin.h
+  echo "New Tilt Hub setup code: ${PIN%????}-${PIN#????}  (put it on the hub's label; kept in main/setup_pin.h)"
+fi
+idf.py "${@:-build}"

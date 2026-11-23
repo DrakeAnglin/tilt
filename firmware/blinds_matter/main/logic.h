@@ -109,6 +109,30 @@ inline bool nonceFresh(const uint8_t nonce[12], const uint8_t boot[4], uint64_t 
   return !memcmp(nonce, boot, 4) && nonceCounter(nonce) > last;
 }
 
+// ---- firmware versions: "2.3.0", "2.3.0-dev7". A release is newer than its own dev builds. A firmware file may not
+// be older than the one running (a known-bad old build could otherwise be put back). Unreadable: treated as older.
+inline bool fwParse(const char *s, long v[4]) {
+  char *e;
+  for (int i = 0; i < 3; i++) {
+    if (!s || *s < '0' || *s > '9') return false;
+    v[i] = strtol(s, &e, 10);
+    s = e;
+    if (i < 2) { if (*s != '.') return false; s++; }
+  }
+  if (!*s) { v[3] = 1L << 30; return true; }   // a release
+  if (*s != '-') return false;
+  while (*s && (*s < '0' || *s > '9')) s++;
+  v[3] = *s ? strtol(s, nullptr, 10) : 0;
+  return true;
+}
+inline bool fwIsOlder(const char *candidate, const char *running) {
+  long a[4], b[4];
+  if (!fwParse(running, b)) return false;        // nothing to compare with
+  if (!fwParse(candidate, a)) return true;
+  for (int i = 0; i < 4; i++) if (a[i] != b[i]) return a[i] < b[i];
+  return false;
+}
+
 // ---- who may do what (sec.h permit() gathers the facts and asks this)
 // plainOpen: no phone owns the controller yet, or the developer switch is on. cidArg: the "cid" in the command; ownCid: the
 // caller's own id (hex). nullptr: allowed. Otherwise the reason it is refused.
@@ -117,7 +141,7 @@ inline const char *permitRule(bool secure, bool owner, bool plainOpen, bool isUp
   if (!secure) return (isUpdate || plainOpen) ? nullptr : "use the app";   // an update checks its own signature
   if (owner) return nullptr;
   // a user: see the blinds and move them, see the people, rename only themself
-  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/keys", "/api/wifistate"}) if (path == ok) return nullptr;
+  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"}) if (path == ok) return nullptr;
   if (path == "/api/keyname" && !cidArg.empty() && cidArg == ownCid) return nullptr;
   return "only the owner can do that";
 }

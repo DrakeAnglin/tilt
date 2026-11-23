@@ -2,7 +2,8 @@
 
 Open-source, 3D-printable motorized **tilt** for cordless horizontal blinds. Each blind gets a printed tilter in its
 headrail; the wand still works by hand. A battery-powered controller drives up to 3 blinds. Control is from the
-**Tilt** iPhone app and **Apple Home** (Matter over Wi-Fi). No cloud, no account.
+**Tilt** iPhone app and **Apple Home**, through a **Tilt Hub**: the controllers talk Thread to the hub and sleep,
+and the hub is Apple Home's Matter device for every blind. No cloud, no account.
 
 Only the current version of each thing is kept here. Older versions are in the Git history.
 
@@ -22,7 +23,7 @@ Only the current version of each thing is kept here. Older versions are in the G
 | [firmware/README.md](firmware/README.md) | Flashing and updates |
 | [architecture.md](docs/architecture.md), [requirements.md](docs/requirements.md) | How it works; what it must do |
 | [measure-your-blinds.md](docs/measure-your-blinds.md) | Measuring other blinds |
-| [lift.md](docs/lift.md), [pcb-v3-concept.md](docs/pcb-v3-concept.md) | Later: lifting; the next PCB (on hold) |
+| [pcb-v3-concept.md](docs/pcb-v3-concept.md) | The next PCB (on hold) |
 | [app-store.md](docs/app-store.md) | App Store answers and how firmware is published |
 | [docs/adr](docs/adr) | Decisions on record |
 
@@ -44,7 +45,7 @@ Only the current version of each thing is kept here. Older versions are in the G
 | `tools/fusion_thin.py` | Thin-wall scan of the built tilter |
 | `tools/orient.py`, `tools/bambu.py` | Turn the STLs to print orientation; build the Bambu Studio projects (PLA plate + PETG plate) |
 | `tools/fusion_controller.py` | Builds the controller box in Fusion |
-| `tools/flash_matter.sh` | Builds the firmware and sends it to a controller over Wi-Fi |
+| `tools/flash.sh` | Builds the controller firmware and installs it through the Tilt Hub |
 | `tools/release_firmware.py` | Builds and signs a public firmware release |
 | `tools/blinds_client.py` | Talks to a controller over its secured channel (testing) |
 | `tools/pcb_guide.py` | Generates the PCB build guide and its pictures |

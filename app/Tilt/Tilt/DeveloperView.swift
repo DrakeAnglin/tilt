@@ -41,7 +41,7 @@ struct DeveloperView: View {
                     row("Chip temperature", "sys.temp", "%.0f °C"); LabeledContent("Free memory", value: "\(Int((num("sys.heap") ?? 0) / 1024)) kB")
                 }
                 Section("Network") {
-                    text("Wi-Fi", "wifi.ssid"); text("Address", "wifi.ip"); row("Signal", "wifi.rssi", "%.0f dBm"); text("MAC", "sys.mac")
+                    row("Thread role", "thread.role", "%.0f"); row("Thread channel", "thread.ch", "%.0f"); row("Signal to hub", "thread.parentRssi", "%.0f dBm"); text("MAC", "sys.mac")
                 }
                 Section("Counters") {
                     row("Starts", "st.boots", "%.0f"); row("Brownouts", "st.brown", "%.0f"); row("Crashes", "st.crash", "%.0f"); row("Updates kept", "st.ota", "%.0f")
