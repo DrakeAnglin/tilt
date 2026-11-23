@@ -300,7 +300,7 @@ struct BlindSettingsView: View {
             } footer: { Text("Turn off for a port with nothing plugged in.") }
             Section {
                 Button("Start Setup", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
-            } footer: { Text("Checks which way the motor turns, then saves where this blind is closed up, open, and closed down.") }
+            } footer: { Text("Mark where this blind is closed up, open, and closed down. Its first move after that checks which way the motor turns.") }
         }
             .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }
