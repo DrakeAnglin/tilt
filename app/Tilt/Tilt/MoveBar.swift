@@ -46,7 +46,7 @@ struct GentleButton: View {
                 Button("Over 10 Minutes", systemImage: "tortoise") { taps += 1; action(10) }
                 Button("Over 30 Minutes", systemImage: "tortoise") { taps += 1; action(30) }
             }
-            Button("Move to Position…", systemImage: "slider.horizontal.3") { position() }
+            Button("Set Tilt…", systemImage: "slider.horizontal.3") { position() }
         } label: {
             Label(title, systemImage: systemImage).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 4)
         } primaryAction: { taps += 1; action(0) }

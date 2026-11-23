@@ -26,13 +26,13 @@ struct SettingsTab: View {
                         NavigationLink(value: c.id) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(c.state?.name ?? c.record.name).font(.body.weight(.medium))
-                                Text("\(c.record.owner ? "Owner" : "User")\(c.reach == .online ? "" : c.reach == .asleep ? " · asleep" : " · not reachable")").font(.footnote).foregroundStyle(.secondary)
+                                Text("\(c.record.owner ? "Owner" : "Guest")\(c.reach == .unreachable ? " · unreachable" : "")").font(.footnote).foregroundStyle(.secondary)
                             }
                             .padding(.vertical, 2)
                         }
                         .listRowBackground(rowBackground(c.id))
                     }
-                    if hub.record != nil {              // only a hub this iPhone is connected to (or waiting to join)
+                    if hub.status == .connected {       // only once this iPhone is in (a request still waiting shows on the Blinds page)
                         NavigationLink(value: Self.hubTag) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Tilt Hub").font(.body.weight(.medium))
@@ -44,7 +44,7 @@ struct SettingsTab: View {
                     }
                     Button("Add a New Device", systemImage: "plus") { adding = true }.listRowBackground(RowGlass()).selectionDisabled()
                 } header: { Text("Devices") } footer: {
-                    Text("Tap a device for its settings: blind names and positions, people and Apple Home.")
+                    Text("Tap a device for its settings: blind names and marks, people and Apple Home.")
                 }
                 Section {
                     LabeledContent { TextField("Name", text: $myName).multilineTextAlignment(.trailing).onSubmit { model.rename(to: myName) } } label: { Label("Display Name", systemImage: "person.crop.circle").lineLimit(1).fixedSize(horizontal: true, vertical: false) }.selectionDisabled()
@@ -90,12 +90,12 @@ struct SettingsTab: View {
             .sheet(isPresented: $adding) { AddControllerSheet().presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
         } detail: {
             NavigationStack {
-                if selected == Self.hubTag, hub.record != nil { HubView() }
+                if selected == Self.hubTag, hub.status == .connected { HubView() }
                 else if let c = model.controllers.first(where: { $0.id == selected }) { ControllerSettingsView(controller: c).id(c.id) }
                 else { ContentUnavailableView("Pick a Device", systemImage: "blinds.horizontal.closed", description: Text("Its blinds, people and Apple Home settings show here.")).skyPage() }
             }
         }
-        .onChange(of: hub.record == nil) { _, gone in if gone, selected == Self.hubTag { selected = wide == .regular ? model.controllers.first?.id : nil } }
+        .onChange(of: hub.status == .connected) { _, on in let gone = !on; if gone, selected == Self.hubTag { selected = wide == .regular ? model.controllers.first?.id : nil } }
         .onChange(of: model.controllers.count) { _, _ in if selected != Self.hubTag, !model.controllers.contains(where: { $0.id == selected }) { selected = wide == .regular ? model.controllers.first?.id : nil } }
     }
     /// The Tilt Hub's row in the device list (controllers are picked by their id).

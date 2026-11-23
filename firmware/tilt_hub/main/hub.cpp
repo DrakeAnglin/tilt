@@ -9,7 +9,7 @@
 //                                       sleepy children. Protocol: blinds_matter/main/hub_link.h.
 //
 // The hub moves blinds with its own key, like a phone: it asks to join each controller ("Tilt Hub"), and the owner
-// lets it in from the app (People) as a user.
+// The owner's Tilt app lets it in by itself (as a guest) and tells the controller which key is the hub's.
 #include <string>
 #include <vector>
 #include <esp_err.h>
@@ -60,7 +60,8 @@
 #include <app/server/CommissioningWindowManager.h>
 #include <platform/ESP32/OpenthreadLauncher.h>
 #include "logic.h"                               // battLevel (the controller's own rules)
-#include "home_view.h"                           // what Home sees, the same rules as a controller on Wi-Fi
+#include "home_view.h"                          // what Home sees, the same rules as a controller on Wi-Fi
+#include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm: the same as the controller's
 #include "secrets.h"                             // WIFI_SSID, WIFI_PASSWORD (bench: until Apple Home gives the network)
 // HUB_SETUP_PIN: on the hub's label; made by build.sh, never in the repo. It is copied to flash at the first start, so
 // update files (built with TILT_RELEASE) carry no code at all.
@@ -85,11 +86,13 @@ static uint32_t ms() { return (uint32_t)(esp_timer_get_time() / 1000); }
 // ---- what the hub knows about each controller (the part in flash: Saved)
 struct Saved {
   char id[13];
-  uint8_t keyState;                              // 0 no key, 1 asked to join (waiting for the owner), 2 let in
+  uint8_t keyState;                              // KeyState: the hub's own key on this controller
   uint8_t cid[8], key[32];
   uint16_t ep[PORTS];                            // Home tiles (Matter endpoints, 0 = none): ep[0] alone = all the blinds,
   uint8_t sep;                                   //   or with sep = 1 one tile per blind (the controller's "hksep")
 };
+enum KeyState : uint8_t { KEY_NONE = 0, KEY_ASKED = 1, KEY_IN = 2 };   // no key / asked to join, waiting / let in
+enum OtaState { OTA_NONE = 0, OTA_SENDING = 1, OTA_CHECKING = 2, OTA_DONE = 3, OTA_FAILED = 4 };   // the app reads these numbers
 struct SavedV1 { char id[13]; uint8_t keyState; uint8_t cid[8], key[32]; uint16_t ep[PORTS]; };
 struct Ctrl {
   Saved s;
@@ -114,7 +117,7 @@ struct Ctrl {
   uint32_t cv;                                   // checksum of its settings (from its pushes)
   int own;                                       // it has an owner (from its pushes; -1 not known yet)
   uint32_t firstSeen;                            // ms when the hub first heard from it since this start
-  int otaSt;                                     // firmware through the hub: 0 none, 1 sending, 2 checking, 3 done, 4 failed
+  int otaSt;                                     // OtaState: firmware through the hub
   int otaPct;
   char otaErr[64];
   uint16_t rloc;                                 // its Thread short address, while known
@@ -131,6 +134,7 @@ static uint32_t constrain_u(int v, int lo, int hi) { return v < lo ? lo : v > hi
 struct OtaAck { bool ok, num; uint32_t next; };   // a controller's answer to a firmware piece (num: it gave an offset)
 static QueueHandle_t otaAcks;
 static bool hubTrial = false;                    // the hub runs new firmware it has not kept yet
+static volatile uint32_t homeWindowUntil = 0;    // the owner asked to add the hub to Apple Home: pairing open until then
 static volatile int otaFor = -1;                 // the controller being updated (one at a time)
 static std::string homeManual, homeQr;           // the code to type and the QR text (USB log, and to the controllers)
 static volatile bool inHome = false;             // added to Apple Home (or another Matter home)
@@ -196,25 +200,10 @@ static int ask(int c, char type, const std::string &payload, std::string &ans, u
 
 // ---- the hub's own key for each controller (it moves blinds like a phone would)
 static int rng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
-static bool gcm(bool enc, const uint8_t key[32], const uint8_t nonce[12], const uint8_t *aad, size_t an, const uint8_t *in, size_t n, uint8_t *out, uint8_t *tag) {
-  mbedtls_gcm_context g;
-  mbedtls_gcm_init(&g);
-  bool ok = mbedtls_gcm_setkey(&g, MBEDTLS_CIPHER_ID_AES, key, 256) == 0;
-  if (ok) ok = enc ? mbedtls_gcm_crypt_and_tag(&g, MBEDTLS_GCM_ENCRYPT, n, nonce, 12, aad, an, in, out, 16, tag) == 0
-                   : mbedtls_gcm_auth_decrypt(&g, n, nonce, 12, aad, an, tag, 16, in, out) == 0;
-  mbedtls_gcm_free(&g);
-  return ok;
-}
-static bool unhex(const char *s, uint8_t *out, size_t n) {
-  if (strlen(s) != n * 2) return false;
-  for (size_t i = 0; i < n; i++) { char h[3] = {s[2 * i], s[2 * i + 1], 0}; char *e; out[i] = strtol(h, &e, 16); if (*e) return false; }
-  return true;
-}
-static std::string hexOf(const uint8_t *b, int n) { static const char *H = "0123456789abcdef"; std::string s; for (int i = 0; i < n; i++) { s += H[b[i] >> 4]; s += H[b[i] & 15]; } return s; }
 // The proof on messages between the hub and a controller that has let the hub in (and been told which key is the
 // hub's): the first 16 bytes of HMAC-SHA256 with the link key, in hex. Protocol: blinds_matter/main/hub_link.h.
 static std::string macOf(int c, const std::string &what) {
-  if (ctrls[c].s.keyState != 2) return "";
+  if (ctrls[c].s.keyState != KEY_IN) return "";
   uint8_t link[32], m[32];
   const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
   mbedtls_md_hmac(md, ctrls[c].s.key, 32, (const uint8_t *)"tilt-hub-link", 13, link);
@@ -259,10 +248,10 @@ static void askToJoin(int c) {
   if (ok) {
     xSemaphoreTake(stateMx, portMAX_DELAY);
     memcpy(ctrls[c].s.key, okm, 32);
-    ctrls[c].s.keyState = 1;
+    ctrls[c].s.keyState = KEY_ASKED;
     saveCtrls();
     xSemaphoreGive(stateMx);
-    ESP_LOGI(TAG, "%s: asked to join as Tilt Hub. Let it in from the Tilt app (People).", ctrls[c].s.id);
+    ESP_LOGI(TAG, "%s: asked to join as Tilt Hub (the owner's Tilt app lets it in by itself).", ctrls[c].s.id);
   }
   if (j) cJSON_Delete(j);
   mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&d); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&Q); mbedtls_ecp_point_free(&Qp);
@@ -270,7 +259,7 @@ static void askToJoin(int c) {
 // A command with the hub's key: "/api/home?b=0&lift=5000". Returns the controller's JSON answer, or "" on failure.
 static std::string ctrlCommand(int c, const std::string &cmd) {
   Ctrl &k = ctrls[c];
-  if (k.s.keyState == 0) return "";
+  if (k.s.keyState == KEY_NONE) return "";
   for (int attempt = 0; attempt < 2; attempt++) {
     if (!k.bootOk) {
       std::string h;
@@ -293,14 +282,14 @@ static std::string ctrlCommand(int c, const std::string &cmd) {
     std::string ans;
     int st = ask(c, 'X', pkt, ans);
     if (st == 409) { k.bootOk = false; continue; }  // the controller restarted (new boot id): once more
-    if (st == 403 && ans.find("waiting") != std::string::npos) { ESP_LOGW(TAG, "%s: Tilt Hub is waiting to be let in (Tilt app, People)", k.s.id); return ""; }
-    if (st != 200 || ans.size() < 28) { ESP_LOGW(TAG, "%s: command %s failed (%d) %s", k.s.id, cmd.c_str(), st, st == 200 ? "" : ans.c_str()); if (st == 401) { k.s.keyState = 0; proofs[c] = {}; saveCtrls(); proofsSave(); } return ""; }
+    if (st == 403 && ans.find("waiting") != std::string::npos) { ESP_LOGW(TAG, "%s: Tilt Hub is waiting to be let in (open the owner's Tilt app)", k.s.id); return ""; }
+    if (st != 200 || ans.size() < 28) { ESP_LOGW(TAG, "%s: command %s failed (%d) %s", k.s.id, cmd.c_str(), st, st == 200 ? "" : ans.c_str()); if (st == 401) { k.s.keyState = KEY_NONE; proofs[c] = {}; saveCtrls(); proofsSave(); } return ""; }
     std::string out(ans.size() - 28, 0);
     uint8_t aad2[30];
     memcpy(aad2, "blinds-v1r", 10); memcpy(aad2 + 10, k.s.cid, 8); memcpy(aad2 + 18, p + 8, 12);
     const uint8_t *a = (const uint8_t *)ans.data();
     if (!gcm(false, k.s.key, a, aad2, 30, a + 12, out.size(), (uint8_t *)&out[0], (uint8_t *)(a + 12 + out.size()))) return "";
-    if (k.s.keyState != 2) { k.s.keyState = 2; saveCtrls(); ESP_LOGI(TAG, "%s: Tilt Hub let in", k.s.id); }
+    if (k.s.keyState != KEY_IN) { k.s.keyState = KEY_IN; saveCtrls(); ESP_LOGI(TAG, "%s: Tilt Hub let in", k.s.id); }
     return out;
   }
   return "";
@@ -470,7 +459,7 @@ static void udpTask(void *) {
       xSemaphoreTake(stateMx, portMAX_DELAY);
       for (int i = 0; i < MAX_CTRL; i++) if (ctrls[i].used && ctrls[i].addrOk && sameAddr(ctrls[i].addr, from)) {
         // One that let the hub in proves it is really leaving (anyone else could say it for it).
-        if (ctrls[i].s.keyState == 2 && (!ctrls[i].bootOk || !macOk(i, "ctl-bye" + std::string((const char *)ctrls[i].boot, 4), std::string(buf + 3, n - 3)))) continue;
+        if (ctrls[i].s.keyState == KEY_IN && (!ctrls[i].bootOk || !macOk(i, "ctl-bye" + std::string((const char *)ctrls[i].boot, 4), std::string(buf + 3, n - 3)))) continue;
         std::string inst = ctrls[i].s.id;
         for (auto &ch : inst) ch = toupper(ch);
         mdns_service_remove_for_host((inst + " via Tilt Hub").c_str(), "_tilt", "_tcp", nullptr);
@@ -478,7 +467,7 @@ static void udpTask(void *) {
         ctrls[i].seen = 0;
         ctrls[i].hello.clear();
         // It forgot everything: the hub's key there is gone too. Ask to join again once it is set up anew.
-        ctrls[i].s.keyState = 0; proofs[i] = {};
+        ctrls[i].s.keyState = KEY_NONE; proofs[i] = {};
         saveCtrls(); proofsSave();
         ESP_LOGI(TAG, "%s was reset: it is new again", ctrls[i].s.id);
       }
@@ -505,7 +494,7 @@ static void udpTask(void *) {
         if (c >= 0) {
           // A hello answer carries no proof. It points the hub at a controller it has no key for yet, or at one that
           // has gone quiet for a minute (it restarted and its address changed); otherwise only proven pushes move it.
-          if (ctrls[c].s.keyState != 2 || !ctrls[c].addrOk || (ms() - ctrls[c].seen > 60000 && otaFor != c)) {
+          if (ctrls[c].s.keyState != KEY_IN || !ctrls[c].addrOk || (ms() - ctrls[c].seen > 60000 && otaFor != c)) {
             ctrls[c].addr = from; ctrls[c].addrOk = true; ctrls[c].seen = ms() ? ms() : 1;
             const uint8_t *a = (const uint8_t *)&from.sin6_addr;
             ctrls[c].rloc = (a[11] == 0xff && a[12] == 0xfe) ? (a[14] << 8 | a[15]) : 0;
@@ -560,7 +549,7 @@ static void udpTask(void *) {
     xSemaphoreTake(stateMx, portMAX_DELAY);
     int c = findCtrl(id);
     bool isNew = c < 0;
-    if (c >= 0 && ctrls[c].s.keyState == 2) {    // let the hub in: a proven push, never an old one (boot count, then count)
+    if (c >= 0 && ctrls[c].s.keyState == KEY_IN) {    // let the hub in: a proven push, never an old one (boot count, then count)
       size_t dot = tail.find('.');
       uint32_t pn = dot == std::string::npos ? 0 : strtoul(tail.c_str(), nullptr, 10);
       cJSON *bnj = cJSON_GetObjectItem(j, "bn");
@@ -584,7 +573,7 @@ static void udpTask(void *) {
       for (int i = 0; i < MAX_CTRL && c < 0; i++) {
         bool tiles = false;
         for (int p = 0; p < PORTS; p++) tiles = tiles || ctrls[i].s.ep[p];
-        if (ctrls[i].s.keyState == 0 && !tiles && !ctrls[i].announced && ms() - ctrls[i].seen > 600000) c = i;
+        if (ctrls[i].s.keyState == KEY_NONE && !tiles && !ctrls[i].announced && ms() - ctrls[i].seen > 600000) c = i;
       }
       if (c >= 0) {                              // a clean place (the request lock stays)
         SemaphoreHandle_t m = ctrls[c].mx;
@@ -724,8 +713,9 @@ static void careTask(void *) {
     }
     static uint32_t lastScan = 0;
     if (ms() - lastScan > 30000) { lastScan = ms(); bleScan(); }
-    // Not in a home yet: keep the pairing window open (Matter closes it after 15 minutes).
-    if (matterUp) chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
+    // Not in a home yet: Apple Home can add the hub in its first 15 minutes after power-on, and for 15 minutes after the
+    // owner opens "Add Tilt Hub to Apple Home" in the app (sealed /api/homecode). Not open all the time.
+    if (matterUp && (ms() < 900000 || (int32_t)(homeWindowUntil - ms()) > 0)) chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
       auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
       if (chip::Server::GetInstance().GetFabricTable().FabricCount() == 0 && !mgr.IsCommissioningWindowOpen()) {
         mgr.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
@@ -777,9 +767,9 @@ static void careTask(void *) {
         ctrls[c].announced = false;
         ESP_LOGI(TAG, "%s quiet: no longer announced", ctrls[c].s.id);
       }
-      if (ctrls[c].s.keyState == 2 && ctrls[c].cv && ctrls[c].cv != backupCv(ctrls[c].s.id)) takeBackup(c);
-      if (ctrls[c].s.keyState == 0) askToJoin(c);
-      else if (ctrls[c].s.keyState == 1) ctrlCommand(c, "/api/s");   // let in yet? (also tells us at once)
+      if (ctrls[c].s.keyState == KEY_IN && ctrls[c].cv && ctrls[c].cv != backupCv(ctrls[c].s.id)) takeBackup(c);
+      if (ctrls[c].s.keyState == KEY_NONE) askToJoin(c);
+      else if (ctrls[c].s.keyState == KEY_ASKED) ctrlCommand(c, "/api/s");   // let in yet? (also tells us at once)
       if (matterUp) chip::DeviceLayer::PlatformMgr().ScheduleWork(applyStatus, (intptr_t)c);
     }
   }
@@ -837,13 +827,13 @@ static bool newNearby(uint32_t withinMs = 300000) {
 static const esp_partition_t *stage;
 static uint32_t stageSize;
 static bool stageDelta;                           // the staged file is a patch (blinds_matter/main/hub_link.h)
-static uint32_t otaCh = 480, otaWin = 6;      // measured: 480 x 6 is about 4 KB/s; 960 x 8 lost most pieces          // piece size and pieces in flight (?ch=&win= on the upload, for tuning)
+static uint32_t pieceBytes = 480, piecesInFlight = 6;      // measured: 480 x 6 is about 4 KB/s; 960 x 8 lost most pieces          // piece size and pieces in flight (?ch=&win= on the upload, for tuning)
 static uint32_t uploadUntil[MAX_CTRL];           // an owner allowed an upload for this controller (sealed /api/upload)
-static void otaFail(Ctrl &k, const char *why) { k.otaSt = 4; cleanName(k.otaErr, sizeof k.otaErr, why); ESP_LOGW(TAG, "%s: update failed: %s", k.s.id, why); }
+static void otaFail(Ctrl &k, const char *why) { k.otaSt = OTA_FAILED; cleanName(k.otaErr, sizeof k.otaErr, why); ESP_LOGW(TAG, "%s: update failed: %s", k.s.id, why); }
 static void otaTask(void *arg) {
   int c = (int)(intptr_t)arg;
   Ctrl &k = ctrls[c];
-  uint32_t CH = otaCh, WIN = otaWin;               // a controller that keeps its radio on takes big pieces
+  uint32_t CH = pieceBytes, WIN = piecesInFlight;               // a controller that keeps its radio on takes big pieces
   std::string ans;
   if (ctrlCommand(c, "/api/s").empty()) { otaFail(k, "the controller did not answer"); otaFor = -1; vTaskDelete(nullptr); return; }   // fresh boot id
   std::string sz = std::to_string(stageSize) + (stageDelta ? ",d" : "") + "@" + std::to_string((long)time(nullptr)), mac = k.bootOk ? macOf(c, "hub-ota" + std::string((const char *)k.boot, 4) + sz) : "";
@@ -880,11 +870,11 @@ static void otaTask(void *arg) {
     k.otaPct = (int)(100ULL * acked / stageSize);
   }
   if (acked < stageSize) { otaFail(k, "the controller stopped answering"); otaFor = -1; vTaskDelete(nullptr); return; }
-  k.otaSt = 2;
+  k.otaSt = OTA_CHECKING;
   ESP_LOGI(TAG, "%s: %lu bytes sent in %lu s, checking", k.s.id, (unsigned long)stageSize, (unsigned long)((ms() - t0) / 1000));
   st = ask(c, 'E', "", ans, 15000);
   if (st != 200) { cJSON *j = cJSON_Parse(ans.c_str()); const char *e = j ? cJSON_GetStringValue(cJSON_GetObjectItem(j, "err")) : nullptr; otaFail(k, e ? e : "the controller did not take it"); if (j) cJSON_Delete(j); }
-  else { k.otaSt = 3; k.otaPct = 100; k.bootOk = false; ESP_LOGI(TAG, "%s: update accepted, it restarts", k.s.id); }
+  else { k.otaSt = OTA_DONE; k.otaPct = 100; k.bootOk = false; ESP_LOGI(TAG, "%s: update accepted, it restarts", k.s.id); }
   otaFor = -1;
   vTaskDelete(nullptr);
 }
@@ -976,10 +966,10 @@ static esp_err_t hUpload(httpd_req_t *r, int c) {
   if (otaFor >= 0) { httpd_resp_set_status(r, "409 Conflict"); return httpd_resp_sendstr(r, "{\"ok\":0,\"err\":\"the hub is updating another controller\"}"); }
   if (r->content_len < 1000 || r->content_len > stage->size) { httpd_resp_set_status(r, "400 Bad Request"); return httpd_resp_sendstr(r, "{\"ok\":0,\"err\":\"that is not a firmware file\"}"); }
   char q[64], v[12];
-  otaCh = 480; otaWin = 6;
+  pieceBytes = 480; piecesInFlight = 6;
   if (httpd_req_get_url_query_str(r, q, sizeof q) == ESP_OK) {
-    if (httpd_query_key_value(q, "ch", v, sizeof v) == ESP_OK) otaCh = constrain_u(atoi(v), 32, 1200);
-    if (httpd_query_key_value(q, "win", v, sizeof v) == ESP_OK) otaWin = constrain_u(atoi(v), 1, 16);
+    if (httpd_query_key_value(q, "ch", v, sizeof v) == ESP_OK) pieceBytes = constrain_u(atoi(v), 32, 1200);
+    if (httpd_query_key_value(q, "win", v, sizeof v) == ESP_OK) piecesInFlight = constrain_u(atoi(v), 1, 16);
   }
   otaFor = c;
   uploadUntil[c] = 0;                              // one upload per allowance
@@ -1001,7 +991,7 @@ static esp_err_t hUpload(httpd_req_t *r, int c) {
     httpd_resp_set_status(r, "403 Forbidden");
     return httpd_resp_sendstr(r, (std::string("{\"ok\":0,\"err\":\"") + why + "\"}").c_str());
   }
-  k.otaSt = 1; k.otaPct = 0; k.otaErr[0] = 0;
+  k.otaSt = OTA_SENDING; k.otaPct = 0; k.otaErr[0] = 0;
   xTaskCreate(otaTask, "ota", 6144, (void *)(intptr_t)c, 5, nullptr);
   ESP_LOGI(TAG, "%s: firmware stored (%lu bytes), sending it over Thread", k.s.id, (unsigned long)got);
   httpd_resp_set_type(r, "application/json");
@@ -1387,6 +1377,14 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     if (c >= 0) uploadUntil[c] = (ms() + 300000) | 1;
     xSemaphoreGive(stateMx);
     return c >= 0 ? "{\"ok\":1}" : "{\"ok\":0,\"err\":\"no such controller\"}";
+  }
+  if (path == "/api/homecode" && matterUp) {      // open Apple Home's pairing now (Apple's add screen comes next)
+    homeWindowUntil = (ms() + 900000) | 1;
+    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
+      auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+      if (chip::Server::GetInstance().GetFabricTable().FabricCount() == 0 && !mgr.IsCommissioningWindowOpen())
+        mgr.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
+    }, 0);
   }
   if (path == "/api/homecode") return "{\"ok\":1,\"code\":\"" + homeManual + "\",\"qr\":\"" + homeQr + "\",\"home\":" + (inHome ? "1" : "0") + "}";
   if (path == "/api/backups") return backupsJson();

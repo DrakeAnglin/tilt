@@ -22,7 +22,7 @@ struct AddControllerSheet: View {
                 Section {
                     switch hub.status {
                     case .connected where hub.isOwner:
-                        if hub.answering == false { Label("Your Tilt Hub is not answering", systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) }
+                        if hub.answering == false { Label("Your Tilt Hub is unreachable", systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) }
                         else { Label("Connected to your Tilt Hub", systemImage: "checkmark.circle.fill").foregroundStyle(Palette.good) }
                     case .connected: Label("Only the hub's owner can add controllers", systemImage: "lock")
                     case .waiting: Label("Waiting for the hub's owner to let you in", systemImage: "hourglass")
@@ -39,7 +39,7 @@ struct AddControllerSheet: View {
                         NavigationLink(value: d) { Label("Blinds Controller", systemImage: "blinds.horizontal.closed") }
                     }
                 } header: { Text("New, over Bluetooth") } footer: {
-                    Text("A new controller shows up here until it is set up. If yours is not listed, unplug it and plug it back in.")
+                    Text("A new controller can be set up in its first 15 minutes after it is plugged in. If yours is not listed, unplug it and plug it back in.")
                 }
                 Section {
                     if fresh.isEmpty { Label(hub.answering == true ? "None waiting to be added" : "Looking on your Tilt Hub…", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(.secondary) }
@@ -62,7 +62,7 @@ struct AddControllerSheet: View {
                         Button("Try the Demo", systemImage: "play.rectangle") { model.addDemo(); dismiss() }
                     } footer: { Text("A pretend room with three blinds, to see how Tilt works before you have a controller. Remove it in Settings.") }
                 }
-                if busy { Section { HStack(spacing: 12) { SlatLoader(size: 20); ProgressWords(steps: ["Reaching it through the Tilt Hub…", "Making a key for this iPhone…", "It is asleep between check-ins: one moment…", "Almost there…"]) } } }
+                if busy { Section { HStack(spacing: 12) { SlatLoader(size: 20); ProgressWords(steps: ["Reaching it through the Tilt Hub…", "Making a key for this iPhone…", "It checks in about once a second: one moment…", "Almost there…"]) } } }
                 if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
             }
         }

@@ -66,7 +66,7 @@ struct SetupWizard: View {
                     Spacer()
                     Image(systemName: "checkmark.circle.fill").font(.system(size: 64)).foregroundStyle(Palette.good)
                     Text("\(name) is set up").font(.system(size: 28, weight: .bold, design: .rounded)).padding(.top, 10)
-                    Text("Try each position. The blind moves by itself now.").font(.body).foregroundStyle(.secondary).padding(.top, 2)
+                    Text("Try each one. The blind moves by itself now.").font(.body).foregroundStyle(.secondary).padding(.top, 2)
                     HStack(spacing: 10) {
                         PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.go(blind: index, tilt: -100, solo: true) }
                         PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.go(blind: index, tilt: 0, solo: true) }

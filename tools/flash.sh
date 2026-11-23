@@ -35,7 +35,7 @@ case $(ask /api/otaopen) in *'"ok":1'*) ;; *) echo "the controller did not allow
 # The hub takes a file only when its owner allows it (sealed, owner key on the hub: pair this tool once with
 # "blinds_client.py --ip <hub>/hub --as hub-owner ask" and let it in as an owner from the app). An older hub does not ask.
 "$PY" ../../tools/blinds_client.py --ip "$HUB/hub" --as hub-owner get "/api/upload?id=$ID" >/dev/null 2>&1 || true
-R=$(curl -fsS -m 120 -X POST -H "Content-Type: application/octet-stream" --data-binary @$FILE "http://$HUB/c/$ID/api/update")
+R=$(curl -sS -m 120 -X POST -H "Content-Type: application/octet-stream" --data-binary @$FILE "http://$HUB/c/$ID/api/update")
 case $R in *'"ok":1'*) echo "the hub has it, sending over Thread";; *) echo "the hub refused: $R"; exit 1;; esac
 while true; do
   sleep 10

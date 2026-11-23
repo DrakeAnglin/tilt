@@ -37,7 +37,7 @@ final class HubWatch {
     var statusWord: String {
         guard let r = record else { return "Not connected" }
         if r.waiting { return "Waiting for its owner" }
-        return answering == nil ? "Checking…" : answering! ? "Answering" : "Not answering"
+        return answering == nil ? "Checking…" : answering! ? "Connected" : "Unreachable"
     }
     /// New controllers advertising near the hub (shown to an owner).
     var newNearby = 0
@@ -173,7 +173,7 @@ final class HubWatch {
     }
     /// Only this iPhone forgets the hub (it stays in the hub's people; someone has to let it in again).
     func forgetHere() { forgetLocally() }
-    func makeOwner(cid: String, _ on: Bool) async throws { try await send("/api/makeowner?cid=\(cid)&on=\(on ? 1 : 0)") }
+    func makeOwner(cid: String, _ on: Bool) async throws { try await send(Api.makeOwner(cid: cid, on)) }
     private func forgetLocally() {
         if let r = record { Keychain.delete("hub-" + r.id); if let t = r.topic { Task { await Cloud.unwatch(topic: t) } } }
         record = nil; conn = nil; info = nil; answering = nil; newNearby = 0; asks = []; everyone = nil
@@ -181,9 +181,30 @@ final class HubWatch {
     }
 
     // ---- what a connected iPhone can ask (owner-only on the hub unless said)
-    func people() async throws -> [PhoneKey] { struct K: Decodable { let keys: [PhoneKey] }; let k: K = try await call("/api/keys"); return k.keys }
-    func approve(cid: String, _ ok: Bool, owner: Bool = false) async throws { try await send("/api/approve?cid=\(cid)&ok=\(ok ? 1 : 0)&owner=\(owner ? 1 : 0)"); await refresh() }
-    func revoke(cid: String) async throws { try await send("/api/revoke?cid=\(cid)") }
+    func people() async throws -> [PhoneKey] { struct K: Decodable { let keys: [PhoneKey] }; let k: K = try await call(Api.keys); return k.keys }
+    func approve(cid: String, _ ok: Bool, owner: Bool = false) async throws { try await send(Api.approve(cid: cid, ok, owner: owner)); await refresh() }
+    func revoke(cid: String) async throws { try await send(Api.revoke(cid: cid)) }
+    /// Put new firmware on the hub itself, over Wi-Fi (owner): it restarts on it and keeps it once Wi-Fi and Apple Home
+    /// work, otherwise it goes back by itself. Returns once the hub answers with the new version.
+    func updateHub(_ file: Data, to version: String, progress: @escaping (String) -> Void) async throws {
+        guard let host = record?.host else { throw TiltError("This iPhone is not connected to the Tilt Hub.") }
+        progress("Sending it to the Tilt Hub…")
+        try await send("/api/hubupdate")
+        guard let url = URL(string: "http://\(host)/hub/api/update") else { throw TiltError("The hub's address is not valid.") }
+        var req = URLRequest(url: url, timeoutInterval: 180)
+        req.httpMethod = "POST"
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        let (d, _) = try await URLSession.shared.upload(for: req, from: file)
+        struct R: Decodable { let ok: Int; let err: String? }
+        let r = try? JSONDecoder().decode(R.self, from: d)
+        guard r?.ok == 1 else { throw TiltError((r?.err ?? "The Tilt Hub did not take the update.").capitalizedFirst) }
+        progress("The Tilt Hub is restarting…")
+        for _ in 0..<40 {
+            try await Task.sleep(for: .seconds(3))
+            if let h = try? await Secure.hello("\(host)/hub"), h.fw == version { conn = nil; await refresh(); return }
+        }
+        throw TiltError("The Tilt Hub did not come back with the new firmware. If it cannot start it, it goes back to the old one by itself.")
+    }
     /// Let one firmware file through the hub to this controller (owner; for 5 minutes).
     func allowUpload(for controller: String) async throws { try await send("/api/upload?id=\(controller)") }
     /// The hub's Thread network, for a new controller.
@@ -265,5 +286,9 @@ struct HubInfo: Decodable, Sendable {
         /// Not heard from for 25 minutes (it checks in at least every 10).
         static let silentAfter = 1500
         var notResponding: Bool { seenS < 0 || seenS > Self.silentAfter }
+        /// Its Thread signal, nil when it is not attached to the hub's network (the hub says 127 then).
+        var signal: Int? { rssi.flatMap { $0 == 127 ? nil : $0 } }
+        /// The hub asked to join this controller and the owner's app has not let it in yet.
+        var hubWaiting: Bool { key == 1 }
     }
 }

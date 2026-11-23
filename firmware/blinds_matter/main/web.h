@@ -17,7 +17,7 @@
 #include "update.h"
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev14"
+#define FW_VERSION "2.3.0-dev15"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 
@@ -49,6 +49,12 @@ esp_err_t hRoot(httpd_req_t *r) {
   httpd_resp_set_type(r, "text/plain");           // the built-in web page is gone: the Tilt app is the way in
   return httpd_resp_sendstr(r, "Tilt blinds controller. Use the Tilt app.");
 }
+// The status the app polls (/api/s). Short keys, kept short on purpose (it goes over Thread often):
+//   t epoch, tok clock set, up seconds running, batt {v rest volts, pct, st charge state, vin, low}, closeUp, sync
+//   follow mode, par move at the same time, mv the blind moving (-1 none), log event count, hk in a Matter home,
+//   asks join requests waiting, hkey knows the Tilt Hub's key, me caller is an owner, gentle a slow move running,
+//   topic iCloud notice topic; b[] per blind: hid hidden, pres plugged in, seen checked, cal marks set, tilt, tgt
+//   target, mov moving, q queued, fav, ang raw sensor angle, last what it last did.
 esp_err_t hState(httpd_req_t *r) {
   Lock l;
   std::string j;

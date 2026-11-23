@@ -23,7 +23,7 @@ final class Controller: Identifiable {
         return .asleep
     }
     /// One line for the room when it is not answering.
-    var awayLine: String { TiltWords.away(asleep: reach == .asleep, lastSeen: lastSeen) }
+    var awayLine: String { TiltWords.away(lastSeen: lastSeen) }
     var lastError: String?
     /// Read the controller more often (a setup screen is watching the sensor).
     var boost = false

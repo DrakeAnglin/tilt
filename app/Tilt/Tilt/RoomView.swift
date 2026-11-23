@@ -19,7 +19,7 @@ struct RoomView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(s?.name ?? controller.record.name).font(.system(size: 30, weight: .bold, design: .rounded))
-                        Text(controller.reach == .online ? (s.map(TiltWords.room) ?? "Connecting…") : controller.awayLine + (controller.reach == .unreachable ? ". Is this phone on your home Wi-Fi?" : "")).font(.subheadline).foregroundStyle(.secondary)
+                        Text(controller.reach != .unreachable ? (s.map(TiltWords.room) ?? "Connecting…") : controller.awayLine + ". Is this iPhone on your home Wi-Fi?").font(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if let s { BatteryPill(battery: s.batt) }

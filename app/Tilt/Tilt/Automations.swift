@@ -225,7 +225,7 @@ struct ScheduleEditor: View {
                     }
                 }
                 Section("Do this") {
-                    Picker("Position", selection: Binding(get: { custom ? 1 : schedule.tilt }, set: { if $0 == 1 { custom = true; schedule.tilt = 50 } else { custom = false; schedule.tilt = $0 } })) {
+                    Picker("Tilt", selection: Binding(get: { custom ? 1 : schedule.tilt }, set: { if $0 == 1 { custom = true; schedule.tilt = 50 } else { custom = false; schedule.tilt = $0 } })) {
                         Text("Open").tag(0); Text("Close up").tag(100); Text("Close down").tag(-100); Text("Other").tag(1)
                     }
                     if custom {

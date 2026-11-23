@@ -73,6 +73,7 @@ def main():
     ap.add_argument('--notes', default='')
     ap.add_argument('--sign', metavar='BIN', help='only sign this file (a developer build) and write BIN.signed; no release')
     ap.add_argument('--patch-from', metavar='BASE', help='with --sign: also write BIN.patch, from the image BASE')
+    ap.add_argument('--hub', action='store_true', help='release the Tilt Hub firmware instead (listed as "hub"; the app offers it on the hub page)')
     a = ap.parse_args()
     if not os.path.exists(KEY): sys.exit('no signing key at ' + KEY)
     if a.sign:
@@ -82,6 +83,24 @@ def main():
             p = make_patch(image_of(open(a.patch_from, 'rb').read()), image)
             open(a.sign + '.patch', 'wb').write(p)
             print('patch: %d bytes (the full file is %d)' % (len(p), len(image) + 72))
+        return
+    if a.hub:
+        hubdir = os.path.join(ROOT, 'firmware', 'tilt_hub')
+        hv = re.search(r'set\(PROJECT_VER "([^"]+)"\)', open(os.path.join(hubdir, 'CMakeLists.txt')).read()).group(1)
+        log = open(os.path.join(hubdir, 'build-release.log'), 'w')
+        env = dict(os.environ, BUILD_DIR='build-release')
+        if subprocess.run([os.path.join(hubdir, 'build.sh'), '-B', 'build-release', '-DTILT_RELEASE=1', 'build'], cwd=hubdir, stdout=log, stderr=log, env=env).returncode:
+            sys.exit('the hub release build failed: see firmware/tilt_hub/build-release.log')
+        image = open(os.path.join(hubdir, 'build-release', 'tilt_hub.bin'), 'rb').read()
+        os.makedirs(OUT, exist_ok=True)
+        name = 'tilt-hub-%s.bin' % hv
+        signed = image + sign(image) + b'TILTSIG1'
+        open(os.path.join(OUT, name), 'wb').write(signed)
+        path = os.path.join(OUT, 'firmware.json')
+        listing = json.load(open(path)) if os.path.exists(path) else {}
+        listing['hub'] = {'version': hv, 'file': name, 'size': len(signed), 'sha256': hashlib.sha256(signed).hexdigest(), 'notes': a.notes}
+        json.dump(listing, open(path, 'w'), indent=2)
+        print('hub %s: %s (%d bytes)' % (hv, name, len(signed)))
         return
     version = re.search(r'#define FW_VERSION "([^"]+)"', open(os.path.join(FW, 'main', 'web.h')).read()).group(1)
     os.makedirs(OUT, exist_ok=True)

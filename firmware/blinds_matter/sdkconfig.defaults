@@ -161,7 +161,7 @@ CONFIG_OPENTHREAD_CLI=n
 CONFIG_ENABLE_WIFI_STATION=n
 CONFIG_ENABLE_OTA_REQUESTOR=n
 
-# lwIP for Thread. IPv4 stays in (web.h still asks for a Wi-Fi address and gets none).
+# lwIP for Thread. IPv4 stays in: Matter's network layer here is built with it (it carries no traffic: no Wi-Fi).
 CONFIG_LWIP_IPV6_AUTOCONFIG=n
 CONFIG_LWIP_IPV6_NUM_ADDRESSES=8
 CONFIG_LWIP_MULTICAST_PING=y

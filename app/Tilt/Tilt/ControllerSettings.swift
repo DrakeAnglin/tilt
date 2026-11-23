@@ -42,7 +42,7 @@ struct ControllerSettingsView: View {
                         Toggle("Move at the Same Time", isOn: Binding(get: { par == 1 }, set: { on in change { try await $0.setSameTime(on) } }))
                     }
                 } header: { Text("General") } footer: {
-                    Text("Follow Each Other: when one blind is moved, from here, from Apple Home or by turning its wand, the others go to the same position.\n\nMove at the Same Time: off moves them one after another, which is quieter and easier on the battery.")
+                    Text("Follow Each Other: when one blind is moved, from here, from Apple Home or by turning its wand, the others go to the same tilt.\n\nMove at the Same Time: off moves them one after another, which is quieter and easier on the battery.")
                 }
                 Section {
                     if !onHub { Button("Add to Apple Home", systemImage: "homekit") { openHome() } }
@@ -62,13 +62,13 @@ struct ControllerSettingsView: View {
                             }
                         } else {
                             Button { if p.me == 1 || controller.record.owner { newName = p.name; renaming = p } } label: {
-                                LabeledContent(p.name + (p.me == 1 ? " (this iPhone)" : ""), value: p.owner == 1 ? "Owner" : "User").contentShape(Rectangle())
+                                LabeledContent(p.name + (p.me == 1 ? " (this iPhone)" : ""), value: p.owner == 1 ? "Owner" : "Guest").contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)                // names in the normal text color, not as links
                             .swipeActions {
                                 if controller.record.owner && p.me == 0 {
                                     Button("Remove") { removing = p }.tint(Palette.danger)
-                                    Button(p.owner == 1 ? "Make User" : "Make Owner") { setRole(p, owner: p.owner != 1) }.tint(Palette.accent)
+                                    Button(p.owner == 1 ? "Make Guest" : "Make Owner") { setRole(p, owner: p.owner != 1) }.tint(Palette.accent)
                                 }
                             }
                             .confirmationDialog("Remove \(p.name)?", isPresented: Binding(get: { removing?.cid == p.cid }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
@@ -92,7 +92,7 @@ struct ControllerSettingsView: View {
                         }
                     }
                 } header: { Text("Blinds") } footer: {
-                    Text("One row per port on the controller. A blind moves once its open and closed positions are marked: tap it, then Set Up Positions.")
+                    Text("One row per port on the controller. A blind moves once its marks are set: tap it, then Set Up Marks.")
                 }
               }
                 if devMode && developerBuild { Section {
@@ -114,7 +114,7 @@ struct ControllerSettingsView: View {
                             Button("Remove", role: .destructive) { remove(reset: false) }
                         }
                     } message: {
-                        Text(controller.record.owner ? "Reset makes the controller forget every iPhone, so it can be set up again as new. Schedules and blind positions are kept."
+                        Text(controller.record.owner ? "Reset makes the controller forget every iPhone, so it can be set up again as new. Schedules and marks are kept."
                                                      : "The blinds keep working. To use them here again you will need a new sharing code.")
                     }
             }
@@ -152,7 +152,7 @@ struct ControllerSettingsView: View {
         let s = controller.state?.b[safe: i]
         if b.hid == 1 { return "Port \(i + 1) · hidden" }
         if let s, s.seen == 1, s.pres == 0 { return "Port \(i + 1) · nothing plugged in" }
-        if blindNeedsSetup(i, b) { return "Port \(i + 1) · positions not marked yet" }
+        if blindNeedsSetup(i, b) { return "Port \(i + 1) · marks not set yet" }
         return "Port \(i + 1)"
     }
     /// Plugged in (or not yet checked) and shown, but its open and closed positions are not marked.
@@ -236,7 +236,7 @@ struct HomeSheet: View {
                     Button { addHere() } label: { Label("Add to Apple Home", systemImage: "homekit").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 4) }
                         .buttonStyle(.borderedProminent).controlSize(.large)
                     if info.inHome { Label("The Tilt Hub is in Apple Home already.", systemImage: "checkmark.circle").font(.footnote).foregroundStyle(.secondary) }
-                    Text(info.hub ? "When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The hub accepts this until it is in a home."
+                    Text(info.hub ? "When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The hub accepts this for the next 15 minutes."
                                   : "When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The controller accepts this for the next 10 minutes.")
                         .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     if let note { Label(note, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(Palette.warning) }
@@ -301,7 +301,7 @@ struct BlindSettingsView: View {
                 Toggle("Show this blind", isOn: Binding(get: { blind.hid == 0 }, set: { shown in blind.hid = shown ? 0 : 1; change { try await $0.setHidden(blind: index, !shown) } }))
             } footer: { Text("Turn off for a port with nothing plugged in.") }
             Section {
-                Button("Set Up Positions", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
+                Button("Set Up Marks", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
             } footer: { Text("Mark where this blind is closed up, open, and closed down.") }
             Section {
                 Button { checkMotor() } label: {

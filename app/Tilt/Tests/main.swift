@@ -50,9 +50,9 @@ check(empty.isLow && empty.tooLowToMove, "too low to move is low even while char
 
 // ---- asleep / not reachable wording
 let seenAt = Date(timeIntervalSince1970: 1_800_000_000)
-check(TiltWords.away(asleep: true, lastSeen: seenAt.addingTimeInterval(-30), now: seenAt) == "Asleep · seen just now", "asleep, seen moments ago")
-check(TiltWords.away(asleep: false, lastSeen: nil) == "Not reachable", "never seen")
-check(TiltWords.away(asleep: false, lastSeen: seenAt.addingTimeInterval(-7200), now: seenAt).hasPrefix("Not reachable · last seen 2"), "unreachable, with when it was last seen")
+check(TiltWords.away(lastSeen: seenAt.addingTimeInterval(-30), now: seenAt) == "Unreachable · last seen just now", "unreachable, seen moments ago")
+check(TiltWords.away(lastSeen: nil) == "Unreachable", "never seen")
+check(TiltWords.away(lastSeen: seenAt.addingTimeInterval(-7200), now: seenAt).hasPrefix("Unreachable · last seen 2"), "unreachable, with when it was last seen")
 
 // ---- command strings
 check(Api.go(blind: 1, tilt: -100, solo: true) == "/api/go?b=1&t=-100&solo=1", "one blind, solo")

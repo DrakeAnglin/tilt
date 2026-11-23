@@ -20,7 +20,7 @@ struct HubView: View {
                         LabeledContent("Address", value: i.ip ?? hub.host ?? "")
                         if let w = i.wifi, w != 0 { LabeledContent("Wi-Fi signal", value: Self.signal(w)) }
                         if let ch = i.ch { LabeledContent("Thread channel", value: "\(ch)") }
-                        if let fw = i.fw { LabeledContent("Firmware", value: fw) }
+                        if let fw = i.fw { HubFirmwareRow(fw: fw, owner: hub.isOwner) }
                         if let up = i.up { LabeledContent("Running for", value: Self.span(up)) }
                     } header: { Text("Tilt Hub") }
                     Section {
@@ -47,7 +47,7 @@ struct HubView: View {
                     Section {
                         ForEach(people) { p in
                             VStack(alignment: .leading, spacing: 6) {
-                                LabeledContent(p.name + (p.me == 1 ? " (this iPhone)" : ""), value: p.wait == 1 ? "Asks to join" : p.owner == 1 ? "Owner" : "User")
+                                LabeledContent(p.name + (p.me == 1 ? " (this iPhone)" : ""), value: p.wait == 1 ? "Asks to join" : p.owner == 1 ? "Owner" : "Guest")
                                 if p.wait == 1, hub.isOwner {
                                     Text("Their iPhone shows the code \(p.code ?? ""). Let them in if it matches.").font(.footnote).foregroundStyle(.secondary)
                                     HStack {
@@ -59,7 +59,7 @@ struct HubView: View {
                             .swipeActions {
                                 if hub.isOwner && p.me == 0 && p.wait != 1 {
                                     Button("Remove") { removing = p }.tint(Palette.danger)
-                                    Button(p.owner == 1 ? "Make User" : "Make Owner") { act { try await hub.makeOwner(cid: p.cid, p.owner != 1) } }.tint(Palette.accent)
+                                    Button(p.owner == 1 ? "Make Guest" : "Make Owner") { act { try await hub.makeOwner(cid: p.cid, p.owner != 1) } }.tint(Palette.accent)
                                 }
                             }
                             .confirmationDialog("Remove \(p.name) from the Tilt Hub?", isPresented: Binding(get: { removing?.cid == p.cid }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
@@ -75,7 +75,7 @@ struct HubView: View {
                             .disabled(hub.everyone == nil)          // the choices depend on who else is in
                             .confirmationDialog("Remove the Tilt Hub?", isPresented: $confirmLeave, titleVisibility: .visible) {
                                 if soleOwner {
-                                    Button("Remove and Reset the Hub's People", role: .destructive) { act { try await hub.resetPeople(); dismiss() } }
+                                    Button("Remove and Reset the Tilt Hub's People", role: .destructive) { act { try await hub.resetPeople(); dismiss() } }
                                     Button("Remove from This iPhone Only", role: .destructive) { hub.forgetHere(); dismiss() }
                                 } else {
                                     Button("Leave the Tilt Hub", role: .destructive) { act { try await hub.leave(); dismiss() } }
@@ -130,8 +130,8 @@ private struct MemberRow: View {
                 if m.notResponding { Label("Not responding", systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(Palette.warning) }
             }
             Text(line).font(.footnote).foregroundStyle(.secondary)
-            if let r = m.rssi, r != 127, r <= -85 { Text("Weak signal: move the hub closer.").font(.footnote).foregroundStyle(Palette.warning) }
-            if m.key == 1 { Text("Connecting the hub to this controller…").font(.footnote).foregroundStyle(.secondary) }
+            if let r = m.signal, r <= -85 { Text("Weak signal: move the hub closer.").font(.footnote).foregroundStyle(Palette.warning) }
+            if m.hubWaiting { Text("Connecting the hub to this controller…").font(.footnote).foregroundStyle(.secondary) }
         }
         .padding(.vertical, 2)
     }
@@ -139,7 +139,47 @@ private struct MemberRow: View {
         var parts: [String] = []
         if m.pct >= 0 { parts.append("Battery \(m.pct)%") }
         if m.seenS >= 0 { parts.append(m.seenS < 90 ? "checked in just now" : "checked in \(HubView.span(m.seenS)) ago") }
-        if m.rssi == nil || m.rssi == 127 { parts.append("not on the hub's network") }
+        if m.signal == nil { parts.append("not on the hub's network") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The hub's firmware: "Latest", or (owners) an update from the release list.
+private struct HubFirmwareRow: View {
+    @Environment(HubWatch.self) private var hub
+    let fw: String
+    let owner: Bool
+    @State private var busy: String?
+    @State private var problem: String?
+    private var updates: FirmwareUpdates { .shared }
+    var body: some View {
+        let next = updates.hub.flatMap { Api.version(fw).lexicographicallyPrecedes(Api.version($0.version)) ? $0 : nil }
+        HStack {
+            Text("Firmware").lineLimit(1)
+            Spacer(minLength: 8)
+            Text(fw).foregroundStyle(.secondary)
+            if next == nil && updates.hub != nil {
+                HStack(spacing: 3) { Image(systemName: "checkmark.circle.fill"); Text("Latest") }
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Palette.good).lineLimit(1).fixedSize()
+            }
+        }
+        .task { await updates.check() }
+        if owner, let next {
+            Button { update(next) } label: {
+                HStack { Label("Update Tilt Hub to \(next.version)", systemImage: "arrow.down.circle"); Spacer(); if busy != nil { ProgressView() } }
+            }.disabled(busy != nil)
+            if let busy { Text(busy).font(.footnote).foregroundStyle(.secondary) }
+            if let problem { Label(problem, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(Palette.warning) }
+        }
+    }
+    private func update(_ r: FirmwareRelease) {
+        busy = "Downloading…"; problem = nil
+        Task {
+            defer { busy = nil }
+            do {
+                let file = try await updates.download(r)
+                try await hub.updateHub(file, to: r.version) { s in Task { @MainActor in busy = s } }
+            } catch { problem = error.localizedDescription }
+        }
     }
 }

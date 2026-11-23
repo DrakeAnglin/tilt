@@ -121,14 +121,14 @@ struct RoomCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))      // nothing pokes past the edge mid-move
         .card()
         .geometryGroup()                // the inside moves with the card as it changes size, not each piece by itself
-        .opacity(controller.reach == .online || controller.state == nil ? 1 : 0.75)
+        .opacity(controller.reach != .unreachable || controller.state == nil ? 1 : 0.75)
     }
     private func top(_ s: ControllerState?, _ shown: [BlindState]) -> some View {
            VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(s?.name ?? controller.record.name).font(.title3.weight(.semibold)).lineLimit(1).fixedSize()      // never cut short mid-move
-                    Text(controller.reach == .online ? (s.map(TiltWords.room) ?? "Connecting…") : controller.awayLine).font(.subheadline).foregroundStyle(controller.reach == .unreachable ? Palette.warning : .secondary).lineLimit(1).fixedSize()
+                    Text(controller.reach != .unreachable ? (s.map(TiltWords.room) ?? "Connecting…") : controller.awayLine).font(.subheadline).foregroundStyle(controller.reach == .unreachable ? Palette.warning : .secondary).lineLimit(1).fixedSize()
                 }
                 .layoutPriority(1)
                 Spacer(minLength: 6)
@@ -157,10 +157,10 @@ private struct NextStep: View {
         let todo = state.b.indices.first { state.b[$0].listed && state.b[$0].cal == 0 }
         if let i = todo, controller.record.owner {
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(state.b[i].name) is plugged in. Mark its open and closed positions once, and it is ready to use.")
+                Text("\(state.b[i].name) is plugged in. Set its marks once, and it is ready to use.")
                     .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button { wizard = i } label: {
-                    Label("Mark Positions", systemImage: "slider.horizontal.below.rectangle").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity)
+                    Label("Set Marks", systemImage: "slider.horizontal.below.rectangle").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
             }
@@ -168,7 +168,7 @@ private struct NextStep: View {
                 SetupWizard(controller: controller, index: w.id, name: state.b[safe: w.id]?.name ?? "Blind")
             }
         } else if todo != nil {
-            Label("An owner needs to mark these blinds' positions before they can move.", systemImage: "lock").font(.subheadline).foregroundStyle(.secondary)
+            Label("An owner needs to set these blinds' marks before they can move.", systemImage: "lock").font(.subheadline).foregroundStyle(.secondary)
         } else {
             Label("No blind plugged in yet. Plug one into the controller and it shows up here.", systemImage: "cable.connector").font(.subheadline).foregroundStyle(.secondary)
         }

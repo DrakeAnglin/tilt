@@ -86,6 +86,23 @@ To share the blinds, the Owner invites the people they live with from the room's
 Each controller makes its own setup code. **Show each blind separately** (same section) chooses one tile per blind or
 one for the room; changing it restarts the controller.
 
+## The Tilt Hub
+
+One hub serves every controller in the home. It stays plugged in.
+
+| Part | Notes |
+|---|---|
+| ESP32-C6 dev board, 4 MB flash (for example ESP32-C6-DevKitC-1) | Wi-Fi, Thread and Bluetooth on one chip |
+| USB-C cable and a 5 V USB wall plug (1 A is plenty) | always on |
+| A label | the 8-digit setup code `build.sh` prints on its first build |
+
+1. Copy `firmware/tilt_hub/main/secrets.h.example` to `secrets.h` and fill in the Wi-Fi network.
+2. `firmware/tilt_hub/build.sh -p <USB port> flash`. The first build makes the setup code: put it on the label.
+3. In the Tilt app, the Blinds page shows "New Tilt Hub found": Connect, and type the code.
+
+A printed case for the hub is not designed yet. Later updates come over Wi-Fi (`tools/flash_hub.sh`, or "Update
+Tilt Hub" on the hub page in the app).
+
 ## If something is wrong
 - PCB readings: [PCB build, "If something reads wrong"](pcb-build.md#if-something-reads-wrong).
 - A blind moves the wrong way: nothing to rewire. The motor leads can go either way round; on its first moves the

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build the Tilt Hub firmware. Extra arguments go to idf.py (for example: ./build.sh -p /dev/cu.usbmodemXXXX flash monitor).
-# Wi-Fi comes from ../blinds_matter/main/secrets.h (not in Git) until Apple Home gives the hub its network.
+# Wi-Fi comes from main/secrets.h (not in Git; copy main/secrets.h.example) until Apple Home gives the hub its network.
 cd "$(dirname "$0")"
 . ~/esp/esp-idf/export.sh > /dev/null 2>&1
 . ~/esp/esp-matter/export.sh > /dev/null 2>&1

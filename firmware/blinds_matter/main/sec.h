@@ -26,6 +26,7 @@
 #include "logic.h"                               // nonceFresh, permitRule
 #include "store.h"                               // nvs, event, cleanText
 #include "lock.h"                                // mx
+#include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm (shared with the Tilt Hub)
 
 const int MAX_KEYS = 8;
 struct ClientKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // used 1 = paired, 2 = asked to join, waiting for an owner; role 1 = owner
@@ -72,12 +73,6 @@ void secBegin() {
 }
 bool owned() { for (auto &k : keys) if (k.used == 1) return true; return false; }
 int asksWaiting() { int n = 0; for (auto &k : keys) if (k.used == 2) n++; return n; }
-std::string hexOf(const uint8_t *b, int n) { static const char *H = "0123456789abcdef"; std::string s; for (int i = 0; i < n; i++) { s += H[b[i] >> 4]; s += H[b[i] & 15]; } return s; }
-bool unhex(const std::string &s, uint8_t *out, size_t n) {
-  if (s.length() != n * 2) return false;
-  for (size_t i = 0; i < n; i++) { char h[3] = {s[2 * i], s[2 * i + 1], 0}; char *e; out[i] = strtol(h, &e, 16); if (*e) return false; }
-  return true;
-}
 std::string jsonStr(const std::string &j, const char *key) {      // the string value of "key" in a flat JSON object
   std::string k = std::string("\"") + key + "\"";
   size_t i = j.find(k);
@@ -93,9 +88,6 @@ std::string jsonStr(const std::string &j, const char *key) {      // the string 
     out += j[p];
   }
   return "";
-}
-bool hmac256(const uint8_t *key, size_t kn, const uint8_t *d, size_t dn, uint8_t out[32]) {
-  return mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), key, kn, d, dn, out) == 0;
 }
 // The proof on a message between the hub and this controller: the first 16 bytes of HMAC-SHA256 with the link key
 // (HMAC of the hub's key with "tilt-hub-link"), over a label and the message, in hex. "" when there is no hub key.
@@ -121,15 +113,6 @@ bool hubMacOk(const std::string &what, const std::string &mac) {
   uint8_t d = 0;
   for (size_t i = 0; i < want.size(); i++) d |= want[i] ^ mac[i];
   return d == 0;
-}
-bool gcm(bool enc, const uint8_t key[32], const uint8_t nonce[12], const uint8_t *aad, size_t an, const uint8_t *in, size_t n, uint8_t *out, uint8_t tag[16]) {
-  mbedtls_gcm_context g;
-  mbedtls_gcm_init(&g);
-  bool ok = mbedtls_gcm_setkey(&g, MBEDTLS_CIPHER_ID_AES, key, 256) == 0;
-  if (ok) ok = enc ? mbedtls_gcm_crypt_and_tag(&g, MBEDTLS_GCM_ENCRYPT, n, nonce, 12, aad, an, in, out, 16, tag) == 0
-                   : mbedtls_gcm_auth_decrypt(&g, n, nonce, 12, aad, an, tag, 16, in, out) == 0;
-  mbedtls_gcm_free(&g);
-  return ok;
 }
 std::string body(httpd_req_t *r, size_t maxLen) {
   std::string b;

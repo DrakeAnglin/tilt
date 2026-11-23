@@ -78,7 +78,7 @@ esp_err_t hHome(httpd_req_t *r) {
   Lock l;
   std::string b = arg(r, "b");
   int one = b == "all" || b.empty() ? -1 : constrain(atoi(b.c_str()), 0, PORTS - 1), lift = argi(r, "lift");
-  if (!homeLiftValid(lift)) return fail(r, "bad position");
+  if (!homeLiftValid(lift)) return fail(r, "bad tilt");
   MoveResult m = moveBlinds(moveAsk(FROM_HOME, one, tiltOfHomeLift(lift, cfg.closeUp)));
   event("Home (hub): %d %% closed (%d blind%s)", lift / 100, m.started, m.started == 1 ? "" : "s");
   return m.started ? ok(r) : fail(r, m.why);

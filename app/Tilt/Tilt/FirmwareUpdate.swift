@@ -25,6 +25,8 @@ final class FirmwareUpdates {
 
     private(set) var stable: FirmwareRelease?
     private(set) var beta: FirmwareRelease?
+    /// The newest Tilt Hub firmware (the hub page offers it).
+    private(set) var hub: FirmwareRelease?
     private var checkedAt: Date?
 
     var source: URL? {
@@ -44,10 +46,10 @@ final class FirmwareUpdates {
     func check(force: Bool = false) async {
         if !force, let t = checkedAt, Date().timeIntervalSince(t) < 3600 { return }
         guard let url = source else { return }
-        struct Listing: Decodable { let stable: FirmwareRelease?; let beta: FirmwareRelease? }
+        struct Listing: Decodable { let stable: FirmwareRelease?; let beta: FirmwareRelease?; let hub: FirmwareRelease? }
         guard let (d, r) = try? await URLSession.shared.data(from: url), (r as? HTTPURLResponse)?.statusCode == 200,
               let l = try? JSONDecoder().decode(Listing.self, from: d) else { return }
-        stable = l.stable; beta = l.beta; checkedAt = Date()
+        stable = l.stable; beta = l.beta; hub = l.hub; checkedAt = Date()
     }
 
     /// Download a release and check it is the file the list describes.
