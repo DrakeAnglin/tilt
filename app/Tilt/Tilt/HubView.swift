@@ -166,7 +166,7 @@ private struct HubFirmwareRow: View {
         .task { await updates.check() }
         if owner, let next {
             Button { update(next) } label: {
-                HStack { Label("Update Tilt Hub to \(next.version)", systemImage: "arrow.down.circle"); Spacer(); if busy != nil { ProgressView() } }
+                HStack { Label("Update Tilt Hub to \(next.version)", systemImage: "arrow.down.circle"); Spacer(); if busy != nil { SlatLoader(size: 18) } }
             }.disabled(busy != nil)
             if let busy { Text(busy).font(.footnote).foregroundStyle(.secondary) }
             if let problem { Label(problem, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(Palette.warning) }

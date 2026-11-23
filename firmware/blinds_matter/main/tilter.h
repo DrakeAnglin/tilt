@@ -24,6 +24,10 @@ const float END_STALL_DEG = 10.0f;              // a stall this close to a close
 // way (its wires swapped since the direction was learned). More than a hand on the wand would do in one go.
 const float WRONG_WAY_DEG = 20.0f;
 
+// Seek: the end is where the rod has not gained SEEK_STEP_DEG in its direction of travel for SEEK_STALL_MS (it has to
+// first move SEEK_START_DEG either way to know which way that is). Jitter at a stall is about +-1.5 degrees.
+const float SEEK_STEP_DEG = 2.5f, SEEK_START_DEG = 5.0f;
+const uint32_t SEEK_STALL_MS = 1200;
 enum { MV_NONE, MV_TILT, MV_ANGLE, MV_JOG };
 enum { MS_WAKE, MS_RUN, MS_SETTLE, MS_PULSE, MS_POST };
 struct Move {
@@ -43,6 +47,12 @@ struct Move {
   float lastA = NAN;
   int lastDir = 0, turnBacks = 0;
   const char *endMsg = nullptr;
+  // Seek (setup: run to an end): progress is counted only one way, so the reading's jitter while the motor strains at
+  // the end can't look like movement. seekDir: which way the angle goes (0 until it has clearly moved).
+  bool seek = false;
+  int seekDir = 0;
+  float seekRef = NAN;
+  uint32_t seekT = 0;
   const char *why = nullptr;    // forced stop reason
   bool motorOn = false;         // the motor is driven just now
   float noted = NAN;            // the last true reading (motor stopped); NAN = no tilter
@@ -194,6 +204,13 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
       sp = m.pct;
       if (el < RAMP_MS) sp = std::min(sp, (int)(START_DUTY + (sp - START_DUTY) * (int)el / (int)RAMP_MS));
       drive(m, t, m.jogDir, sp);
+      if (m.seek && el > m.grace && !std::isnan(m.fAng) && !t.noReading()) {
+        if (std::isnan(m.seekRef)) { m.seekRef = m.fAng; m.seekT = now; }
+        float d = angDiff(m.fAng, m.seekRef);
+        bool ahead = m.seekDir ? d * m.seekDir >= SEEK_STEP_DEG : fabsf(d) >= SEEK_START_DEG;
+        if (ahead) { if (!m.seekDir) m.seekDir = d > 0 ? 1 : -1; m.seekRef = m.fAng; m.seekT = now; }
+        else if (now - m.seekT >= SEEK_STALL_MS) { m.stalled = true; toSettle(m, t, nullptr); return; }   // at the end
+      }
     } else {
       float e = moveErr(m, t, a);
       int want = e > 0 ? 1 : -1;
@@ -205,7 +222,8 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
       if (el < RAMP_MS) sp = std::min(sp, (int)(START_DUTY + (sp - START_DUTY) * (int)el / (int)RAMP_MS));
       drive(m, t, m.angDir * msignOf(t), sp);
       // Clearly going the wrong way (not a hand on the wand: that is one jump, this keeps growing): turn round.
-      if (el > m.grace && fabsf(moveErr(m, t, m.fAng)) > m.runErr + WRONG_WAY_DEG && tryFlip(m, t, a)) return;
+      // Not while the sensor is in its blind spot near zero: the reading there is only the last good one.
+      if (el > m.grace && !t.noReading() && fabsf(moveErr(m, t, m.fAng)) > m.runErr + WRONG_WAY_DEG && tryFlip(m, t, a)) return;
     }
     if (el > m.grace && now - m.spT >= 500) {           // speed, for the log (after the gear play is taken up)
       float v = fabsf(angDiff(m.fAng, m.spRef)) * 1000.0f / (now - m.spT);

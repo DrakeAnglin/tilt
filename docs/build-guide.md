@@ -68,9 +68,10 @@ Install **Tilt** from the App Store on an iPhone or iPad on your home Wi-Fi. Plu
 1. Power the controller (plug in its cell). A new controller shows up in the app for 15 minutes after power-on.
 2. The app says **New controller found**: tap **Set Up**, pick it under **New, over Bluetooth**, then **Connect to the
    Tilt Hub**. The first phone to set it up is its **Owner**. It shows up in Apple Home by itself, through the hub.
-3. Open the room and use the gear to set up each blind. The app asks for three **Marks**: turn the wand until the
-   slats are **closed up**, then **level (open)**, then **closed down**, and save each one. Then try each position:
-   the blind now moves by itself.
+3. Open the room, use the gear, pick a blind and tap **Set Up**. The app asks for three **Marks**: turn the wand
+   until the slats are **closed up**, then **level (open)**, then **closed down**, and save each one. The blind then
+   moves to Open by itself. That first move checks the motor's wiring: if the wires are the other way round, the
+   controller turns it round and remembers it, so nothing needs rewiring. Then try each position.
 4. In the room's settings, name the blinds, and pick which way **"Close"** tilts the slats (up or down).
 5. Put the tilters and the box in their headrails, push the rods through, and check each blind once more.
 

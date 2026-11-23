@@ -288,8 +288,6 @@ struct BlindSettingsView: View {
     let reload: () async -> Void
     @State private var name = ""
     @State private var settingUp = false
-    @State private var checking = false
-    @State private var motorNote: String?
 
     var body: some View {
         Form {
@@ -301,14 +299,8 @@ struct BlindSettingsView: View {
                 Toggle("Show this blind", isOn: Binding(get: { blind.hid == 0 }, set: { shown in blind.hid = shown ? 0 : 1; change { try await $0.setHidden(blind: index, !shown) } }))
             } footer: { Text("Turn off for a port with nothing plugged in.") }
             Section {
-                Button("Set Up Marks", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
-            } footer: { Text("Mark where this blind is closed up, open, and closed down.") }
-            Section {
-                Button { checkMotor() } label: {
-                    HStack { Label("Check Motor Direction", systemImage: "arrow.left.arrow.right"); Spacer(); if checking { ProgressView() } }
-                }.disabled(checking)
-                if let motorNote { Text(motorNote).font(.footnote).foregroundStyle(.secondary) }
-            } footer: { Text("If this blind goes the wrong way (its motor wires were swapped), turn the slats to about halfway and tap this: it turns a little each way and learns how the motor is wired.") }
+                Button("Start Setup", systemImage: "slider.horizontal.below.rectangle") { settingUp = true }
+            } footer: { Text("Checks which way the motor turns, then saves where this blind is closed up, open, and closed down.") }
         }
             .listRowBackground(RowGlass())      // rows are glass over the sky, not solid white
         }
@@ -319,12 +311,5 @@ struct BlindSettingsView: View {
     }
     private func change(_ what: @escaping (ControllerClient) async throws -> Void) {
         Task { try? await what(controller.client); await reload() }
-    }
-    private func checkMotor() {
-        checking = true; motorNote = nil
-        Task {
-            defer { checking = false }
-            motorNote = await MotorCheck.run(controller, blind: index) ?? "Done: the controller knows which way this motor turns."
-        }
     }
 }

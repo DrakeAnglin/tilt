@@ -1,5 +1,6 @@
-// Teaching a blind its three marks. First the motor turns a little each way, so the controller learns which way it is
-// wired; then you turn the blind by hand to each mark and save it.
+// Teaching a blind its three marks: you turn the wand to each mark and save it. Then the blind moves to Open by
+// itself, and that first move checks the motor's wiring: if it starts the wrong way, the controller turns it round and
+// remembers it (firmware tilter.h), so swapped motor wires need no rewiring.
 import SwiftUI
 
 struct SetupWizard: View {
@@ -7,7 +8,9 @@ struct SetupWizard: View {
     let controller: Controller
     let index: Int
     let name: String
-    @State private var step = -1                // -1: check the motor first
+    @State private var step = 0
+    @State private var wiring: String?            // what the first move found out about the motor's wiring
+    @State private var checking = false
     @State private var problem: String?
     @State private var busy = false
     @State private var lastAngle: Double?
@@ -24,19 +27,7 @@ struct SetupWizard: View {
         let blind = controller.state?.b[safe: index]
         NavigationStack {
             VStack(spacing: 0) {
-                if step < 0 {
-                    Text("FIRST").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-                    Text("Check the motor").font(.system(size: 30, weight: .bold, design: .rounded)).padding(.top, 2)
-                    SlatView(tilt: 50, slats: 11).frame(maxWidth: 300).frame(height: 300).padding(.vertical, 20)
-                    Text("Turn the wand so the slats are about halfway, not shut. Then tap Check Motor: the blind turns a little one way and back, so the controller learns which way its motor is wired.")
-                        .font(.body).multilineTextAlignment(.center).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).padding(.top, 12) }
-                    Spacer(minLength: 12)
-                    Button { checkMotor() } label: {
-                        HStack { if busy { ProgressView().tint(Palette.onAccent) }; Text(busy ? "Turning…" : "Check Motor").font(.headline) }.frame(maxWidth: .infinity).padding(.vertical, 6)
-                    }
-                    .buttonStyle(.glassProminent).controlSize(.large).disabled(busy || blind?.pres == 0)
-                } else if step < 3 {
+                if step < 3 {
                     let s = steps[step]
                     HStack(spacing: 6) {
                         ForEach(0..<3, id: \.self) { i in Capsule().fill(i <= step ? Palette.accent : Color.primary.opacity(0.15)).frame(height: 5) }
@@ -54,10 +45,10 @@ struct SetupWizard: View {
                         .font(.subheadline.weight(.medium)).foregroundStyle(steady && blind?.pres != 0 ? Palette.good : Color.secondary)
                         .padding(.horizontal, 14).padding(.vertical, 8).card(radius: 20).padding(.top, 16)
                         .animation(.default, value: steady)
-                    if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).padding(.top, 12) }
+                    if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).padding(.top, 12) }
                     Spacer(minLength: 12)
                     Button { mark(s.mark) } label: {
-                        HStack { if busy { ProgressView().tint(Palette.onAccent) }; Text(busy ? "Saving…" : s.save).font(.headline) }.frame(maxWidth: .infinity).padding(.vertical, 6)
+                        HStack { if busy { SlatLoader(size: 18).tint(Palette.onAccent) }; Text(busy ? "Saving…" : s.save).font(.headline) }.frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
                     .buttonStyle(.glassProminent).controlSize(.large).disabled(busy || blind?.pres == 0)
                     .sensoryFeedback(.success, trigger: step)
@@ -65,18 +56,27 @@ struct SetupWizard: View {
                 } else {
                     Spacer()
                     Image(systemName: "checkmark.circle.fill").font(.system(size: 64)).foregroundStyle(Palette.good)
-                    Text("\(name) is set up").font(.system(size: 28, weight: .bold, design: .rounded)).padding(.top, 10)
-                    Text("Try each one. The blind moves by itself now.").font(.body).foregroundStyle(.secondary).padding(.top, 2)
+                    Text("\(name) is ready").font(.system(size: 28, weight: .bold, design: .rounded)).padding(.top, 10)
+                    Group {
+                        if checking {
+                            HStack(spacing: 8) { SlatLoader(size: 16); Text("Moving to Open to check the motor wiring…") }
+                        } else if let wiring {
+                            Label(wiring, systemImage: "checkmark.circle").foregroundStyle(Palette.good)
+                        }
+                    }
+                    .font(.subheadline).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).padding(.top, 8)
+                    if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(Palette.warning).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).padding(.top, 8) }
+                    Text("Try each one. The blind moves by itself now.").font(.body).foregroundStyle(.secondary).padding(.top, 8)
                     HStack(spacing: 10) {
                         PositionButton(title: "Close Down", systemImage: "chevron.down") { controller.go(blind: index, tilt: -100, solo: true) }
                         PositionButton(title: "Open", systemImage: "sun.max.fill") { controller.go(blind: index, tilt: 0, solo: true) }
                         PositionButton(title: "Close Up", systemImage: "chevron.up") { controller.go(blind: index, tilt: 100, solo: true) }
                     }
-                    .padding(.top, 24)
+                    .padding(.top, 24).disabled(checking)
                     Text(blind.map(TiltWords.status) ?? "").font(.subheadline).foregroundStyle(.secondary).padding(.top, 12)
                     Spacer()
                     Button { dismiss() } label: { Text("Done").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6) }.buttonStyle(.glassProminent).controlSize(.large)
-                    Button("Set Up Again") { step = 0; problem = nil }.padding(.top, 10)
+                    Button("Redo Setup") { step = 0; problem = nil; wiring = nil }.padding(.top, 10)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 16)
@@ -106,11 +106,33 @@ struct SetupWizard: View {
         .interactiveDismissDisabled()
     }
 
-    private func checkMotor() {
-        busy = true; problem = nil
+    /// The first move after setup: to Open. The controller watches which way the angle goes; if the motor's wires are
+    /// swapped it turns round and keeps that. Reported from the controller's developer view ("sign": -1 = swapped).
+    private func checkWiring() {
+        checking = true; problem = nil; wiring = nil
         Task {
-            defer { busy = false }
-            if let p = await MotorCheck.run(controller, blind: index) { problem = p } else { step = 0 }
+            defer { checking = false }
+            do {
+                try await controller.client.go(blind: index, tilt: 0, solo: true)
+                let t0 = Date()
+                var seenMoving = false
+                while Date().timeIntervalSince(t0) < 30 {
+                    try await Task.sleep(for: .milliseconds(700))
+                    guard let b = try? await controller.client.state().b[safe: index] else { continue }
+                    if b.moving { seenMoving = true; continue }
+                    if seenMoving || Date().timeIntervalSince(t0) > 4 {
+                        if !b.last.localizedCaseInsensitiveContains("reached") && !b.last.localizedCaseInsensitiveContains("already") {
+                            problem = "The blind did not reach Open (\(b.last)). Check it turns freely, then tap Open."
+                            return
+                        }
+                        break
+                    }
+                }
+                let dev = await controller.client.developerInfo()
+                let sign = ((dev["p"] as? [[String: Any]])?[safe: index]?["sign"] as? Int) ?? 0
+                wiring = sign < 0 ? "Motor checked: its wires are the other way round. The controller has learned that, nothing to rewire."
+                                  : "Motor checked: it turns the right way."
+            } catch { problem = error.localizedDescription }
         }
     }
     private func mark(_ which: String) {
@@ -127,6 +149,7 @@ struct SetupWizard: View {
                     return
                 }
                 step += 1
+                if step == 3 { checkWiring() }
             } catch { problem = error.localizedDescription }
         }
     }
@@ -150,39 +173,5 @@ struct HoldButton: View {
             }
             .sensoryFeedback(.impact, trigger: held)
             .accessibilityAddTraits(.isButton)
-    }
-}
-
-/// Which way a blind's motor is wired: it turns a little one way and back, and the controller learns the direction
-/// from how its angle moved (it keeps it, so swapped motor wires never send a blind the wrong way).
-enum MotorCheck {
-    /// nil when it worked, else what to tell the user.
-    static func run(_ c: Controller, blind i: Int) async -> String? {
-        // One way until the angle has clearly moved; if that way is against an end stop, the other way.
-        for dir in [1, -1] {
-            guard let moved = await turn(c, blind: i, dir: dir) else { return "The controller did not answer. Try again." }
-            if abs(moved) >= 6 {
-                _ = await turn(c, blind: i, dir: -dir)        // back to where it was
-                return nil
-            }
-        }
-        return "The blind did not turn. Turn the wand so the slats are about halfway, check the cable, and try again."
-    }
-    /// Holds the motor one way (up to 5 s) until the angle has moved 8 degrees. Returns how far it moved, nil if no answer.
-    private static func turn(_ c: Controller, blind i: Int, dir: Int) async -> Double? {
-        guard let a0 = try? await c.client.state().b[safe: i]?.ang else { return nil }
-        let start = Date()
-        while Date().timeIntervalSince(start) < 5 {
-            await c.client.jog(blind: i, dir: dir, percent: 80, ms: 700)
-            if let a = try? await c.client.state().b[safe: i]?.ang, abs(diff(a0, a)) >= 8 { break }
-        }
-        try? await Task.sleep(for: .seconds(1.5))           // stops and settles; the controller learns the direction now
-        guard let a1 = try? await c.client.state().b[safe: i]?.ang else { return nil }
-        return diff(a0, a1)
-    }
-    private static func diff(_ a: Double, _ b: Double) -> Double {
-        var d = (b - a).truncatingRemainder(dividingBy: 360)
-        if d > 180 { d -= 360 } else if d < -180 { d += 360 }
-        return d
     }
 }

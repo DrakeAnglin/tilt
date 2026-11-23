@@ -79,28 +79,33 @@ struct SplashView: View {
     }
 }
 
-/// The icon's three slats, tilting back and forth: the app's "working on it" sign.
+/// The icon's three slats, tilting open and shut: the app's one "working on it" sign. Use it everywhere instead of a
+/// spinner.
+/// Each slat turns about its long side, toward and away from you, like a real blind (never a seesaw or a slide in the
+/// plane of the screen). The angle comes from the clock in a TimelineView, not from a repeating animation: a
+/// repeating animation also catches the row's own layout as a list or form loads, which made the slats slide left and
+/// right.
 struct SlatLoader: View {
     var size: CGFloat = 44
     var label: String? = nil
     @Environment(\.accessibilityReduceMotion) private var calm
-    @State private var on = false
     var body: some View {
         VStack(spacing: size * 0.32) {
-            VStack(spacing: size * 0.15) {
-                ForEach(0..<3, id: \.self) { i in
-                    // A slat tilts about its long side, toward and away from you, like a real blind opening and
-                    // closing (not a seesaw turn in the plane of the screen).
-                    RoundedRectangle(cornerRadius: size * 0.04).fill(.tint)
-                        .frame(width: size, height: size * 0.2)
-                        .rotation3DEffect(.degrees(on ? 72 : 8), axis: (x: 1, y: 0, z: 0), perspective: 0.4)
-                        .animation(calm ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true).delay(0.12 * Double(i)), value: on)
+            TimelineView(.animation(paused: calm)) { tl in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                VStack(spacing: size * 0.15) {
+                    ForEach(0..<3, id: \.self) { i in
+                        RoundedRectangle(cornerRadius: size * 0.04).fill(.tint)
+                            .frame(width: size, height: size * 0.2)
+                            .rotation3DEffect(.degrees(calm ? 40 : Self.tilt(t - 0.12 * Double(i))), axis: (x: 1, y: 0, z: 0), perspective: 0.4)
+                    }
                 }
             }
-            .frame(height: size * 0.95)
+            .frame(width: size, height: size * 0.95)
             if let label { Text(label).font(.subheadline).foregroundStyle(.secondary) }
         }
-        .onAppear { on = true }
         .accessibilityElement().accessibilityLabel(label ?? "Loading")
     }
+    /// 8 degrees (nearly flat to you) to 72 (nearly edge-on) and back, every 1.4 s, eased at both ends.
+    private static func tilt(_ t: Double) -> Double { 8 + 64 * (0.5 - 0.5 * cos(2 * .pi * t / 1.4)) }
 }

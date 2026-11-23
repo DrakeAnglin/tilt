@@ -65,7 +65,10 @@ float readAngle(int p) {
     if (sh >= 0) { capLast[p] = sh; capLastMs[p] = t ? t : 1; }
     else if (capLastMs[p] && t - capLastMs[p] < 200) sh = capLast[p];     // a few frames lost to noise: keep the last good one
     bs[p].blind = sh < 0;
-    if (sh < 0) sh = 0;                       // no pulses for a while: resting low (just above zero) or high (just below a full turn)
+    // No pulses for a while: the sensor is within a few degrees of its zero (resting low just above it, or high just
+    // below a full turn). Keep the last good reading, which is on the right side of zero; a flat 0 there could be read
+    // as a jump of tens of degrees (a blind turning through zero then looked like it was going the wrong way).
+    if (sh < 0) sh = capLastMs[p] ? capLast[p] : 0;
     bs[p].mv = sh * 3300.0f;                  // shown on the developer page in place of the voltage
     return sh * 360.0f;
   }
@@ -256,14 +259,17 @@ const char *startAngle(int p, float deg) {    // developer: go to a raw sensor a
   MVX.tgt = fmodf(deg + 360.0f, 360.0f);
   return nullptr;
 }
-const char *jog(int p, int d, int pct, uint32_t ms) {   // hold-to-run: call again before the time is up
+// Hold-to-run: call again before the time is up. seek (setup): one long run that ends on its own when the motor stalls
+// at an end (the stall check below reads the sensor every few ms), so the phone doesn't judge the end over a slow link.
+const char *jog(int p, int d, int pct, uint32_t ms, bool seek) {
   if (p < 0 || p >= PORTS) return "no such blind";
   if (!battOkToMove()) return "battery too low";
-  ms = min(ms, (uint32_t)2000);
+  ms = min(ms, (uint32_t)(seek ? 30000 : 2000));
   Use u(p);
   if (MVX.kind == MV_JOG && MVX.jogDir == d) { MVX.deadline = millis() + ms; MVX.pct = pct; return nullptr; }
   beginMove(MV_JOG, p);
   MVX.jogDir = d;
+  MVX.seek = seek;
   MVX.pct = pct;
   MVX.deadline = millis() + ms + 30;
   return nullptr;
@@ -362,7 +368,9 @@ void watchTick(uint32_t now) {                 // from motionTick, only while no
   if (!watchOn) { digitalWrite(P_EN[watchPort], HIGH); delay(20); senseWake(watchPort); watchOn = true; }
   if (now - last >= 100) { last = now; noteAngle(watchPort, readAngle(watchPort)); if (handBusy) handTick(now); }
 }
-// A reading for a mark: the sensor has to hold still (within 1 degree) for 0.6 s. Returns NAN if it does not.
+// A reading for a mark: the sensor has to hold still for 0.6 s. A still PWM reading wanders about +-1.5 degrees (brush
+// noise on the shared wires), so "still" is within STEADY_DEG; a wand being turned moves far more. Returns NAN if not.
+const float STEADY_DEG = 3.5f;
 float steadyAngle(int p) {
   float a0 = readAngle(p), lo = 0, hi = 0, sum = 0;
   for (int k = 0; k < 12; k++) {
@@ -370,7 +378,7 @@ float steadyAngle(int p) {
     float d = angDiff(readAngle(p), a0);
     lo = min(lo, d); hi = max(hi, d); sum += d;
   }
-  if (hi - lo > 1.0f) return NAN;
+  if (hi - lo > STEADY_DEG) return NAN;
   return fmodf(a0 + sum / 12 + 360.0f, 360.0f);
 }
 // ---- marks (setup): take the blind's present position as closed-up / open / closed-down

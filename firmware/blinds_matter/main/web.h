@@ -17,7 +17,7 @@
 #include "update.h"
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev15"
+#define FW_VERSION "2.3.0-dev20"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 
@@ -194,7 +194,7 @@ esp_err_t hGo(httpd_req_t *r) {
   return m.started ? ok(r) : fail(r, m.why);
 }
 esp_err_t hStop(httpd_req_t *r) { Lock l; moveStop(); return ok(r); }
-esp_err_t hJog(httpd_req_t *r) { Lock l; return done(r, jog(argi(r, "b"), argi(r, "d") < 0 ? -1 : 1, constrain(argi(r, "p"), 30, 100), argi(r, "ms"))); }
+esp_err_t hJog(httpd_req_t *r) { Lock l; return done(r, jog(argi(r, "b"), argi(r, "d") < 0 ? -1 : 1, constrain(argi(r, "p"), 30, 100), argi(r, "ms"), argi(r, "seek") == 1)); }
 esp_err_t hAngle(httpd_req_t *r) { Lock l; return done(r, startAngle(argi(r, "b"), atof(arg(r, "a").c_str()))); }
 esp_err_t hMark(httpd_req_t *r) {
   Lock l;
