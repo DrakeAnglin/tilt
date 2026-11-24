@@ -26,6 +26,15 @@ final class SceneStore {
     /// Read the Scenes from the controllers. `soon`: skip it if they were read a moment ago.
     func load(_ controllers: [Controller], soon: Bool = false) async {
         if soon, Date().timeIntervalSince(lastLoad) < 15 { return }
+        let got = await refresh(controllers)
+        // Scenes never on a controller yet (made before the controllers kept them, or while one could not): put them
+        // there now, once every controller they cover answers, so the other phones see them.
+        for s in scenes where !s.seen && !s.tilts.isEmpty && s.tilts.keys.allSatisfy({ got[$0.controller] != nil }) {
+            try? await save(s, controllers: controllers)
+        }
+    }
+    /// Read every controller's Scenes and put them together with this phone's copy. Returns what each one answered.
+    private func refresh(_ controllers: [Controller]) async -> [String: [SceneSlot]] {
         lastLoad = Date()
         var got: [String: [SceneSlot]] = [:], old: Set<String> = []
         await withTaskGroup(of: (String, [SceneSlot]?, Bool).self) { g in
@@ -41,8 +50,7 @@ final class SceneStore {
         let known = Set(controllers.map(\.id))           // a controller taken off this phone takes its blinds out of the Scenes here
         scenes = ScenePlan.scenes(read: got, kept: scenes.map { var s = $0; s.tilts = s.tilts.filter { known.contains($0.key.controller) }; return s })
         save()
-        // Scenes made before the controllers kept them: put them on the controllers now, so the other phones see them.
-        for s in scenes where s.gid == 0 { try? await save(s, controllers: controllers) }
+        return got
     }
 
     /// Save (or delete) a Scene on every controller it covers, and keep the copy here.
@@ -53,6 +61,8 @@ final class SceneStore {
         s.ver = UInt32(Date().timeIntervalSince1970)
         let name = { (id: String) in controllers.first { $0.id == id }?.state?.name ?? "A controller" }
         let ports = Dictionary(uniqueKeysWithValues: controllers.compactMap { c in c.state.map { (c.id, $0.b.count) } })
+        // A controller that did not answer last time, or had firmware without Scenes, may have since: ask again first.
+        if s.tilts.keys.contains(where: { read[$0.controller] == nil }) { _ = await refresh(controllers) }
         let writes: [SceneWrite]
         do { writes = try ScenePlan.writes(s, delete: delete, read: read, localOnly: localOnly, ports: ports) }
         catch .full(let c) { throw TiltError("\(name(c)) already has \(ScenePlan.perController) scenes.") }
@@ -67,6 +77,7 @@ final class SceneStore {
             await load(controllers)                         // some were written: show what the controllers have now
             throw error
         }
+        s.seen = !s.tilts.keys.contains { localOnly.contains($0.controller) }     // all of it is on the controllers
         if delete { scenes.removeAll { $0.id == s.id } }
         else if let i = scenes.firstIndex(where: { $0.id == s.id }) { scenes[i] = s } else { scenes.append(s) }
         save()

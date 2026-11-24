@@ -15,10 +15,13 @@ struct BlindScene: Identifiable, Codable, Equatable {
     var gid: UInt32 = UInt32.random(in: 1...UInt32.max)
     /// When it was last edited, seconds since 1970.
     var ver: UInt32 = 0
+    /// It has been on a controller. A Scene that never was (made on this phone while its controller could not keep
+    /// Scenes yet, or before they did) is put on the controllers, not taken for one deleted on another phone.
+    var seen = false
 
     init(id: UUID = UUID(), name: String = "New Scene", symbol: String = "sun.max", tilts: [BlindTarget: Int] = [:],
-         gid: UInt32 = UInt32.random(in: 1...UInt32.max), ver: UInt32 = 0) {
-        self.id = id; self.name = name; self.symbol = symbol; self.tilts = tilts; self.gid = gid; self.ver = ver
+         gid: UInt32 = UInt32.random(in: 1...UInt32.max), ver: UInt32 = 0, seen: Bool = false) {
+        self.id = id; self.name = name; self.symbol = symbol; self.tilts = tilts; self.gid = gid; self.ver = ver; self.seen = seen
     }
     // A copy saved by an older app has no gid or ver: it is then not on any controller yet.
     init(from d: Decoder) throws {
@@ -29,6 +32,7 @@ struct BlindScene: Identifiable, Codable, Equatable {
         tilts = try c.decode([BlindTarget: Int].self, forKey: .tilts)
         gid = try c.decodeIfPresent(UInt32.self, forKey: .gid) ?? 0
         ver = try c.decodeIfPresent(UInt32.self, forKey: .ver) ?? 0
+        seen = try c.decodeIfPresent(Bool.self, forKey: .seen) ?? false
     }
     /// The same id on every phone for a Scene first seen on a controller (Shortcuts keep pointing at it).
     static func id(for gid: UInt32) -> UUID {
@@ -51,14 +55,15 @@ enum ScenePlan {
     /// How many Scenes one controller keeps (firmware scenes.h SCENES).
     static let perController = 16
     /// The Scenes, put together from the controllers that answered (`read`), with the phone's copy (`kept`) for the
-    /// controllers that did not. A kept Scene that no answering controller has any more was deleted on another phone:
-    /// only its part on controllers that did not answer is left, or nothing. Kept order first, new ones after.
+    /// controllers that did not. A kept Scene that was on a controller but that no answering controller has any more
+    /// was deleted on another phone: only its part on controllers that did not answer is left, or nothing. A kept Scene
+    /// never seen on a controller stays whole. Kept order first, new ones after.
     static func scenes(read: [String: [SceneSlot]], kept: [BlindScene]) -> [BlindScene] {
         var found: [UInt32: BlindScene] = [:]
         var order: [UInt32] = []
         for c in read.keys.sorted() {
             for sl in read[c]! where sl.gid != 0 {
-                var s = found[sl.gid] ?? BlindScene(id: BlindScene.id(for: sl.gid), name: sl.name, symbol: sl.sym, gid: sl.gid, ver: sl.ver)
+                var s = found[sl.gid] ?? BlindScene(id: BlindScene.id(for: sl.gid), name: sl.name, symbol: sl.sym, gid: sl.gid, ver: sl.ver, seen: true)
                 if found[sl.gid] == nil { order.append(sl.gid) }
                 if sl.ver > s.ver { s.name = sl.name; s.symbol = sl.sym; s.ver = sl.ver }
                 for (p, t) in sl.t.enumerated() where sl.mask >> p & 1 == 1 { s.tilts[BlindTarget(controller: c, blind: p)] = t }
@@ -68,12 +73,13 @@ enum ScenePlan {
         var out: [BlindScene] = []
         for k in kept {
             let away = k.tilts.filter { read[$0.key.controller] == nil }           // its part on controllers that did not answer
-            if k.gid == 0 { out.append(k); continue }                               // not shared yet: SceneStore puts it on the controllers
             if var s = found.removeValue(forKey: k.gid) {
                 s.id = k.id                                                         // the id this phone's Shortcuts know
                 if k.ver > s.ver { s.name = k.name; s.symbol = k.symbol; s.ver = k.ver }
                 s.tilts.merge(away) { now, _ in now }
                 out.append(s)
+            } else if !k.seen {
+                out.append(k)                                                       // never on a controller yet: SceneStore puts it there
             } else if !away.isEmpty {
                 var s = k; s.tilts = away; out.append(s)
             }

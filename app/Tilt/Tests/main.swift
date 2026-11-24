@@ -215,6 +215,11 @@ let away = ScenePlan.scenes(read: ["den": homeScenes["den"]!], kept: [movie])
 check(away[0].tilts[hall(1)] == 0 && away[0].tilts[den(2)] == -50, "a controller that did not answer: its part comes from the phone's copy")
 check((try? ScenePlan.writes(movie, read: ["den": []])) == nil, "saving a Scene with blinds on a controller that did not answer is refused")
 check((try? ScenePlan.writes(movie, read: ["den": []], localOnly: ["hall"]))?.count == 1, "old firmware: its part stays on the phone, the rest is saved")
+// Made while its controller could not keep Scenes yet (old firmware): after the update it is kept, not taken for deleted.
+let onPhone = BlindScene(name: "Read", symbol: "book", tilts: [hall(0): 40], gid: 77, ver: 300)
+let afterUpdate = ScenePlan.scenes(read: ["den": [], "hall": []], kept: [onPhone])
+check(afterUpdate == [onPhone], "a Scene never on a controller survives the controller's update (to be put there)")
+check(ScenePlan.scenes(read: homeScenes, kept: [])[0].seen, "a Scene read from a controller counts as seen")
 // Deleted on another phone: gone here too.
 applyScenes(try ScenePlan.writes(mine[0], delete: true, read: homeScenes), to: &homeScenes)
 check(homeScenes["den"]!.isEmpty && ScenePlan.scenes(read: homeScenes, kept: mine).isEmpty, "a Scene deleted on another phone is gone here too")
