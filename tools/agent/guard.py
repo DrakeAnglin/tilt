@@ -11,11 +11,14 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 
 MERGE = 'merge with tools/agent/merge_pr.sh <pr>, or leave it for the owner.'
 MAIN = 'nothing is pushed to main; open a pull request.'
 HOOK = 'no going around the pre-push hook.'
 LABEL = 'only the owner takes off needs-human or one-way-door.'
+OUT = 'only the owner opens main, by running tools/agent/allow_main.sh in their own terminal. Ask them.'
+ALLOW_FILE = 'factory-allow-main'
 SEPARATORS = {';', '&&', '||', '|', '&', '(', ')', '|&', ';;'}
 # Words that can stand in front of a command without changing what it is.
 PREFIXES = {'command', 'env', 'sudo', 'time', 'nohup', 'exec', 'builtin', 'if', 'then', 'else', 'elif', 'do', 'while',
@@ -84,7 +87,22 @@ def on_main(cwd):
         return False
 
 
+def main_is_open(cwd):
+    """True while the owner's out is open: tools/agent/allow_main.sh wrote a time that has not passed."""
+    try:
+        r = subprocess.run(['git', 'rev-parse', '--git-common-dir'], cwd=cwd or None, capture_output=True, text=True, timeout=5)
+        path = os.path.join(cwd or '', r.stdout.strip(), ALLOW_FILE)
+        return r.returncode == 0 and time.time() < int(open(path).read().strip())
+    except Exception:
+        return False
+
+
 def check_git(args, cwd, state):
+    why = check_git_rules(args, cwd, state)
+    return None if why == MAIN and main_is_open(cwd) else why
+
+
+def check_git_rules(args, cwd, state):
     sub, i, pre = None, 0, args
     while i < len(args):
         a = args[i]
@@ -164,6 +182,8 @@ def check_gh(args):
 def check(line, cwd=None, depth=0, state=None):
     """Why this command line is blocked, or None when it is fine."""
     state = {} if state is None else state
+    if ALLOW_FILE in line:                  # anywhere in the line: a redirect can write it
+        return OUT
     try:
         cmds = commands(line)
     except ValueError:
@@ -178,6 +198,8 @@ def check(line, cwd=None, depth=0, state=None):
                 break
         if not words:
             continue
+        if any(os.path.basename(w) == 'allow_main.sh' for w in words):
+            return OUT
         name = os.path.basename(words[0])
         if name in RUNNERS:                 # timeout 60 git push ...: look at the command it runs
             known = ('git', 'gh', 'curl', 'eval') + tuple(SHELLS)

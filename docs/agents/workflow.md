@@ -26,6 +26,10 @@ How one agent takes one issue from request to `main`, without a person in the lo
     - Human: the `needs-human` label, always with a comment that says why: a TL;DR first, notes after. Tell the owner the TL;DR and stop. Do not merge.
 11. **Clean up.** After a merge: remove the worktree (`git worktree remove`), delete the local branch. The issue closes itself through `Closes #<n>`.
 
+## The owner's out
+
+The owner can open `main` for direct pushes: `tools/agent/allow_main.sh` in their own terminal (30 minutes by default, `off` to close). While it is open, the guard and the pre-push hook let a push to `main` through. An agent cannot open it and does not ask for it to dodge a review. If the owner tells you to push to `main` and it is closed, ask them to run the command.
+
 ## Things found on the way
 
 A bug, a smell, a missing test that is not this issue: file it and move on.

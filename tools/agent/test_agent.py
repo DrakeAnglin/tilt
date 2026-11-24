@@ -57,6 +57,10 @@ BLOCKED = [
     'git push origin HEAD:main > /dev/null',
     'git checkout main && git merge issue-5 && git push 2>&1 | tail -3',
     'git config --unset core.hooksPath',
+    'tools/agent/allow_main.sh',
+    'sh tools/agent/allow_main.sh 600',
+    'echo 9999999999 > .git/factory-allow-main',
+    'touch "$(git rev-parse --git-common-dir)/factory-allow-main"',
     'git push --branches origin',
     'git -ccore.hooksPath=/x push origin issue-5',
     'GIT_CONFIG_COUNT=1 git push origin issue-5',
@@ -125,6 +129,25 @@ class Guard(unittest.TestCase):
             subprocess.run(['git', '-C', repo, 'checkout', '-q', '-b', 'issue-5'], check=True)
             for line in ['git push', 'git push 2>&1 | tail -3', 'git push -u origin HEAD']:
                 self.assertIsNone(guard.check(line, cwd=repo), line)
+
+    def test_owners_out(self):
+        import subprocess
+        import tempfile
+        import time
+        with tempfile.TemporaryDirectory() as repo:
+            subprocess.run(['git', 'init', '-q', '-b', 'main', repo], check=True)
+            allow = os.path.join(repo, '.git', 'factory-allow-main')
+            pushes = ['git push', 'git push origin main', 'git push origin HEAD:main 2>&1 | tail -3']
+            for line in pushes:                                   # closed
+                self.assertIsNotNone(guard.check(line, cwd=repo), line)
+            open(allow, 'w').write(str(int(time.time()) + 600))
+            for line in pushes:                                   # open
+                self.assertIsNone(guard.check(line, cwd=repo), line)
+            for line in ['gh pr merge 5', 'git push --no-verify origin main']:   # still blocked while open
+                self.assertIsNotNone(guard.check(line, cwd=repo), line)
+            for text in [str(int(time.time()) - 1), 'forever', '']:              # expired or not a time
+                open(allow, 'w').write(text)
+                self.assertIsNotNone(guard.check('git push origin main', cwd=repo), text)
 
     def test_bad_input_blocks(self):
         import subprocess
