@@ -68,6 +68,7 @@ final class Controller: Identifiable {
                     // Set up before the controller knew which key is the hub's: tell it (once per start of the app).
                     if self.record.owner, self.record.onHub, s.hkey == 0, !self.hubKeyTold {
                         self.hubKeyTold = true
+                        // May run alongside a setup's own admitHub: harmless, a request already let in is not let in again.
                         if let hub = try? HubWatch.shared.client() { _ = await hub.admitHub(on: self.client, controllerId: self.id) }
                     }
                 } catch LinkProblem.waiting {

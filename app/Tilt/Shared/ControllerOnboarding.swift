@@ -13,38 +13,38 @@ protocol ControllerStore: Sendable {
 
 actor ControllerOnboarding {
     private let controller: ControllerClient
-    private let hub: HubClient
     private let store: any ControllerStore
-    private let hello: Hello, paired: Paired, hubHost: String
+    private let hello: Hello, paired: Paired
     private let look: @Sendable (String) async -> Hello?
     private let sleep: @Sendable (Duration) async throws -> Void
     private let leftBluetooth: @Sendable () async -> Void
     /// It took the hub's network and left Bluetooth: a second try only waits for it on the hub again.
     private var moved = false
 
-    /// `transport`: sealed commands to the new controller over Bluetooth. `hubHost`: the hub's address on the Wi-Fi.
+    /// `transport`: sealed commands to the new controller over Bluetooth.
     /// `look`: the controller's hello at an address (nil when it does not answer). `leftBluetooth`: it is off Bluetooth now.
-    init(transport: any ControllerTransport, hub: HubClient, store: any ControllerStore, hello: Hello, paired: Paired, hubHost: String,
+    init(transport: any ControllerTransport, store: any ControllerStore, hello: Hello, paired: Paired,
          look: @escaping @Sendable (String) async -> Hello? = { try? await Secure.hello($0) },
          sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
          leftBluetooth: @escaping @Sendable () async -> Void = {}) {
         controller = ControllerClient(transport: transport)
-        self.hub = hub; self.store = store; self.hello = hello; self.paired = paired; self.hubHost = hubHost
+        self.store = store; self.hello = hello; self.paired = paired
         self.look = look; self.sleep = sleep; self.leftBluetooth = leftBluetooth
     }
 
     /// Give the controller the hub's network (and, with `restore`, a backup the hub kept: its own, or a replaced
     /// controller's), wait for it on the hub, keep it, then let the hub in (it asks to join the controller like a phone).
-    nonisolated func run(restore: String?) -> AsyncThrowingStream<OnboardingStep, Error> {
+    /// `hub` and `hubHost` (its address on the Wi-Fi) are read fresh for each try: the hub may have a new address by then.
+    nonisolated func run(restore: String?, hub: HubClient, hubHost: String) -> AsyncThrowingStream<OnboardingStep, Error> {
         AsyncThrowingStream { c in
             let t = Task {
-                do { try await self.steps(restore: restore) { c.yield($0) }; c.finish() } catch { c.finish(throwing: error) }
+                do { try await self.steps(restore: restore, hub: hub, hubHost: hubHost) { c.yield($0) }; c.finish() } catch { c.finish(throwing: error) }
             }
             c.onTermination = { _ in t.cancel() }
         }
     }
 
-    private func steps(restore: String?, _ step: (OnboardingStep) -> Void) async throws {
+    private func steps(restore: String?, hub: HubClient, hubHost: String, _ step: (OnboardingStep) -> Void) async throws {
         let onThread = hello.net == "thread"           // older controllers started on Wi-Fi firmware and switch over
         if !moved {
             step(.gettingNetwork)

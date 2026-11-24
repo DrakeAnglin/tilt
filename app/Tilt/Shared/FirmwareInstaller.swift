@@ -31,7 +31,8 @@ struct HTTPUploader: FirmwareUploader {
 struct FirmwareInstaller: Sendable {
     enum Job: Sendable { case release(FirmwareRelease), file(Data) }
 
-    let hub: HubClient
+    /// The client for the connected hub, asked for again at each use: the hub may get a new address during an update.
+    let hub: @Sendable () async throws -> HubClient
     let uploader: any FirmwareUploader
     let sleep: @Sendable (Duration) async throws -> Void
     /// The hello at an address: a controller's ("<hub>/c/<id>") or the hub's own ("<hub>/hub"). nil when it does not answer.
@@ -65,7 +66,7 @@ struct FirmwareInstaller: Sendable {
             step(.downloading)
             let file = try await download(r.file, r.sha256)
             step(.sending)
-            try await hub.allowHubUpdate()
+            try await hub().allowHubUpdate()
             try await post(file, to: HubApi.base(hubHost) + HubApi.upload, timeout: 180, refused: "The Tilt Hub did not take the update.")
             step(.restarting)
             for _ in 0..<40 {
@@ -80,7 +81,7 @@ struct FirmwareInstaller: Sendable {
     private func put(_ file: Data, on c: ControllerClient, id: String, _ step: (FirmwareStep) -> Void) async throws {
         step(.sending)
         try await c.allowUpdate()
-        try await hub.allowUpload(for: id)                 // the hub takes a file only when its owner says so
+        try await hub().allowUpload(for: id)                 // the hub takes a file only when its owner says so
         let host = await c.transport.host
         // The hub takes the file and feeds it over Thread.
         guard host.contains(ControllerRecord.hubPath) else { throw TiltError("This controller is not on a Tilt Hub. Set it up again to put it on the hub.") }
@@ -90,7 +91,7 @@ struct FirmwareInstaller: Sendable {
         var done = false
         for _ in 0..<900 where !done {                     // a few minutes; up to half an hour for an older controller
             try await sleep(.seconds(2))
-            guard let m = try? await hub.info().c.first(where: { $0.id == id }) else { continue }
+            guard let m = try? await hub().info().c.first(where: { $0.id == id }) else { continue }
             switch m.ota {
             case 4: throw TiltError((m.otaErr ?? "The update did not go through.").capitalizedFirst)
             case 3: done = true

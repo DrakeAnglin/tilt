@@ -341,12 +341,12 @@ let ohub = HubClient(transport: ScriptedDevice(name: "hub", log: olog, address: 
     }
 })
 let looks = Cell(0)
-let onb = ControllerOnboarding(transport: ScriptedDevice(name: "ble", log: olog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: ohub,
+let onb = ControllerOnboarding(transport: ScriptedDevice(name: "ble", log: olog, address: "bluetooth") { _ in #"{"ok":1}"# },
                                store: TestStore(log: olog, client: controllerOnHub(olog, hubWaiting: Cell(true), hkey: Cell(0))),
-                               hello: fakeHello("new1", boot: "0a0b0c0d", net: nil), paired: Paired(cid: fcid, key: fkey, owner: true), hubHost: "10.0.0.2",
+                               hello: fakeHello("new1", boot: "0a0b0c0d", net: nil), paired: Paired(cid: fcid, key: fkey, owner: true),
                                look: { host in looks.value += 1; olog.add("look \(host)"); return looks.value < 3 ? nil : fakeHello("new1", boot: "11223344", net: "thread") },
                                sleep: { _ in }, leftBluetooth: { olog.add("left bluetooth") })
-let run1 = await collect(onb.run(restore: "old1"))
+let run1 = await collect(onb.run(restore: "old1", hub: ohub, hubHost: "10.0.0.2"))
 check(run1.error == nil && run1.steps == [.gettingNetwork, .restoring, .joining, .waitingOnHub, .lettingHubIn, .done], "onboarding steps, in order (\(run1.steps), \(run1.error?.localizedDescription ?? "-"))")
 let onbExpected = ["hub /api/net", "hub /api/backup?id=old1",
                 "ble /api/restore?o=0&d=\(String(repeating: "ab", count: 128))", "ble /api/restore?o=128&d=\(String(repeating: "ab", count: 72))&end=1",
@@ -356,22 +356,27 @@ let onbExpected = ["hub /api/net", "hub /api/backup?id=old1",
                 "hub /api/replace?old=old1&new=new1"]
 check(olog.all == onbExpected, "restore before joining, wait for it on the hub, keep it, let the hub in, take over the old one's place\n  got \(olog.all.map { String($0.prefix(60)) })")
 
-// A Thread controller that did not reach the hub: the second try only waits for it again
+// A Thread controller that did not reach the hub: the second try only waits for it again, at the hub's address then
 let rlog = Recorder(), reachable = Cell(false)
 let rhub = HubClient(transport: ScriptedDevice(name: "hub", log: rlog, address: "10.0.0.2/hub") { c in
     cmdPath(c) == HubApi.info ? hubInfoJSON("new1", hubCid: hubCidOnNew) : cmdPath(c) == HubApi.network ? #"{"ok":1,"ds":"0e08"}"# : #"{"ok":1}"#
 })
-let ronb = ControllerOnboarding(transport: ScriptedDevice(name: "ble", log: rlog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: rhub,
+let ronb = ControllerOnboarding(transport: ScriptedDevice(name: "ble", log: rlog, address: "bluetooth") { _ in #"{"ok":1}"# },
                                 store: TestStore(log: rlog, client: controllerOnHub(rlog, hubWaiting: Cell(true), hkey: Cell(0))),
-                                hello: fakeHello("new1", boot: "0a0b0c0d", net: "thread"), paired: Paired(cid: fcid, key: fkey, owner: true), hubHost: "10.0.0.2",
-                                look: { _ in reachable.value ? fakeHello("new1", boot: "0a0b0c0d", net: "thread") : nil }, sleep: { _ in })
-let rFirst = await collect(ronb.run(restore: nil))
+                                hello: fakeHello("new1", boot: "0a0b0c0d", net: "thread"), paired: Paired(cid: fcid, key: fkey, owner: true),
+                                look: { host in rlog.add("look \(host)"); return reachable.value && host == "10.0.0.9/c/new1" ? fakeHello("new1", boot: "0a0b0c0d", net: "thread") : nil }, sleep: { _ in })
+let rFirst = await collect(ronb.run(restore: nil, hub: rhub, hubHost: "10.0.0.2"))
 check(rFirst.error?.localizedDescription.hasPrefix("It did not reach the hub.") == true && rFirst.steps.last == .waitingOnHub, "not on the hub: the reason is shown")
 check(rlog.count("ble /api/hubjoin") == 1 && rlog.count("ble /api/swapfw") == 0 && rlog.count("ble /api/reboot") == 0, "a Thread controller joins without switching firmware or restarting")
-reachable.value = true
-let rSecond = await collect(ronb.run(restore: nil))
+reachable.value = true                               // and the hub got a new address on the Wi-Fi meanwhile
+let rhub2 = HubClient(transport: ScriptedDevice(name: "hub2", log: rlog, address: "10.0.0.9/hub") { c in
+    cmdPath(c) == HubApi.info ? hubInfoJSON("new1", hubCid: hubCidOnNew) : #"{"ok":1}"#
+})
+let rSecond = await collect(ronb.run(restore: nil, hub: rhub2, hubHost: "10.0.0.9"))
 check(rSecond.error == nil && rSecond.steps == [.waitingOnHub, .lettingHubIn, .done], "the second try only waits for it on the hub")
 check(rlog.count("hub /api/net") == 1 && rlog.count("ble ") == 1, "the hub's network is not asked for or sent again")
+check(rlog.count("look 10.0.0.9/c/new1") == 1 && rlog.count("adopt 10.0.0.9/c/new1") == 1 && rlog.count("hub2 /api/info") >= 1 && !rlog.all.contains("adopt 10.0.0.2/c/new1"),
+      "the second try waits, keeps it and lets the hub in at the hub's new address")
 
 // The hub is let in exactly once (the setup flow and the app's model share admitHub)
 let alog = Recorder(), waitingHub = Cell(true), knows = Cell(0)
@@ -405,13 +410,13 @@ final class FakeUploader: FirmwareUploader, @unchecked Sendable {
     }
 }
 /// A controller update through a fake hub: `infos` are the hub's /api/info answers in turn (the last one repeats).
-func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boots: [String]) -> FirmwareInstaller {
+func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boots: [String], hub fresh: (@Sendable () -> HubClient)? = nil) -> FirmwareInstaller {
     let seen = Cell(0), bootsLeft = Cell(boots)
     let hub = HubClient(transport: ScriptedDevice(name: "hub", log: log, address: "10.0.0.2/hub") { c in
         guard cmdPath(c) == HubApi.info else { return #"{"ok":1}"# }
         let i = infos[min(seen.value, infos.count - 1)]; seen.value += 1; return i
     })
-    var f = FirmwareInstaller(hub: hub, uploader: FakeUploader(log: log, answers: uploads), sleep: { _ in }, download: { file, _ in log.add("download \(file)"); return Data(file.utf8) })
+    var f = FirmwareInstaller(hub: { fresh?() ?? hub }, uploader: FakeUploader(log: log, answers: uploads), sleep: { _ in }, download: { file, _ in log.add("download \(file)"); return Data(file.utf8) })
     f.look = { host in
         var b = bootsLeft.value; let boot = b.count > 1 ? b.removeFirst() : b[0]; bootsLeft.value = b
         log.add("look \(boot)"); return Hello(id: "den1", name: "Den", fw: boot == "b2" ? "2.3.0" : "2.2.1", boot: boot, img: "aaa", owned: 1, home: nil, net: "thread", hub: 1)
@@ -442,6 +447,18 @@ check(patched.steps.prefix(3) == [.downloading, .sending, .downloading], "the st
 let keepAt = plog.all.firstIndex(of: "ctrl /api/keep"), newBootAt = plog.all.firstIndex(of: "look b2")
 check(plog.count("ctrl /api/keep") == 1 && keepAt != nil && newBootAt != nil && keepAt! > newBootAt!, "kept once, and only after the boot id changed")
 check(patched.steps.suffix(3) == [.restarting, .confirming, .done("2.3.0")], "restart, check it runs, done")
+
+// The hub gets a new address during an update: each look at its progress asks for the hub's client again
+let mlog = Recorder(), clientAsks = Cell(0)
+let movedHub = HubClient(transport: ScriptedDevice(name: "hub2", log: mlog, address: "10.0.0.9/hub") { c in
+    cmdPath(c) == HubApi.info ? hubInfoJSON("den1", hubCid: nil, ota: 3) : #"{"ok":1}"#
+})
+let oldHub = HubClient(transport: ScriptedDevice(name: "hub", log: mlog, address: "10.0.0.2/hub") { c in
+    cmdPath(c) == HubApi.info ? hubInfoJSON("den1", hubCid: nil, ota: 1, pct: 10) : #"{"ok":1}"#
+})
+let mrun = await collect(fakeInstaller(mlog, infos: [], boots: ["b1", "b2"], hub: { clientAsks.value += 1; return clientAsks.value <= 2 ? oldHub : movedHub })
+    .install(.file(Data("f.bin".utf8)), on: fwCtrl(mlog), id: "den1"))
+check(mrun.error == nil && mrun.steps.last == .done("2.3.0") && mlog.count("hub2 /api/info") == 1, "the update follows the hub to its new address (\(mrun.error?.localizedDescription ?? "-"))")
 
 // The hub's own update: allowed, posted to the hub, done once the hub answers with the new version
 let ulog = Recorder()

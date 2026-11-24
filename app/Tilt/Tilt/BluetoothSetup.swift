@@ -248,10 +248,10 @@ struct BluetoothSetupView: View {
                 if onboarding == nil {
                     guard let transport else { throw TiltError("The Bluetooth link to the controller was lost. Start the setup again.") }
                     let ble = ble
-                    onboarding = ControllerOnboarding(transport: transport, hub: hubClient, store: AppControllers(model: model), hello: h, paired: p,
-                                                      hubHost: hubHost, leftBluetooth: { await ble.stop() })
+                    onboarding = ControllerOnboarding(transport: transport, store: AppControllers(model: model), hello: h, paired: p,
+                                                      leftBluetooth: { await ble.stop() })
                 }
-                for try await s in onboarding!.run(restore: restoreFrom.isEmpty ? nil : restoreFrom) {
+                for try await s in onboarding!.run(restore: restoreFrom.isEmpty ? nil : restoreFrom, hub: hubClient, hubHost: hubHost) {
                     switch s {
                     case .gettingNetwork: hubStatus = "Getting the hub's network…"
                     case .restoring: hubStatus = "Restoring its settings…"

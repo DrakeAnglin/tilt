@@ -56,7 +56,8 @@ final class FirmwareUpdates {
 
     /// The installer for the connected hub and the controllers on it.
     static func installer() throws -> FirmwareInstaller {
-        FirmwareInstaller(hub: try HubWatch.shared.client(), uploader: HTTPUploader(), sleep: { try await Task.sleep(for: $0) },
+        _ = try HubWatch.shared.client()                    // not connected: say so before anything starts
+        return FirmwareInstaller(hub: { try await HubWatch.shared.client() }, uploader: HTTPUploader(), sleep: { try await Task.sleep(for: $0) },
                           download: { try await FirmwareUpdates.shared.download(file: $0, sha: $1) })
     }
 }
