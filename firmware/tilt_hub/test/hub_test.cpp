@@ -233,7 +233,7 @@ static void fileTests() {
   { std::vector<uint8_t> b = hub; b[hub.size() / 2] ^= 0x04;
     CHECK(hubFile(b, "0.3.4", err, ver) == 403 && same(err, "the file's signature is not valid"), "hub file: one bit flipped"); }
   { std::vector<uint8_t> t(hub.begin(), hub.begin() + 500);
-    CHECK(hubFile(t, "0.3.4", err, ver) == 403, "hub file: truncated"); }
+    CHECK(hubFile(t, "0.3.4", err, ver) == 403 && same(err, "the file's signature is not valid"), "hub file: truncated"); }
 }
 
 int main() {
