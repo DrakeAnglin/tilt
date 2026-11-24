@@ -243,15 +243,49 @@ inline bool replyOpen(const uint8_t key[32], const uint8_t cid[8], const uint8_t
   return true;
 }
 
-// ---- a string field of a flat JSON object (the hello's "boot"): "" when it is not there
+// ---- the string value of a top-level key of a JSON object (the hello's "boot"): "" when it is not there or not a
+// string. It walks the object key by key, so the same text in a value (a controller named "boot") or inside a nested
+// object never counts.
+inline bool linkJsonReadStr(const std::string &j, size_t &i, std::string &out) {   // j[i] is the opening quote
+  out.clear();
+  for (i++; i < j.size(); i++) {
+    if (j[i] == '"') { i++; return true; }
+    if (j[i] == '\\' && i + 1 < j.size()) i++;
+    out += j[i];
+  }
+  return false;
+}
+inline void linkJsonSkipWs(const std::string &j, size_t &i) { while (i < j.size() && isspace((unsigned char)j[i])) i++; }
 inline std::string linkJsonStr(const std::string &j, const char *key) {
-  std::string k = std::string("\"") + key + "\"";
-  size_t i = j.find(k);
-  if (i == std::string::npos) return "";
-  i = j.find(':', i + k.size());
-  if (i == std::string::npos) return "";
-  i = j.find('"', i);
-  if (i == std::string::npos) return "";
-  size_t e = j.find('"', i + 1);
-  return e == std::string::npos ? "" : j.substr(i + 1, e - i - 1);
+  size_t i = 0;
+  linkJsonSkipWs(j, i);
+  if (i >= j.size() || j[i] != '{') return "";
+  i++;
+  for (;;) {
+    linkJsonSkipWs(j, i);
+    std::string k, v;
+    if (i >= j.size() || j[i] != '"' || !linkJsonReadStr(j, i, k)) return "";
+    linkJsonSkipWs(j, i);
+    if (i >= j.size() || j[i] != ':') return "";
+    i++;
+    linkJsonSkipWs(j, i);
+    if (i >= j.size()) return "";
+    if (j[i] == '"') {
+      if (!linkJsonReadStr(j, i, v)) return "";
+      if (k == key) return v;
+    } else {                                     // a number, true/false/null, or a nested object or list: skip it
+      if (k == key) return "";
+      int depth = 0;
+      for (; i < j.size(); i++) {
+        char ch = j[i];
+        if (ch == '"') { std::string skip; if (!linkJsonReadStr(j, i, skip)) return ""; i--; continue; }
+        if (ch == '{' || ch == '[') depth++;
+        else if (ch == '}' || ch == ']') { if (!depth) break; depth--; }
+        else if (ch == ',' && !depth) break;
+      }
+    }
+    linkJsonSkipWs(j, i);
+    if (i >= j.size() || j[i] != ',') return "";
+    i++;
+  }
 }

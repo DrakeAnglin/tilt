@@ -168,6 +168,14 @@ static void datagramTests() {
   CHECK(std::string(statusLine(409)) == "409 Conflict" && std::string(statusLine(410)) == "410 Gone" && std::string(statusLine(0)) == "504 Gateway Timeout",
         "the status lines");
   CHECK(linkJsonStr("{\"id\":\"x\",\"boot\":\"a1b2c3d4\"}", "boot") == "a1b2c3d4" && linkJsonStr("{}", "boot").empty(), "a hello's boot id");
+  // the real hello puts the name first: a controller named "boot" (or with a quote in its name) must not fool it
+  CHECK(linkJsonStr("{\"id\":\"a0b1c2d3e4f5\",\"name\":\"boot\",\"fw\":\"2.3.0\",\"boot\":\"a1b2c3d4\",\"owned\":1}", "boot") == "a1b2c3d4",
+        "a controller named boot");
+  CHECK(linkJsonStr("{\"name\":\"say \\\"boot\\\": \\\"x\\\"\",\"boot\":\"a1b2c3d4\"}", "boot") == "a1b2c3d4", "escaped quotes in a name");
+  CHECK(linkJsonStr("{ \"n\" : 3, \"o\":{\"boot\":\"no\"}, \"l\":[1,\"boot\"], \"t\":true, \"boot\" : \"a1b2c3d4\" }", "boot") == "a1b2c3d4",
+        "numbers, nested objects, lists and spaces are skipped");
+  CHECK(linkJsonStr("{\"boot\":5}", "boot").empty() && linkJsonStr("{\"o\":{\"boot\":\"no\"}}", "boot").empty() && linkJsonStr("{\"boot\":\"a1b2", "boot").empty() &&
+        linkJsonStr("[\"boot\",\"x\"]", "boot").empty() && linkJsonStr("", "boot").empty(), "not a top-level string: nothing");
 }
 
 int main() {

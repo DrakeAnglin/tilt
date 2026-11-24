@@ -17,6 +17,7 @@ struct FakeController : LinkSeam {
   uint64_t last = 0;
   KeyState ks = KEY_IN;
   bool knowsKey = true, waiting = false;
+  std::string name = "Dining";
   int hellos = 0, commands = 0, stale = 0, drops = 0, letIns = 0;
   std::vector<uint64_t> taken;                   // the counters it took, in order
   std::atomic<uint64_t> clock{1795319000000ULL};
@@ -24,7 +25,11 @@ struct FakeController : LinkSeam {
   void restart() { std::lock_guard<std::mutex> l(m); bootId[0]++; last = 0; }
   int ask(char type, const std::string &payload, std::string &ans) override {
     std::lock_guard<std::mutex> l(m);
-    if (type == DG_HELLO) { hellos++; ans = "{\"id\":\"a0b1c2d3e4f5\",\"boot\":\"" + hexOf(bootId, 4) + "\"}"; return 200; }
+    if (type == DG_HELLO) {                      // as web.h helloJson: the name comes before the boot id
+      hellos++;
+      ans = "{\"id\":\"a0b1c2d3e4f5\",\"name\":\"" + name + "\",\"fw\":\"2.3.0\",\"boot\":\"" + hexOf(bootId, 4) + "\",\"owned\":1}";
+      return 200;
+    }
     if (type != DG_COMMAND) return 400;
     commands++;
     Frame f;
@@ -76,6 +81,12 @@ int main() {
     CallResult r = link.call(c, "/api/go?b=0&t=50");
     CHECK(r.why == CallResult::OK && c.stale == 1 && c.hellos == 2, "restart: 409, hello again, then it goes through"); }
 
+  { FakeController c; CtrlLink link; c.name = "boot";   // its name is the key's text: the boot id still comes from the key
+    link.call(c, "/api/s");
+    c.restart();
+    CallResult r = link.call(c, "/api/s");
+    CHECK(r.why == CallResult::OK && c.stale == 1 && c.hellos == 2, "a controller named boot: 409, hello, retry still works"); }
+
   { FakeController c; CtrlLink link;
     link.call(c, "/api/s");
     c.knowsKey = false;                            // the owner removed the hub
@@ -104,7 +115,7 @@ int main() {
     const int T = 6, N = 40;
     std::atomic<int> ok{0};
     std::atomic<bool> stop{false};
-    std::thread pushes([&] { while (!stop) { uint8_t b[4]; memcpy(b, c.bootId, 4); link.setBoot(b); std::this_thread::yield(); } });
+    std::thread pushes([&] { while (!stop) { uint8_t b[4]; { std::lock_guard<std::mutex> l(c.m); memcpy(b, c.bootId, 4); } link.setBoot(b); std::this_thread::yield(); } });
     std::vector<std::thread> ts;
     for (int t = 0; t < T; t++) ts.emplace_back([&, t] { for (int i = 0; i < N; i++) if (link.call(c, "/api/s?t=" + std::to_string(t)).why == CallResult::OK) ok++; });
     for (auto &t : ts) t.join();
