@@ -9,7 +9,7 @@ A release is a version tag on `main`. The GitHub Action (`.github/workflows/rele
    - Controller, stable: `git tag -a fw-v2.3.0 -m "What changed"`
    - Controller, beta (only developer builds of the app see it): `git tag -a fw-v2.3.0-beta1 -m "..."`
    - Tilt Hub: `git tag -a hub-v0.3.4 -m "..."`
-3. `git push origin <tag>`. Watch it under Actions, "Firmware release" (about 15 minutes).
+3. `git push origin <tag>`. Watch it under Actions, "Firmware release" (about 35 minutes).
 
 The Action stops, and publishes nothing, when the tag is not on `main`, the tag and the code's version differ, a logic test fails, the build fails, a `secrets.h` value is in the image, or a signature does not check out.
 
