@@ -4,6 +4,8 @@
 <dict>
 	<key>com.apple.developer.homekit</key>
 	<true/>
+	<key>com.apple.developer.matter.allow-setup-payload</key>
+	<true/>
 	<key>com.apple.developer.applesignin</key>
 	<array>
 		<string>Default</string>

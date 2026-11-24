@@ -138,6 +138,7 @@ static volatile uint32_t homeWindowUntil = 0;    // the owner asked to add the h
 static volatile int otaFor = -1;                 // the controller being updated (one at a time)
 static std::string homeManual, homeQr;           // the code to type and the QR text (USB log, and to the controllers)
 static volatile bool inHome = false;             // added to Apple Home (or another Matter home)
+static std::string homesJson();                  // the homes it is in, read fresh (below)
 static SemaphoreHandle_t stateMx;              // ctrls[] (not the per-controller request lock)
 static nvs_handle_t nv;
 static void proofsSave() { nvs_set_blob(nv, "proof", proofs, sizeof proofs); nvs_commit(nv); }
@@ -1141,7 +1142,7 @@ static std::string infoJson() {
     first = false;
   }
   xSemaphoreGive(stateMx);
-  j += std::string("],\"home\":") + (inHome ? "1" : "0") + ",\"new\":[";
+  j += "]," + homesJson() + ",\"new\":[";
   xSemaphoreTake(newMx, portMAX_DELAY);
   first = true;
   for (auto &n : newOnes) {
@@ -1407,14 +1408,17 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     return c >= 0 ? "{\"ok\":1}" : "{\"ok\":0,\"err\":\"no such controller\"}";
   }
   if (path == "/api/homecode" && matterUp) {      // open Apple Home's pairing now (Apple's add screen comes next)
+    // Also when the hub still counts a home: the owner asked, and that home may be gone (removed in its own app
+    // without the hub hearing of it). Matter allows a hub in several homes. The automatic window (above) stays for a
+    // hub in no home only.
     homeWindowUntil = (ms() + 900000) | 1;
     chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
       auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
-      if (chip::Server::GetInstance().GetFabricTable().FabricCount() == 0 && !mgr.IsCommissioningWindowOpen())
+      if (!mgr.IsCommissioningWindowOpen())
         mgr.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
     }, 0);
   }
-  if (path == "/api/homecode") return "{\"ok\":1,\"code\":\"" + homeManual + "\",\"qr\":\"" + homeQr + "\",\"home\":" + (inHome ? "1" : "0") + "}";
+  if (path == "/api/homecode") return "{\"ok\":1,\"code\":\"" + homeManual + "\",\"qr\":\"" + homeQr + "\"," + homesJson() + "}";
   if (path == "/api/backups") return backupsJson();
   if (path == "/api/backup") return backupJson(qv(q, "id").c_str());
   if (path == "/api/replace") return replaceJson(qv(q, "old").c_str(), qv(q, "new").c_str());
@@ -1582,6 +1586,29 @@ static void announceHub() {
   if (ip == "0.0.0.0") return;
   mdns_txt_item_t t[] = {{"ip", ip.c_str()}, {"id", id.c_str()}, {"owned", hubOwned() ? "1" : "0"}};
   if (mdns_service_txt_set_for_host("Tilt Hub", "_tilthub", "_tcp", nullptr, t, 3) != ESP_OK) mdns_service_add_for_host("Tilt Hub", "_tilthub", "_tcp", nullptr, 80, t, 3);
+}
+// The homes the hub is in (Matter fabrics), read fresh: `home` is 1 if there is any. Each one with its maker's
+// number (Apple's is 4996), the hub's node ID in it, and its label. Apple adds two (the home and the iPhone's iCloud
+// Keychain) and leaves the Keychain one when the hub is removed from Home, so `home` alone can't say "in Apple Home":
+// the app compares the node IDs with the accessories Apple Home has (HomeSetup.inHome).
+static std::string homesJson() {
+  if (!matterUp) return std::string("\"homes\":[],\"home\":") + (inHome ? "1" : "0");   // Matter not running: nothing to lock or read
+  std::string j = "\"homes\":[";
+  int n = 0;
+  chip::DeviceLayer::PlatformMgr().LockChipStack();
+  for (const auto &f : chip::Server::GetInstance().GetFabricTable()) {
+    chip::CharSpan l = f.GetFabricLabel();
+    std::string label;
+    for (size_t i = 0; i < l.size(); i++) { char c = l.data()[i]; if (c != '"' && c != '\\' && (unsigned char)c >= 32 && (unsigned char)c < 127) label += c; }   // plain ASCII: always good JSON
+    char one[128];                               // node: the hub's own ID in that home (Apple Home shows it per accessory)
+    snprintf(one, sizeof one, "%s{\"i\":%u,\"vendor\":%u,\"node\":\"%016llX\",\"label\":\"%s\"}", n ? "," : "", (unsigned)f.GetFabricIndex(),
+             (unsigned)f.GetVendorId(), (unsigned long long)f.GetNodeId(), label.c_str());
+    j += one;
+    n++;
+  }
+  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+  inHome = n > 0;
+  return j + "],\"home\":" + (n ? "1" : "0");
 }
 static void event_cb(const ChipDeviceEvent *ev, intptr_t) {
   if (ev->Type == chip::DeviceLayer::DeviceEventType::kCommissioningComplete) { inHome = true; ESP_LOGI(TAG, "added to a home"); }

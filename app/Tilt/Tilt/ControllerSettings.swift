@@ -1,6 +1,5 @@
 // One controller's settings: general options, Apple Home, people, its blinds, firmware.
 import CoreImage.CIFilterBuiltins
-import HomeKit
 import SwiftUI
 
 struct ControllerSettingsView: View {
@@ -15,13 +14,14 @@ struct ControllerSettingsView: View {
     @State private var review: JoinAsk?
     @State private var renaming: PhoneKey?
     @State private var newName = ""
-    @State private var home: HomeInfo?
+    @State private var home: HomeSetup.Code?
+    @State private var opening = false             // asking for the code / Apple's add screen is open
+    @State private var homeTask: Task<Void, Never>?
     @State private var problem: String?
     @State private var confirmRemove = false
     @State private var retried = false
     @AppStorage(Prefs.devMode) private var devMode = false
 
-    struct HomeInfo: Identifiable { let code: String; let qr: String; var hub = false; var inHome = false; var id: String { qr } }
     /// On a Tilt Hub the app reaches the controller through the hub ("<hub>/c/<id>"), and Apple Home sees its blinds there.
     private var onHub: Bool { controller.record.onHub }
 
@@ -45,11 +45,18 @@ struct ControllerSettingsView: View {
                     Text("Follow Each Other: when you turn one blind's wand by hand, the others go to the same tilt. A blind moved from the app or Apple Home moves alone.\n\nMove at the Same Time: off moves them one after another, which is quieter and easier on the battery.")
                 }
                 Section {
-                    if !onHub { Button("Add to Apple Home", systemImage: "homekit") { openHome() } }
+                    if !onHub && (controller.state?.hk ?? 0) == 0 {
+                        Button { openHome() } label: { Label(opening ? "Opening Apple Home…" : "Add to Apple Home", systemImage: "homekit") }.disabled(opening)
+                    }
                     Toggle("Show each blind separately", isOn: Binding(get: { cfg.hksep == 1 }, set: { on in change { try await $0.setHomeSeparate(on) } }))
                 } header: { Text("Apple Home") } footer: {
                     if onHub { Text("Apple Home sees these blinds through the Tilt Hub. Changing how they are shown can take a minute to appear in Home.") }
-                    else { Text((controller.state?.hk ?? 0) > 0 ? "Added to Apple Home. Changing how blinds are shown restarts the controller." : "Not added to Apple Home yet.") }
+                    else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text((controller.state?.hk ?? 0) > 0 ? "Added to Apple Home. Changing how blinds are shown restarts the controller." : "Not added to Apple Home yet.")
+                            if (controller.state?.hk ?? 0) == 0 { Button("Show the code instead") { openHome(showCode: true) }.font(.footnote).disabled(opening) }
+                        }
+                    }
                 }
               }
                 Section {
@@ -124,8 +131,8 @@ struct ControllerSettingsView: View {
         .skyPage()
         .navigationTitle(controller.state?.name ?? controller.record.name)
         .navigationBarTitleDisplayMode(.inline)
-        // Not `.task`: that is cancelled whenever the page is rebuilt (picking a room in the side-by-side layout does
-        // that), and the cancelled request used to be shown as an error with nothing else on the page.
+        // Not `.task`: that is canceled whenever the page is rebuilt (picking a room in the side-by-side layout does
+        // that), and the canceled request used to be shown as an error with nothing else on the page.
         .onAppear { Task { await load() } }
         // Someone asked to join, or a request was answered (here or on the approve page): show it in People right away.
         .onChange(of: controller.requests) { _, _ in Task { await load() } }
@@ -137,7 +144,8 @@ struct ControllerSettingsView: View {
             Button("Save") { rename(p) }
             Button("Cancel", role: .cancel) {}
         } message: { p in Text(p.me == 1 ? "What other people see for this iPhone." : "What this iPhone is called in the list.") }
-        .sheet(item: $home) { HomeSheet(info: $0, roomName: controller.state?.name ?? controller.record.name).presentationDetents([.large]) }
+        .sheet(item: $home, onDismiss: { Task { await load() } }) { HomeSheet(info: $0).presentationDetents([.large]) }
+        .onDisappear { homeTask?.cancel() }
     }
 
     private func remove(reset: Bool) {
@@ -169,9 +177,9 @@ struct ControllerSettingsView: View {
             withAnimation { phones = list }
             if let me = phones.first(where: { $0.me == 1 }) { model.setOwner(controller, me.owner == 1) }      // the owner may have changed
         } catch {
-            // A request that was cancelled is not a fault: try once more instead of showing "cancelled".
-            let cancelled = error is CancellationError || (error as? URLError)?.code == .cancelled
-            if cancelled { if !retried { retried = true; try? await Task.sleep(for: .milliseconds(300)); await load() } }
+            // A request that was canceled is not a fault: try once more instead of showing "canceled".
+            let canceled = error is CancellationError || (error as? URLError)?.code == .cancelled
+            if canceled { if !retried { retried = true; try? await Task.sleep(for: .milliseconds(300)); await load() } }
             else { problem = error.localizedDescription }
         }
         retried = false
@@ -200,9 +208,19 @@ struct ControllerSettingsView: View {
             } catch { problem = error.localizedDescription }
         }
     }
-    private func openHome() {
-        Task {
-            do { let h = try await controller.client.homeSetupCode(); home = HomeInfo(code: h.code, qr: h.qr) } catch { problem = error.localizedDescription }
+    /// Apple's add screen with the code filled in; the code itself only if that can't open (or `showCode`).
+    private func openHome(showCode: Bool = false) {
+        guard !opening else { return }
+        opening = true; problem = nil
+        homeTask = Task {
+            defer { opening = false }
+            do {
+                home = try await HomeSetup.start(name: controller.state?.name ?? controller.record.name, showCode: showCode) {
+                    let h = try await controller.client.homeSetupCode()
+                    return HomeSetup.Code(code: h.code, qr: h.qr)
+                }
+                if home == nil { await load() }
+            } catch { if !Task.isCancelled { problem = error.localizedDescription } }   // the page was closed: nothing to say
         }
     }
 }
@@ -222,27 +240,24 @@ struct QRCode: View {
     }
 }
 
+/// The code for adding by hand, or from another iPhone: shown when Apple's add screen could not open (with why), or
+/// when asked for. (The one-tap way is `HomeSetup.start`.)
 struct HomeSheet: View {
-    let info: ControllerSettingsView.HomeInfo
-    var roomName = "Blinds"
+    let info: HomeSetup.Code
     @Environment(\.openURL) private var openURL
     @State private var copied = false
-    @State private var note: String?
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    // The quick way: Apple's own add-accessory page, opened here with the code already filled in.
-                    Button { addHere() } label: { Label("Add to Apple Home", systemImage: "homekit").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 4) }
-                        .buttonStyle(.borderedProminent).controlSize(.large)
+                    if let note = info.note { Label(note + " Try adding it by hand below.", systemImage: "exclamationmark.triangle").font(.subheadline).foregroundStyle(Palette.warning) }
                     if info.inHome { Label("The Tilt Hub is in Apple Home already.", systemImage: "checkmark.circle").font(.footnote).foregroundStyle(.secondary) }
                     Text(info.hub ? "When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The hub accepts this for the next 15 minutes."
                                   : "When it says \u{201C}Uncertified Accessory\u{201D}, choose Add Anyway. The controller accepts this for the next 10 minutes.")
                         .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    if let note { Label(note, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(Palette.warning) }
 
                     VStack(spacing: 12) {
-                        Text("Or add it by hand").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Add it by hand").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                         Text(info.code).font(.title2.monospacedDigit().weight(.semibold)).textSelection(.enabled)
                         HStack(spacing: 10) {
                             Button { UIPasteboard.general.string = info.code.filter(\.isNumber); copied = true } label: { Label(copied ? "Copied" : "Copy Code", systemImage: copied ? "checkmark" : "doc.on.doc").frame(maxWidth: .infinity) }
@@ -266,17 +281,6 @@ struct HomeSheet: View {
             }
             .navigationTitle("Add to Apple Home").navigationBarTitleDisplayMode(.inline)
             .sensoryFeedback(.success, trigger: copied)
-        }
-    }
-    private func addHere() {
-        note = nil
-        Task {
-            let request = HMAccessorySetupRequest()
-            request.payload = URL(string: info.qr).flatMap { HMAccessorySetupPayload(url: $0) }
-            request.suggestedAccessoryName = roomName
-            guard request.payload != nil else { note = "Use the code below instead."; return }
-            do { try await HMAccessorySetupManager().performAccessorySetup(using: request) }
-            catch { if (error as? HMError)?.code != .operationCancelled { note = "Apple Home could not start from here. Use the code below instead." } }
         }
     }
 }

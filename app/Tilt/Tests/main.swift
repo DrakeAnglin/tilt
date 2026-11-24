@@ -3,6 +3,7 @@
 // Reference values come from the firmware's own formulas (sec.h, web.h), computed in Python.
 import CryptoKit
 import Foundation
+import Matter
 
 var failures = 0, passed = 0
 func check(_ ok: Bool, _ what: String, file: String = #file, line: Int = #line) {
@@ -195,6 +196,35 @@ try await ble.go(blind: 0, tilt: 50)
 check(radio.written.first == Data("X".utf8) + fpkt, "a Bluetooth command is 'X' + the same frame as Frame.seal")
 _ = try? await ble.state()
 check(radio.written.last.map { $0.dropFirst(13).prefix(8).hex } == "000001a20159ec3c", "the counter rises when the clock does not")
+
+// ---- Apple Home in one tap (issue #50): the code goes to Apple's add screen as a Matter payload
+// The Matter spec's example device: passcode 20202021, discriminator 3840.
+let specQR = "MT:-24J0AFN00KA0648G00", specCode = "34970112332"
+let sp = HomeSetup.payload(qr: specQR, code: specCode)
+check(sp?.setupPasscode == 20202021 && sp?.discriminator == 3840, "the Matter spec's example QR reads as passcode 20202021, discriminator 3840")
+check(HomeSetup.payload(qr: specQR, code: "3497-011-2332") != nil, "the typed code may have dashes and spaces")
+check(HomeSetup.payload(qr: specQR, code: "") != nil, "no typed code: the QR alone is enough")
+// A code made by Apple's own Matter library, as the hub makes its own.
+let made = MTRSetupPayload(setupPasscode: 31415926, discriminator: 1234)
+if let q = made.qrCodeString(), let m = made.manualEntryCode() {
+    check(HomeSetup.payload(qr: q, code: m)?.setupPasscode == 31415926, "a QR and typed code made together are accepted")
+    check(HomeSetup.payload(qr: q, code: specCode) == nil, "a typed code with another passcode: refused (the app shows the code instead)")
+} else { check(false, "Apple's Matter library made a QR and a typed code") }
+check(HomeSetup.payload(qr: "", code: specCode) == nil, "no QR: no request")
+check(HomeSetup.payload(qr: "MT:not-a-code", code: "") == nil, "a broken QR: no request")
+check(HomeSetup.payload(qr: "X-HM://0024ABCDE1234", code: "") == nil, "a HomeKit (not Matter) code: no request")
+// "Added to Apple Home": the hub's own word is not enough (Apple leaves its iCloud Keychain connection behind when the
+// hub is removed in the Home app, 2026-11-23), so it is checked against Apple Home's accessories.
+let keychain = HomeSetup.HubHome(node: "00000000A1B2C3D4", vendor: 4996), home = HomeSetup.HubHome(node: "0000000012345678", vendor: 4937)
+check(!HomeSetup.inHome(hubSays: true, hubHomes: [keychain], appleNodes: [0x99, 0x42]), "removed in the Home app, only the Keychain connection left: not added")
+check(HomeSetup.inHome(hubSays: true, hubHomes: [keychain, home], appleNodes: [0x12345678]), "Apple Home has an accessory with the hub's ID: added")
+check(HomeSetup.inHome(hubSays: true, hubHomes: [keychain, home], appleNodes: [0x77]), "both of Apple's connections there (Apple 4937 and Keychain 4996), IDs not matching: still added")
+check(HomeSetup.inHome(hubSays: true, hubHomes: [keychain, .init(node: "0000000012345678", vendor: 4996)], appleNodes: [0x77]), "two Apple Keychain-numbered connections: still added")
+check(!HomeSetup.inHome(hubSays: true, hubHomes: [keychain, .init(node: "00000000000000AA", vendor: 4447)], appleNodes: [0x77]), "the Keychain leftover plus another maker's home (Alexa): not in Apple Home")
+check(!HomeSetup.inHome(hubSays: false, hubHomes: [], appleNodes: [0x12345678]) && HomeSetup.inHome(hubSays: true, hubHomes: [], appleNodes: []), "a hub too old to give its IDs: its own word")
+check(HomeSetup.inHome(hubSays: true, hubHomes: [home], appleNodes: nil) && !HomeSetup.inHome(hubSays: false, hubHomes: [home], appleNodes: nil), "no Home access: the hub's own word")
+check(HomeSetup.inHome(hubSays: true, hubHomes: [.init(node: "not hex", vendor: 4996)], appleNodes: [0x12345678]), "an ID that can't be read is skipped (then the hub's own word)")
+check(!HomeSetup.inHome(hubSays: true, hubHomes: [home], appleNodes: []), "no accessories in Apple Home: not added")
 
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

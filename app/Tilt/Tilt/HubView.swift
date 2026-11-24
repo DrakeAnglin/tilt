@@ -6,7 +6,9 @@ struct HubView: View {
     @Environment(HubWatch.self) private var hub
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @State private var home: ControllerSettingsView.HomeInfo?
+    @State private var home: HomeSetup.Code?
+    @State private var opening = false             // asking for the code / Apple's add screen is open
+    @State private var homeTask: Task<Void, Never>?
     @State private var problem: String?
     @State private var confirmLeave = false
     @State private var removing: PhoneKey?
@@ -24,12 +26,15 @@ struct HubView: View {
                         if let up = i.up { LabeledContent("Running for", value: Self.span(up)) }
                     } header: { Text("Tilt Hub") }
                     Section {
-                        LabeledContent("Status", value: (i.home ?? 0) == 1 ? "Added" : "Not added yet")
-                        if hub.isOwner && (i.home ?? 0) != 1 {
-                            Button("Add Tilt Hub to Apple Home", systemImage: "homekit") { openHome() }
+                        LabeledContent("Status", value: hub.inHome ? "Added" : "Not added yet")
+                        if hub.isOwner && !hub.inHome {
+                            Button { openHome() } label: { Label(opening ? "Opening Apple Home…" : "Add Tilt Hub to Apple Home", systemImage: "homekit") }.disabled(opening)
                         }
                     } header: { Text("Apple Home") } footer: {
-                        Text("Add the hub once: every controller on it shows up in Apple Home by itself.")
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Add the hub once: every controller on it shows up in Apple Home by itself.")
+                            if hub.isOwner && !hub.inHome { Button("Show the code instead") { openHome(showCode: true) }.font(.footnote).disabled(opening) }
+                        }
                     }
                     Section {
                         if let n = i.new, !n.isEmpty {
@@ -100,19 +105,32 @@ struct HubView: View {
         .navigationTitle("Tilt Hub")
         .refreshable { await load() }
         .task { await load() }
-        .sheet(item: $home) { HomeSheet(info: $0, roomName: "Tilt Hub").presentationDetents([.large]) }
+        .sheet(item: $home, onDismiss: { Task { await load() } }) { HomeSheet(info: $0).presentationDetents([.large]) }
+        .onDisappear { homeTask?.cancel() }
     }
     /// This iPhone is the hub's only owner (leaving would leave the hub with nobody to let people in).
     private var soleOwner: Bool { hub.isOwner && !people.contains { $0.me == 0 && $0.owner == 1 && $0.wait != 1 } }
     private var people: [PhoneKey] { hub.everyone ?? [] }
-    private func load() async { await hub.refresh() }
+    /// Also looks in Apple Home itself, so "Added" is right even after the hub was removed in the Home app (iOS asks
+    /// for Home access the first time).
+    private func load() async { AppleHomes.shared.start(); await AppleHomes.shared.ready(); await hub.refresh() }
     private func act(_ f: @escaping () async throws -> Void) {
         problem = nil
         Task { do { try await f(); await load() } catch { problem = error.localizedDescription } }
     }
-    private func openHome() {
-        Task {
-            do { let h = try await hub.homeCode(); home = .init(code: h.code, qr: h.qr, hub: true, inHome: h.home == 1) } catch { problem = error.localizedDescription }
+    /// Apple's add screen with the code filled in; the code itself only if that can't open (or `showCode`).
+    private func openHome(showCode: Bool = false) {
+        guard !opening else { return }
+        opening = true; problem = nil
+        homeTask = Task {
+            defer { opening = false }
+            do {
+                home = try await HomeSetup.start(name: "Tilt Hub", showCode: showCode) {
+                    let h = try await hub.homeCode()
+                    return .init(code: h.code, qr: h.qr, hub: true, inHome: hub.inHome)
+                }
+                if home == nil { await load() }
+            } catch { if !Task.isCancelled { problem = error.localizedDescription } }   // the page was closed: nothing to say
         }
     }
     static func signal(_ dbm: Int) -> String { "\(dbm) dBm (\(dbm > -60 ? "strong" : dbm > -75 ? "good" : dbm > -85 ? "weak" : "very weak"))" }

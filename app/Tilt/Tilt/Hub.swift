@@ -31,6 +31,7 @@ final class HubWatch {
     var isOwner: Bool { record?.owner == true && record?.waiting == false }
     /// Where the hub is: the connected one's address, else the one found.
     var host: String? { record?.host ?? found?.host }
+    /// In Apple Home: checked against Apple Home's own accessories once the Tilt Hub page has opened (HomeSetup.inHome).
     var inHome = false
     /// The connected hub answered lately. nil: not asked yet.
     var answering: Bool?
@@ -107,7 +108,8 @@ final class HubWatch {
             let i: HubInfo = try await call("/api/info")
             guard current() else { return }
             misses = 0; answering = true; info = i
-            inHome = (i.home ?? 0) == 1
+            inHome = HomeSetup.inHome(hubSays: (i.home ?? 0) == 1, hubHomes: (i.homes ?? []).map { .init(node: $0.node, vendor: $0.vendor) },
+                                      appleNodes: AppleHomes.shared.nodeIDs)
             newNearby = i.new?.count ?? 0
             if var r = record, r.waiting { r.waiting = false; r.code = nil; save(r) }     // the owner let this iPhone in
             if let ps = try? await people(), current() {
@@ -270,6 +272,9 @@ final class HubWatch {
 /// What the hub says about itself and its controllers (/api/info).
 struct HubInfo: Decodable, Sendable {
     let fw: String?, up: Int?, ip: String?, wifi: Int?, ch: Int?, home: Int?
+    /// Its Matter home connections: `node` is the hub's own ID in each (hex), to find it among Apple Home's accessories.
+    let homes: [Home]?
+    struct Home: Decodable, Sendable { let node: String?; let vendor: Int? }
     let c: [Member]
     let new: [New]?
     struct New: Decodable, Sendable { let ble: String; let rssi: Int? }
