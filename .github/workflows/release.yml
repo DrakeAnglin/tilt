@@ -1,0 +1,127 @@
+name: Firmware release
+
+# Push a version tag on a commit in main and this builds, signs and publishes the release on DrakeAnglin/tilt-site,
+# where the Tilt app finds it (releases/latest/download/firmware.json). How to cut one: docs/firmware-release.md.
+#   fw-v2.3.0        controller, stable        fw-v2.3.0-beta1   controller, beta        hub-v0.3.4   Tilt Hub
+# The tag's message (git tag -a ... -m "...") becomes the release notes the app shows.
+# A pull request that changes the release path runs the same build and signs with a throwaway key; nothing is published.
+on:
+  push:
+    tags: ['fw-v*', 'hub-v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - tools/release_firmware.py
+      - tools/release_ci.py
+
+concurrency:
+  group: firmware-release           # one release at a time: each one builds on the last firmware.json
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # esp-matter 1.5 on ESP-IDF 5.5.5, the same as the Mac (pinned, so a release builds the same way twice).
+    container: espressif/esp-matter:release-v1.5_idf_v5.5.5@sha256:51e890d6e913be195d273384eb93785bc9e64c35751a13fdd02c79ff06c07273
+    # The signing key is only given to tag runs. Keep both secrets in the "release" environment, allowed for
+    # fw-v* and hub-v* tags only (docs/firmware-release.md).
+    environment: ${{ github.event_name == 'push' && 'release' || '' }}
+    outputs:
+      kind: ${{ steps.tag.outputs.kind }}
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tools
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          pip3 install --break-system-packages --quiet detools
+          mkdir -p ~/esp ~/.tilt
+          ln -sfn "$IDF_PATH" ~/esp/esp-idf          # build.sh looks in ~/esp, as on the Mac
+          ln -sfn "$ESP_MATTER_PATH" ~/esp/esp-matter
+      - name: Which release
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = push ]; then
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"     # the annotated tag, with its message
+            git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main: tag a commit in main"; exit 1; }
+            python3 tools/release_ci.py check-tag "$TAG" >> "$GITHUB_OUTPUT"
+            git for-each-ref "refs/tags/$TAG" --format='%(contents)' | sed '/-----BEGIN PGP/,$d' > notes.txt
+          else
+            V=$(python3 -c "import sys; sys.path.insert(0,'tools'); import release_ci; print(release_ci.code_version('controller'))")
+            printf 'kind=both\nversion=%s\n' "$V" >> "$GITHUB_OUTPUT"
+            echo "Dry run from a pull request" > notes.txt
+          fi
+          cat "$GITHUB_OUTPUT"
+      - name: Logic tests
+        run: tools/firmware_tests.sh
+      - name: Signing key
+        env:
+          KEY: ${{ secrets.FIRMWARE_SIGNING_KEY }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          umask 077
+          if [ "$EVENT" = push ]; then
+            [ -n "$KEY" ] || { echo "::error::no FIRMWARE_SIGNING_KEY secret"; exit 1; }
+            printf '%s\n' "$KEY" > ~/.tilt/firmware-signing-key.pem
+          else
+            openssl ecparam -name prime256v1 -genkey -noout -out ~/.tilt/firmware-signing-key.pem     # throwaway
+          fi
+      - name: What is published now
+        run: python3 tools/release_ci.py fetch
+      - name: Build and sign the controller
+        if: steps.tag.outputs.kind != 'hub'
+        env:
+          CHANNEL: ${{ steps.tag.outputs.channel || 'beta' }}
+        run: python3 tools/release_firmware.py "$CHANNEL" --notes "$(cat notes.txt)" || { tail -50 firmware/blinds_matter/build-release.log; exit 1; }
+      - name: Build and sign the Tilt Hub
+        if: steps.tag.outputs.kind != 'controller'
+        run: python3 tools/release_firmware.py --hub --notes "$(cat notes.txt)" || { tail -50 firmware/tilt_hub/build-release.log; exit 1; }
+      - name: Check the signatures
+        run: |
+          # Every image ends in its signature: check it with the public half of the key, as the controller does.
+          openssl ec -in ~/.tilt/firmware-signing-key.pem -pubout -out pub.pem 2>/dev/null
+          python3 tools/release_ci.py verify pub.pem
+          rm -f ~/.tilt/firmware-signing-key.pem
+      - name: Files for the release
+        run: |
+          mkdir -p upload
+          python3 tools/release_ci.py files | xargs -I{} cp {} upload/
+          cp notes.txt upload/notes.txt
+          cat firmware/releases/firmware.json
+          ls -l upload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: upload/
+          retention-days: 30
+
+  publish:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: upload
+      - name: Publish on tilt-site
+        env:
+          GH_TOKEN: ${{ secrets.TILT_SITE_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          KIND: ${{ needs.build.outputs.kind }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::no TILT_SITE_TOKEN secret"; exit 1; }
+          if [ "$KIND" = hub ]; then TITLE="Tilt Hub $VERSION"; else TITLE="Firmware $VERSION"; fi
+          mv upload/notes.txt notes.txt
+          gh release create "$TAG" --repo DrakeAnglin/tilt-site --title "$TITLE" --notes-file notes.txt --latest upload/*
+          echo "Published: https://github.com/DrakeAnglin/tilt-site/releases/tag/$TAG"

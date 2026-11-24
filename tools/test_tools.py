@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(HERE, '../hardware/pcb'))
 import bambu  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
+import release_ci  # noqa: E402
 import release_firmware  # noqa: E402
 
 try:
@@ -31,6 +32,45 @@ class ReleaseFirmware(unittest.TestCase):
             return b'\x02' + bytes([len(v)]) + v
         body = integer(r) + integer(s)
         self.assertEqual(release_firmware.der_to_raw(b'\x30' + bytes([len(body)]) + body), r + s)
+
+
+    def test_stable_also_goes_to_beta_unless_beta_is_newer(self):
+        e = lambda v: {'version': v, 'file': 'tilt-%s.bin' % v}
+        self.assertEqual(release_firmware.add_to_listing({}, 'stable', e('2.3.0'))['beta']['version'], '2.3.0')
+        l = release_firmware.add_to_listing({'beta': e('2.3.0-beta2')}, 'stable', e('2.3.0'))
+        self.assertEqual(l['beta']['version'], '2.3.0')          # the beta it came from is not newer
+        l = release_firmware.add_to_listing({'beta': e('2.4.0-beta1')}, 'stable', e('2.3.1'))
+        self.assertEqual(l['beta']['version'], '2.4.0-beta1')    # a newer beta stays
+        l = release_firmware.add_to_listing({'stable': e('2.3.0')}, 'beta', e('2.4.0-beta1'))
+        self.assertEqual(l['stable']['version'], '2.3.0')        # a beta never touches stable
+
+
+class ReleaseCI(unittest.TestCase):
+    def test_parse_tag(self):
+        self.assertEqual(release_ci.parse_tag('fw-v2.3.0'), ('controller', '2.3.0', 'stable'))
+        self.assertEqual(release_ci.parse_tag('fw-v2.3.0-beta1'), ('controller', '2.3.0-beta1', 'beta'))
+        self.assertEqual(release_ci.parse_tag('hub-v0.3.4'), ('hub', '0.3.4', 'hub'))
+        for bad in ['v2.3.0', 'fw-2.3.0', 'fw-v2.3', 'fw-v2.3.0 ', 'firmware-2.3.0']:
+            with self.assertRaises(ValueError): release_ci.parse_tag(bad)
+
+    def test_code_versions_parse(self):
+        self.assertRegex(release_ci.code_version('controller'), r'^\d+\.\d+\.\d+')
+        self.assertRegex(release_ci.code_version('hub'), r'^\d+\.\d+\.\d+')
+
+    def test_raw_to_der_undoes_der_to_raw(self):
+        for raw in [b'\x80' + b'\x11' * 31 + b'\x00\x22' + b'\x33' * 30, b'\x01' * 64, b'\x00' * 31 + b'\x05' + b'\xff' * 32]:
+            self.assertEqual(release_firmware.der_to_raw(release_ci.raw_to_der(raw)), raw)
+
+    def test_signed_part(self):
+        self.assertEqual(release_ci.signed_part(b'IMG' + b's' * 64 + b'TILTSIG1'), (b'IMG', b's' * 64))
+        self.assertEqual(release_ci.signed_part(b'P' + b's' * 64 + b'TILTDLT1'), (b'P', b's' * 64))
+        with self.assertRaises(ValueError): release_ci.signed_part(b'x' * 80)
+
+    def test_listed_files_names_every_image_and_patch_once(self):
+        listing = {'stable': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                   'beta': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                   'hub': {'file': 'tilt-hub-0.3.4.bin'}}
+        self.assertEqual(release_ci.listed_files(listing), ['tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin'])
 
 
 class Orient(unittest.TestCase):
