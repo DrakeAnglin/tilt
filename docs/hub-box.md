@@ -21,8 +21,9 @@ The pinhole face carries the mark: the app icon's three slats and "tilt", engrav
 
 1. Flash the ESP on the bench first ([firmware](../firmware/tilt_hub/README.md)). Do not solder pins on it.
 2. Push the adapter into the ESP.
-3. Slice at **0.2 mm layers**, no supports. Add a **pause after layer 39** (7.8 mm): the last layer of the walls,
-   just before the roof. The build prints the right layer for the sizes in `Hub.py`; it moves when they change.
+3. Slice at **0.2 mm layers**, no supports. Put a **pause on layer 40** (8.0 mm). Bambu Studio pauses at the start of
+   the layer you pick, so the printer stops **after layer 39** (7.8 mm): the walls are done, the roof is next. The
+   build prints the right layer for the sizes in `Hub.py`; it moves when they change.
 4. At the pause, put the ESP and adapter in **parts side down** (the ESP's bare back up), **nose first**: hold the
    back end up a little, slide the plug out through the hole in the front, then lay the back end down. It must lie
    flat by itself. Run a finger over the top: **nothing may stand above the walls**, or the nozzle hits it. If it
@@ -36,7 +37,8 @@ The pinhole face carries the mark: the app icon's three slats and "tilt", engrav
 mark as a second color instead of a groove: the slats and the word fill the first two layers, flush with the face.
 
 1. Open it in Bambu Studio. The box is filament 1 (white) and the mark filament 2: pick your second color.
-2. The **pause after layer 39 is already set** (look for it on the layer slider after slicing).
+2. The **pause is already set**: after slicing, the layer slider shows it on layer 40, so the printer stops after
+   layer 39.
 3. It is set up for the H2D, 0.4 nozzle, 0.2 mm layers, PLA, no supports. Change the filament type if you print PETG.
 
 Rebuild it after any change to the box: run `tools/fusion_hub.py` in Fusion, then `python3 tools/bambu_hub.py`.

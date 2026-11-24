@@ -36,11 +36,12 @@ BED = (175.0, 160.0)                # middle of the H2D's bed
 
 
 def pause_xml():
-    """A pause after the last layer of the walls, before the roof (Hub.py's pause height). Type 1 = pause in Bambu
+    """A pause after the last layer of the walls, before the roof. Bambu Studio pauses at the START of the layer the
+    mark is on, so the mark goes on the first roof layer (Hub.py's pause height + one layer). Type 1 = pause in Bambu
     Studio's list (0 color change, 2 tool change)."""
     return ('<?xml version="1.0" encoding="utf-8"?>\n<custom_gcodes_per_layer>\n<plate>\n<plate_info id="1"/>\n'
             '<layer top_z="%.2f" type="1" extruder="1" color="" extra="" gcode="M400 U1"/>\n'
-            '<mode value="MultiAsSingle"/>\n</plate>\n</custom_gcodes_per_layer>\n' % H['zp'])
+            '<mode value="MultiAsSingle"/>\n</plate>\n</custom_gcodes_per_layer>\n' % (H['zp'] + H['layer']))
 
 
 def main():
@@ -98,7 +99,7 @@ def main():
                 dst.writestr(info, src.read(info.filename))
         dst.writestr('Metadata/custom_gcode_per_layer.xml', pause_xml())
     shutil.rmtree(tmp)
-    print('wrote', os.path.relpath(OUT, REPO), '- pause at %.1f mm (after layer %d)' % (H['zp'], H['pause_layer']))
+    print('wrote', os.path.relpath(OUT, REPO), '- pause before layer %d, walls done at %.1f mm (after layer %d)' % (H['pause_layer'] + 1, H['zp'], H['pause_layer']))
 
 
 if __name__ == '__main__':

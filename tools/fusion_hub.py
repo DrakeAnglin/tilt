@@ -184,17 +184,16 @@ try:
     tbm.booleanOperation(hollow, bx(H['x_in'] - 1, H['L'] - WALL_MIN - 0.05, -30, 30, H['fz'] - 0.01, H['zp'] + 0.01), B.IntersectionBooleanType)
     for x, y in H['btn'].values():
         tbm.booleanOperation(hollow, cyl((x, y, -1), (x, y, H['tube_top'] + 0.02), H['pin_d'] / 2 + 0.05), B.DifferenceBooleanType)
-    # grow test: the hollow moved WALL_MIN any way sideways, up or down must stay inside the outside shape
+    # grow test: the hollow moved WALL_MIN any way sideways, or straight up or down, must stay inside the outside shape
     worst = 0.0
     for k in range(16):
         ang = math.pi * k / 8
-        for dz in (0,):
-            t = adsk.core.Matrix3D.create()
-            t.translation = adsk.core.Vector3D.create(math.cos(ang) * WALL_MIN / 10, math.sin(ang) * WALL_MIN / 10, 0)
-            cpy = tbm.copy(hollow)
-            tbm.transform(cpy, t)
-            tbm.booleanOperation(cpy, tbm.copy(H['outline']), B.DifferenceBooleanType)
-            worst = max(worst, cpy.volume * 1000 if cpy.faces.count else 0.0)
+        t = adsk.core.Matrix3D.create()
+        t.translation = adsk.core.Vector3D.create(math.cos(ang) * WALL_MIN / 10, math.sin(ang) * WALL_MIN / 10, 0)
+        cpy = tbm.copy(hollow)
+        tbm.transform(cpy, t)
+        tbm.booleanOperation(cpy, tbm.copy(H['outline']), B.DifferenceBooleanType)
+        worst = max(worst, cpy.volume * 1000 if cpy.faces.count else 0.0)
     for dz in (WALL_MIN, -WALL_MIN):
         t = adsk.core.Matrix3D.create()
         t.translation = adsk.core.Vector3D.create(0, 0, dz / 10)
@@ -208,6 +207,7 @@ try:
         failures.append('a wall is under %.1f mm (%.2f mm3 breaks out when the hollow is moved that far)' % (WALL_MIN, worst))
 except Exception as ex:
     wall_note = 'failed: %s' % str(ex)[:80]
+    failures.append('the wall check did not run: %s' % str(ex)[:80])
 
 # ------------------------------------------------------------------ document
 design = KIT.fresh_document(app, 'hub', old_prefixes=(PREFIX,))

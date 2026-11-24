@@ -7,7 +7,7 @@ adapter plugged into it is dropped in at a pause part-way up the print, and the 
   * The parts go in nose first: tilted, the plug slides out through the lip's hole, then the back drops down. The
     stop is a low bar so the body's back corner swings over it (checked by the Fusion driver's slide-in test); once
     the roof is on, the body cannot lift over it.
-  * The ESP lies on two rails that reach up to its face along the pad rows, behind the web.
+  * The ESP lies on two rails that reach up to its face along the pad rows, behind the low stop bar.
   * Two pinholes in the bed face, one under BOOT and one under RST, each in a tube that guides a paper clip.
   * No supports: the roof bridges across the box, one layer over the adapter and about 0.7 over the ESP's back.
 
