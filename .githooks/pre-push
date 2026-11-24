@@ -1,0 +1,9 @@
+#!/bin/sh
+# Nothing is pushed straight to main: it goes in through a pull request. See docs/agents/workflow.md.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = refs/heads/main ]; then
+    echo "pre-push: main only changes through a pull request. Push a branch and open one." >&2
+    exit 1
+  fi
+done
+exit 0

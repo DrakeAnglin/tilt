@@ -1,0 +1,74 @@
+name: CI
+
+# Runs the same tests as tools/agent/check.sh on every pull request and on main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.find.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: find
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # The app tests need a Mac (10x the minutes), so they run only when the app or the shared wire fixture changed.
+          if FILES=$(git diff --name-only "$BASE" HEAD 2>/dev/null); then
+            if echo "$FILES" | grep -qE '^(app/|firmware/blinds_matter/test/wire|tools/app_tests\.sh|\.github/workflows/)'; then
+              echo "app=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "app=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tools/firmware_tests.sh
+
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install cryptography
+      - run: python3 -m unittest tools/test_tools.py
+
+  app:
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tools/app_tests.sh
+
+  # One check to look at: green only when every job passed or was skipped on purpose.
+  ci:
+    if: always()
+    needs: [changes, firmware, tools, app]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          case "$RESULTS" in *failure*|*cancelled*) exit 1 ;; esac
