@@ -57,9 +57,10 @@ human_only '^(hardware/|tools/(fusion_.*|bambu.*|orient)\.py$)' \
 human_only '^tools/(release_firmware\.py|flash.*\.sh)$|(^|/)(partitions\.csv|sdkconfig[^/]*)$' \
   "Release or flashing changed; a mistake here can reach controllers that are in use." \
   "a controller still takes an update and still starts."
-# The update path is not here: it is two-way at merge and gets a bench check before the next release.
-human_only '(^|/)(fwkey\.h|sec\.h|tilt_crypto\.h|lock\.h|Secure\.swift)$' \
-  "Keys, pairing or who may do what changed, and a bench check does not show a hole." \
+# update.h is here for its signature check (fwSignatureOk). The rest of the update path is two-way
+# at merge and gets a bench check before the next release.
+human_only '(^|/)(fwkey\.h|sec\.h|tilt_crypto\.h|lock\.h|update\.h|Secure\.swift)$' \
+  "Keys, pairing, the firmware signature check or who may do what changed, and a bench check does not show a hole." \
   "nothing is let in that should not be, and paired devices still trust each other."
 human_only '(^|/)(Info\.plist|[^/]*-Info\.plist|PrivacyInfo\.xcprivacy|[^/]*\.entitlements)$' \
   "What the app asks Apple for changed." \

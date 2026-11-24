@@ -21,7 +21,7 @@ A one-way door needs a named reason: what happens on merge that a revert cannot 
 
 Some two-way changes are only safe to release once they have run on real hardware. Merging them is fine; releasing them untested is not. The reviewer adds the `bench-check` label and writes what to check in its review. These are:
 
-- The update path: `update.h`, `ota.h`, `FirmwareUpdate.swift`, the hub's update code. A bad update can leave a controller that cannot be updated again.
+- The update path: `ota.h`, `FirmwareUpdate.swift`, the hub's update code (`update.h` is human-only, above). A bad update can leave a controller that cannot be updated again.
 - Stored data changes shape: what a controller or hub keeps in flash (`store.h`), what the app keeps (`Store.swift`).
 - The wire format: `wire.h`, `api.h`, `Api.swift`, the hub link, the `test/wire` fixture, when devices or apps already in use would stop understanding each other.
 - Firmware that only runs on the ESP (adapters, tasks, timers) and has no Mac test.
@@ -67,7 +67,7 @@ Tests cannot vouch for these, or they are the rules themselves:
 - `hardware/`, `tools/fusion_*.py`, `tools/bambu*.py`, `tools/orient.py`: printed parts and the PCB. Someone has to look at the part.
 - `tools/release_firmware.py`, `tools/flash*.sh`, `partitions.csv`, `sdkconfig*`: release and flashing.
 - `tools/firmware_tests.sh`, `tools/app_tests.sh`: what the tests run. Adding tests is fine; changing how they run is not.
-- `fwkey.h`, `sec.h`, `tilt_crypto.h`, `lock.h`, `Secure.swift`: keys, pairing and who may do what. A hole here lets someone in, and a bench check does not show a hole.
+- `fwkey.h`, `sec.h`, `tilt_crypto.h`, `lock.h`, `update.h` (it holds the firmware signature check), `Secure.swift`: keys, pairing, signatures and who may do what. A hole here lets someone in, and a bench check does not show a hole.
 - `*.entitlements`, `Info.plist`, `PrivacyInfo.xcprivacy`: what Apple reviews.
 - `docs/adr/`, `docs/requirements.md`: decisions are the owner's.
 - `docs/agents/review-policy.md`, `.claude/agents/`, `.claude/settings.json`, `tools/agent/`, `.githooks/`, `.github/workflows/`: what decides a merge. That is this policy, the reviewer and the gate, the merge script, the guard and CI. An agent does not approve that for itself.
