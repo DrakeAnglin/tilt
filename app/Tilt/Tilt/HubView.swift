@@ -21,11 +21,11 @@ struct HubView: View {
                 if let i = hub.info {
                     Section {
                         LabeledContent("Status", value: hub.statusWord)
-                        LabeledContent("Address", value: i.ip ?? hub.host ?? "")
-                        if let w = i.wifi, w != 0 { LabeledContent("Wi-Fi signal", value: Self.signal(w)) }
-                        if let ch = i.ch { LabeledContent("Thread channel", value: "\(ch)") }
-                        if let fw = i.fw { HubFirmwareRow(fw: fw, owner: hub.isOwner) }
-                        if let up = i.up { LabeledContent("Running for", value: Self.span(up)) }
+                        LabeledContent("Address", value: i.ip)
+                        if i.wifi != 0 { LabeledContent("Wi-Fi signal", value: Self.signal(i.wifi)) }
+                        LabeledContent("Thread channel", value: "\(i.ch)")
+                        HubFirmwareRow(fw: i.fw, owner: hub.isOwner)
+                        LabeledContent("Running for", value: Self.span(i.up))
                     } header: { Text("Tilt Hub") }
                     Section {
                         IntegrationRow(icon: "homekit", tint: .orange, name: "Apple Home",
@@ -45,7 +45,7 @@ struct HubView: View {
                         }
                     }
                     Section {
-                        if let n = i.new, !n.isEmpty {
+                        if case let n = i.new, !n.isEmpty {
                             Label("\(n.count) new controller\(n.count == 1 ? "" : "s") nearby, waiting for setup", systemImage: "sparkles")
                         }
                         if i.c.isEmpty { Text("No controllers yet.").foregroundStyle(.secondary) }
@@ -72,11 +72,11 @@ struct HubView: View {
                             .swipeActions {
                                 if hub.isOwner && p.me == 0 && p.wait != 1 {
                                     Button("Remove") { removing = p }.tint(Palette.danger)
-                                    Button(p.owner == 1 ? "Make Guest" : "Make Owner") { act { try await hub.makeOwner(cid: p.cid, p.owner != 1) } }.tint(Palette.accent)
+                                    Button(p.owner == 1 ? "Make Guest" : "Make Owner") { act { try await hub.client().makeOwner(cid: p.cid, p.owner != 1) } }.tint(Palette.accent)
                                 }
                             }
                             .confirmationDialog("Remove \(p.name) from the Tilt Hub?", isPresented: Binding(get: { removing?.cid == p.cid }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
-                                Button("Remove", role: .destructive) { act { try await hub.revoke(cid: p.cid) } }
+                                Button("Remove", role: .destructive) { act { try await hub.client().revoke(cid: p.cid) } }
                             }
                         }
                     } header: { Text("People") } footer: {
@@ -149,7 +149,7 @@ struct HubView: View {
             defer { opening = false }
             do {
                 home = try await HomeSetup.start(name: "Tilt Hub", showCode: showCode) {
-                    let h = try await hub.homeCode()
+                    let h = try await hub.client().homeCode()
                     return .init(code: h.code, qr: h.qr, hub: true, inHome: hub.inHome)
                 }
                 if home == nil { await load() }
@@ -163,7 +163,7 @@ struct HubView: View {
         Task {
             defer { askingAlexa = false }
             do {
-                let s = try await hub.shareCode()
+                let s = try await hub.client().shareCode()
                 alexa = AlexaCode(code: s.code, mins: s.mins, first: s.first)
             } catch { problem = error.localizedDescription }
         }
@@ -245,8 +245,15 @@ private struct HubFirmwareRow: View {
         Task {
             defer { busy = nil }
             do {
-                let file = try await updates.download(r)
-                try await hub.updateHub(file, to: r.version) { s in Task { @MainActor in busy = s } }
+                guard let host = hub.record?.host else { throw TiltError("This iPhone is not connected to the Tilt Hub.") }
+                for try await s in try FirmwareUpdates.installer().updateHub(to: r, hubHost: host) {
+                    switch s {
+                    case .downloading: busy = "Downloading…"
+                    case .sending: busy = "Sending it to the Tilt Hub…"
+                    case .restarting: busy = "The Tilt Hub is restarting…"
+                    case .done: await hub.restarted()
+                    }
+                }
             } catch { problem = error.localizedDescription }
         }
     }

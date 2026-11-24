@@ -8,15 +8,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct FirmwareRelease: Decodable, Equatable {
-    let version: String, file: String, size: Int, sha256: String
-    let notes: String?
-    /// Only what changed since an earlier firmware ("from": that image's SHA-256): about a minute over Thread
-    /// instead of seven. Used when the controller runs exactly that firmware.
-    let patches: [Patch]?
-    struct Patch: Decodable, Equatable { let from: String, file: String, size: Int, sha256: String }
-}
-
+// The release list and downloads. Installing is FirmwareInstaller (Shared/FirmwareInstaller.swift).
 @MainActor @Observable
 final class FirmwareUpdates {
     static let shared = FirmwareUpdates()
@@ -62,49 +54,10 @@ final class FirmwareUpdates {
         return d
     }
 
-    enum Step: Equatable { case downloading, sending, hub(Int), restarting, confirming, done(String) }
-
-    /// Put a firmware file on a controller: allow the upload, send it, wait for the restart, then keep the new firmware.
-    static func install(_ file: Data, on c: Controller, step: @escaping (Step) -> Void) async throws {
-        step(.sending)
-        try await c.client.allowUpdate()
-        try await HubWatch.shared.allowUpload(for: c.id)       // the hub takes a file only when its owner says so
-        let host = await c.client.transport.host
-        // The hub takes the file and feeds it over Thread.
-        guard host.contains(ControllerRecord.hubPath) else { throw TiltError("This controller is not on a Tilt Hub. Set it up again to put it on the hub.") }
-        let before = try? await Secure.hello(host)
-        guard let url = URL(string: "http://\(host)/api/update") else { throw TiltError("The controller's address is not valid.") }
-        var req = URLRequest(url: url, timeoutInterval: 240)
-        req.httpMethod = "POST"
-        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        let (d, _) = try await URLSession.shared.upload(for: req, from: file)
-        struct R: Decodable { let ok: Int; let err: String? }
-        let r = try? JSONDecoder().decode(R.self, from: d)
-        guard r?.ok == 1 else { throw TiltError((r?.err ?? "The controller did not take the update.").capitalizedFirst) }
-
-        do {
-            step(.hub(0))
-            var done = false
-            for _ in 0..<900 where !done {        // a few minutes; up to half an hour for an older controller
-                try await Task.sleep(for: .seconds(2))
-                guard let m = await HubWatch.fetchInfo()?.c.first(where: { $0.id == c.id }) else { continue }
-                switch m.ota ?? 0 {
-                case 4: throw TiltError((m.otaErr ?? "The update did not go through.").capitalizedFirst)
-                case 3: done = true
-                case 2: step(.hub(100))
-                default: step(.hub(m.otaPct ?? 0))
-                }
-            }
-            guard done else { throw TiltError("The update through the hub did not finish.") }
-        }
-        step(.restarting)
-        try await Task.sleep(for: .seconds(10))
-        step(.confirming)
-        for _ in 0..<40 {         // up to a minute or two more for it to come back
-            if let h = try? await Secure.hello(host), h.boot != before?.boot, (try? await c.client.keepFirmware()) != nil { step(.done(h.fw)); return }
-            try await Task.sleep(for: .seconds(3))
-        }
-        throw TiltError("The controller did not come back. If it restarts later it goes back to the old firmware by itself.")
+    /// The installer for the connected hub and the controllers on it.
+    static func installer() throws -> FirmwareInstaller {
+        FirmwareInstaller(hub: try HubWatch.shared.client(), uploader: HTTPUploader(), sleep: { try await Task.sleep(for: $0) },
+                          download: { try await FirmwareUpdates.shared.download(file: $0, sha: $1) })
     }
 }
 
@@ -162,7 +115,7 @@ struct FirmwareInstallSheet: View {
     @Environment(\.dismiss) private var dismiss
     let job: FirmwareJob
     let controller: Controller
-    @State private var step: FirmwareUpdates.Step = .downloading
+    @State private var step: FirmwareStep = .downloading
     @State private var problem: String?
     private var finished: Bool { if case .done = step { return true }; return problem != nil }
     var body: some View {
@@ -182,10 +135,10 @@ struct FirmwareInstallSheet: View {
         .padding(24)
         .task { await run() }
     }
-    private func order(_ s: FirmwareUpdates.Step) -> Int {
+    private func order(_ s: FirmwareStep) -> Int {
         switch s { case .downloading: 0; case .sending, .hub: 1; case .restarting: 2; case .confirming: 3; case .done: 4 }
     }
-    private func row(_ s: FirmwareUpdates.Step, _ text: String, order n: Int) -> some View {
+    private func row(_ s: FirmwareStep, _ text: String, order n: Int) -> some View {
         let now = order(step)
         return HStack(spacing: 10) {
             if now == n && problem == nil { SlatLoader(size: 18) } else { Image(systemName: now > n ? "checkmark.circle.fill" : "circle").foregroundStyle(now > n ? Palette.good : Color.secondary) }
@@ -193,21 +146,12 @@ struct FirmwareInstallSheet: View {
         }
     }
     private func run() async {
-        do {
-            let file: Data
-            switch job {
-            case .release(let r):
-                step = .downloading
-                // A patch when there is one for exactly the firmware it runs; the whole file if that does not work.
-                let img = try? await Secure.hello(controller.record.host).img
-                if let p = r.patches?.first(where: { $0.from == img }), let d = try? await FirmwareUpdates.shared.download(file: p.file, sha: p.sha256) {
-                    do { try await FirmwareUpdates.install(d, on: controller) { s in Task { @MainActor in step = s } }; return }
-                    catch { step = .downloading }
-                }
-                file = try await FirmwareUpdates.shared.download(r)
-            case .file(let d, _): file = d
-            }
-            try await FirmwareUpdates.install(file, on: controller) { s in Task { @MainActor in step = s } }
-        } catch { problem = error.localizedDescription }
+        let work: FirmwareInstaller.Job
+        switch job {
+        case .release(let r): work = .release(r)
+        case .file(let d, _): work = .file(d)
+        }
+        do { for try await s in try FirmwareUpdates.installer().install(work, on: controller.client, id: controller.id) { step = s } }
+        catch { problem = error.localizedDescription }
     }
 }

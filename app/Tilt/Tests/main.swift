@@ -233,5 +233,222 @@ check(!HomeSetup.inAlexa(hubHomes: [keychain, home]), "Apple's two connections o
 check(!HomeSetup.inAlexa(hubHomes: []) && !HomeSetup.inAlexa(hubHomes: [.init(node: nil, vendor: nil)]), "no homes, or a hub too old to give makers: not in Alexa")
 check(!HomeSetup.inAlexa(hubHomes: [.init(node: "00000000000000AA", vendor: 4447)]), "another maker's home: not Alexa")
 check(!HomeSetup.inHome(hubSays: true, hubHomes: [alexa], appleNodes: [0x77]), "in Alexa only: not in Apple Home")
+// ---- the Tilt Hub client (Shared/HubClient.swift, issue #82): commands, answers, the demo hub
+/// What a fake device was sent, in order, across devices (to check the order of a flow).
+final class Recorder: @unchecked Sendable {
+    private let lock = NSLock(); private var items: [String] = []
+    func add(_ s: String) { lock.lock(); items.append(s); lock.unlock() }
+    var all: [String] { lock.lock(); defer { lock.unlock() }; return items }
+    func count(_ prefix: String) -> Int { all.filter { $0.hasPrefix(prefix) }.count }
+}
+final class Cell<T>: @unchecked Sendable {
+    private let lock = NSLock(); private var v: T
+    init(_ v: T) { self.v = v }
+    var value: T { get { lock.lock(); defer { lock.unlock() }; return v } set { lock.lock(); v = newValue; lock.unlock() } }
+}
+/// A hub or controller that answers from a script and writes what it was sent to a Recorder.
+struct Scripted: ControllerTransport {
+    let name: String, log: Recorder, address: String
+    let answer: @Sendable (String) -> String
+    var host: String { address }
+    func move(to host: String) async {}
+    func call(_ c: String) async throws -> Data { log.add("\(name) \(c)"); return Data(answer(c).utf8) }
+}
+func cmdPath(_ c: String) -> String { String(c.split(separator: "?").first ?? "") }
+
+check(HubApi.info == "/api/info" && HubApi.network == "/api/net" && HubApi.homeCode == "/api/homecode" && HubApi.shareCode == "/api/sharecode", "hub reading commands")
+check(HubApi.backup(id: "a1") == "/api/backup?id=a1" && HubApi.replace(old: "a1", new: "b2") == "/api/replace?old=a1&new=b2", "backup and replace")
+check(HubApi.allowUpload(controller: "a1") == "/api/upload?id=a1" && HubApi.allowHubUpdate == "/api/hubupdate" && HubApi.resetPeople == "/api/resetpeople", "updates and people")
+check(HubApi.base("10.0.0.2") == "10.0.0.2/hub" && HubApi.controller("a1", hubHost: "10.0.0.2") == "10.0.0.2/c/a1", "the hub's addresses")
+check(Api.hubKey(cid: "0011") == "/api/hubkey?cid=0011", "tell a controller the hub's key")
+
+// /api/info, from the shared fixture (in the shape of the hub's builder, firmware/tilt_hub/main/hub.cpp infoJson)
+let hubInfoData = try Data(contentsOf: wireDir.appendingPathComponent("hub_info.json"))
+let hi = try? JSONDecoder().decode(HubInfo.self, from: hubInfoData)
+check(hi?.fw == "0.3.5" && hi?.ip == "192.168.1.40" && hi?.ch == 15 && hi?.home == 1 && hi?.homes?.first?.vendor == 4937, "hub_info.json: the hub's own fields")
+check(hi?.c.count == 2 && hi?.c[0].hubCid == "0011223344556677" && hi?.c[0].own == 1 && hi?.c[0].signal == -61, "hub_info.json: a controller on the hub")
+check(hi?.c[1].notResponding == true && hi?.c[1].signal == nil && hi?.c[1].ota == 4 && hi?.c[1].otaErr == "the controller stopped answering", "hub_info.json: a silent controller whose update failed")
+check(hi?.new.first?.ble == "aa:bb:cc:dd:ee:ff", "hub_info.json: a new controller nearby")
+let renamed = Data(String(decoding: hubInfoData, as: UTF8.self).replacingOccurrences(of: "\"seenS\"", with: "\"seen\"").utf8)
+check((try? JSONDecoder().decode(HubInfo.self, from: renamed)) == nil, "a renamed key in /api/info fails to decode (not silently nil)")
+let noHomes = #"{"ok":1,"fw":"0.2.3","up":1,"ip":"x","wifi":0,"ch":11,"c":[],"new":[]}"#
+check((try? JSONDecoder().decode(HubInfo.self, from: Data(noHomes.utf8)))?.homes == nil, "a hub from before homes (0.2.6) still decodes")
+
+let hlog = Recorder()
+let hc = HubClient(transport: Scripted(name: "hub", log: hlog, address: "10.0.0.2/hub") { c in
+    switch cmdPath(c) {
+    case HubApi.homeCode: #"{"ok":0,"err":"a home app is adding the Tilt Hub right now: try again in a minute"}"#
+    case HubApi.shareCode: #"{"ok":1,"code":"12345678901","qr":"MT:X","mins":15,"first":1,"homes":[],"home":0}"#
+    case HubApi.network: #"{"ok":1,"ds":"0e08"}"#
+    case "/api/revoke": #"{"ok":0,"err":"you cannot remove yourself"}"#
+    default: #"{"ok":1}"#
+    }
+})
+do { _ = try await hc.homeCode(); check(false, "a refused home code throws") }
+catch { check(error.localizedDescription == "A home app is adding the Tilt Hub right now: try again in a minute", "the hub's reason is passed on") }
+let share = try? await hc.shareCode()
+check(share?.code == "12345678901" && share?.first == true && share?.mins == 15, "a share code is decoded")
+check((try? await hc.network()) == "0e08", "the hub's network")
+do { try await hc.revoke(cid: "aa"); check(false, "a refused remove throws") } catch { check(error.localizedDescription == "You cannot remove yourself", "a refusal is the hub's words") }
+try? await hc.approve(cid: "bb", true); try? await hc.allowUpload(for: "a1")
+check(hlog.all.suffix(2) == ["hub /api/approve?cid=bb&ok=1&owner=0", "hub /api/upload?id=a1"], "the hub client builds the commands")
+
+let dh = HubClient.make(host: Demo.host, cid: Data(), key: SymmetricKey(size: .bits256))
+let dinfo = try? await dh.info()
+check(dinfo?.c.first?.id == Demo.id && dinfo?.c.first?.hubCid == DemoHub.hubCid, "the demo hub decodes as a hub, with the demo room on it")
+let dme = (try? await dh.people())?.first?.me, dnet = try? await dh.network()
+check(dme == 1 && dnet != nil, "the demo hub answers people and its network")
+check((try? await dh.homeCode()) == nil, "the demo hub has no Apple Home")
+
+// ---- adding a controller to the hub (Shared/ControllerOnboarding.swift)
+let hubCidOnNew = "00112233aabbccdd"
+func hubInfoJSON(_ id: String, hubCid: String?, ota: Int = 0, pct: Int = 0, err: String? = nil) -> String {
+    #"{"ok":1,"fw":"0.3.5","up":9,"ip":"10.0.0.2","wifi":-50,"ch":15,"c":[{"id":"\#(id)","name":"Den","fw":"2.2.1","key":1,"seenS":1,"pct":80,"low":0,"rssi":-60,"lqi":3,"ota":\#(ota),"otaPct":\#(pct)"#
+        + (err.map { #","otaErr":"\#($0)""# } ?? "") + (hubCid.map { #","hubCid":"\#($0)""# } ?? "") + #","own":1}],"new":[]}"#
+}
+func stateJSON(_ hkey: Int) -> String { #"{"v":"2.2.1","name":"Den","batt":{"v":3.9,"pct":80,"st":"battery","low":0},"closeUp":1,"sync":0,"mv":-1,"hkey":\#(hkey),"b":[]}"# }
+/// A controller on the hub whose people include the hub's request (waiting until approved).
+func controllerOnHub(_ log: Recorder, hubWaiting: Cell<Bool>, hkey: Cell<Int>) -> ControllerClient {
+    ControllerClient(transport: Scripted(name: "ctrl", log: log, address: "10.0.0.2/c/new1") { c in
+        switch cmdPath(c) {
+        case Api.keys: return #"{"keys":[{"cid":"aa","name":"Me","owner":1,"me":1,"wait":0},{"cid":"\#(hubCidOnNew)","name":"Tilt Hub","owner":0,"me":0,"wait":\#(hubWaiting.value ? 1 : 0)}]}"#
+        case "/api/approve": hubWaiting.value = false; return #"{"ok":1}"#
+        case "/api/hubkey": hkey.value = 1; return #"{"ok":1}"#
+        case Api.state: return stateJSON(hkey.value)
+        default: return #"{"ok":1}"#
+        }
+    })
+}
+struct TestStore: ControllerStore {
+    let log: Recorder, client: ControllerClient
+    func adopt(_ h: Hello, host: String, paired: Paired) async -> ControllerClient { log.add("adopt \(host)"); return client }
+}
+func fakeHello(_ id: String, boot: String, net: String?) -> Hello { Hello(id: id, name: "Den", fw: "2.2.1", boot: boot, img: "aaa", owned: 1, home: nil, net: net, hub: nil) }
+func collect<S>(_ stream: AsyncThrowingStream<S, Error>) async -> (steps: [S], error: Error?) {
+    var steps: [S] = []
+    do { for try await s in stream { steps.append(s) }; return (steps, nil) } catch { return (steps, error) }
+}
+
+// A controller that started on Wi-Fi firmware, restored from a replaced controller's backup
+let olog = Recorder()
+let backupHex = String(repeating: "ab", count: 200)       // two pieces of 128 bytes and 72
+let ohub = HubClient(transport: Scripted(name: "hub", log: olog, address: "10.0.0.2/hub") { c in
+    switch cmdPath(c) {
+    case HubApi.network: #"{"ok":1,"ds":"0e08"}"#
+    case "/api/backup": #"{"ok":1,"d":"\#(backupHex)"}"#
+    case HubApi.info: hubInfoJSON("new1", hubCid: hubCidOnNew)
+    default: #"{"ok":1}"#
+    }
+})
+let looks = Cell(0)
+let onb = ControllerOnboarding(transport: Scripted(name: "ble", log: olog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: ohub,
+                               store: TestStore(log: olog, client: controllerOnHub(olog, hubWaiting: Cell(true), hkey: Cell(0))),
+                               hello: fakeHello("new1", boot: "0a0b0c0d", net: nil), paired: Paired(cid: fcid, key: fkey, owner: true), hubHost: "10.0.0.2",
+                               look: { host in looks.value += 1; olog.add("look \(host)"); return looks.value < 3 ? nil : fakeHello("new1", boot: "11223344", net: "thread") },
+                               sleep: { _ in }, leftBluetooth: { olog.add("left bluetooth") })
+let run1 = await collect(onb.run(restore: "old1"))
+check(run1.error == nil && run1.steps == [.gettingNetwork, .restoring, .joining, .waitingOnHub, .lettingHubIn, .done], "onboarding steps, in order (\(run1.steps), \(run1.error?.localizedDescription ?? "-"))")
+let onbExpected = ["hub /api/net", "hub /api/backup?id=old1",
+                "ble /api/restore?o=0&d=\(String(repeating: "ab", count: 128))", "ble /api/restore?o=128&d=\(String(repeating: "ab", count: 72))&end=1",
+                "ble /api/hubjoin?ds=0e08", "ble /api/swapfw", "left bluetooth",
+                "look 10.0.0.2/c/new1", "look 10.0.0.2/c/new1", "look 10.0.0.2/c/new1", "adopt 10.0.0.2/c/new1",
+                "hub /api/info", "ctrl /api/keys", "ctrl /api/approve?cid=\(hubCidOnNew)&ok=1&owner=0", "ctrl /api/hubkey?cid=\(hubCidOnNew)",
+                "hub /api/replace?old=old1&new=new1"]
+check(olog.all == onbExpected, "restore before joining, wait for it on the hub, keep it, let the hub in, take over the old one's place\n  got \(olog.all.map { String($0.prefix(60)) })")
+
+// A Thread controller that did not reach the hub: the second try only waits for it again
+let rlog = Recorder(), reachable = Cell(false)
+let rhub = HubClient(transport: Scripted(name: "hub", log: rlog, address: "10.0.0.2/hub") { c in
+    cmdPath(c) == HubApi.info ? hubInfoJSON("new1", hubCid: hubCidOnNew) : cmdPath(c) == HubApi.network ? #"{"ok":1,"ds":"0e08"}"# : #"{"ok":1}"#
+})
+let ronb = ControllerOnboarding(transport: Scripted(name: "ble", log: rlog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: rhub,
+                                store: TestStore(log: rlog, client: controllerOnHub(rlog, hubWaiting: Cell(true), hkey: Cell(0))),
+                                hello: fakeHello("new1", boot: "0a0b0c0d", net: "thread"), paired: Paired(cid: fcid, key: fkey, owner: true), hubHost: "10.0.0.2",
+                                look: { _ in reachable.value ? fakeHello("new1", boot: "0a0b0c0d", net: "thread") : nil }, sleep: { _ in })
+let rFirst = await collect(ronb.run(restore: nil))
+check(rFirst.error?.localizedDescription.hasPrefix("It did not reach the hub.") == true && rFirst.steps.last == .waitingOnHub, "not on the hub: the reason is shown")
+check(rlog.count("ble /api/hubjoin") == 1 && rlog.count("ble /api/swapfw") == 0 && rlog.count("ble /api/reboot") == 0, "a Thread controller joins without switching firmware or restarting")
+reachable.value = true
+let rSecond = await collect(ronb.run(restore: nil))
+check(rSecond.error == nil && rSecond.steps == [.waitingOnHub, .lettingHubIn, .done], "the second try only waits for it on the hub")
+check(rlog.count("hub /api/net") == 1 && rlog.count("ble ") == 1, "the hub's network is not asked for or sent again")
+
+// The hub is let in exactly once (the setup flow and the app's model share admitHub)
+let alog = Recorder(), waitingHub = Cell(true), knows = Cell(0)
+let actrl = controllerOnHub(alog, hubWaiting: waitingHub, hkey: knows)
+let ahub = HubClient(transport: Scripted(name: "hub", log: alog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: hubCidOnNew) })
+let a1 = await ahub.admitHub(on: actrl, controllerId: "new1"), a2 = await ahub.admitHub(on: actrl, controllerId: "new1")
+check(a1 == HubAdmission(hubCid: hubCidOnNew, done: true) && a2 == a1, "the hub's request is let in, and the second time it is already in")
+check(alog.count("ctrl /api/approve") == 1 && alog.count("ctrl /api/hubkey") == 1, "approved once and its key told once (approve \(alog.count("ctrl /api/approve")), hubkey \(alog.count("ctrl /api/hubkey")))")
+check(!alog.all.contains { $0.hasPrefix("ctrl /api/approve") && !$0.contains(hubCidOnNew) }, "only the hub's own request is let in")
+let blog = Recorder()
+let bctrl = controllerOnHub(blog, hubWaiting: Cell(false), hkey: Cell(0))      // let in before controllers knew the hub's key
+let bhub = HubClient(transport: Scripted(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: hubCidOnNew) })
+_ = await bhub.admitHub(on: bctrl, controllerId: "new1")
+check(blog.count("ctrl /api/approve") == 0 && blog.count("ctrl /api/hubkey") == 1, "already in, the controller not told: only the key is told")
+let nhub = HubClient(transport: Scripted(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: nil) })
+check(await nhub.admitHub(on: bctrl, controllerId: "new1") == HubAdmission(hubCid: nil, done: false), "the hub has not asked yet: nothing is let in")
+
+// ---- firmware (Shared/FirmwareInstaller.swift)
+final class FakeUploader: FirmwareUploader, @unchecked Sendable {
+    let log: Recorder, answers: Cell<[String]>
+    init(log: Recorder, answers: [String]) { self.log = log; self.answers = Cell(answers) }
+    func upload(_ file: Data, to address: String, timeout: TimeInterval) async throws -> Data {
+        log.add("upload \(String(decoding: file, as: UTF8.self)) to \(address)")
+        var a = answers.value; let first = a.isEmpty ? #"{"ok":1}"# : a.removeFirst(); answers.value = a
+        return Data(first.utf8)
+    }
+}
+/// A controller update through a fake hub: `infos` are the hub's /api/info answers in turn (the last one repeats).
+func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boots: [String]) -> FirmwareInstaller {
+    let seen = Cell(0), bootsLeft = Cell(boots)
+    let hub = HubClient(transport: Scripted(name: "hub", log: log, address: "10.0.0.2/hub") { c in
+        guard cmdPath(c) == HubApi.info else { return #"{"ok":1}"# }
+        let i = infos[min(seen.value, infos.count - 1)]; seen.value += 1; return i
+    })
+    var f = FirmwareInstaller(hub: hub, uploader: FakeUploader(log: log, answers: uploads), sleep: { _ in }, download: { file, _ in log.add("download \(file)"); return Data(file.utf8) })
+    f.look = { host in
+        var b = bootsLeft.value; let boot = b.count > 1 ? b.removeFirst() : b[0]; bootsLeft.value = b
+        log.add("look \(boot)"); return Hello(id: "den1", name: "Den", fw: boot == "b2" ? "2.3.0" : "2.2.1", boot: boot, img: "aaa", owned: 1, home: nil, net: "thread", hub: 1)
+    }
+    return f
+}
+let fwCtrl = { (log: Recorder) in ControllerClient(transport: Scripted(name: "ctrl", log: log, address: "10.0.0.2/c/den1") { _ in #"{"ok":1}"# }) }
+let rel = FirmwareRelease(version: "2.3.0", file: "full.bin", size: 9, sha256: "x", notes: nil,
+                              patches: [.init(from: "aaa", file: "patch.bin", size: 1, sha256: "y"), .init(from: "zzz", file: "other.bin", size: 1, sha256: "z")])
+
+// The update fails on the controller: the hub's reason is shown
+let elog = Recorder()
+let failed = await collect(fakeInstaller(elog, infos: [hubInfoJSON("den1", hubCid: nil, ota: 1, pct: 40), hubInfoJSON("den1", hubCid: nil, ota: 4, err: "the controller stopped answering")],
+                                     boots: ["b1"]).install(.file(Data("f.bin".utf8)), on: fwCtrl(elog), id: "den1"))
+check(failed.error?.localizedDescription == "The controller stopped answering" && failed.steps == [.sending, .hub(0), .hub(40)], "a failed update shows the hub's reason (\(failed.steps))")
+check(elog.all.prefix(3) == ["ctrl /api/otaopen", "hub /api/upload?id=den1", "look b1"] && elog.count("upload f.bin to 10.0.0.2/c/den1/api/update") == 1,
+      "allowed on the controller and the hub, then posted to the controller's address on the hub")
+check(elog.count("ctrl /api/keep") == 0, "a failed update is never kept")
+
+// The patch is refused: the whole file follows, and it is kept only once the controller restarted (a new boot id)
+let plog = Recorder()
+let pinst = fakeInstaller(plog, infos: [hubInfoJSON("den1", hubCid: nil, ota: 3)], uploads: [#"{"ok":0,"err":"not a patch for this firmware"}"#], boots: ["b1", "b1", "b1", "b1", "b2"])
+let patched = await collect(pinst.install(.release(rel), on: fwCtrl(plog), id: "den1"))
+check(patched.error == nil && patched.steps.last == .done("2.3.0"), "the update finishes on the whole file (\(patched.error?.localizedDescription ?? "-"))")
+check(plog.all.filter { $0.hasPrefix("download") || $0.hasPrefix("upload") } == ["download patch.bin", "upload patch.bin to 10.0.0.2/c/den1/api/update", "download full.bin", "upload full.bin to 10.0.0.2/c/den1/api/update"],
+      "the patch for exactly the running firmware first, then the whole file")
+check(patched.steps.prefix(3) == [.downloading, .sending, .downloading], "the steps go back to downloading for the whole file")
+let keepAt = plog.all.firstIndex(of: "ctrl /api/keep"), newBootAt = plog.all.firstIndex(of: "look b2")
+check(plog.count("ctrl /api/keep") == 1 && keepAt != nil && newBootAt != nil && keepAt! > newBootAt!, "kept once, and only after the boot id changed")
+check(patched.steps.suffix(3) == [.restarting, .confirming, .done("2.3.0")], "restart, check it runs, done")
+
+// The hub's own update: allowed, posted to the hub, done once the hub answers with the new version
+let ulog = Recorder()
+var uinst = fakeInstaller(ulog, infos: [hubInfoJSON("den1", hubCid: nil)], boots: ["b1"])
+let hubFw = Cell(["0.3.5", "0.3.5", "0.3.6"])
+uinst.look = { host in var v = hubFw.value; let fw = v.count > 1 ? v.removeFirst() : v[0]; hubFw.value = v; ulog.add("look \(host)"); return Hello(id: "hub", name: "Tilt Hub", fw: fw, boot: "h1", img: nil, owned: 1, home: nil, net: nil, hub: nil) }
+let hubRelease = FirmwareRelease(version: "0.3.6", file: "hub.bin", size: 1, sha256: "h", notes: nil, patches: nil)
+let hubRun = await collect(uinst.updateHub(to: hubRelease, hubHost: "10.0.0.2"))
+check(hubRun.error == nil && hubRun.steps == [.downloading, .sending, .restarting, .done], "the hub update steps")
+check(ulog.all.prefix(3) == ["download hub.bin", "hub /api/hubupdate", "upload hub.bin to 10.0.0.2/hub/api/update"] && ulog.count("look 10.0.0.2/hub") == 3, "allowed, posted to the hub, then waited for its new version")
+let refusedHub = await collect(fakeInstaller(Recorder(), infos: [hubInfoJSON("den1", hubCid: nil)], uploads: [#"{"ok":0}"#], boots: ["b1"]).updateHub(to: hubRelease, hubHost: "10.0.0.2"))
+check(refusedHub.error?.localizedDescription == "The Tilt Hub did not take the update.", "a hub that does not take the file says so")
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)
