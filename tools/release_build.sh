@@ -32,5 +32,6 @@ rm -f ~/.tilt/firmware-signing-key.pem
 python3 tools/release_ci.py verify pub.pem
 mkdir -p upload
 python3 tools/release_ci.py files | xargs -I{} cp {} upload/
+cp notes.txt upload/notes.txt
 cat firmware/releases/firmware.json
 ls -l upload

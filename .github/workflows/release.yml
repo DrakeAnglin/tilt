@@ -69,7 +69,6 @@ jobs:
           docker run --rm -v "$PWD:/w" -w /w -e FIRMWARE_SIGNING_KEY -e KIND -e CHANNEL --entrypoint /bin/bash \
             espressif/esp-matter:release-v1.5_idf_v5.5.5@sha256:51e890d6e913be195d273384eb93785bc9e64c35751a13fdd02c79ff06c07273 \
             -c '. "$IDF_PATH/export.sh" >/dev/null && tools/release_build.sh'
-          cp notes.txt upload/notes.txt
       - uses: actions/upload-artifact@v4
         with:
           name: release
