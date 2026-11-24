@@ -17,8 +17,14 @@ BEGIN { bad = 0; lines = 0 }
   body = substr($0, 2)
   if (body ~ /^[ \t]*#/ || body ~ /^[ \t]*$/) { next }
   # Ways to make a failing test look like a pass.
-  if (body ~ /\|\|[ \t]*(true|:)([ \t;)]|$)/) { bad = 1 }
-  if (body ~ /set[ \t]+\+e/) { bad = 1 }
+  # Any "or else" can swallow a failure; a person judges those.
+  if (body ~ /\|\|/) { bad = 1 }
+  # set +e, set +o errexit and the like turn off stopping on a failure.
+  if (body ~ /(^|[ \t;&|])set[ \t]+\+/) { bad = 1 }
+  if (body ~ /(^|[ \t;&|])return([^A-Za-z0-9_]|$)/) { bad = 1 }
+  # A test run in the background is not waited for.
+  if (body ~ /&[ \t]*$/ || body ~ /[^&]&[ \t]*[;)]/) { bad = 1 }
+  if (body ~ /(^|[ \t;&|])trap[ \t]/ && body ~ /exit/) { bad = 1 }
   if (body ~ /(^|[ \t;&|])exit[ \t]+0([ \t;]|$)/) { bad = 1 }
   # A bare exit passes on the last command's status; only exit with a nonzero number is fine.
   if (body ~ /(^|[ \t;&|])exit([^A-Za-z0-9_]|$)/ && body !~ /(^|[ \t;&|])exit[ \t]+[1-9]/) { bad = 1 }

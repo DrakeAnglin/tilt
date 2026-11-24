@@ -134,11 +134,6 @@ class Guard(unittest.TestCase):
         self.assertEqual(run('{"tool_input": {"command": "ls"}}'), 0)
         self.assertEqual(run('{"tool_input": {"command": "gh pr merge 5"}}'), 2)
 
-
-if __name__ == '__main__':
-    unittest.main()
-
-
 class OnlyAddsTests(unittest.TestCase):
     """tools/agent/only_adds_tests.awk: may an agent merge this change to a test script?"""
 
@@ -161,8 +156,16 @@ class OnlyAddsTests(unittest.TestCase):
 
     def test_hiding_a_failure_is_not(self):
         for line in ['"$OUT/link_test" || true', '"$OUT/link_test" ||:', 'set +e', 'exit 0',
-                     'if x; then exit; fi', 'exec true', 'a && exit 0; b']:
+                     'if x; then exit; fi', 'exec true', 'a && exit 0; b',
+                     '"$X" || echo skipped', '"$X" || return 0', 'set +o errexit', 'trap "exit 0" EXIT',
+                     '"$X" &', '[ -f x ] || { echo no; exit 1; }']:
             self.assertFalse(self.ok('@@ -1,1 +1,2 @@\n set -e\n+' + line + '\n'), line)
+
+    def test_a_cleanup_trap_is_fine(self):
+        self.assertTrue(self.ok('@@ -1,1 +1,2 @@\n set -e\n+trap \'rm -rf "$OUT"\' EXIT\n'))
 
     def test_an_empty_patch_is_not(self):
         self.assertFalse(self.ok(''))
+
+if __name__ == '__main__':
+    unittest.main()
