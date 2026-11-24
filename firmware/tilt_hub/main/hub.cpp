@@ -1243,7 +1243,21 @@ static void pinBegin() {
   else ESP_LOGE(TAG, "no setup code: build once over USB with main/setup_pin.h");
 }
 static bool hubOwned() { for (auto &k : hkeys) if (k.used == 1 && k.role == 1) return true; return false; }
-static std::string hubId() { uint8_t m[6]; esp_read_mac(m, ESP_MAC_WIFI_STA); return "hub" + hexOf(m, 6); }
+// The hub's id: made from its chip's MAC the first time, then kept in its saved data. So a new hub that takes over an
+// old one's saved data (tools/move_hub.sh) is the same hub to the app. A factory reset forgets it with the rest.
+static std::string hubIdKept;
+static std::string hubId() {
+  if (!hubIdKept.empty()) return hubIdKept;      // set once at start (app_main), before any other task asks
+  char b[24] = {0};
+  size_t n = sizeof b;
+  if (nvs_get_str(nv, "hubid", b, &n) == ESP_OK && b[0]) return hubIdKept = b;
+  uint8_t m[6];
+  esp_read_mac(m, ESP_MAC_WIFI_STA);
+  hubIdKept = "hub" + hexOf(m, 6);
+  nvs_set_str(nv, "hubid", hubIdKept.c_str());
+  nvs_commit(nv);
+  return hubIdKept;
+}
 static std::string askCode(const HubKey &k) {
   uint8_t h[32]; char c[6];
   mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), k.key, 32, (const uint8_t *)"code", 4, h);
@@ -1658,6 +1672,7 @@ static void resetTask(void *) {
 extern "C" void app_main() {
   nvs_flash_init();
   nvs_open("hub", NVS_READWRITE, &nv);
+  ESP_LOGI(TAG, "hub id %s", hubId().c_str());
   stateMx = xSemaphoreCreateMutex();
   newMx = xSemaphoreCreateMutex();
   keysBegin();
