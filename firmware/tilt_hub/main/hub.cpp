@@ -1667,7 +1667,10 @@ static void statusTask(void *) {
   bool wifi = false;
   for (int tick = 0;; tick++) {
     vTaskDelay(pdMS_TO_TICKS(100));
-    if ((int32_t)(lightTestUntil - ms()) > 0) { shown = 0xFFFFFFFF; continue; }   // the owner's light test (/api/light)
+    if (lightTestUntil) {                        // the owner's light test (/api/light); 0: none (so no false "on" after 25 days)
+      if ((int32_t)(lightTestUntil - ms()) > 0) { shown = 0xFFFFFFFF; continue; }
+      lightTestUntil = 0;
+    }
     if (tick % 10 == 0) {                        // once a second: Thread and Matter
       esp_openthread_lock_acquire(portMAX_DELAY);
       role = otThreadGetDeviceRole(esp_openthread_get_instance());

@@ -158,7 +158,7 @@ private struct HubLight {
     static let all: [HubLight] = [
         .init(color: .white, look: "Blinking white", what: "Factory reset: the BOOT button is held."),
         .init(color: .blue, look: "Blinking blue", what: "Being added to Apple Home right now."),
-        .init(color: .red, look: "Flashing red", what: "A problem: the hub's Wi-Fi, Thread network or Apple Home connection is down, or a controller has not checked in for 30 minutes."),
+        .init(color: .red, look: "Flashing red", what: "A problem: the hub has no Wi-Fi or Thread network, its Matter (Apple Home) side is not running, or a controller has not checked in for 30 minutes."),
         .init(color: .purple, look: "Blinking purple", what: "Installing an update, its own or a controller's."),
         .init(color: .blue, look: "Solid blue", what: "Ready to be added to Apple Home."),
         .init(color: .green, look: "Solid green", what: "A new controller is nearby, waiting for setup in Tilt."),
