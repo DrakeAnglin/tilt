@@ -129,6 +129,17 @@ struct ControllerClient: Sendable {
     }
     func setSchedule(slot: Int, _ v: SchedSlot) async throws { try await send(Self.scheduleCommand(slot: slot, v)) }
 
+    // ---- Scenes (see ScenePlan)
+    /// The Scenes' parts this controller keeps; nil when its firmware is older than Scenes on the controller.
+    func scenes() async throws -> [SceneSlot]? {
+        let d = try await transport.call(Api.scenes)
+        if let l = try? JSONDecoder().decode(SceneList.self, from: d) { return l.sc }
+        if let a = try? JSONDecoder().decode(CommandAnswer.self, from: d), a.err == "unknown command" { return nil }
+        throw TiltError("That did not work.")
+    }
+    static func sceneCommand(_ v: SceneSlot) -> String { Api.scene(gid: v.gid, ver: v.ver, name: v.name, symbol: v.sym, mask: v.mask, tilts: v.t) }
+    func setScene(_ v: SceneSlot) async throws { try await send(Self.sceneCommand(v)) }
+
 
     // ---- people
     func approve(cid: String, _ ok: Bool, owner: Bool) async throws { try await send(Api.approve(cid: cid, ok, owner: owner)) }
