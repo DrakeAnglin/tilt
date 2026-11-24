@@ -83,7 +83,9 @@ elif [ "$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.name == "ci" and .bucket
 fi
 
 # The review and the gate must both be for this exact commit.
-markers() { get "[.comments[].body | capture(\"<!-- $1 (?<m>[^>]*) -->\"; \"g\") | .m]"; }
+# Count only what the account running this posted: a comment from anyone else is not a review or a verdict.
+ME=$(gh api user --jq .login)
+markers() { get "[.comments[] | select(.author.login == \"$ME\") | .body | capture(\"<!-- $1 (?<m>[^>]*) -->\"; \"g\") | .m]"; }
 field() { printf '%s' "$1" | tr ' ' '\n' | sed -n "s/^$2=//p"; }
 REVIEW=$(markers factory-review | jq -r 'last // ""')
 GATE=$(markers factory-gate | jq -r 'last // ""')
@@ -109,7 +111,7 @@ if [ -n "$NO" ]; then
     # The label never stands alone: say why, once per commit.
     # Leave out "has the label": whoever set it has said why already.
     WHY=$(printf '%s\n' "$NO" | grep '^- ' | grep -v 'has the needs-human label' || true)
-    if [ -n "$WHY" ] && [ "$(get "[.comments[].body | select(contains(\"factory-human sha=$SHA\"))] | length")" = 0 ]; then
+    if [ -n "$WHY" ] && [ "$(get "[.comments[] | select(.author.login == \"$ME\") | .body | select(contains(\"factory-human sha=$SHA\"))] | length")" = 0 ]; then
       FIRST=$(printf '%s\n' "$WHY" | sed -n '1s/^- //p' | sed "s/ Confirm:.*//")
       COUNT=$(printf '%s\n' "$WHY" | grep -c '^- ')
       [ "$COUNT" -le 1 ] || FIRST="$FIRST ($((COUNT - 1)) more below.)"
