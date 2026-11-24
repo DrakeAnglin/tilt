@@ -1073,6 +1073,11 @@ static const char *stageCheck(const Ctrl &k) {
 // /api/hubupdate). The signed file goes into the spare slot; the hub checks the signature and that it is not older,
 // then starts it on trial. Kept once Wi-Fi and Apple Home have worked for a minute; otherwise it goes back by itself.
 static uint32_t hubUpdUntil = 0;
+static bool cloudBusy() {                        // a firmware file is coming in or going out: no TLS meanwhile (memory)
+  if (otaFor >= 0 || (hubUpdUntil && (int32_t)(hubUpdUntil - ms()) > 0)) return true;
+  for (auto u : uploadUntil) if (u && (int32_t)(u - ms()) > 0) return true;
+  return false;
+}
 static esp_err_t hHubUpdate(httpd_req_t *r) {
   auto no = [&](const char *st, const char *why) { httpd_resp_set_status(r, st); return httpd_resp_sendstr(r, (std::string("{\"ok\":0,\"err\":\"") + why + "\"}").c_str()); };
   if (!hubUpdUntil || (int32_t)(ms() - hubUpdUntil) > 0) return no("403 Forbidden", "the Tilt Hub's owner has to allow this update first");

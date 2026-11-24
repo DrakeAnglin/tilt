@@ -15,6 +15,7 @@
 // the setup code. A public release carries no key: each hub keeps its own in flash.
 #pragma once
 #include <esp_tls.h>
+#include <esp_heap_caps.h>
 #include <esp_crt_bundle.h>                      // just the two roots in main/cloud_roots.pem (sdkconfig.defaults)
 #include <mbedtls/ecdsa.h>
 #include <mbedtls/sha256.h>
@@ -113,8 +114,16 @@ static bool ckSign(const std::string &date, const std::string &body, const std::
 }
 // One signed request, straight over TLS (no HTTP library: the hub has little room). HTTP/1.0, so the answer is
 // never in chunks. Returns the HTTP status (-1: no connection), the answer's body in resp.
+// A TLS session takes about 30 KB of the hub's memory for a few seconds (measured 2026-11-24: about 50 KB free
+// before, 18-25 KB at the lowest; ckPost logs it). With less than CK_NEED_HEAP free, or while a firmware file is
+// coming in or going out, Wi-Fi and Matter could run short, so the alert waits (-2) until the hub is calmer.
+static const size_t CK_NEED_HEAP = 45000;
+static bool cloudBusy();                         // hub.cpp: an update is on
 static int ckPost(const char *env, const char *op, const std::string &body, std::string &resp) {
   static const char HOST[] = "api.apple-cloudkit.com";
+  size_t freeBefore = esp_get_free_heap_size();
+  if (cloudBusy() || freeBefore < CK_NEED_HEAP || heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < 12000) { strlcpy(ckLastErr, "waiting for memory", sizeof ckLastErr); return -2; }
+  heap_caps_monitor_local_minimum_free_size_start();
   std::string sub = std::string("/database/1/") + CK_CONTAINER + "/" + env + "/public/records/" + op, sig;
   char date[64];
   time_t now = time(nullptr);
@@ -150,6 +159,8 @@ static int ckPost(const char *env, const char *op, const std::string &body, std:
     if (off == req.size() && all.compare(0, 5, "HTTP/") == 0 && all.size() > 12) st = atoi(all.c_str() + 9);
   }
   esp_tls_conn_destroy(tls);
+  ESP_LOGI(TAG, "iCloud %s: %d; memory free %u before, %u at the lowest", op, st, (unsigned)freeBefore, (unsigned)esp_get_minimum_free_heap_size());
+  heap_caps_monitor_local_minimum_free_size_stop();
   size_t hb = all.find("\r\n\r\n");
   if (hb != std::string::npos) resp = all.substr(hb + 4);
   return st;
@@ -186,6 +197,7 @@ static bool ckSend(const char *env, Alert &a, bool unsure) {
                      str("detail", jstr(a.detail)) + "," + str("port", std::to_string(a.port)) + "," + str("n", std::to_string(a.n)) +
                      ",\"at\":{\"value\":" + std::to_string(atMs) + ",\"type\":\"TIMESTAMP\"}}}}]}", resp;
   int st = ckPost(env, "modify", body, resp);
+  if (st == -2) return false;                    // not tried: too little memory just now
   ckLastStatus = st;
   bool ok = st == 200 && resp.find("serverErrorCode") == std::string::npos;
   if (ok) { ckLastErr[0] = 0; ckLastOkAt = (uint32_t)time(nullptr); return true; }
@@ -233,6 +245,7 @@ static void cloudTask(void *) {
       if (alertq[i].used && alertq[i].n == a.n) { alertq[i].sent = sent; alertq[i].unsure = unsure; if (done) alertq[i].used = 0; alertsSave(); }
       xSemaphoreGive(alertMx);
       if (done) { ESP_LOGI(TAG, "alert %lu (%s, %s) sent", (unsigned long)a.n, a.kind, a.name); fails = 0; continue; }
+      if (!strcmp(ckLastErr, "waiting for memory")) { waitMs = 60000; break; }   // not a failure: try again in a minute
       fails++;
       waitMs = fails > 6 ? 900000 : 15000u << fails;   // 30 s, 1 min, ... up to 15 minutes
       ESP_LOGW(TAG, "alert %lu not sent yet (%s): again in %lu s", (unsigned long)a.n, ckLastErr, (unsigned long)(waitMs / 1000));

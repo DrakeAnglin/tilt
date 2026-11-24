@@ -181,3 +181,8 @@ CONFIG_MBEDTLS_X509_CRL_PARSE_C=n
 CONFIG_MBEDTLS_KEY_EXCHANGE_RSA=n
 CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA=n
 CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_RSA=n
+# TLS buffers: 4 KB in, 2 KB out, not 16 + 4 (saves 14 KB of the hub's memory during a send). iCloud's biggest
+# handshake message is about 3.1 KB (its certificates); a request and an answer are about 1 KB. (Dynamic buffers can't
+# be used: Thread needs DTLS.)
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=2048
