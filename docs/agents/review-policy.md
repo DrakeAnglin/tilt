@@ -45,7 +45,7 @@ Three things, each with the same parts, so the owner can read any one of them al
 | `pr-reviewer` | A comment | Its own TL;DR, Summary, Evidence and Merge Danger, written from the diff, then the findings |
 | `merge-gate` | A comment | TL;DR of the verdict, door, blast radius, what could go wrong, then the seven rules as notes |
 
-**`needs-human` never stands alone.** Whoever adds the label, the gate or `merge_pr.sh`, also leaves a comment that starts with a TL;DR: why a person is needed and what to look at. Notes come after it.
+**`needs-human` never stands alone.** It always comes with two things: **why** a person is needed (what a person can judge here that tests and agents cannot), and **what to confirm** (three checks at most, each naming a file). The gate writes them in its comment and in the pull request body under `## Human Review`. `merge_pr.sh` writes them in a comment when it is the one that refuses.
 
 ## Human-only paths
 
@@ -58,4 +58,4 @@ Tests cannot vouch for these, or they are the rules themselves:
 - `docs/adr/`, `docs/requirements.md`: decisions are the owner's.
 - `.github/`, `.claude/`, `.githooks/`, `tools/agent/`, `docs/agents/`, `CLAUDE.md`: the factory itself. An agent does not change its own rules.
 
-The list the script uses is in `tools/agent/merge_pr.sh`. Keep the two the same.
+The script's list is in `tools/agent/merge_pr.sh`, with the why and the what-to-confirm for each line. Keep the two the same.

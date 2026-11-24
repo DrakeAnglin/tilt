@@ -45,7 +45,12 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 6. Under 400 lines: yes/no
 7. No human-only path: yes/no <name the paths when no>
 
-<for human, when useful: where to start reading, by file>
+### Human Review
+<merge: "Not needed." human: fill in both lines below>
+**Why:** <why a person, and not an agent, has to decide this. The real reason, not "touches a human-only path": say what a person can judge here that tests and agents cannot.>
+**Confirm:**
+- [ ] <one thing to check, with the file to open>
+- [ ] <three at most>
 
 <!-- factory-gate sha=<full head sha> verdict=<merge|human> -->
 ```
@@ -53,5 +58,7 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 More than three `factory-review` comments on the pull request: **human**, "too many rounds of review".
 
 Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge, `--add-label needs-human` for human. Remove the other one if it is there. Never add `needs-human` without this comment.
+
+Last, put the same thing where the owner looks first, the pull request body: replace what is under its `## Human Review` heading (add the heading at the end if it is missing) with `Not needed.` or your **Why** and **Confirm** lines. `gh pr view <pr> --json body --jq .body`, change only that section, `gh pr edit <pr> --body-file <file>`.
 
 Reply with the verdict and the TL;DR.

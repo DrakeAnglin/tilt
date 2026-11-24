@@ -8,8 +8,6 @@ set -eu
 PR=${1:?usage: merge_pr.sh <pr> [--check]}
 MODE=${2:-}
 
-# Human-only paths. Keep the same as the list in docs/agents/review-policy.md.
-HUMAN_ONLY='^(hardware/|tools/(fusion_.*|bambu.*|orient|release_firmware)\.py$|tools/(flash.*|firmware_tests|app_tests)\.sh$|tools/agent/|docs/adr/|docs/agents/|docs/requirements\.md$|\.github/|\.claude/|\.githooks/|CLAUDE\.md$)|(^|/)(partitions\.csv|sdkconfig[^/]*|fwkey\.h|sec\.h|tilt_crypto\.h|lock\.h|update\.h|Secure\.swift|FirmwareUpdate\.swift|Info\.plist|[^/]*-Info\.plist|PrivacyInfo\.xcprivacy|[^/]*\.entitlements)$'
 MAX_LINES=400
 MAX_REVIEWS=3
 
@@ -39,13 +37,38 @@ for L in needs-human one-way-door; do
 done
 
 LINES=$(( $(get .additions) + $(get .deletions) ))
-[ "$LINES" -lt "$MAX_LINES" ] || no "$LINES changed lines (must be under $MAX_LINES)"
+[ "$LINES" -lt "$MAX_LINES" ] || no "$LINES changed lines (must be under $MAX_LINES): too big for an agent to vouch for. Confirm: the change is one thing, and read the summary against the diff."
 
 # Every changed file (and the old name of a renamed one), not only the first page.
 FILES=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
 [ -n "$FILES" ] || no "could not list the changed files"
-TOUCHED=$(printf '%s\n' "$FILES" | grep -E "$HUMAN_ONLY" || true)
-[ -z "$TOUCHED" ] || no "touches human-only paths: $(echo $TOUCHED)"
+# Human-only paths: pattern, why a person is needed, what the person confirms.
+# Keep the same as the list in docs/agents/review-policy.md.
+human_only() {
+  HIT=$(printf '%s\n' "$FILES" | grep -E "$1" | tr '\n' ' ' || true)
+  [ -z "$HIT" ] || no "$2 Confirm: $3 Files: $HIT"
+}
+human_only '^(hardware/|tools/(fusion_.*|bambu.*|orient)\.py$)' \
+  "Printed parts or the PCB changed, and no test can look at a part." \
+  "the build is ok, nothing pokes out, every moving part can turn."
+human_only '^tools/(release_firmware\.py|flash.*\.sh)$|(^|/)(partitions\.csv|sdkconfig[^/]*)$' \
+  "Release or flashing changed; a mistake here can reach controllers that are in use." \
+  "a controller still takes an update and still starts."
+human_only '(^|/)(fwkey\.h|sec\.h|tilt_crypto\.h|lock\.h|update\.h|Secure\.swift|FirmwareUpdate\.swift)$' \
+  "Security or update code changed." \
+  "nothing is let in that should not be, and paired devices still trust each other."
+human_only '(^|/)(Info\.plist|[^/]*-Info\.plist|PrivacyInfo\.xcprivacy|[^/]*\.entitlements)$' \
+  "What the app asks Apple for changed." \
+  "the permissions and privacy answers are what you want Apple to review."
+human_only '^(docs/adr/|docs/requirements\.md$)' \
+  "A decision or requirement changed, and those are the owner's." \
+  "you agree with the decision as written."
+human_only '^tools/(firmware_tests|app_tests)\.sh$' \
+  "How the tests run changed." \
+  "no test was dropped or weakened."
+human_only '^(tools/agent/|docs/agents/|\.github/|\.claude/|\.githooks/|CLAUDE\.md$)' \
+  "The agents' own rules changed, and an agent does not approve its own rules." \
+  "the rules still say what you want: who may merge, the doors, the human-only list."
 
 # CI: the 'ci' check must have passed, and nothing may be failing or still running.
 CHECKS=$(gh pr checks "$PR" --json name,bucket 2>/dev/null) || true
@@ -62,17 +85,17 @@ markers() { get "[.comments[].body | capture(\"<!-- $1 (?<m>[^>]*) -->\"; \"g\")
 field() { printf '%s' "$1" | tr ' ' '\n' | sed -n "s/^$2=//p"; }
 REVIEW=$(markers factory-review | jq -r 'last // ""')
 GATE=$(markers factory-gate | jq -r 'last // ""')
-[ "$(markers factory-review | jq -r length)" -le "$MAX_REVIEWS" ] || no "more than $MAX_REVIEWS rounds of review"
+[ "$(markers factory-review | jq -r length)" -le "$MAX_REVIEWS" ] || no "More than $MAX_REVIEWS rounds of review without a clean result. Confirm: read the last review and decide whether to go on."
 if [ -z "$REVIEW" ]; then wait_for "no review yet (run the pr-reviewer agent)"
 elif [ "$(field "$REVIEW" sha)" != "$SHA" ]; then wait_for "the review is for an older commit (run pr-reviewer again)"
 else
-  [ "$(field "$REVIEW" door)" = two-way ] || no "the review says one-way door"
+  [ "$(field "$REVIEW" door)" = two-way ] || no "The review says one-way door: no going back once shipped. Confirm: you want this, and the reason in the review holds."
   [ "$(field "$REVIEW" must-fix)" = 0 ] || wait_for "the review has must-fix findings"
 fi
 if [ -z "$GATE" ]; then wait_for "no gate verdict yet (run the merge-gate agent)"
 elif [ "$(field "$GATE" sha)" != "$SHA" ]; then wait_for "the gate verdict is for an older commit (run merge-gate again)"
 else
-  [ "$(field "$GATE" verdict)" = merge ] || no "the gate says a human decides"
+  [ "$(field "$GATE" verdict)" = merge ] || no "The gate says a human decides: see its comment for why and what to confirm."
 fi
 
 if [ -n "$NO" ]; then
@@ -85,15 +108,17 @@ if [ -n "$NO" ]; then
     # Leave out "has the label": whoever set it has said why already.
     WHY=$(printf '%s\n' "$NO" | grep '^- ' | grep -v 'has the needs-human label' || true)
     if [ -n "$WHY" ] && [ "$(get "[.comments[].body | select(contains(\"factory-human sha=$SHA\"))] | length")" = 0 ]; then
-      FIRST=$(printf '%s\n' "$WHY" | sed -n '1s/^- //p' | cut -c1-120)
+      FIRST=$(printf '%s\n' "$WHY" | sed -n '1s/^- //p' | sed "s/ Confirm:.*//")
       COUNT=$(printf '%s\n' "$WHY" | grep -c '^- ')
-      [ "$COUNT" -le 1 ] || FIRST="$FIRST; and $((COUNT - 1)) more below"
+      [ "$COUNT" -le 1 ] || FIRST="$FIRST ($((COUNT - 1)) more below.)"
       gh pr comment "$PR" --body "## Needs human review
 
-**TL;DR:** An agent may not merge this: $FIRST. The owner reviews and merges on GitHub.
+**TL;DR:** An agent may not merge this. $FIRST
 
-### Notes
+### Why, and what to confirm
 $WHY
+
+When you are happy, merge on GitHub.
 
 <!-- factory-human sha=$SHA -->" >/dev/null
     fi

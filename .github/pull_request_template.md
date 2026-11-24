@@ -16,3 +16,7 @@ Closes #
 **Blast Radius:** <!-- one word: docs, tools, app, firmware, hardware, release -->
 
 **What could go wrong:** <!-- what breaks, and for whom, if this is wrong after merge -->
+
+## Human Review
+
+<!-- Filled in by the gate. "Not needed", or: why a person is needed, and a short list of what to confirm. -->
