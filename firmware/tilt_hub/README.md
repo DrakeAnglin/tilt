@@ -96,11 +96,15 @@ into the hub's flash at its next start. A public release build carries no key; e
 1. Make the key: `~/.espressif/python_env/idf5.5_py3.9_env/bin/python tools/cloudkit_key.py new`. It prints a public
    key.
 2. In [CloudKit Console](https://icloud.developer.apple.com/dashboard/), container `iCloud.app.tilt.blinds`:
-   **Tokens & Keys** > **Server-to-Server Keys** > **+**, paste the public key, save, and copy the **Key ID**.
-3. `tools/cloudkit_key.py header <Key ID>`, then update the hub: `tools/flash_hub.sh`.
+   **Tokens & Keys** > **Server-to-Server Keys** > **+**, paste the public key, save, and copy the **Key ID**. Keys
+   are per environment: do it once in **Development** and once in **Production** (the same public key both times).
+3. `tools/cloudkit_key.py header <Development Key ID> <Production Key ID>`, then update the hub:
+   `tools/flash_hub.sh`.
 4. Try it: `tools/cloudkit_key.py test <topic>` from the Mac, or `/api/testalert` on the hub.
-5. In CloudKit Console, **Schema** > **Indexes**: make `topic` on the **Alert** record type **Queryable** (and
-   **Sortable** off); then **Deploy Schema Changes** to Production, so App Store phones get alerts too.
+5. Done once already (2026-11-24) in Development: record type **Alert** with fields `topic`, `kind`, `name`,
+   `detail` (String), `port`, `n` (Int(64)), `at` (Date/Time), and a **Queryable** index on `topic` (the phones'
+   subscriptions need it). A server key can't make these itself. **Deploy Schema Changes** copies them to Production,
+   so App Store phones get alerts too.
 
 
 - **Setup code.** `build.sh` makes an 8-digit code once (`main/setup_pin.h`, not in Git) and prints it: put it on a
