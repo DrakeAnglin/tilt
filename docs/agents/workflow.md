@@ -16,8 +16,8 @@ How one agent takes one issue from request to `main`, without a person in the lo
    `git fetch origin && git worktree add .claude/worktrees/issue-<n> -b issue-<n>-<short-name> origin/main`, then work there.
 3. **Build it.** Read `CONTEXT.md` and the ADRs for the area. Write the test first where there is a place for one (`/tdd`). Small commits.
 4. **Check locally.** `tools/agent/check.sh` must pass.
-5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create`. Write the body in the template's shape (Matt Pocock's `pr` skill, when installed, is the guide): `Closes #<n>`, summary, evidence, door, blast radius, what could go wrong.
-6. **Wait for CI.** `gh pr checks <pr> --watch`. Red? Fix it, push, wait again. Turn on the app's watch for the pull request (Auto-fix: `set_monitor` with `auto_fix`, when that tool is there), so this session is woken on a conflict, a red CI or a comment while it waits.
+5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create`. Write the body in the template's shape (Matt Pocock's `pr` skill, when installed, is the guide): `Closes #<n>`, summary, evidence, door, blast radius, what could go wrong. Last, turn on the app's watch for the pull request (Auto-fix: `set_monitor` with `auto_fix`), so this session is woken on a conflict, a red CI or a comment. If that tool is not there or is not approved, go on without it.
+6. **Wait for CI.** `gh pr checks <pr> --watch`. Red? Fix it, push, wait again.
 7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its own summary, evidence, merge danger and findings as a comment on the pull request.
 8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Three rounds at most; the merge script counts them, and after that it goes to a human.
 9. **Gate.** Start the `merge-gate` agent with the pull request number. It reads the review and the policy and decides: merge, or human.
@@ -30,7 +30,7 @@ How one agent takes one issue from request to `main`, without a person in the lo
 
 Other pull requests merge while yours is open, and yours can stop merging cleanly. That is yours to notice and fix; it is not a reason to stop.
 
-**When to look** (`gh pr view <pr> --json mergeable --jq .mergeable`):
+**When to look** (`gh pr view <pr> --json mergeable --jq .mergeable`; on `UNKNOWN`, wait a few seconds and ask again):
 
 - before asking for review, and before merging (`merge_pr.sh` refuses a pull request that does not merge cleanly)
 - when the app wakes you about your pull request
@@ -41,11 +41,11 @@ Other pull requests merge while yours is open, and yours can stop merging cleanl
 1. `git fetch origin && git merge origin/main`. Merge, never rebase or force push: the review is tied to commits.
 2. Fix each conflict so that what both sides meant is kept. Two new sections in the same place: keep both. Read the other pull request to see what it meant (`git log origin/main -- <file>`).
 3. `tools/agent/check.sh`, commit the merge, push.
-4. Have `pr-reviewer` look again: the review is for the commit before. Then the gate.
+4. Have `pr-reviewer` look again: the review is for the commit before. Then the gate. Each review counts toward the three-round limit, so a pull request that keeps conflicting ends up with the owner.
 
 **Someone else's pull request** that your merge put into conflict: if its worktree is on this Mac under `.claude/worktrees/` and has nothing uncommitted, resolve it there the same way and leave a comment on the pull request saying what you did and that it needs review again. Otherwise leave a comment and do not touch the branch.
 
-**Do not guess.** When the two sides really disagree (the same line, two meanings; a file one side deleted and the other changed), stop: `needs-human` with a comment that shows both sides, and notify the owner.
+**Do not guess.** When the two sides really disagree (the same line, two meanings; a file one side deleted and the other changed), stop: `needs-human` with a comment that says why, shows both sides, and names what the owner should confirm. Then notify the owner.
 
 ## Notifying the owner
 
