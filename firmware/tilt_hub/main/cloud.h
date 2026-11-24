@@ -22,10 +22,11 @@
 #include <mbedtls/base64.h>
 #include <time.h>
 #if __has_include("cloud_key.h") && !defined(TILT_RELEASE)
-#include "cloud_key.h"                           // CLOUD_KEY_ID, CLOUD_KEY_HEX
+#include "cloud_key.h"                           // CLOUD_KEY_ID, CLOUD_KEY_ID_PROD, CLOUD_KEY_HEX
 #endif
 #ifndef CLOUD_KEY_ID
 #define CLOUD_KEY_ID ""
+#define CLOUD_KEY_ID_PROD ""
 #define CLOUD_KEY_HEX ""
 #endif
 
@@ -52,7 +53,7 @@ static Alert alertq[ALERT_Q];
 static uint32_t alertN = 0;
 static SemaphoreHandle_t alertMx;
 static TaskHandle_t cloudTaskH;
-static char ckKeyId[80];
+static char ckKeyId[2][80];                      // a key ID per environment (CloudKit keys are per environment; one key pair)
 static uint8_t ckKey[32];
 static bool ckKeyOk = false;
 // What the app's hub page shows: how the last try went.
@@ -133,7 +134,7 @@ static int ckPost(const char *env, const char *op, const std::string &body, std:
   resp.clear();
   if (!ckSign(date, body, sub, sig)) { strlcpy(ckLastErr, "could not sign", sizeof ckLastErr); return -1; }
   std::string req = "POST " + sub + " HTTP/1.0\r\nHost: " + HOST + "\r\nContent-Type: application/json\r\nContent-Length: " + std::to_string(body.size()) +
-                    "\r\nX-Apple-CloudKit-Request-KeyID: " + ckKeyId + "\r\nX-Apple-CloudKit-Request-ISO8601Date: " + date +
+                    "\r\nX-Apple-CloudKit-Request-KeyID: " + ckKeyId[strcmp(env, CK_ENVS[0]) ? 1 : 0] + "\r\nX-Apple-CloudKit-Request-ISO8601Date: " + date +
                     "\r\nX-Apple-CloudKit-Request-SignatureV1: " + sig + "\r\n\r\n" + body;
   esp_tls_cfg_t cfg = {};
   cfg.crt_bundle_attach = esp_crt_bundle_attach;
@@ -211,46 +212,58 @@ static bool ckSend(const char *env, Alert &a, bool unsure) {
   return false;
 }
 static bool netUp();
+// Each environment goes on its own: one that fails (no schema there yet, say) waits longer and longer between tries,
+// and never holds the other back.
 static void cloudTask(void *) {
-  uint32_t fails = 0, waitMs = 5000;
+  uint32_t fails[CK_NENV] = {}, nextTry[CK_NENV] = {};
+  uint32_t waitMs = 5000;
   for (;;) {
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(waitMs));
     waitMs = 30000;
     if (!ckKeyOk || !netUp() || time(nullptr) < 1700000000) continue;   // no key, no Wi-Fi or no clock yet: wait
-    for (;;) {
-      xSemaphoreTake(alertMx, portMAX_DELAY);
-      int i = -1;
-      uint32_t now = (uint32_t)time(nullptr);
-      bool dropped = false;
-      for (int k = 0; k < ALERT_Q; k++) {
-        Alert &q = alertq[k];
-        if (!q.used) continue;
-        if (!q.at) q.at = now;                   // happened before the clock was set: about now
-        if (now - q.at > ALERT_KEEP_S) { ESP_LOGW(TAG, "alert %lu (%s) too old: dropped", (unsigned long)q.n, q.kind); q.used = 0; dropped = true; continue; }
-        if (i < 0 || q.n < alertq[i].n) i = k;
+    bool memWait = false;
+    for (int e = 0; e < CK_NENV && !memWait; e++) {
+      if (nextTry[e] && (int32_t)(nextTry[e] - ms()) > 0) continue;
+      nextTry[e] = 0;
+      for (;;) {                                 // this environment's waiting alerts, oldest first
+        xSemaphoreTake(alertMx, portMAX_DELAY);
+        int i = -1;
+        uint32_t now = (uint32_t)time(nullptr);
+        bool dropped = false;
+        for (int k = 0; k < ALERT_Q; k++) {
+          Alert &q = alertq[k];
+          if (!q.used) continue;
+          if (!q.at) q.at = now;                 // happened before the clock was set: about now
+          if (now - q.at > ALERT_KEEP_S) { ESP_LOGW(TAG, "alert %lu (%s) too old: dropped", (unsigned long)q.n, q.kind); q.used = 0; dropped = true; continue; }
+          if (q.sent & (1 << e)) continue;
+          if (i < 0 || q.n < alertq[i].n) i = k;
+        }
+        if (dropped) alertsSave();
+        Alert a = i >= 0 ? alertq[i] : Alert{};
+        xSemaphoreGive(alertMx);
+        if (i < 0) break;
+        bool ok = ckSend(CK_ENVS[e], a, a.unsure & (1 << e));
+        if (!ok && !strcmp(ckLastErr, "waiting for memory")) { memWait = true; break; }   // not a failure: again in a minute
+        xSemaphoreTake(alertMx, portMAX_DELAY);
+        if (alertq[i].used && alertq[i].n == a.n) {
+          Alert &q = alertq[i];
+          if (ok) { q.sent |= 1 << e; q.unsure &= ~(1 << e); }
+          else if (ckLastStatus < 0 || ckLastStatus >= 500) q.unsure |= 1 << e;   // it may have gone through
+          if (q.sent == (1 << CK_NENV) - 1) q.used = 0;
+          alertsSave();
+        }
+        xSemaphoreGive(alertMx);
+        if (ok) { ESP_LOGI(TAG, "alert %lu (%s, %s) sent to %s", (unsigned long)a.n, a.kind, a.name, CK_ENVS[e]); fails[e] = 0; continue; }
+        fails[e]++;
+        uint32_t back = fails[e] > 6 ? 900000 : 15000u << fails[e];   // 30 s, 1 min, ... up to 15 minutes
+        nextTry[e] = (ms() + back) | 1;
+        ESP_LOGW(TAG, "alert %lu not sent to %s yet (%s): again in %lu s", (unsigned long)a.n, CK_ENVS[e], ckLastErr, (unsigned long)(back / 1000));
+        break;
       }
-      if (dropped) alertsSave();
-      Alert a = i >= 0 ? alertq[i] : Alert{};
-      xSemaphoreGive(alertMx);
-      if (i < 0) break;
-      uint8_t sent = a.sent, unsure = a.unsure;
-      for (int e = 0; e < CK_NENV; e++) {
-        if (sent & (1 << e)) continue;
-        bool ok = ckSend(CK_ENVS[e], a, unsure & (1 << e));
-        if (ok) { sent |= 1 << e; unsure &= ~(1 << e); }
-        else if (ckLastStatus < 0 || ckLastStatus >= 500) unsure |= 1 << e;   // it may have gone through
-      }
-      xSemaphoreTake(alertMx, portMAX_DELAY);
-      bool done = sent == (1 << CK_NENV) - 1;
-      if (alertq[i].used && alertq[i].n == a.n) { alertq[i].sent = sent; alertq[i].unsure = unsure; if (done) alertq[i].used = 0; alertsSave(); }
-      xSemaphoreGive(alertMx);
-      if (done) { ESP_LOGI(TAG, "alert %lu (%s, %s) sent", (unsigned long)a.n, a.kind, a.name); fails = 0; continue; }
-      if (!strcmp(ckLastErr, "waiting for memory")) { waitMs = 60000; break; }   // not a failure: try again in a minute
-      fails++;
-      waitMs = fails > 6 ? 900000 : 15000u << fails;   // 30 s, 1 min, ... up to 15 minutes
-      ESP_LOGW(TAG, "alert %lu not sent yet (%s): again in %lu s", (unsigned long)a.n, ckLastErr, (unsigned long)(waitMs / 1000));
-      break;
     }
+    if (memWait) { waitMs = 60000; continue; }
+    for (int e = 0; e < CK_NENV; e++)            // wake for the next environment that is backing off
+      if (nextTry[e]) { int32_t left = (int32_t)(nextTry[e] - ms()); waitMs = left < 1000 ? 1000 : (uint32_t)left < waitMs ? (uint32_t)left : waitMs; }
   }
 }
 static int alertsWaiting() {
@@ -270,16 +283,19 @@ static void cloudBegin() {
   nvs_get_u32(nv, "alertn", &alertN);
   // The key from cloud_key.h goes to flash (a newer build may bring a new key); a release build uses what is there.
   if (CLOUD_KEY_ID[0] && strlen(CLOUD_KEY_HEX) == 64) {
-    char have[80] = {0};
-    n = sizeof have;
-    if (nvs_get_str(nv, "ckid", have, &n) != ESP_OK || strcmp(have, CLOUD_KEY_ID)) {
-      uint8_t k[32];
-      if (unhex(CLOUD_KEY_HEX, k, 32)) { nvs_set_str(nv, "ckid", CLOUD_KEY_ID); nvs_set_blob(nv, "ckkey", k, 32); nvs_commit(nv); ESP_LOGI(TAG, "iCloud key saved"); }
+    char have[80] = {0}, haveP[80] = {0};
+    size_t a = sizeof have, b = sizeof haveP;
+    nvs_get_str(nv, "ckid", have, &a);
+    nvs_get_str(nv, "ckidp", haveP, &b);
+    uint8_t k[32];
+    if ((strcmp(have, CLOUD_KEY_ID) || strcmp(haveP, CLOUD_KEY_ID_PROD)) && unhex(CLOUD_KEY_HEX, k, 32)) {
+      nvs_set_str(nv, "ckid", CLOUD_KEY_ID); nvs_set_str(nv, "ckidp", CLOUD_KEY_ID_PROD); nvs_set_blob(nv, "ckkey", k, 32); nvs_commit(nv);
+      ESP_LOGI(TAG, "iCloud key saved");
     }
   }
-  n = sizeof ckKeyId;
   size_t kn = sizeof ckKey;
-  ckKeyOk = nvs_get_str(nv, "ckid", ckKeyId, &n) == ESP_OK && ckKeyId[0] && nvs_get_blob(nv, "ckkey", ckKey, &kn) == ESP_OK && kn == 32;
+  for (int e = 0; e < CK_NENV; e++) { n = sizeof ckKeyId[e]; if (nvs_get_str(nv, e ? "ckidp" : "ckid", ckKeyId[e], &n) != ESP_OK) ckKeyId[e][0] = 0; }
+  ckKeyOk = ckKeyId[0][0] && nvs_get_blob(nv, "ckkey", ckKey, &kn) == ESP_OK && kn == 32;
   if (!ckKeyOk) ESP_LOGW(TAG, "no iCloud key: alerts wait in flash (tools/cloudkit_key.py)");
   xTaskCreate(cloudTask, "cloud", 8192, nullptr, 3, &cloudTaskH);
 }

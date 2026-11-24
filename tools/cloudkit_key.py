@@ -3,7 +3,9 @@
 
   cloudkit_key.py new              make a key pair (~/.tilt/cloudkit-key.pem) and print the public key to paste
                                    into CloudKit Console > Tilt > Tokens & Keys > Server-to-Server Keys
-  cloudkit_key.py header KEYID     write firmware/tilt_hub/main/cloud_key.h (not in Git) for the next hub build
+  cloudkit_key.py header DEV_ID PROD_ID
+                                   write firmware/tilt_hub/main/cloud_key.h (not in Git) for the next hub build. CloudKit
+                                   keys are per environment: add the same public key in Development and in Production
   cloudkit_key.py test TOPIC [KIND] [ENV]
                                    send one Alert from this Mac, signed the same way the hub does it
                                    (ENV: development (default) or production)
@@ -16,7 +18,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 KEY = os.path.expanduser("~/.tilt/cloudkit-key.pem")
-IDF = os.path.expanduser("~/.tilt/cloudkit-key-id")
+IDF = os.path.expanduser("~/.tilt/cloudkit-key-ids.json")
 HEADER = os.path.join(os.path.dirname(__file__), "..", "firmware", "tilt_hub", "main", "cloud_key.h")
 CONTAINER = "iCloud.app.tilt.blinds"
 
@@ -38,13 +40,13 @@ def new():
     print(pub)
 
 
-def header(key_id):
+def header(key_id, prod_id):
     d = load().private_numbers().private_value.to_bytes(32, "big").hex()
     with open(IDF, "w") as f:
-        f.write(key_id)
+        json.dump({"development": key_id, "production": prod_id}, f)
     with open(HEADER, "w") as f:
         f.write("// The Tilt Hub's iCloud key (push alerts). Made by tools/cloudkit_key.py; never commit it.\n#pragma once\n")
-        f.write(f'#define CLOUD_KEY_ID "{key_id}"\n#define CLOUD_KEY_HEX "{d}"\n')
+        f.write(f'#define CLOUD_KEY_ID "{key_id}"\n#define CLOUD_KEY_ID_PROD "{prod_id}"\n#define CLOUD_KEY_HEX "{d}"\n')
     print(f"wrote {os.path.normpath(HEADER)}: build and update the hub (tools/flash_hub.sh)")
 
 
@@ -55,7 +57,7 @@ def post(env, op, body):
     msg = f"{date}:{base64.b64encode(hashlib.sha256(raw).digest()).decode()}:{sub}".encode()
     sig = base64.b64encode(load().sign(msg, ec.ECDSA(hashes.SHA256()))).decode()
     req = urllib.request.Request("https://api.apple-cloudkit.com" + sub, raw, method="POST", headers={
-        "Content-Type": "application/json", "X-Apple-CloudKit-Request-KeyID": open(IDF).read().strip(),
+        "Content-Type": "application/json", "X-Apple-CloudKit-Request-KeyID": json.load(open(IDF))[env],
         "X-Apple-CloudKit-Request-ISO8601Date": date, "X-Apple-CloudKit-Request-SignatureV1": sig})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
@@ -74,6 +76,6 @@ def test(topic, kind="test", env="development"):
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a[:1] == ["new"]: new()
-    elif a[:1] == ["header"] and len(a) == 2: header(a[1])
+    elif a[:1] == ["header"] and len(a) == 3: header(a[1], a[2])
     elif a[:1] == ["test"] and len(a) >= 2: test(*a[1:4])
     else: print(__doc__)
