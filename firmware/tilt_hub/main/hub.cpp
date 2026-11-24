@@ -1245,7 +1245,7 @@ static void pinBegin() {
 }
 static bool hubOwned() { for (auto &k : hkeys) if (k.used == 1 && k.role == 1) return true; return false; }
 // The hub's id: made from its chip's MAC the first time, then kept in its saved data. So a new hub that takes over an
-// old one's saved data (tools/move_hub.sh) is the same hub to the app. A factory reset forgets it with the rest.
+// old one's saved data (copied from the old chip) is the same hub to the app. A factory reset forgets it too.
 static std::string hubIdKept;
 static std::string hubId() {
   if (!hubIdKept.empty()) return hubIdKept;      // set once at start (app_main), before any other task asks
