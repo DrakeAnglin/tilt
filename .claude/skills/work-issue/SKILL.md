@@ -16,4 +16,4 @@ What each step leans on:
 Done means one of two things, and you say which:
 
 1. Merged: the pull request link, what changed, and any issues you filed on the way.
-2. Waiting for the owner: the pull request link, the `needs-human` reason, and what to look at.
+2. Waiting for the owner: the pull request link, the `needs-human` reason, and what to look at. Send the push notification first ("Notifying the owner" in the workflow doc).
