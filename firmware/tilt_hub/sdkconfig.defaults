@@ -165,3 +165,19 @@ CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 CONFIG_CHIP_LOG_DEFAULT_LEVEL_ERROR=y          # Matter: errors only (its progress messages took ~100 KB); the hub's own log stays
+
+# Push alerts (main/cloud.h): one TLS client to iCloud, kept small. Only the two roots iCloud's certificate comes from
+# (main/cloud_roots.pem: DigiCert Global Root G3 and Apple Root CA - G3), not the 69 KB list of web roots, and the TLS
+# parts nothing here uses are left out. If Apple ever moves to another root, add it to that file.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="main/cloud_roots.pem"
+CONFIG_MBEDTLS_ERROR_STRINGS=n
+CONFIG_MBEDTLS_TLS_CLIENT_ONLY=y
+CONFIG_MBEDTLS_SSL_RENEGOTIATION=n
+CONFIG_MBEDTLS_SSL_ALPN=n
+CONFIG_MBEDTLS_CLIENT_SSL_SESSION_TICKETS=n
+CONFIG_MBEDTLS_X509_CRL_PARSE_C=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_RSA=n

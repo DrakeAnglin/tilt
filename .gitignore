@@ -53,3 +53,4 @@ sdkconfig.release
 # Claude Code scratch
 .claude/worktrees/
 .claude/settings.local.json
+firmware/**/cloud_key.h

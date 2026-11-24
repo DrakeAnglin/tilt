@@ -1,8 +1,10 @@
-// Low-battery notices, made on the phone (there is no server to push them): whenever Tilt hears from a controller,
-// in the app or during iOS's background refresh, and its battery is low, the phone shows a notification.
-// At most one a day per controller.
+// Notices made on the phone itself. Everything a Tilt Hub knows comes as a push from the hub instead (Cloud.swift,
+// firmware/tilt_hub/main/cloud.h), so these are only:
+//   - low battery of a controller that is NOT on a Tilt Hub (whenever Tilt hears from it, at most once a day), and
+//   - "Tilt Hub is offline": on the home Wi-Fi, the hub can't be reached (the hub can't send that one itself).
 import BackgroundTasks
 import Foundation
+import Network
 import UserNotifications
 
 /// Shows Tilt's notices as a banner even while the app is open.
@@ -54,46 +56,55 @@ enum BatteryAlerts {
         r.earliestBeginDate = Date(timeIntervalSinceNow: 4 * 3600)
         try? BGTaskScheduler.shared.submit(r)
     }
-    /// From what a Tilt Hub reports (no controller is woken for it).
-    static func checkPercent(id: String, name: String, pct: Int, tooLow: Bool) {
-        guard pct < 20 || tooLow else { return }
-        let key = "lowbatt.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
-        guard now - last > 86400 else { return }
-        UserDefaults.standard.set(now, forKey: key)
-        let c = UNMutableNotificationContent()
-        c.title = "\(name): battery low"
-        c.body = tooLow ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(pct)%. Plug in the charging cable soon."
-        c.sound = .default
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
-    }
-    /// The hub has not heard from a controller for 25 minutes (unplugged, flat, or out of range of the hub).
-    static func notResponding(id: String, name: String) {
-        let key = "noresp.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
-        guard now - last > 43200 else { return }
-        UserDefaults.standard.set(now, forKey: key)
-        let c = UNMutableNotificationContent()
-        c.title = "\(name) is not responding"
-        c.body = "Your Tilt Hub has not heard from it for a while. Check that its battery is charged and that it is within reach of the hub."
-        c.sound = .default
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
-    }
-
-    /// Run by iOS now and then while the app is closed. Controllers on a Tilt Hub are checked through the hub (it
-    /// knows their battery and when each last checked in), so none of them is woken; the others are asked directly.
+    /// Run by iOS now and then while the app is closed. Controllers on a Tilt Hub are left alone (the hub sends their
+    /// alerts itself, and none of them is woken); the others are asked directly. And: is the hub still there?
     static func backgroundCheck() async {
         scheduleRefresh()
-        var onHub: Set<String> = []
-        if let info = await HubWatch.fetchInfo() {
-            for m in info.c {
-                onHub.insert(m.id)
-                if m.pct >= 0 { checkPercent(id: m.id, name: m.name, pct: m.pct, tooLow: m.low == 1) }
-                if m.seenS > HubInfo.Member.silentAfter { notResponding(id: m.id, name: m.name) }
-            }
+        if let r = HubWatch.loadRecord(), !r.waiting {
+            var info = await HubWatch.fetchInfo()
+            if info == nil { try? await Task.sleep(for: .seconds(20)); info = await HubWatch.fetchInfo() }   // not a restart of a moment
+            if info != nil { await HubOffline.answered() } else if r.owner { await HubOffline.missed(since: nil) }
         }
-        for (rec, client) in TiltActions.clients() where !onHub.contains(rec.id) {
+        for (rec, client) in TiltActions.clients() where !rec.onHub {
             guard let s = try? await client.state() else { continue }
             check(id: rec.id, name: s.name, battery: s.batt)
             if rec.owner, (s.asks ?? 0) > 0 { JoinAlerts.notify(cid: "any.\(rec.id)", who: "Someone", room: s.name) }
+        }
+    }
+}
+
+/// "Tilt Hub is offline": the hub can't tell anyone that itself, so an owner's phone does, once per outage, and only on
+/// the home Wi-Fi (away from home a hub out of reach is normal). Home = the same Wi-Fi router as when the hub last
+/// answered. Not for a moment's restart (an update): only after it has been out of reach for a few minutes.
+enum HubOffline {
+    private static let sentKey = "huboff.sent", routerKey = "huboff.router"
+    static let after: TimeInterval = 180
+
+    static func answered() async {
+        UserDefaults.standard.removeObject(forKey: sentKey)
+        if let r = await wifiRouter() { UserDefaults.standard.set(r, forKey: routerKey) }
+    }
+    /// since: when it was first missed in a row (nil: checked twice just now, in the background).
+    static func missed(since: Date?) async {
+        if let since, Date().timeIntervalSince(since) < after { return }
+        guard !UserDefaults.standard.bool(forKey: sentKey), let home = UserDefaults.standard.string(forKey: routerKey),
+              let now = await wifiRouter(), now == home else { return }
+        UserDefaults.standard.set(true, forKey: sentKey)
+        let c = UNMutableNotificationContent()
+        c.title = AlertWords.title(kind: "hub-offline", room: "Tilt Hub", detail: "")
+        c.body = AlertWords.body(kind: "hub-offline", room: "Tilt Hub", detail: "")
+        c.sound = .default
+        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "huboff", content: c, trigger: nil))
+    }
+    /// The Wi-Fi router this iPhone is on now (nil: not on Wi-Fi).
+    static func wifiRouter() async -> String? {
+        await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in
+            let m = NWPathMonitor(requiredInterfaceType: .wifi)
+            m.pathUpdateHandler = { p in
+                m.cancel()
+                done.resume(returning: p.status == .satisfied ? p.gateways.first.map { "\($0)" } : nil)
+            }
+            m.start(queue: .global())
         }
     }
 }
