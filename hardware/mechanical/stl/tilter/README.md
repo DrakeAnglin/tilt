@@ -47,6 +47,7 @@ PETG is for the parts that rub or mesh against PLA all the time.
 | M1.6 × 4 | 2 | N20 to the motor shell |
 | Ø2 × 6 dowel pin | 5 | 4 planet axles in the carrier, 1 worm top pin in the worm case |
 | Super Lube 21030 | a little | worm, wheel, every gear, the carrier's hub, the sleeve's nose |
+| Felt pad, about 8 mm, 1.5 to 2 mm tall | 6 | 4 under the floor, 1 on each long side wall (step 9) |
 
 Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter-8).
 
@@ -77,7 +78,11 @@ Grease every gear as it goes in.
 8. **Lid:** press the magnet into the magnet gear's hub. Pick the support out of the lid's gear cage, then slide the
    gear in from the rod side until its hub clicks into its seat. Lower the lid straight down over the jack; the gear
    turns itself into mesh. M3 × 25 down through the column and the sensor board, M3 × 8 in the corner. Snug.
-9. **Into the rail**, then push the rod through. Turn the wand a little if it stops.
+9. **Felt pads.** Stick 4 felt pads under the floor, one in each corner, and 1 on the middle of each long side wall.
+   They keep the tilter off the metal rail, which would otherwise carry the motor's buzz into the room. Felt, not
+   rubber: rubber still passes the vibration on.
+   If the rod binds once it is in, use thinner pads, or leave the side ones off.
+10. **Into the rail**, then push the rod through. Turn the wand a little if it stops.
 
 Plug the cord in and set the blind up in the app: [build guide](../../../../docs/build-guide.md).
 
