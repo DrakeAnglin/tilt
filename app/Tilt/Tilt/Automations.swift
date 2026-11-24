@@ -5,22 +5,32 @@ import SwiftUI
 
 // Schedule and BlindTarget live in Shared/SchedulePlan.swift.
 
-// BlindScene and ScenePlan live in Shared/ScenePlan.swift.
+// BlindScene and ScenePlan (kept on the controllers) live in Shared/ScenePlan.swift; running, keeping a copy on the
+// phone and pruning in Shared/Scenes.swift.
 
 /// The Scenes, kept on the controllers and shared by every phone with a key. The phone keeps a copy (for Siri,
 /// Shortcuts, and controllers it cannot reach right now). One store for every page that shows them.
 @MainActor @Observable
 final class SceneStore {
     static let shared = SceneStore()
-    var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: Prefs.scenes)).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
+    var scenes: [BlindScene] = Scenes.load()
     private var read: [String: [SceneSlot]] = [:]       // per controller, as last read
     private var localOnly: Set<String> = []             // controllers whose firmware does not keep Scenes: their part stays on this phone
     private var lastLoad = Date.distantPast
 
     /// Keep the copy on this phone.
-    func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: Prefs.scenes) }
+    func save() { Scenes.save(scenes) }
     func run(_ scene: BlindScene, controllers: [Controller]) {
-        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.go(blind: t.blind, tilt: tilt) }
+        let clients = Dictionary(controllers.map { ($0.id, $0.client) }, uniquingKeysWith: { a, _ in a })
+        Task {
+            let r = await Scenes.run(scene, clients: clients)
+            for (id, why) in r.failed { controllers.first { $0.id == id }?.lastError = why }
+        }
+    }
+    /// A controller was removed: the scenes that only moved its blinds go with it.
+    func prune(controller id: String) {
+        let left = Scenes.prune(scenes, controller: id)
+        if left.count != scenes.count { scenes = left; save() }
     }
 
     /// Read the Scenes from the controllers. `soon`: skip it if they were read a moment ago.

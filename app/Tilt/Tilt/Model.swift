@@ -108,6 +108,14 @@ final class Controller: Identifiable {
         }
         requests = asks
     }
+    /// The people on this controller as the person sees them (People.shown: the hub's own key left out, this phone
+    /// first). Notes when this phone's role changed (an owner made it a user, or the other way round).
+    func people() async throws -> [PhoneKey] {
+        let hubCid = record.onHub ? await HubWatch.shared.hubCid(for: id) : nil
+        let list = People.shown(try await client.people(), hubCid: hubCid)
+        if let me = list.first(where: { $0.me == 1 }), (me.owner == 1) != record.owner { record.owner = me.owner == 1; changed?() }
+        return list
+    }
     /// Let a phone that asked to join in (as an owner or a user), or turn it down.
     func answer(_ r: PhoneKey, approve: Bool, owner: Bool = false) async {
         do { try await client.approve(cid: r.cid, approve, owner: owner) } catch { lastError = error.localizedDescription }
@@ -243,11 +251,6 @@ final class AppModel {
         }
         if changed { save() }
     }
-    func setOwner(_ c: Controller, _ owner: Bool) {
-        guard c.record.owner != owner else { return }
-        c.record.owner = owner
-        save()
-    }
     /// Start over on this iPhone: every room, its key and any unfinished setup is removed (the controllers and the hub
     /// are not touched; set them up again from Add).
     func eraseAll() {
@@ -265,10 +268,7 @@ final class AppModel {
         BatteryAlerts.forget(id: c.id)
         UserDefaults.standard.removeObject(forKey: Prefs.lastSeen(c.id))
         controllers.removeAll { $0.id == c.id }
-        let store = SceneStore.shared                       // scenes that only moved this controller's blinds go with it
-        let before = store.scenes.count
-        store.scenes.removeAll { !$0.tilts.isEmpty && $0.tilts.keys.allSatisfy { $0.controller == c.id } }
-        if store.scenes.count != before { store.save() }
+        SceneStore.shared.prune(controller: c.id)          // scenes that only moved this controller's blinds go with it
         waiting.removeAll { $0.id == c.id }
         save()
     }

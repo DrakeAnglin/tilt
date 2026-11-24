@@ -8,19 +8,18 @@ struct SetupWizard: View {
     let controller: Controller
     let index: Int
     let name: String
-    @State private var step = 0
+    @State private var setup = BlindSetup()           // the rules: Shared/BlindSetup.swift
+    private var step: Int { setup.step }
     @State private var wiring: String?            // what the first move found out about the motor's wiring
     @State private var checking = false
     @State private var problem: String?
     @State private var busy = false
-    @State private var lastAngle: Double?
-    @State private var movedAt = Date.distantPast
     @State private var steady = false
 
-    private let steps: [(mark: String, title: String, detail: String, save: String, tilt: Double)] = [
-        ("up", "Close the slats up", "Turn the wand until the slats are shut tight, with the room-side edge pointing up.", "Save Closed Up", 100),
-        ("open", "Level the slats", "Turn the wand until the slats are flat and you can see straight through.", "Save Open", 0),
-        ("down", "Close the slats down", "Turn the wand until the slats are shut tight, with the room-side edge pointing down.", "Save Closed Down", -100),
+    private let steps: [(mark: BlindSetup.Mark, title: String, detail: String, save: String, tilt: Double)] = [
+        (.up, "Close the slats up", "Turn the wand until the slats are shut tight, with the room-side edge pointing up.", "Save Closed Up", 100),
+        (.open, "Level the slats", "Turn the wand until the slats are flat and you can see straight through.", "Save Open", 0),
+        (.down, "Close the slats down", "Turn the wand until the slats are shut tight, with the room-side edge pointing down.", "Save Closed Down", -100),
     ]
 
     var body: some View {
@@ -54,7 +53,7 @@ struct SetupWizard: View {
                     .buttonStyle(.glassProminent).controlSize(.large).disabled(busy || absent || !steady)
                     .animation(.default, value: steady)
                     .sensoryFeedback(.success, trigger: step)
-                    Button("Back") { step -= 1; problem = nil }.padding(.top, 10).opacity(step > 0 ? 1 : 0).disabled(step == 0)
+                    Button("Back") { setup.back(); problem = nil }.padding(.top, 10).opacity(step > 0 ? 1 : 0).disabled(step == 0)
                 } else {
                     Spacer()
                     Image(systemName: "checkmark.circle.fill").font(.system(size: 64)).foregroundStyle(Palette.good)
@@ -78,7 +77,7 @@ struct SetupWizard: View {
                     Text(blind.map(TiltWords.status) ?? "").font(.subheadline).foregroundStyle(.secondary).padding(.top, 12)
                     Spacer()
                     Button { dismiss() } label: { Text("Done").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6) }.buttonStyle(.glassProminent).controlSize(.large)
-                    Button("Redo Setup") { step = 0; problem = nil; wiring = nil }.padding(.top, 10)
+                    Button("Redo Setup") { setup.restart(); problem = nil; wiring = nil }.padding(.top, 10)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 16)
@@ -94,13 +93,10 @@ struct SetupWizard: View {
                     try? await Task.sleep(for: .milliseconds(900))
                 }
             }
-            .onChange(of: blind?.ang) { _, a in
-                if let a, let l = lastAngle, abs(a - l) > 0.6, abs(a - l) < 359.4 { movedAt = .now }
-                lastAngle = a
-            }
+            .onChange(of: blind?.ang) { _, a in setup.reading(angle: a, at: .now) }
             .task {                                                  // "holding still" once the reading has not moved for a moment
                 while !Task.isCancelled {
-                    steady = lastAngle != nil && Date.now.timeIntervalSince(movedAt) > 1.2
+                    steady = setup.steady(at: .now)
                     try? await Task.sleep(for: .milliseconds(300))
                 }
             }
@@ -109,7 +105,7 @@ struct SetupWizard: View {
     }
 
     /// The first move after setup: to Open. The controller watches which way the angle goes; if the motor's wires are
-    /// swapped it turns round and keeps that. Reported from the controller's developer view ("sign": -1 = swapped).
+    /// swapped it turns round and keeps that, and says so in its motor sign (-1 = swapped).
     private func checkWiring() {
         checking = true; problem = nil; wiring = nil
         Task {
@@ -117,41 +113,33 @@ struct SetupWizard: View {
             do {
                 try await controller.client.go(blind: index, tilt: 0)
                 let t0 = Date()
-                var seenMoving = false
-                while Date().timeIntervalSince(t0) < 30 {
+                var check = BlindSetup.WiringCheck()
+                poll: while Date().timeIntervalSince(t0) < BlindSetup.WiringCheck.giveUpAfter {
                     try await Task.sleep(for: .milliseconds(700))
-                    guard let b = try? await controller.client.state().b[safe: index] else { continue }
-                    if b.moving { seenMoving = true; continue }
-                    if seenMoving || Date().timeIntervalSince(t0) > 4 {
-                        if !b.last.localizedCaseInsensitiveContains("reached") && !b.last.localizedCaseInsensitiveContains("already") {
-                            problem = "The blind did not reach Open (\(b.last)). Check it turns freely, then tap Open."
-                            return
-                        }
-                        break
+                    let b = try? await controller.client.state().b[safe: index]
+                    switch check.poll(b, elapsed: Date().timeIntervalSince(t0)) {
+                    case .wait: continue
+                    case .reached: break poll
+                    case .failed(let reason): problem = reason; return
                     }
                 }
-                let dev = await controller.client.developerInfo()
-                let sign = ((dev["p"] as? [[String: Any]])?[safe: index]?["sign"] as? Int) ?? 0
-                wiring = sign < 0 ? "Motor checked: its wires are the other way round. The controller has learned that, nothing to rewire."
-                                  : "Motor checked: it turns the right way."
+                wiring = BlindSetup.WiringCheck.words(sign: await controller.client.motorSign(blind: index))
             } catch { problem = error.localizedDescription }
         }
     }
-    private func mark(_ which: String) {
+    private func mark(_ which: BlindSetup.Mark) {
         busy = true; problem = nil
         Task {
             defer { busy = false }
             do {
-                let m = try await controller.client.mark(blind: index, which)
-                if m.ok != 1 { problem = (m.err ?? "That did not work.").capitalizedFirst; return }
-                if which == "down", let p = m.prob {            // the three marks do not make sense together: start over
+                let answer = try await controller.client.mark(blind: index, which.rawValue)
+                switch setup.marked(answer) {
+                case .failed(let reason): problem = reason
+                case .restart(let reason):                      // the three marks do not make sense together: start over
                     _ = try? await controller.client.mark(blind: index, "clear")
-                    problem = p.capitalizedFirst + ". Start again from step 1."
-                    step = 0
-                    return
+                    problem = reason
+                case .next(let step): if step == 3 { checkWiring() }
                 }
-                step += 1
-                if step == 3 { checkWiring() }
             } catch { problem = error.localizedDescription }
         }
     }

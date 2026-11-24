@@ -1,7 +1,8 @@
-// Tests for main/logic.h, main/home_view.h, main/request.h, main/tilter.h and main/wire.h, run on the Mac:
+// Tests for main/logic.h, main/handwatch.h, main/home_view.h, main/request.h, main/tilter.h and main/wire.h, run on the Mac:
 // tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
 #include "../main/home_view.h"
+#include "../main/handwatch.h"
 #include "../main/request.h"
 #include "../main/tilter.h"
 #include "../main/wire.h"
@@ -254,6 +255,92 @@ static void tilterTests() {
     CHECK(s.endMsg == "already there" && s.dir == 0, "already there: the motor never runs"); }
 }
 
+// Follow and the watch (handwatch.h), driven the way motionTick drives it: with no watch, an idle look at one blind
+// every 350 ms; with a watch, its blind read every 100 ms. tilt[] is where each blind really is (a hand moves it).
+struct WandSim {
+  HandWatch h;
+  float tilt[PORTS] = {0, 0, 0};
+  bool blindSpot = false;                             // the watched blind's sensor gives no reading
+  uint32_t now = 1000, lastIdle = 0, lastRead = 0;
+  int idle = 0, follows = 0, from = -1;
+  float to = NAN;
+  float ang(int p) { return 290 - tilt[p] * 0.9f; }
+  void step() {                                       // 10 ms
+    now += 10;
+    HandWatchNow w = h.tick(now);
+    if (w.followFrom >= 0) { follows++; from = w.followFrom; to = w.followTilt; return; }
+    if (w.watchPort >= 0) {
+      if (now - lastRead >= 100) { lastRead = now; int p = w.watchPort; h.reading(p, tilt[p], ang(p), blindSpot, now); }
+      return;
+    }
+    if (now - lastIdle >= 350) { lastIdle = now; h.reading(idle, tilt[idle], ang(idle), false, now); idle = (idle + 1) % PORTS; }
+  }
+  void run(uint32_t ms) { for (uint32_t e = 0; e < ms; e += 10) step(); }
+  void turn(int p, float by, uint32_t ms) {           // a hand turns blind p's wand steadily
+    int n = ms / 10;
+    for (int i = 0; i < n; i++) { tilt[p] += by / n; step(); }
+  }
+};
+static void handWatchTests() {
+  { WandSim s; s.run(2000);                            // every blind looked at: where the controller left them
+    s.turn(0, 40, 2000);
+    s.run(1400);
+    CHECK(s.follows == 0, "follow: not while the hand may still be at work");
+    s.run(3000);
+    CHECK(s.follows == 1 && s.from == 0 && near(s.to, 40, 1), "follow: a wand turn makes the others follow");
+    s.run(10000);
+    CHECK(s.follows == 1, "follow: exactly once"); }
+  { WandSim s; s.run(2000);
+    s.turn(1, 20, 1000);
+    s.run(1200);                                       // a pause under 1.5 s
+    CHECK(s.follows == 0, "follow: a pause under 1.5 s does not start the others early");
+    s.turn(1, 30, 1000);
+    s.run(3000);
+    CHECK(s.follows == 1 && s.from == 1 && near(s.to, 50, 1), "follow: after the pause, the whole turn is followed"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 4, 1000); s.run(5000);
+    CHECK(s.follows == 0 && s.h.tick(s.now).watchPort < 0, "follow: a small bump is not a turn"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 40, 1000);                               // a hand watch is under way
+    s.h.setupOpen(2, s.now);                           // and a setup screen opens
+    s.run(3000);
+    CHECK(s.follows == 0, "follow: an open Setup screen stops it");
+    for (int k = 0; k < 5; k++) { s.h.setupOpen(2, s.now); s.turn(1, -10, 1000); }   // turning wands while Setup is open
+    s.run(20000);
+    CHECK(s.follows == 0, "follow: wands turned while Setup is open are not followed, then or later"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 40, 500);
+    s.blindSpot = true;                                // stuck at the sensor's zero: no reading at all
+    s.run(65000);
+    CHECK(s.follows == 0 && s.h.tick(s.now).watchPort < 0, "follow: the watch gives up after 60 s, nothing followed"); }
+  { WandSim s; s.run(2000);
+    for (int i = 0; i < 70; i++) s.turn(0, i % 2 ? 3 : -3, 1000);   // a hand that never holds still
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: a turn that lasts over 60 s is not followed"); }
+  { WandSim s; s.run(2000);
+    s.tilt[0] = 50;                                    // moved while Follow was off (no readings went to it)
+    s.h.reset();                                       // Follow turned on
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: turning it on starts fresh, old turns are not followed"); }
+  { WandSim s; s.run(2000);                            // a recovery: the blind is turned to its ends by hand
+    for (int k = 0; k < 6; k++) { s.h.setupOpen(0, s.now); s.turn(0, k % 2 ? -60 : 60, 1000); }
+    s.run(25000);
+    CHECK(s.follows == 0, "follow: recovery turns are not followed"); }
+  { WandSim s; s.run(2000);
+    s.h.motorStarted(); s.tilt[2] = -70; s.h.motorLeft(2, -70);   // a motor moved it
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: a blind moved by its motor is not followed"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 40, 1000);
+    s.h.motorStarted();                                // the app moves this blind while its wand is being turned
+    CHECK(s.h.tick(s.now).watchPort < 0, "follow: a motor starting ends the watch");
+    s.tilt[0] = 10; s.h.motorLeft(0, 10);              // and leaves it at 10
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: the turn before the motor moved it is not followed"); }
+  { HandWatch h; h.reading(0, NAN, 100, false, 100); h.reading(0, NAN, 200, false, 500);
+    CHECK(h.tick(600).watchPort < 0 && std::isnan(h.ref[0]), "follow: a blind that cannot move is never watched"); }
+}
+
 int main() {
   // ---- angles
   CHECK(near(angDiff(10, 350), 20, 1e-4), "angDiff crosses zero forward");
@@ -296,6 +383,7 @@ int main() {
   // ---- one blind's Move, on a simulated Tilter
   sensorTests();
   tilterTests();
+  handWatchTests();
 
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");
