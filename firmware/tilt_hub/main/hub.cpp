@@ -1085,7 +1085,9 @@ static esp_err_t hRelay(httpd_req_t *r) {
   if (r->method == HTTP_GET && path == "/x/hello") type = 'H';
   else if (r->method == HTTP_POST && path == "/x") type = 'X';
   else if (r->method == HTTP_POST && path == "/x/ask") type = 'A';
-  else if (r->method == HTTP_POST && path == "/x/pair") type = 'P';
+  else if (r->method == HTTP_POST && path == "/x/recover") type = 'R';      // no owner left: turn a blind to get in
+  else if (r->method == HTTP_GET && path == "/x/recstate") type = 'Q';
+  // No /x/pair: a controller takes its first owner over Bluetooth only (blinds_matter/main/hub_link.h).
   if (!type) { httpd_resp_set_status(r, "404 Not Found"); return httpd_resp_sendstr(r, "{\"err\":\"not through the hub\"}"); }
   std::string body;
   if (r->method == HTTP_POST) {
@@ -1102,7 +1104,7 @@ static esp_err_t hRelay(httpd_req_t *r) {
     if (!h.empty()) { httpd_resp_set_type(r, "application/json"); httpd_resp_set_hdr(r, "Cache-Control", "no-store"); return httpd_resp_send(r, h.data(), h.size()); }
   }
   std::string ans;
-  int st = ask(c, type, body, ans, type == 'A' || type == 'P' ? 4000 : 2500);
+  int st = ask(c, type, body, ans, type == 'A' || type == 'R' ? 4000 : 2500);
   httpd_resp_set_status(r, reason(st));
   if (!st) return httpd_resp_sendstr(r, "{\"err\":\"the controller did not answer through the hub\"}");
   httpd_resp_set_type(r, st == 200 && type == 'X' ? "application/octet-stream" : "application/json");

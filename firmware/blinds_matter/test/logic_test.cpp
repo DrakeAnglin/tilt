@@ -336,19 +336,43 @@ int main() {
   uint8_t other[4] = {9, 9, 9, 9};
   CHECK(!nonceFresh(nonce, other, 0), "a command from before a restart is refused");
 
-  // ---- who may do what
+  // ---- who may do what: the one route table (routes.h) and the rule that reads it
   std::string me = "aabbccddeeff0011", them = "1122334455667788";
-  CHECK(permitRule(false, false, false, false, "/api/s", "", "") != nullptr, "plain closed once owned");
-  CHECK(permitRule(false, false, true, false, "/api/set", "", "") == nullptr, "plain open before pairing or with the switch");
-  CHECK(permitRule(false, false, false, true, "/api/update", "", "") == nullptr, "update checks its own signature");
-  CHECK(permitRule(true, true, false, false, "/api/set", "", me) == nullptr, "owner may change settings");
+  auto rule = [&](const char *path, bool owner, const std::string &cid) {
+    const RouteRule *r = routeRule(path);
+    return r ? permitRule(r->who, owner, cid, me) : "not a command";
+  };
+  {
+    bool roles = routeRuleCount > 30, paths = true, once = true;
+    for (int i = 0; i < routeRuleCount; i++) {
+      Who w = routeRules[i].who;
+      if (w != OWNER && w != GUEST && w != SELF) roles = false;
+      if (strncmp(routeRules[i].path, "/api/", 5)) paths = false;
+      for (int k = 0; k < i; k++) if (!strcmp(routeRules[i].path, routeRules[k].path)) once = false;
+    }
+    CHECK(roles, "every route has a role");
+    CHECK(paths && once, "every route is an /api/ command, listed once");
+  }
+  for (int i = 0; i < routeRuleCount; i++) CHECK(rule(routeRules[i].path, true, "") == nullptr, "an owner may send every command");
   for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"})
-    CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move");
-  for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen"})
-    CHECK(permitRule(true, false, false, false, p, "", me) != nullptr, "user refused owner-only command");
-  CHECK(permitRule(true, false, false, false, "/api/keyname", me, me) == nullptr, "user may rename themself");
-  CHECK(permitRule(true, false, false, false, "/api/keyname", them, me) != nullptr, "user may not rename others");
-  CHECK(permitRule(true, false, false, false, "/api/keyname", "", me) != nullptr, "rename with no id refused");
+    CHECK(rule(p, false, "") == nullptr, "a guest may see and move");
+  for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen", "/api/openapi", "/api/hubkey", "/api/reboot", "/api/reset"})
+    CHECK(rule(p, false, "") != nullptr, "a guest is refused an owner command");
+  {
+    int guestOk = 0;
+    for (int i = 0; i < routeRuleCount; i++) if (permitRule(routeRules[i].who, false, "", me) == nullptr) guestOk++;
+    CHECK(guestOk == 7, "a guest may send exactly the seven guest commands");
+  }
+  CHECK(rule("/api/keyname", false, me) == nullptr, "a guest may rename themself");
+  CHECK(rule("/api/keyname", false, them) != nullptr, "a guest may not rename others");
+  CHECK(rule("/api/keyname", false, "") != nullptr, "rename with no id refused");
+  CHECK(rule("/api/keyname", true, them) == nullptr, "an owner may rename anyone");
+  CHECK(routeRule("/api/nothing") == nullptr && routeRule("/") == nullptr && routeRule("/x/pair") == nullptr, "an unknown command is not a route");
+
+  // ---- what the Tilt Hub may send (hub_link.h)
+  for (char t : std::string("HXAQRBWEs")) CHECK(hubAsks(t), "the hub's requests are taken");
+  for (char t : std::string("PGSLhx#Zr")) CHECK(!hubAsks(t), "an unknown datagram type is refused (no P: first pairing is Bluetooth only)");
+  CHECK(!hubAsks(0), "a zero type is refused");
 
   // ---- Apple Home: what Home asked for
   CHECK(near(tiltOfHomeLift(10000, true), 100, 1e-4) && near(tiltOfHomeLift(10000, false), -100, 1e-4), "closed: up or down by closeUp");

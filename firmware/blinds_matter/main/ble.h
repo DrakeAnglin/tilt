@@ -2,7 +2,8 @@
 // starts (Matter does that). This adds one more service next to Matter's, for the blinds app:
 //
 //   service  B11D0001-7A3C-4F52-9E0D-6C2A91D4E5F0
-//   RX       B11D0002-...   the app writes a request:  'H' hello | 'P' + pairing JSON | 'X' + sealed command
+//   RX       B11D0002-...   the app writes a request:  'H' hello | 'P' + pairing JSON |
+//                           'R' + the same JSON, recovering (people.h) | 'Q' recovery progress | 'X' + sealed command (sec.h)
 //   TX       B11D0003-...   the app then reads the answer:  status digit ('2' good, '4' refused) + answer
 //
 // Pairing and commands are exactly the ones in sec.h, so the hub's network travels sealed with the phone's key
@@ -37,6 +38,8 @@ static int bleAccess(uint16_t conn, uint16_t, struct ble_gatt_access_ctxt *c, vo
     const char *st = "400";
     if (in[0] == 'H') { out = helloJson(); st = "200"; }
     else if (in[0] == 'P') st = pairDo(in.substr(1), out);
+    else if (in[0] == 'R') st = recoverDo(in.substr(1), out);
+    else if (in[0] == 'Q') { out = recoverStateJson(); st = "200"; }
     else if (in[0] == 'X') st = secDo(in.substr(1), out, nullptr);
     else out = "{\"err\":\"unknown request\"}";
     bleAnswer = std::string(1, st[0]) + out;

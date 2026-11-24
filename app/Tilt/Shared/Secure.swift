@@ -64,7 +64,8 @@ enum Secure {
     static func pair(host: String, phoneName: String, how: Joining, salt: Data = Data()) async throws -> Paired {
         try await pair(phoneName: phoneName, salt: salt) { try await http(host, how.rawValue, body: $0) }
     }
-    /// The three ways in: the first phone of a new controller, asking an owner, or proving you are at the window.
+    /// The three ways in: the first phone (of a Tilt Hub; a new controller's first phone pairs over Bluetooth), asking an
+    /// owner, or proving you are at the window.
     enum Joining: String { case first = "/x/pair", ask = "/x/ask", recover = "/x/recover" }
     /// How far a recovery has got: steps done (0…3) and seconds left; nil when none is running.
     static func recovery(_ host: String) async -> (step: Int, left: Int)? {

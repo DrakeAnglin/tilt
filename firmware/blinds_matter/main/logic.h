@@ -6,6 +6,7 @@
 #include <cstring>
 #include <ctime>
 #include <string>
+#include "routes.h"                              // Who: the roles permitRule decides by
 
 const int PORTS = 3;                                         // a controller has 3 ports
 
@@ -145,15 +146,14 @@ inline bool fwIsOlder(const char *candidate, const char *running) {
   return false;
 }
 
-// ---- who may do what (sec.h permit() gathers the facts and asks this)
-// plainOpen: no phone owns the controller yet, or the developer switch is on. cidArg: the "cid" in the command; ownCid: the
-// caller's own id (hex). nullptr: allowed. Otherwise the reason it is refused.
-inline const char *permitRule(bool secure, bool owner, bool plainOpen, bool isUpdate, const std::string &path,
-                              const std::string &cidArg, const std::string &ownCid) {
-  if (!secure) return (isUpdate || plainOpen) ? nullptr : "use the app";   // an update checks its own signature
-  if (owner) return nullptr;
-  // a user: see the blinds and move them, see the people, rename only themself
-  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"}) if (path == ok) return nullptr;
-  if (path == "/api/keyname" && !cidArg.empty() && cidArg == ownCid) return nullptr;
+// ---- the requests the Tilt Hub may send this controller (hub_link.h); anything else is ignored, never answered
+inline bool hubAsks(char t) { return t && strchr("HXAQRBWEs", t); }
+
+// ---- who may do what (sec.h permit() gathers the facts and asks this; the roles are in routes.h)
+// owner: the caller is an Owner (else a Guest). cidArg: the "cid" in the command; ownCid: the caller's own id (hex).
+// nullptr: allowed. Otherwise the reason it is refused.
+inline const char *permitRule(Who who, bool owner, const std::string &cidArg, const std::string &ownCid) {
+  if (owner || who == GUEST) return nullptr;
+  if (who == SELF && !cidArg.empty() && cidArg == ownCid) return nullptr;
   return "only the owner can do that";
 }
