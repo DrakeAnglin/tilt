@@ -364,11 +364,19 @@ static void settingsChangeTests() {
     while (m.kind != MV_NONE && s.t < at + 30000) { s.step(10); moveTick(m, s, s.t); }
     CHECK(wasRunning && m.kind == MV_NONE && s.endMsg == "stopped: Setup changed" && s.dir == 0, "Marks cleared mid-move: the move ends, motor off");
     CHECK(s.t - at < 1000 && s.sign == 1 && s.keeps == 0, "Marks cleared mid-move: within a second, nothing learned from it"); }
-  { SimTilter s; s.degPerS = 15; s.sign = 2;               // the gate stops it before the settings change under it
-    Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = -100;
-    while (m.kind != MV_NONE && s.t < 1500) { s.step(10); moveTick(m, s, s.t); }
+  { SimTilter s; s.degPerS = 15; s.sign = 1;               // the gate stops it before the settings change under it
+    Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = -100;     // open (290) toward closed down (40): 110 degrees away
+    while (m.kind != MV_NONE && s.t < 4000) { s.step(10); moveTick(m, s, s.t); }
+    float gone = fabsf(angDiff(s.wrapped(), 290));
+    bool running = m.kind != MV_NONE && s.dir != 0;
     stopNow(m, s, "stopped: settings changed");
-    CHECK(m.kind == MV_NONE && s.dir == 0 && s.endMsg == "stopped: settings changed" && s.sign == 2, "settings change: the move is ended at once, direction kept"); }
+    CHECK(running && gone > 20 && m.kind == MV_NONE && s.dir == 0 && s.endMsg == "stopped: settings changed", "settings change: the move is ended at once, motor off");
+    CHECK(s.sign == 2 && s.keeps == 1, "settings change: a move that got clearly closer keeps its direction as learned"); }
+  { SimTilter s; s.degPerS = 15; s.sign = 1;
+    Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = -100;
+    while (m.kind != MV_NONE && s.t < 300) { s.step(10); moveTick(m, s, s.t); }   // barely started: not closer yet
+    stopNow(m, s, "stopped: settings changed");
+    CHECK(m.kind == MV_NONE && s.sign == 1 && s.keeps == 0, "settings change: a move stopped before it got closer learns nothing"); }
   { SimTilter s; Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = 50;   // still waking its sensor
     stopNow(m, s, "stopped: settings changed");
     CHECK(m.kind == MV_NONE && s.dir == 0 && s.endMsg == "stopped: settings changed", "settings change while waking: ended, nothing read"); }
