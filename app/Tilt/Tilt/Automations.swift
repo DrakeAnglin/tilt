@@ -74,7 +74,7 @@ final class SceneStore {
                 if w.value.mask != 0 { read[w.controller]!.append(w.value) }
             }
         } catch {
-            await load(controllers)                         // some were written: show what the controllers have now
+            _ = await refresh(controllers)                  // some were written: show what the controllers have now (only read: no retry loop)
             throw error
         }
         s.seen = !s.tilts.keys.contains { localOnly.contains($0.controller) }     // all of it is on the controllers
@@ -96,16 +96,18 @@ struct ScenesRow: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(store.scenes) { sc in
-                    Button { ran = sc.id; store.run(sc, controllers: model.controllers) } label: {
+                    // A Menu per tile, not .contextMenu: inside a List row (the Automations tab) every tile's context menu
+                    // opened the row's first tile, so Edit or Delete acted on the wrong Scene.
+                    Menu {
+                        Button("Edit", systemImage: "pencil") { editing = sc }
+                        Button("Delete", systemImage: "trash", role: .destructive) { change(sc, delete: true) }
+                    } label: {
                         VStack(spacing: 8) { Image(systemName: sc.symbol).font(.title2); Text(sc.name).font(.footnote.weight(.semibold)).lineLimit(1) }
                             .frame(width: 104, height: 84)
                             .card(radius: 20)
-                    }
+                    } primaryAction: { ran = sc.id; store.run(sc, controllers: model.controllers) }
                     .buttonStyle(.plain)
-                    .contextMenu {
-                        Button("Edit", systemImage: "pencil") { editing = sc }
-                        Button("Delete", systemImage: "trash", role: .destructive) { change(sc, delete: true) }
-                    }
+                    .accessibilityHint("Runs the scene. Hold to edit or delete.")
                 }
                 Button { editing = BlindScene() } label: {
                     VStack(spacing: 8) { Image(systemName: "plus").font(.title2); Text("New Scene").font(.footnote.weight(.semibold)) }
