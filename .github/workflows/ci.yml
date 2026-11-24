@@ -52,6 +52,7 @@ jobs:
           python-version: '3.12'
       - run: pip install cryptography
       - run: python3 -m unittest tools/test_tools.py
+      - run: python3 -m unittest tools/agent/test_agent.py
 
   app:
     needs: changes
@@ -71,4 +72,6 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "$RESULTS"
-          case "$RESULTS" in *failure*|*cancelled*) exit 1 ;; esac
+          for R in $RESULTS; do
+            case "$R" in success|skipped) ;; *) exit 1 ;; esac
+          done

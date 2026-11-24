@@ -19,7 +19,7 @@ How one agent takes one issue from request to `main`, without a person in the lo
 5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create` using the template: `Closes #<n>`, summary, evidence, door, blast radius.
 6. **Wait for CI.** `gh pr checks <pr> --watch`. Red? Fix it, push, wait again.
 7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its findings and the door on the pull request.
-8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Three rounds at most; after that it goes to a human.
+8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Three rounds at most; the merge script counts them, and after that it goes to a human.
 9. **Gate.** Start the `merge-gate` agent with the pull request number. It reads the review and the policy and decides: merge, or human.
 10. **Merge or hand over.**
     - Merge: `tools/agent/merge_pr.sh <pr>`. It checks the rules again and squash-merges.

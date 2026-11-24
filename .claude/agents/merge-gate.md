@@ -42,6 +42,8 @@ One comment, `gh pr comment <pr> --body-file <file>`:
 <!-- factory-gate sha=<full head sha> verdict=<merge|human> -->
 ```
 
+More than three `factory-review` comments on the pull request: **human**, "too many rounds of review".
+
 Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge, `--add-label needs-human` for human. Remove the other one if it is there.
 
 Reply with the verdict and the reason.

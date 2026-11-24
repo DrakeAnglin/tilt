@@ -31,6 +31,8 @@ When unsure, call it one-way.
 6. Under 400 changed lines.
 7. No human-only path is touched (below).
 
+A label the owner sets by hand wins: a pull request with `needs-human` or `one-way-door` is never merged by an agent.
+
 **A human merges** in every other case. The agent adds the `needs-human` label, says why in one comment on the pull request, and stops.
 
 ## Human-only paths
@@ -39,6 +41,7 @@ Tests cannot vouch for these, or they are the rules themselves:
 
 - `hardware/`, `tools/fusion_*.py`, `tools/bambu*.py`, `tools/orient.py`: printed parts and the PCB. Someone has to look at the part.
 - `tools/release_firmware.py`, `tools/flash*.sh`, `partitions.csv`, `sdkconfig*`: release and flashing.
+- `tools/firmware_tests.sh`, `tools/app_tests.sh`: what the tests run. Adding tests is fine; changing how they run is not.
 - `fwkey.h`, `sec.h`, `tilt_crypto.h`, `lock.h`, `update.h`, `Secure.swift`, `FirmwareUpdate.swift`, `*.entitlements`, `Info.plist`, `PrivacyInfo.xcprivacy`: security, updates and what Apple reviews.
 - `docs/adr/`, `docs/requirements.md`: decisions are the owner's.
 - `.github/`, `.claude/`, `.githooks/`, `tools/agent/`, `docs/agents/`, `CLAUDE.md`: the factory itself. An agent does not change its own rules.
