@@ -28,7 +28,7 @@ Controllers never go back to an older version by themselves: the app only offers
 2. In that environment, add two secrets:
    - `FIRMWARE_SIGNING_KEY`: the whole text of `~/.tilt/firmware-signing-key.pem` (`pbcopy < ~/.tilt/firmware-signing-key.pem`).
    - `TILT_SITE_TOKEN`: a fine-grained personal access token for `DrakeAnglin/tilt-site` only, with Contents read and write.
-3. Optional: Settings, Rules, a tag ruleset on `fw-v*` and `hub-v*` so only you can make them.
+3. Settings, Rules, a tag ruleset on `fw-v*` and `hub-v*` so only you can make them. This matters: a tag runs the workflow file of the commit it points at, so the workflow's "tag is on main" check alone does not keep the key from a tag on an edited branch.
 
 ## By hand, on the Mac
 

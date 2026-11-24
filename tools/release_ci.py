@@ -60,12 +60,13 @@ def signed_part(data):
     return data[:-72], data[-72:-8]
 
 
-FETCHED = 1_000_000_000              # fetch() dates the files it downloads in 2001; anything newer was built here
+FETCHED = 1_000_000_000              # fetch() dates the controller images it downloads in 2001, oldest first
+FETCHED_LIST = '.fetched'           # and lists every file it downloaded here: verify() checks only the others
 
 
 def verify(pub, out=OUT):
     import subprocess, tempfile
-    built = [f for f in sorted(os.listdir(out)) if f.endswith(('.bin', '.patch')) and os.path.getmtime(os.path.join(out, f)) > FETCHED + 10**6]
+    built = [f for f in sorted(os.listdir(out)) if f.endswith(('.bin', '.patch')) and f not in fetched_names(out)]
     if not built: sys.exit('nothing was built')
     for f in built:
         body, sig = signed_part(open(os.path.join(out, f), 'rb').read())
@@ -76,8 +77,16 @@ def verify(pub, out=OUT):
         print('signature ok: ' + f)
 
 
+def fetched_names(out=OUT):
+    p = os.path.join(out, FETCHED_LIST)
+    return open(p).read().split() if os.path.exists(p) else []
+
+
 def _get(url):
-    req = urllib.request.Request(url, headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'tilt-release'})
+    headers = {'Accept': 'application/vnd.github+json', 'User-Agent': 'tilt-release'}
+    if url.startswith('https://api.github.com/') and os.environ.get('GITHUB_TOKEN'):
+        headers['Authorization'] = 'Bearer ' + os.environ['GITHUB_TOKEN']      # a higher rate limit than anonymous
+    req = urllib.request.Request(url, headers=headers)
     return urllib.request.urlopen(req, timeout=60).read()
 
 
@@ -85,6 +94,7 @@ def fetch(out=OUT):
     """Download what is published now: the newest firmware.json and the files it names (they go on the new release
     again), and the last few controller images (release_firmware.py makes patches from them, newest last by time)."""
     os.makedirs(out, exist_ok=True)
+    open(os.path.join(out, FETCHED_LIST), 'w').close()
     releases = [r for r in json.loads(_get('https://api.github.com/repos/%s/releases?per_page=30' % SITE))
                 if not r['draft'] and not r['prerelease']]
     if not releases: print('nothing published yet'); return
@@ -105,6 +115,7 @@ def fetch(out=OUT):
             t = images.index(name) + FETCHED
             os.utime(p, (t, t))
     json.dump(listing, open(os.path.join(out, 'firmware.json'), 'w'), indent=2)
+    open(os.path.join(out, FETCHED_LIST), 'w').write('\n'.join(want) + '\n')
     print('fetched: ' + ', '.join(want))
 
 

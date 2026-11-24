@@ -67,6 +67,37 @@ class ReleaseCI(unittest.TestCase):
         self.assertEqual(release_ci.signed_part(b'P' + b's' * 64 + b'TILTDLT1'), (b'P', b's' * 64))
         with self.assertRaises(ValueError): release_ci.signed_part(b'x' * 80)
 
+    def test_fetch_and_verify_check_only_what_was_built(self):
+        """fetch() downloads every file firmware.json names plus older images; verify() then checks only new files."""
+        import json, subprocess
+        site = {'firmware.json': json.dumps({'stable': {'version': '2.2.0', 'file': 'tilt-2.2.0.bin', 'patches': [{'file': 'tilt-2.2.0-from-2.1.0.patch'}]},
+                                             'hub': {'version': '0.3.3', 'file': 'tilt-hub-0.3.3.bin'}}).encode(),
+                'tilt-2.1.0.bin': b'old', 'tilt-2.2.0.bin': b'new', 'tilt-2.2.0-from-2.1.0.patch': b'p', 'tilt-hub-0.3.3.bin': b'h'}
+        releases = [{'draft': False, 'prerelease': False, 'published_at': '2026-11-0%d' % i,
+                     'assets': [{'name': n, 'browser_download_url': 'u:' + n} for n in names]}
+                    for i, names in [(1, ['tilt-2.1.0.bin']), (2, list(site))]]
+        get = release_ci._get
+        release_ci._get = lambda url: json.dumps(releases).encode() if url.startswith('https://api') else site[url[2:]]
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                release_ci.fetch(d)
+                self.assertEqual(sorted(release_ci.fetched_names(d)), sorted(n for n in site if n != 'firmware.json'))
+                self.assertLess(os.path.getmtime(os.path.join(d, 'tilt-2.1.0.bin')), os.path.getmtime(os.path.join(d, 'tilt-2.2.0.bin')))
+                key, pub = os.path.join(d, 'k.pem'), os.path.join(d, 'p.pem')
+                subprocess.run(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', key], check=True)
+                subprocess.run(['openssl', 'ec', '-in', key, '-pubout', '-out', pub], check=True, capture_output=True)
+                old_key, release_firmware.KEY = release_firmware.KEY, key
+                try:
+                    img = b'image' * 50
+                    open(os.path.join(d, 'tilt-2.3.0.bin'), 'wb').write(img + release_firmware.sign(img) + b'TILTSIG1')
+                finally:
+                    release_firmware.KEY = old_key
+                release_ci.verify(pub, d)                   # the fetched files are not signed with this key: skipped
+                open(os.path.join(d, 'tilt-2.3.0.bin'), 'r+b').write(b'X')
+                with self.assertRaises(SystemExit): release_ci.verify(pub, d)
+        finally:
+            release_ci._get = get
+
     def test_listed_files_names_every_image_and_patch_once(self):
         listing = {'stable': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
                    'beta': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},

@@ -16,7 +16,9 @@ on:
       - tools/release_build.sh
 
 concurrency:
-  group: firmware-release           # one release at a time: each one builds on the last firmware.json
+  # One release at a time: each one builds on the last firmware.json. Dry runs have their own group, so they never
+  # cancel a release that is waiting.
+  group: firmware-release-${{ github.event_name }}
   cancel-in-progress: false
 
 permissions:
@@ -62,11 +64,12 @@ jobs:
           FIRMWARE_SIGNING_KEY: ${{ github.event_name == 'push' && secrets.FIRMWARE_SIGNING_KEY || '' }}
           KIND: ${{ steps.tag.outputs.kind }}
           CHANNEL: ${{ steps.tag.outputs.channel || 'beta' }}
+          GITHUB_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
         run: |
           if [ "$EVENT" = push ] && [ -z "$FIRMWARE_SIGNING_KEY" ]; then echo "::error::no FIRMWARE_SIGNING_KEY secret"; exit 1; fi
           # esp-matter 1.5 on ESP-IDF 5.5.5, the same as the Mac (pinned, so a release builds the same way twice).
-          docker run --rm -v "$PWD:/w" -w /w -e FIRMWARE_SIGNING_KEY -e KIND -e CHANNEL --entrypoint /bin/bash \
+          docker run --rm -v "$PWD:/w" -w /w -e FIRMWARE_SIGNING_KEY -e KIND -e CHANNEL -e GITHUB_TOKEN --entrypoint /bin/bash \
             espressif/esp-matter:release-v1.5_idf_v5.5.5@sha256:51e890d6e913be195d273384eb93785bc9e64c35751a13fdd02c79ff06c07273 \
             -c '. "$IDF_PATH/export.sh" >/dev/null && tools/release_build.sh'
       - uses: actions/upload-artifact@v4
