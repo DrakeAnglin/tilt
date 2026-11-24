@@ -331,22 +331,24 @@ void webBegin() {
 
 extern volatile uint32_t hubLinkSeen;            // hub_link.h
 // Restart (or go back to the firmware before, rollback) once the last answers have gone out. From the blinds task,
-// which holds mx: the motors are stopped and held first, then mx is let go for the wait, so no other task waits
-// behind it. If going back is refused, the controller carries on as it was.
+// which holds mx: mx is let go for the wait, so no other task waits behind it. A restart stops and holds the motors
+// first (no handler may start one meanwhile). A rollback leaves the moves alone, as before: if going back is refused,
+// the controller carries on as it was, moves included.
 void restartNow(bool rollback, uint32_t waitMs) {
-  motorsHeld = true;
-  rampCancel();
-  for (int i = 0; i < PORTS; i++) {
-    bs[i].queued = false;
-    if (movingPort(i)) { Use u(i); stopNow(MVX, tilters[i], "stopped: restarting"); }
-    motorRaw(i, 0, 0); digitalWrite(P_EN[i], LOW);
+  if (!rollback) {
+    motorsHeld = true;
+    rampCancel();
+    for (int i = 0; i < PORTS; i++) {
+      bs[i].queued = false;
+      if (movingPort(i)) { Use u(i); stopNow(MVX, tilters[i], "stopped: restarting"); }
+      motorRaw(i, 0, 0); digitalWrite(P_EN[i], LOW);
+    }
   }
   xSemaphoreGive(mx);
   vTaskDelay(pdMS_TO_TICKS(waitMs));
   if (!rollback) esp_restart();
-  esp_ota_mark_app_invalid_rollback_and_reboot();
+  esp_ota_mark_app_invalid_rollback_and_reboot();  // returns only if refused
   xSemaphoreTake(mx, portMAX_DELAY);
-  motorsHeld = false;
 }
 // Once a second, from the blinds task (the lock is held).
 void webTick() {

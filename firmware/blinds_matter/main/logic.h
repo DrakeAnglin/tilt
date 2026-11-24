@@ -50,6 +50,9 @@ inline bool sameAngle(float a, float b) { return (std::isnan(a) && std::isnan(b)
 inline bool steeringChanged(const Marks &a, int signA, const Marks &b, int signB) {
   return !sameAngle(a.up, b.up) || !sameAngle(a.open, b.open) || !sameAngle(a.down, b.down) || (signA > 0) != (signB > 0);
 }
+// The motor direction after a settings change that stopped a move: the one asked for if the change set it, else
+// what the stopped move left (it may have learned or put back the direction while ending).
+inline int8_t keptSign(int8_t asked, int8_t before, int8_t afterStop) { return asked != before ? asked : afterStop; }
 // Current tilt (CONTEXT.md: it always wins): the sensor now. While a move runs, its live reading; at rest, the last
 // true reading (noted, worked out when it was read). Not set up: unknown, moving or not.
 inline float currentTiltOf(const Marks &m, bool moving, float live, float noted) {

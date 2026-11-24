@@ -348,6 +348,8 @@ static void settingsChangeTests() {
   CHECK(!steeringChanged(k, 1, k, 2) && !steeringChanged(k, -2, k, -1), "steering: the motor direction learned or forgotten is no change");
   CHECK(steeringChanged(k, 1, none, 1) && steeringChanged(k, 1, Marks{200, 291, 40}, 1), "steering: Marks cleared or moved");
   CHECK(steeringChanged(k, 2, k, -1), "steering: the motor direction turned round");
+  CHECK(keptSign(-1, 2, 2) == -1 && keptSign(1, 2, 2) == 1, "settings change: a motor direction that was set wins");
+  CHECK(keptSign(1, 1, 2) == 2 && keptSign(-1, -1, 1) == 1, "settings change: else what the stopped move learned or put back stays");
   // Current tilt always wins (CONTEXT.md): what the sensor reads, not the Target.
   CHECK(near(currentTiltOf(k, false, NAN, 40), 40, 0.01), "Current tilt: at rest, the last true reading (not the Target)");
   CHECK(near(currentTiltOf(k, true, 245, 0), 50, 0.01), "Current tilt: while moving, the live reading");

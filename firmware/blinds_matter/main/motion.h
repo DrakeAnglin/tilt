@@ -328,10 +328,14 @@ void cfgApply(const Settings &n) {
       if (bs[p].queued) { bs[p].queued = false; bs[p].target = NAN; }
       if (movingPort(p)) { Use u(p); stopNow(MVX, tilters[p], "stopped: settings changed"); }
     }
-    if (next.b[p].motSign == was) next.b[p].motSign = cfg.b[p].motSign;   // what the stopped move learned is kept
+    next.b[p].motSign = keptSign(next.b[p].motSign, was, cfg.b[p].motSign);   // what the stopped move learned is kept
   }
   cfg = next;
-  for (int p = 0; p < PORTS; p++) if (hit[p]) { noteAngle(p, bs[p].ang); hand.forget(p); }
+  for (int p = 0; p < PORTS; p++) {
+    if (!hit[p]) continue;
+    if (bs[p].seen) noteAngle(p, bs[p].ang); else bs[p].tilt = NAN;    // not read yet: it stays "not seen"
+    hand.forget(p);
+  }
   cfgSave();
 }
 
