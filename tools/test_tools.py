@@ -12,6 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '../hardware/pcb'))
 import bambu  # noqa: E402
+import bambu_project  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
 import release_firmware  # noqa: E402
@@ -73,6 +74,48 @@ class BambuPacking(unittest.TestCase):
                 for b in boxes[i + 1:]:
                     apart = a[3] <= b[1] or b[3] <= a[1] or a[4] <= b[2] or b[4] <= a[2]
                     self.assertTrue(apart, (m, a[0], b[0]))
+
+
+class BambuProject(unittest.TestCase):
+    """tools/bambu_project.py: one plate per part, whole-set plates, per-part brims and supports."""
+
+    def test_every_part_has_its_own_plate(self):
+        single = [p for p in bambu_project.PLATES[3:]]
+        printed = sorted(n for _, rows in single for r in rows for n in r)
+        every = sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX))
+        self.assertEqual(printed, every)
+
+    def test_whole_set_plates_hold_one_tilter_and_the_box(self):
+        sets = sorted(n for _, rows in bambu_project.PLATES[:3] for r in rows for n in r)
+        self.assertEqual(sets, sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX)))
+
+    def test_plate_names_are_allowed_in_bambu_studio(self):
+        for title, _ in bambu_project.PLATES:
+            self.assertFalse(set(title) & set('<>:/\\|?*"'), title)
+
+    def test_plates_fit_without_overlap(self):
+        for title, rows in bambu_project.PLATES:
+            boxes = []
+            for n, (x, y) in bambu_project.pack(rows).items():
+                w, d = bambu_project.size(n)
+                boxes.append((n, x - w / 2, y - d / 2, x + w / 2, y + d / 2))     # size() includes the brim
+            for n, x0, y0, x1, y1 in boxes:
+                self.assertTrue(0 <= x0 and x1 <= bambu_project.H2D[0] and 0 <= y0 and y1 <= bambu_project.H2D[1],
+                                (title, n))
+            for i, a in enumerate(boxes):
+                for b in boxes[i + 1:]:
+                    apart = a[3] <= b[1] or b[3] <= a[1] or a[4] <= b[2] or b[4] <= a[2]
+                    self.assertTrue(apart, (title, a[0], b[0]))
+
+    def test_supports_only_where_the_owner_said(self):
+        on = {n for _, rows in bambu_project.PLATES for r in rows for n in r
+              if bambu_project.object_settings(n).get('enable_support') == '1'}
+        self.assertEqual(on, {'tray_lid', 'worm', 'worm_wheel'})
+        self.assertEqual(bambu_project.TWEAKS['enable_support'], '0')
+
+    def test_worm_has_a_brim(self):
+        self.assertEqual(bambu_project.object_settings('worm')['brim_type'], 'outer_only')
+        self.assertEqual(bambu_project.TWEAKS['brim_type'], 'no_brim')
 
 
 class Netlist(unittest.TestCase):
