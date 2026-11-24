@@ -233,5 +233,77 @@ check(!HomeSetup.inAlexa(hubHomes: [keychain, home]), "Apple's two connections o
 check(!HomeSetup.inAlexa(hubHomes: []) && !HomeSetup.inAlexa(hubHomes: [.init(node: nil, vendor: nil)]), "no homes, or a hub too old to give makers: not in Alexa")
 check(!HomeSetup.inAlexa(hubHomes: [.init(node: "00000000000000AA", vendor: 4447)]), "another maker's home: not Alexa")
 check(!HomeSetup.inHome(hubSays: true, hubHomes: [alexa], appleNodes: [0x77]), "in Alexa only: not in Apple Home")
+// ---- blind setup (Shared/BlindSetup.swift)
+func blind(hid: Int = 0, pres: Int = 1, seen: Int = 1, cal: Int = 1, mov: Int = 0, q: Int = 0, last: String = "") -> BlindState {
+    BlindState(name: "B", hid: hid, pres: pres, seen: seen, cal: cal, tilt: 0, tgt: nil, mov: mov, q: q, fav: 0, ang: nil, last: last)
+}
+let ts = Date(timeIntervalSince1970: 1_800_000_000)
+var su = BlindSetup()
+check(!su.steady(at: ts), "no reading yet: not steady")
+su.reading(angle: 359.8, at: ts); su.reading(angle: 0.1, at: ts.addingTimeInterval(0.2))
+check(su.steady(at: ts.addingTimeInterval(1.5)), "359.8 to 0.1 is noise across 0/360, not a turn")
+su.reading(angle: 359.0, at: ts.addingTimeInterval(1.6)); su.reading(angle: 1.0, at: ts.addingTimeInterval(1.7))
+check(!su.steady(at: ts.addingTimeInterval(2.5)) && su.steady(at: ts.addingTimeInterval(3.0)), "359 to 1 is a 2 degree turn: wait 1.2 s after it")
+su.reading(angle: 10, at: ts.addingTimeInterval(4)); su.reading(angle: 200, at: ts.addingTimeInterval(4.1))
+check(!su.steady(at: ts.addingTimeInterval(4.5)), "a big turn is a turn")
+su.reading(angle: nil, at: ts.addingTimeInterval(9))
+check(!su.steady(at: ts.addingTimeInterval(20)), "the sensor gave nothing: not steady")
+let okA = CommandAnswer(ok: 1, err: nil, proof: nil, prob: nil)
+check(su.mark == .up && su.marked(okA) == .next(step: 1) && su.mark == .open, "a saved mark: on to the next")
+check(su.marked(CommandAnswer(ok: 0, err: "no reading", proof: nil, prob: nil)) == .failed(reason: "No reading") && su.step == 1, "a refused mark: stay, with the reason")
+_ = su.marked(okA)
+check(su.mark == .down && su.marked(CommandAnswer(ok: 1, err: nil, proof: nil, prob: "up and down are too close")) == .restart(reason: "Up and down are too close. Start again from step 1.") && su.step == 0, "bad marks: start again from step 1")
+_ = su.marked(okA); _ = su.marked(okA)
+check(su.marked(okA) == .next(step: 3) && su.done && su.mark == nil, "three good marks: done")
+su.back(); check(su.step == 2, "back one step")
+var wc = BlindSetup.WiringCheck()
+check(wc.poll(nil, elapsed: 1) == .wait && wc.poll(blind(last: "reached 0"), elapsed: 1) == .wait, "before the move starts: wait")
+check(wc.poll(blind(mov: 1), elapsed: 2) == .wait && wc.poll(blind(last: "reached open"), elapsed: 3) == .reached, "moved, then reached")
+var wc2 = BlindSetup.WiringCheck()
+check(wc2.poll(blind(last: "already there"), elapsed: 5) == .reached, "already at Open: reached")
+check(wc2.poll(blind(last: "blocked: no turn"), elapsed: 6) == .failed(reason: "The blind did not reach Open (blocked: no turn). Check it turns freely, then tap Open."), "did not get there: says why")
+check(BlindSetup.WiringCheck.words(sign: -1).contains("other way round") && BlindSetup.WiringCheck.words(sign: 1).contains("right way") && BlindSetup.WiringCheck.words(sign: nil).contains("right way"), "the wiring words")
+check(blind(cal: 0).needsSetup && !blind(cal: 1).needsSetup, "not marked: needs setup")
+check(!blind(hid: 1, cal: 0).needsSetup && !blind(pres: 0, seen: 1, cal: 0).needsSetup, "hidden or an empty port: no setup asked for")
+check(blind(pres: 0, seen: 0, cal: 0).needsSetup, "a port not checked yet still asks for setup")
+
+// ---- scenes (Shared/Scenes.swift) and the motor sign, against scripted controllers
+actor Scripted: ControllerTransport {
+    let answers: [String: String]
+    var sent: [String] = []
+    init(_ answers: [String: String]) { self.answers = answers }
+    var host: String { "fake" }
+    func move(to host: String) {}
+    func call(_ command: String) async throws -> Data {
+        sent.append(command)
+        if let a = answers.first(where: { command.hasPrefix($0.key) })?.value { return Data(a.utf8) }
+        throw URLError(.timedOut)
+    }
+}
+let den = Scripted(["/api/go": #"{"ok":1}"#, "/api/dev": #"{"fw":"x","p":[{"ang":1,"sign":1},{"ang":2,"sign":-1}]}"#])
+let office = Scripted(["/api/go": #"{"ok":0,"err":"too low to move"}"#])
+let scene = BlindScene(name: "Movie", tilts: [BlindTarget(controller: "den", blind: 0): -100, BlindTarget(controller: "den", blind: 1): -100,
+                                              BlindTarget(controller: "office", blind: 0): 50, BlindTarget(controller: "gone", blind: 0): 0])
+let run = await Scenes.run(scene, clients: ["den": ControllerClient(transport: den), "office": ControllerClient(transport: office)])
+check(run.reached == 2 && run.failed == ["office": "Too low to move"], "a scene moves what it can, says why not, and skips a missing controller")
+check(Set(await den.sent) == ["/api/go?b=0&t=-100", "/api/go?b=1&t=-100"], "a scene sends each blind its tilt")
+let signs = [await ControllerClient(transport: den).motorSign(blind: 0), await ControllerClient(transport: den).motorSign(blind: 1),
+             await ControllerClient(transport: den).motorSign(blind: 2), await ControllerClient(transport: office).motorSign(blind: 0)]
+check(signs == [1, -1, nil, nil], "the motor sign, typed; nil when there is no such port or no answer")
+let onlyDen = BlindScene(name: "Den", tilts: [BlindTarget(controller: "den", blind: 0): 0]), empty0 = BlindScene(name: "Empty")
+let pruned = Scenes.prune([scene, onlyDen, empty0], controller: "den")
+check(pruned.map(\.name) == ["Movie", "Empty"], "removing a controller removes the scenes that only moved its blinds")
+let sd = UserDefaults(suiteName: "tilt-tests-\(UUID())")!
+Scenes.save([scene, onlyDen], sd)
+check(Scenes.load(sd) == [scene, onlyDen] && Scenes.load(UserDefaults(suiteName: "tilt-tests-empty-\(UUID())")!) == [], "scenes are kept and read back")
+check(TiltMath.tilt(percentOpen: 100, closeUp: true) == 0 && TiltMath.tilt(percentOpen: 0, closeUp: true) == 100 && TiltMath.tilt(percentOpen: 0, closeUp: false) == -100, "percent open: 100 is level, 0 is closed on the Close side")
+check(TiltMath.tilt(percentOpen: 30, closeUp: false) == -70 && TiltMath.tilt(percentOpen: 130, closeUp: true) == 0, "in between, and out of range is held to 0…100")
+
+// ---- people as shown (Shared/Client.swift People)
+let pk = { (cid: String, me: Int, wait: Int?) in PhoneKey(cid: cid, name: cid, owner: 0, me: me, wait: wait, code: nil) }
+let shown = People.shown([pk("x", 0, 0), pk("hub", 0, 1), pk("w", 0, 1), pk("me", 1, 0)], hubCid: "hub")
+check(shown.map(\.cid) == ["me", "w", "x"], "the hub's own key is left out; this phone first, then requests")
+check(People.shown([pk("hub", 0, 1)], hubCid: nil).count == 1, "not on a hub: nobody is left out")
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)
