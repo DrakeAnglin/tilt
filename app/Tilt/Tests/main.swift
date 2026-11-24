@@ -247,7 +247,7 @@ final class Cell<T>: @unchecked Sendable {
     var value: T { get { lock.lock(); defer { lock.unlock() }; return v } set { lock.lock(); v = newValue; lock.unlock() } }
 }
 /// A hub or controller that answers from a script and writes what it was sent to a Recorder.
-struct Scripted: ControllerTransport {
+struct ScriptedDevice: ControllerTransport {
     let name: String, log: Recorder, address: String
     let answer: @Sendable (String) -> String
     var host: String { address }
@@ -275,7 +275,7 @@ let noHomes = #"{"ok":1,"fw":"0.2.3","up":1,"ip":"x","wifi":0,"ch":11,"c":[],"ne
 check((try? JSONDecoder().decode(HubInfo.self, from: Data(noHomes.utf8)))?.homes == nil, "a hub from before homes (0.2.6) still decodes")
 
 let hlog = Recorder()
-let hc = HubClient(transport: Scripted(name: "hub", log: hlog, address: "10.0.0.2/hub") { c in
+let hc = HubClient(transport: ScriptedDevice(name: "hub", log: hlog, address: "10.0.0.2/hub") { c in
     switch cmdPath(c) {
     case HubApi.homeCode: #"{"ok":0,"err":"a home app is adding the Tilt Hub right now: try again in a minute"}"#
     case HubApi.shareCode: #"{"ok":1,"code":"12345678901","qr":"MT:X","mins":15,"first":1,"homes":[],"home":0}"#
@@ -309,7 +309,7 @@ func hubInfoJSON(_ id: String, hubCid: String?, ota: Int = 0, pct: Int = 0, err:
 func stateJSON(_ hkey: Int) -> String { #"{"v":"2.2.1","name":"Den","batt":{"v":3.9,"pct":80,"st":"battery","low":0},"closeUp":1,"sync":0,"mv":-1,"hkey":\#(hkey),"b":[]}"# }
 /// A controller on the hub whose people include the hub's request (waiting until approved).
 func controllerOnHub(_ log: Recorder, hubWaiting: Cell<Bool>, hkey: Cell<Int>) -> ControllerClient {
-    ControllerClient(transport: Scripted(name: "ctrl", log: log, address: "10.0.0.2/c/new1") { c in
+    ControllerClient(transport: ScriptedDevice(name: "ctrl", log: log, address: "10.0.0.2/c/new1") { c in
         switch cmdPath(c) {
         case Api.keys: return #"{"keys":[{"cid":"aa","name":"Me","owner":1,"me":1,"wait":0},{"cid":"\#(hubCidOnNew)","name":"Tilt Hub","owner":0,"me":0,"wait":\#(hubWaiting.value ? 1 : 0)}]}"#
         case "/api/approve": hubWaiting.value = false; return #"{"ok":1}"#
@@ -332,7 +332,7 @@ func collect<S>(_ stream: AsyncThrowingStream<S, Error>) async -> (steps: [S], e
 // A controller that started on Wi-Fi firmware, restored from a replaced controller's backup
 let olog = Recorder()
 let backupHex = String(repeating: "ab", count: 200)       // two pieces of 128 bytes and 72
-let ohub = HubClient(transport: Scripted(name: "hub", log: olog, address: "10.0.0.2/hub") { c in
+let ohub = HubClient(transport: ScriptedDevice(name: "hub", log: olog, address: "10.0.0.2/hub") { c in
     switch cmdPath(c) {
     case HubApi.network: #"{"ok":1,"ds":"0e08"}"#
     case "/api/backup": #"{"ok":1,"d":"\#(backupHex)"}"#
@@ -341,7 +341,7 @@ let ohub = HubClient(transport: Scripted(name: "hub", log: olog, address: "10.0.
     }
 })
 let looks = Cell(0)
-let onb = ControllerOnboarding(transport: Scripted(name: "ble", log: olog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: ohub,
+let onb = ControllerOnboarding(transport: ScriptedDevice(name: "ble", log: olog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: ohub,
                                store: TestStore(log: olog, client: controllerOnHub(olog, hubWaiting: Cell(true), hkey: Cell(0))),
                                hello: fakeHello("new1", boot: "0a0b0c0d", net: nil), paired: Paired(cid: fcid, key: fkey, owner: true), hubHost: "10.0.0.2",
                                look: { host in looks.value += 1; olog.add("look \(host)"); return looks.value < 3 ? nil : fakeHello("new1", boot: "11223344", net: "thread") },
@@ -358,10 +358,10 @@ check(olog.all == onbExpected, "restore before joining, wait for it on the hub, 
 
 // A Thread controller that did not reach the hub: the second try only waits for it again
 let rlog = Recorder(), reachable = Cell(false)
-let rhub = HubClient(transport: Scripted(name: "hub", log: rlog, address: "10.0.0.2/hub") { c in
+let rhub = HubClient(transport: ScriptedDevice(name: "hub", log: rlog, address: "10.0.0.2/hub") { c in
     cmdPath(c) == HubApi.info ? hubInfoJSON("new1", hubCid: hubCidOnNew) : cmdPath(c) == HubApi.network ? #"{"ok":1,"ds":"0e08"}"# : #"{"ok":1}"#
 })
-let ronb = ControllerOnboarding(transport: Scripted(name: "ble", log: rlog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: rhub,
+let ronb = ControllerOnboarding(transport: ScriptedDevice(name: "ble", log: rlog, address: "bluetooth") { _ in #"{"ok":1}"# }, hub: rhub,
                                 store: TestStore(log: rlog, client: controllerOnHub(rlog, hubWaiting: Cell(true), hkey: Cell(0))),
                                 hello: fakeHello("new1", boot: "0a0b0c0d", net: "thread"), paired: Paired(cid: fcid, key: fkey, owner: true), hubHost: "10.0.0.2",
                                 look: { _ in reachable.value ? fakeHello("new1", boot: "0a0b0c0d", net: "thread") : nil }, sleep: { _ in })
@@ -376,22 +376,22 @@ check(rlog.count("hub /api/net") == 1 && rlog.count("ble ") == 1, "the hub's net
 // The hub is let in exactly once (the setup flow and the app's model share admitHub)
 let alog = Recorder(), waitingHub = Cell(true), knows = Cell(0)
 let actrl = controllerOnHub(alog, hubWaiting: waitingHub, hkey: knows)
-let ahub = HubClient(transport: Scripted(name: "hub", log: alog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: hubCidOnNew) })
+let ahub = HubClient(transport: ScriptedDevice(name: "hub", log: alog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: hubCidOnNew) })
 let a1 = await ahub.admitHub(on: actrl, controllerId: "new1"), a2 = await ahub.admitHub(on: actrl, controllerId: "new1")
 check(a1 == HubAdmission(hubCid: hubCidOnNew, done: true) && a2 == a1, "the hub's request is let in, and the second time it is already in")
 check(alog.count("ctrl /api/approve") == 1 && alog.count("ctrl /api/hubkey") == 1, "approved once and its key told once (approve \(alog.count("ctrl /api/approve")), hubkey \(alog.count("ctrl /api/hubkey")))")
 check(!alog.all.contains { $0.hasPrefix("ctrl /api/approve") && !$0.contains(hubCidOnNew) }, "only the hub's own request is let in")
 let blog = Recorder()
 let bctrl = controllerOnHub(blog, hubWaiting: Cell(false), hkey: Cell(0))      // let in before controllers knew the hub's key
-let bhub = HubClient(transport: Scripted(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: hubCidOnNew) })
+let bhub = HubClient(transport: ScriptedDevice(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: hubCidOnNew) })
 _ = await bhub.admitHub(on: bctrl, controllerId: "new1")
 check(blog.count("ctrl /api/approve") == 0 && blog.count("ctrl /api/hubkey") == 1, "already in, the controller not told: only the key is told")
 let slog = Recorder()                                // the controller's state cannot be read: not done, so it is asked again
-let sctrl = ControllerClient(transport: Scripted(name: "ctrl", log: slog, address: "10.0.0.2/c/new1") { c in
+let sctrl = ControllerClient(transport: ScriptedDevice(name: "ctrl", log: slog, address: "10.0.0.2/c/new1") { c in
     cmdPath(c) == Api.keys ? #"{"keys":[{"cid":"\#(hubCidOnNew)","name":"Tilt Hub","owner":0,"me":0,"wait":0}]}"# : "not json"
 })
 check(await bhub.admitHub(on: sctrl, controllerId: "new1") == HubAdmission(hubCid: hubCidOnNew, done: false), "a state that cannot be read is not done")
-let nhub = HubClient(transport: Scripted(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: nil) })
+let nhub = HubClient(transport: ScriptedDevice(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: nil) })
 check(await nhub.admitHub(on: bctrl, controllerId: "new1") == HubAdmission(hubCid: nil, done: false), "the hub has not asked yet: nothing is let in")
 
 // ---- firmware (Shared/FirmwareInstaller.swift)
@@ -407,7 +407,7 @@ final class FakeUploader: FirmwareUploader, @unchecked Sendable {
 /// A controller update through a fake hub: `infos` are the hub's /api/info answers in turn (the last one repeats).
 func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boots: [String]) -> FirmwareInstaller {
     let seen = Cell(0), bootsLeft = Cell(boots)
-    let hub = HubClient(transport: Scripted(name: "hub", log: log, address: "10.0.0.2/hub") { c in
+    let hub = HubClient(transport: ScriptedDevice(name: "hub", log: log, address: "10.0.0.2/hub") { c in
         guard cmdPath(c) == HubApi.info else { return #"{"ok":1}"# }
         let i = infos[min(seen.value, infos.count - 1)]; seen.value += 1; return i
     })
@@ -418,7 +418,7 @@ func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boo
     }
     return f
 }
-let fwCtrl = { (log: Recorder) in ControllerClient(transport: Scripted(name: "ctrl", log: log, address: "10.0.0.2/c/den1") { _ in #"{"ok":1}"# }) }
+let fwCtrl = { (log: Recorder) in ControllerClient(transport: ScriptedDevice(name: "ctrl", log: log, address: "10.0.0.2/c/den1") { _ in #"{"ok":1}"# }) }
 let rel = FirmwareRelease(version: "2.3.0", file: "full.bin", size: 9, sha256: "x", notes: nil,
                               patches: [.init(from: "aaa", file: "patch.bin", size: 1, sha256: "y"), .init(from: "zzz", file: "other.bin", size: 1, sha256: "z")])
 
@@ -454,6 +454,77 @@ check(hubRun.error == nil && hubRun.steps == [.downloading, .sending, .restartin
 check(ulog.all.prefix(3) == ["download hub.bin", "hub /api/hubupdate", "upload hub.bin to 10.0.0.2/hub/api/update"] && ulog.count("look 10.0.0.2/hub") == 3, "allowed, posted to the hub, then waited for its new version")
 let refusedHub = await collect(fakeInstaller(Recorder(), infos: [hubInfoJSON("den1", hubCid: nil)], uploads: [#"{"ok":0}"#], boots: ["b1"]).updateHub(to: hubRelease, hubHost: "10.0.0.2"))
 check(refusedHub.error?.localizedDescription == "The Tilt Hub did not take the update.", "a hub that does not take the file says so")
+// ---- blind setup (Shared/BlindSetup.swift)
+func blind(hid: Int = 0, pres: Int = 1, seen: Int = 1, cal: Int = 1, mov: Int = 0, q: Int = 0, last: String = "") -> BlindState {
+    BlindState(name: "B", hid: hid, pres: pres, seen: seen, cal: cal, tilt: 0, tgt: nil, mov: mov, q: q, fav: 0, ang: nil, last: last)
+}
+let ts = Date(timeIntervalSince1970: 1_800_000_000)
+var su = BlindSetup()
+check(!su.steady(at: ts), "no reading yet: not steady")
+su.reading(angle: 359.8, at: ts); su.reading(angle: 0.1, at: ts.addingTimeInterval(0.2))
+check(su.steady(at: ts.addingTimeInterval(1.5)), "359.8 to 0.1 is noise across 0/360, not a turn")
+su.reading(angle: 359.0, at: ts.addingTimeInterval(1.6)); su.reading(angle: 1.0, at: ts.addingTimeInterval(1.7))
+check(!su.steady(at: ts.addingTimeInterval(2.5)) && su.steady(at: ts.addingTimeInterval(3.0)), "359 to 1 is a 2 degree turn: wait 1.2 s after it")
+su.reading(angle: 10, at: ts.addingTimeInterval(4)); su.reading(angle: 200, at: ts.addingTimeInterval(4.1))
+check(!su.steady(at: ts.addingTimeInterval(4.5)), "a big turn is a turn")
+su.reading(angle: nil, at: ts.addingTimeInterval(9))
+check(!su.steady(at: ts.addingTimeInterval(20)), "the sensor gave nothing: not steady")
+let okA = CommandAnswer(ok: 1, err: nil, proof: nil, prob: nil)
+check(su.mark == .up && su.marked(okA) == .next(step: 1) && su.mark == .open, "a saved mark: on to the next")
+check(su.marked(CommandAnswer(ok: 0, err: "no reading", proof: nil, prob: nil)) == .failed(reason: "No reading") && su.step == 1, "a refused mark: stay, with the reason")
+_ = su.marked(okA)
+check(su.mark == .down && su.marked(CommandAnswer(ok: 1, err: nil, proof: nil, prob: "up and down are too close")) == .restart(reason: "Up and down are too close. Start again from step 1.") && su.step == 0, "bad marks: start again from step 1")
+_ = su.marked(okA); _ = su.marked(okA)
+check(su.marked(okA) == .next(step: 3) && su.done && su.mark == nil, "three good marks: done")
+su.back(); check(su.step == 2, "back one step")
+var wc = BlindSetup.WiringCheck()
+check(wc.poll(nil, elapsed: 1) == .wait && wc.poll(blind(last: "reached 0"), elapsed: 1) == .wait, "before the move starts: wait")
+check(wc.poll(blind(mov: 1), elapsed: 2) == .wait && wc.poll(blind(last: "reached open"), elapsed: 3) == .reached, "moved, then reached")
+var wc2 = BlindSetup.WiringCheck()
+check(wc2.poll(blind(last: "already there"), elapsed: 5) == .reached, "already at Open: reached")
+check(wc2.poll(blind(last: "blocked: no turn"), elapsed: 6) == .failed(reason: "The blind did not reach Open (blocked: no turn). Check it turns freely, then tap Open."), "did not get there: says why")
+check(BlindSetup.WiringCheck.words(sign: -1).contains("other way round") && BlindSetup.WiringCheck.words(sign: 1).contains("right way") && BlindSetup.WiringCheck.words(sign: nil).contains("right way"), "the wiring words")
+check(blind(cal: 0).needsSetup && !blind(cal: 1).needsSetup, "not marked: needs setup")
+check(!blind(hid: 1, cal: 0).needsSetup && !blind(pres: 0, seen: 1, cal: 0).needsSetup, "hidden or an empty port: no setup asked for")
+check(blind(pres: 0, seen: 0, cal: 0).needsSetup, "a port not checked yet still asks for setup")
+
+// ---- scenes (Shared/Scenes.swift) and the motor sign, against scripted controllers
+actor Scripted: ControllerTransport {
+    let answers: [String: String]
+    var sent: [String] = []
+    init(_ answers: [String: String]) { self.answers = answers }
+    var host: String { "fake" }
+    func move(to host: String) {}
+    func call(_ command: String) async throws -> Data {
+        sent.append(command)
+        if let a = answers.first(where: { command.hasPrefix($0.key) })?.value { return Data(a.utf8) }
+        throw URLError(.timedOut)
+    }
+}
+let den = Scripted(["/api/go": #"{"ok":1}"#, "/api/dev": #"{"fw":"x","p":[{"ang":1,"sign":1},{"ang":2,"sign":-1}]}"#])
+let office = Scripted(["/api/go": #"{"ok":0,"err":"too low to move"}"#])
+let scene = BlindScene(name: "Movie", tilts: [BlindTarget(controller: "den", blind: 0): -100, BlindTarget(controller: "den", blind: 1): -100,
+                                              BlindTarget(controller: "office", blind: 0): 50, BlindTarget(controller: "gone", blind: 0): 0])
+let run = await Scenes.run(scene, clients: ["den": ControllerClient(transport: den), "office": ControllerClient(transport: office)])
+check(run.reached == 2 && run.failed == ["office": "Too low to move"], "a scene moves what it can, says why not, and skips a missing controller")
+check(Set(await den.sent) == ["/api/go?b=0&t=-100", "/api/go?b=1&t=-100"], "a scene sends each blind its tilt")
+let signs = [await ControllerClient(transport: den).motorSign(blind: 0), await ControllerClient(transport: den).motorSign(blind: 1),
+             await ControllerClient(transport: den).motorSign(blind: 2), await ControllerClient(transport: office).motorSign(blind: 0)]
+check(signs == [1, -1, nil, nil], "the motor sign, typed; nil when there is no such port or no answer")
+let onlyDen = BlindScene(name: "Den", tilts: [BlindTarget(controller: "den", blind: 0): 0]), empty0 = BlindScene(name: "Empty")
+let pruned = Scenes.prune([scene, onlyDen, empty0], controller: "den")
+check(pruned.map(\.name) == ["Movie", "Empty"], "removing a controller removes the scenes that only moved its blinds")
+let sd = UserDefaults(suiteName: "tilt-tests-\(UUID())")!
+Scenes.save([scene, onlyDen], sd)
+check(Scenes.load(sd) == [scene, onlyDen] && Scenes.load(UserDefaults(suiteName: "tilt-tests-empty-\(UUID())")!) == [], "scenes are kept and read back")
+check(TiltMath.tilt(percentOpen: 100, closeUp: true) == 0 && TiltMath.tilt(percentOpen: 0, closeUp: true) == 100 && TiltMath.tilt(percentOpen: 0, closeUp: false) == -100, "percent open: 100 is level, 0 is closed on the Close side")
+check(TiltMath.tilt(percentOpen: 30, closeUp: false) == -70 && TiltMath.tilt(percentOpen: 130, closeUp: true) == 0, "in between, and out of range is held to 0…100")
+
+// ---- people as shown (Shared/Client.swift People)
+let pk = { (cid: String, me: Int, wait: Int?) in PhoneKey(cid: cid, name: cid, owner: 0, me: me, wait: wait, code: nil) }
+let shown = People.shown([pk("x", 0, 0), pk("hub", 0, 1), pk("w", 0, 1), pk("me", 1, 0)], hubCid: "hub")
+check(shown.map(\.cid) == ["me", "w", "x"], "the hub's own key is left out; this phone first, then requests")
+check(People.shown([pk("hub", 0, 1)], hubCid: nil).count == 1, "not on a hub: nobody is left out")
 
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

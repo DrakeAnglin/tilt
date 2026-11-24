@@ -4,7 +4,6 @@ import SwiftUI
 
 struct ControllerSettingsView: View {
     @Environment(AppModel.self) private var model
-    @Environment(HubWatch.self) private var hub
     @Environment(\.dismiss) private var dismiss
     let controller: Controller
     @State private var cfg: ControllerConfig?
@@ -94,7 +93,7 @@ struct ControllerSettingsView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(b.name)
-                                Text(blindNote(i, b)).font(.footnote).foregroundStyle(blindNeedsSetup(i, b) ? Palette.warning : .secondary)
+                                Text(blindNote(i, b)).font(.footnote).foregroundStyle(blindNeedsSetup(i) ? Palette.warning : .secondary)
                             }
                         }
                     }
@@ -160,22 +159,17 @@ struct ControllerSettingsView: View {
         let s = controller.state?.b[safe: i]
         if b.hid == 1 { return "Port \(i + 1) · hidden" }
         if let s, s.seen == 1, s.pres == 0 { return "Port \(i + 1) · nothing plugged in" }
-        if blindNeedsSetup(i, b) { return "Port \(i + 1) · Setup required" }
+        if blindNeedsSetup(i) { return "Port \(i + 1) · Setup required" }
         return "Port \(i + 1)"
     }
     /// Plugged in (or not yet checked) and shown, but its open and closed positions are not marked.
-    private func blindNeedsSetup(_ i: Int, _ b: ControllerConfig.Blind) -> Bool {
-        guard let s = controller.state?.b[safe: i] else { return false }
-        return s.listed && s.cal == 0
-    }
+    private func blindNeedsSetup(_ i: Int) -> Bool { controller.state?.b[safe: i]?.needsSetup ?? false }
     private func load() async {
         do {
             let c = try await controller.client.config()
             cfg = c; name = c.name; problem = nil
-            let hubKey = onHub ? await hub.hubCid(for: controller.id) : nil
-            let list = ((try? await controller.client.people()) ?? []).filter { $0.cid != hubKey }.sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }      // this phone first, then requests
+            let list = (try? await controller.people()) ?? []
             withAnimation { phones = list }
-            if let me = phones.first(where: { $0.me == 1 }) { model.setOwner(controller, me.owner == 1) }      // the owner may have changed
         } catch {
             // A request that was canceled is not a fault: try once more instead of showing "canceled".
             let canceled = error is CancellationError || (error as? URLError)?.code == .cancelled

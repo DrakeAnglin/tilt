@@ -4,21 +4,25 @@ import SwiftUI
 
 // Schedule and BlindTarget live in Shared/SchedulePlan.swift.
 
-struct BlindScene: Identifiable, Codable, Equatable {
-    var id = UUID()
-    var name = "New Scene"
-    var symbol = "sun.max"
-    var tilts: [BlindTarget: Int] = [:]
-}
+// BlindScene and the scene rules live in Shared/Scenes.swift.
 
 /// The scenes, kept on this phone. One copy for every page that shows them.
 @MainActor @Observable
 final class SceneStore {
     static let shared = SceneStore()
-    var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: Prefs.scenes)).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
-    func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: Prefs.scenes) }
+    var scenes: [BlindScene] = Scenes.load()
+    func save() { Scenes.save(scenes) }
     func run(_ scene: BlindScene, controllers: [Controller]) {
-        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.go(blind: t.blind, tilt: tilt) }
+        let clients = Dictionary(controllers.map { ($0.id, $0.client) }, uniquingKeysWith: { a, _ in a })
+        Task {
+            let r = await Scenes.run(scene, clients: clients)
+            for (id, why) in r.failed { controllers.first { $0.id == id }?.lastError = why }
+        }
+    }
+    /// A controller was removed: the scenes that only moved its blinds go with it.
+    func prune(controller id: String) {
+        let left = Scenes.prune(scenes, controller: id)
+        if left.count != scenes.count { scenes = left; save() }
     }
 }
 
