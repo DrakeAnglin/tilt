@@ -215,7 +215,7 @@ final class HubWatch {
     func homeCode() async throws -> (code: String, qr: String, home: Int) {
         struct H: Decodable { let ok: Int?; let err: String?; let code: String?; let qr: String?; let home: Int? }
         let h: H = try await call("/api/homecode")
-        guard let code = h.code, let qr = h.qr else { throw TiltError((h.err ?? "The Tilt Hub could not give its code.").capitalizedFirst) }
+        guard h.ok ?? 1 == 1, let code = h.code, let qr = h.qr else { throw TiltError((h.err ?? "The Tilt Hub could not give its code.").capitalizedFirst) }
         return (code, qr, h.home ?? 0)
     }
     /// A one-time code to add the hub to another home app (Alexa): fresh, good for `mins` minutes and one home. A hub

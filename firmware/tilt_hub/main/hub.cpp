@@ -1441,21 +1441,22 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     return c >= 0 ? "{\"ok\":1}" : "{\"ok\":0,\"err\":\"no such controller\"}";
   }
   if (path == "/api/homecode" && matterUp) {      // open Apple Home's pairing now (Apple's add screen comes next)
-    chip::DeviceLayer::PlatformMgr().LockChipStack();
-    bool busy = homeBeingAdded();
-    chip::DeviceLayer::PlatformMgr().UnlockChipStack();
-    if (busy) return BUSY_JSON;
     // Also when the hub still counts a home: the owner asked, and that home may be gone (removed in its own app
     // without the hub hearing of it). Matter allows a hub in several homes. The automatic window (above) stays for a
-    // hub in no home only.
-    homeWindowUntil = (ms() + 900000) | 1;
-    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
-      auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+    // hub in no home only. The check and the window change happen in one go (under the lock), so the code given is
+    // always the one the window takes.
+    chip::DeviceLayer::PlatformMgr().LockChipStack();
+    auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+    bool busy = homeBeingAdded();
+    if (!busy) {
       // A window open for an Alexa code takes only that code: swap it for one that takes the hub's own code.
-      if (mgr.IsCommissioningWindowOpen() && shareUntil && (int32_t)(shareUntil - ms()) > 0 && !homeBeingAdded()) { mgr.CloseCommissioningWindow(); shareUntil = 0; }
+      if (mgr.IsCommissioningWindowOpen() && shareUntil && (int32_t)(shareUntil - ms()) > 0) { mgr.CloseCommissioningWindow(); shareUntil = 0; }
       if (!mgr.IsCommissioningWindowOpen())
         mgr.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
-    }, 0);
+    }
+    chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+    if (busy) return BUSY_JSON;
+    homeWindowUntil = (ms() + 900000) | 1;
   }
   if (path == "/api/homecode") return "{\"ok\":1,\"code\":\"" + homeManual + "\",\"qr\":\"" + homeQr + "\"," + homesJson() + "}";
   if (path == "/api/sharecode") return shareCodeJson();   // a one-time code for a second home app (Alexa)
