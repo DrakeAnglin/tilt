@@ -218,6 +218,7 @@ static int ask(int c, char type, const std::string &payload, std::string &ans, u
 // ---- the hub's own key for each controller (it moves blinds like a phone would)
 static int rng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
 #include "cloud.h"                               // alertRaise: push alerts through iCloud
+#include "alert_rules.h"                         // when to send them
 // The proof on messages between the hub and a controller that has let the hub in (and been told which key is the
 // hub's): the first 16 bytes of HMAC-SHA256 with the link key, in hex. Protocol: blinds_matter/main/hub_link.h.
 static std::string macOf(int c, const std::string &what) {
@@ -313,24 +314,16 @@ static std::string ctrlCommand(int c, const std::string &cmd) {
   return "";
 }
 
-// ---- Alert rules: when the hub tells the owners (cloud.h sends it). Each alert is sent once:
-//   stall       a blind stalled during an ordinary move (the controller's status counts them, b[].st)
-//   silent      a controller set up with the hub has not been heard for 25 minutes (cleared when it is heard again)
-//   batt-low / batt-crit / batt-dead   under 20 %, under 10 %, too low to move: each level once, all reset only
-//               when the battery is back at 25 % or more (a little above the low line, so a reading near it can't flap)
-//   update      a firmware update through the hub failed;  hub-update   the hub's own new firmware went back
-struct Memo {                                    // per controller, by id (flash "amemo"): what was already told
+// ---- Alert rules (alert_rules.h): when the hub tells a controller's owners. cloud.h sends them.
+struct Memo {                                    // per controller, by id (flash "amemo2"): what was already told
   char id[13];
   char name[33];                                 // its room's name (kept: the hub may restart while it is silent)
   uint8_t topic[16];                             // its iCloud topic (its status, asked once with the hub's key)
-  uint8_t silent, batt, stBase;                  // "not responding" sent; battery level told (0-3); stall counts known
-  uint32_t bn;                                   // the controller start the stall counts belong to
-  uint16_t st[PORTS];
+  AlertMemo r;
 };
 static Memo memos[MAX_CTRL];
-static const uint32_t SILENT_MS = 1500000;      // the app's HubInfo.Member.silentAfter (25 minutes)
-static void memosSave() { nvs_set_blob(nv, "amemo", memos, sizeof memos); nvs_commit(nv); }
-static void memosLoad() { size_t n = sizeof memos; if (nvs_get_blob(nv, "amemo", memos, &n) != ESP_OK || n != sizeof memos) memset(memos, 0, sizeof memos); }
+static void memosSave() { nvs_set_blob(nv, "amemo2", memos, sizeof memos); nvs_commit(nv); }
+static void memosLoad() { size_t n = sizeof memos; if (nvs_get_blob(nv, "amemo2", memos, &n) != ESP_OK || n != sizeof memos) memset(memos, 0, sizeof memos); }
 static Memo &memoOf(int c) {
   const char *id = ctrls[c].s.id;
   for (auto &m : memos) if (!strcmp(m.id, id)) return m;
@@ -342,32 +335,21 @@ static Memo &memoOf(int c) {
   return memos[slot];
 }
 static bool topicKnown(const Memo &m) { for (auto b : m.topic) if (b) return true; return false; }
-static int battLevelOf(int pct, int low) { return low == 1 ? 3 : pct < 0 ? -1 : pct < 10 ? 2 : pct < 20 ? 1 : 0; }
 // A status push came in (under stateMx): battery levels, stalls, and it is no longer silent.
 static void alertsFromPush(int c, cJSON *j) {
   Ctrl &k = ctrls[c];
   Memo &m = memoOf(c);
-  bool save = false, told = topicKnown(m);
+  bool save = false, told = topicKnown(m);       // no topic yet: nothing can be sent, so nothing counts as told
   if (strcmp(m.name, k.name)) { strlcpy(m.name, k.name, sizeof m.name); save = true; }
-  if (m.silent) { m.silent = 0; save = true; ESP_LOGI(TAG, "%s heard again", k.s.id); }
-  int lv = battLevelOf(k.pct, k.low);
-  static const char *const battKinds[] = {"", "batt-low", "batt-crit", "batt-dead"};
-  if (told && lv > m.batt) { alertRaise(m.topic, battKinds[lv], 9, k.name, std::to_string(k.pct).c_str()); m.batt = lv; save = true; }
-  else if (lv == 0 && m.batt && k.pct >= 25) { m.batt = 0; save = true; }
+  if (alertHeard(m.r)) { save = true; ESP_LOGI(TAG, "%s heard again", k.s.id); }
+  if (told)
+    if (const char *kind = alertBattery(m.r, k.pct, k.low, &save)) alertRaise(m.topic, kind, 9, k.name, std::to_string(k.pct).c_str());
   cJSON *bl = cJSON_GetObjectItem(j, "b"), *bnj = cJSON_GetObjectItem(j, "bn");
   if (cJSON_IsNumber(cJSON_GetObjectItem(cJSON_GetArrayItem(bl, 0), "st")) && cJSON_IsNumber(bnj)) {   // a controller that counts stalls
-    uint32_t bn = (uint32_t)bnj->valuedouble;
-    bool fresh = !m.stBase;                      // the first push: only learn the counts
-    if (bn != m.bn) { if (!fresh) memset(m.st, 0, sizeof m.st); m.bn = bn; save = true; }   // it restarted: counts from 0 again
-    for (int p = 0; p < PORTS; p++) {
-      cJSON *sv = cJSON_GetObjectItem(cJSON_GetArrayItem(bl, p), "st");
-      if (!cJSON_IsNumber(sv)) continue;
-      uint16_t st = (uint16_t)sv->valueint;
-      if (st == m.st[p]) continue;
-      if (st > m.st[p] && !fresh && told) alertRaise(m.topic, "stall", p, k.name, k.b[p].name);
-      m.st[p] = st; save = true;
-    }
-    if (fresh) { m.stBase = 1; save = true; }
+    int st[PORTS];
+    for (int p = 0; p < PORTS; p++) { cJSON *sv = cJSON_GetObjectItem(cJSON_GetArrayItem(bl, p), "st"); st[p] = cJSON_IsNumber(sv) ? sv->valueint : -1; }
+    int stalled = alertStalls(m.r, (uint32_t)bnj->valuedouble, st, PORTS, &save);
+    for (int p = 0; p < PORTS && told; p++) if (stalled & (1 << p)) alertRaise(m.topic, "stall", p, k.name, k.b[p].name);
   }
   if (save) memosSave();
 }
@@ -378,9 +360,9 @@ static void alertsCare() {
     xSemaphoreTake(stateMx, portMAX_DELAY);
     Memo &m = memoOf(c);
     uint32_t quiet = ctrls[c].seen ? ms() - ctrls[c].seen : ms();
-    if (!m.silent && quiet > SILENT_MS && topicKnown(m) && otaFor != c) {
+    if (topicKnown(m) && otaFor != c && alertSilent(m.r, quiet)) {
       alertRaise(m.topic, "silent", 9, m.name[0] ? m.name : ctrls[c].name);
-      m.silent = 1; memosSave();
+      memosSave();
     }
     bool ask = !topicKnown(m) && ctrls[c].seen && ms() - ctrls[c].seen < 60000;
     xSemaphoreGive(stateMx);
