@@ -1,10 +1,12 @@
 """The Tilt Hub box in a fresh document: the box, mock-ups of the ESP32-C6 and the USB-C adapter, checks (collisions,
 the drop-in at the pause, the pinholes over the buttons) and the print STL.
+Then run tools/bambu_hub.py for the two-color Bambu Studio project.
 
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_hub.py --timeout 600
 """
 import math
 import os
+import tempfile
 
 # REPO is set by fusion.py exec
 KIT = load_script(os.path.join(REPO, 'hardware/mechanical/fusion/fusion_kit.py'))
@@ -256,6 +258,8 @@ if WORDMARK:
         if q.maxPoint.x * 10 > H['L'] - 2.0:
             failures.append('the word runs too near the front edge (to X %.1f)' % (q.maxPoint.x * 10))
         tbm.booleanOperation(box, tool, B.DifferenceBooleanType)
+        fill = isect(tbm.copy(tool), bx(0, H['L'], -30, 30, 0, H['mark_depth']))      # the word's share of the inlay
+        tbm.booleanOperation(groups['Mark'][0][1], fill, B.UnionBooleanType)
     except Exception as ex:
         eng = 'failed: %s' % str(ex)[:120]
         failures.append('the word could not be engraved')
@@ -274,7 +278,7 @@ def appearance(name):
             return design.appearances.addByCopy(src, name)
 
 
-APPEAR = {'Box': 'Plastic - Matte (White)', 'Parts': 'Plastic - Matte (Black)'}
+APPEAR = {'Box': 'Plastic - Matte (White)', 'Mark': 'Plastic - Matte (Blue)', 'Parts': 'Plastic - Matte (Black)'}
 COLOR = {'ESP32-C6 board': 'Plastic - Glossy (Blue)', 'Adapter body': 'Steel - Satin', 'Adapter plug': 'Steel - Satin'}
 comps = {}
 for g, lst in groups.items():
@@ -314,6 +318,15 @@ path = os.path.join(STL, 'hub_box.stl')
 opt = design.exportManager.createSTLExportOptions(comps['Box'], path)
 opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
 design.exportManager.execute(opt)
+# the inlay for a two-color print, same coordinates as the box. It is only an input for tools/bambu_hub.py, which packs
+# box + inlay into hub_box_multicolor.3mf, so it goes to the temporary folder, not the repo
+mark_path = os.path.join(tempfile.gettempdir(), 'tilt_hub_box_mark.stl')
+opt = design.exportManager.createSTLExportOptions(comps['Mark'], mark_path)
+opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
+design.exportManager.execute(opt)
+mb = comps['Mark'].bRepBodies.item(0)
+if vol(tbm.copy(comps['Box'].bRepBodies.item(0)), tbm.copy(mb)) > 0.01:
+    failures.append('the inlay runs into the box')
 ui.activeSelections.clear()
 KIT.hide_helpers(design)
 bbx = comps['Box'].bRepBodies.item(0).boundingBox
@@ -323,4 +336,5 @@ result = {'ok': not failures, 'failures': failures,
           'plug sticks out (mm)': round(H['tip'] - H['L'], 2),
           'pause at (mm)': round(H['zp'], 2), 'room over the adapter at the pause (mm)': round(H['adp_top'], 2), 'floor (mm)': round(H['fz'], 2), 'rails to the ESP face (mm)': round(H['esp_face'] - H['rail_top'], 3), 'roof over the ESP back (mm)': round(H['zp'] - H['esp_back'], 2), 'web (mm)': round(H['web_x1'] - H['web_x0'], 2), 'pause after layer': H['pause_layer'], 'layer (mm)': H['layer'],
           'way in': ('tilt up to %d deg, %d steps' % (max(a for a, _ in way_in), len(way_in))) if way_in else None,
-          'walls': wall_note, 'wordmark': eng, 'lumps': comps['Box'].bRepBodies.item(0).lumps.count, 'chamfer': edge_note, 'exported': path}
+          'walls': wall_note, 'wordmark': eng, 'lumps': comps['Box'].bRepBodies.item(0).lumps.count, 'chamfer': edge_note, 'inlay': '%.1f mm3, %d pieces, Z %.2f..%.2f' % (mb.volume * 1000, mb.lumps.count, mb.boundingBox.minPoint.z * 10, mb.boundingBox.maxPoint.z * 10),
+          'exported': [path, mark_path]}

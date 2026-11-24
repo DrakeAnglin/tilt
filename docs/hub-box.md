@@ -8,7 +8,8 @@ into it. The plug sticks out the front: push the hub into any USB-C charger or c
 ![The hub box, seen through from the roof side](renders/hub-box.png)
 
 - Generator: [`Hub.py`](../hardware/mechanical/fusion/Hub/Hub.py), built by `tools/fusion_hub.py`.
-- Print file: [`hub_box.stl`](../hardware/mechanical/stl/hub/hub_box.stl), already in print orientation (pinhole face on the bed).
+- Print files: [`hub_box.stl`](../hardware/mechanical/stl/hub/hub_box.stl) for one color, already in print orientation
+  (pinhole face on the bed); `hub_box_multicolor.3mf` for a [two-color mark](#two-color-mark-optional).
 - Parts: [bill of materials](../hardware/BOM.md#tilt-hub-1).
 
 The ESP and the adapter are both measured (sizes and notes at the top of `Hub.py`).
@@ -28,6 +29,17 @@ The pinhole face carries the mark: the app icon's three slats and "tilt", engrav
    does not fit, cancel the print (you have lost about a quarter of an hour, not the parts).
 5. Resume. The nozzle passes 0.4 mm over the adapter and 0.9 mm over the ESP's back, and bridges the roof. The bridge
    sags onto the adapter and holds it down.
+
+## Two-color mark (optional)
+
+[`hub_box_multicolor.3mf`](../hardware/mechanical/stl/hub/hub_box_multicolor.3mf) is a Bambu Studio project with the
+mark as a second color instead of a groove: the slats and the word fill the first two layers, flush with the face.
+
+1. Open it in Bambu Studio. The box is filament 1 (white) and the mark filament 2: pick your second color.
+2. The **pause after layer 39 is already set** (look for it on the layer slider after slicing).
+3. It is set up for the H2D, 0.4 nozzle, 0.2 mm layers, PLA, no supports. Change the filament type if you print PETG.
+
+Rebuild it after any change to the box: run `tools/fusion_hub.py` in Fusion, then `python3 tools/bambu_hub.py`.
 
 ## Buttons
 

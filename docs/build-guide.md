@@ -92,15 +92,19 @@ One hub serves every controller in the home. It stays plugged in.
 
 | Part | Notes |
 |---|---|
-| ESP32-C6 dev board, 4 MB flash (for example ESP32-C6-DevKitC-1) | Wi-Fi, Thread and Bluetooth on one chip |
-| USB-C cable and a 5 V USB wall plug (1 A is plenty) | always on |
+| ESP32-C6 SuperMini, no pins soldered | Wi-Fi, Thread and Bluetooth on one chip |
+| USB-C male-to-male adapter | the hub's plug ([BOM](../hardware/BOM.md#tilt-hub-1)) |
+| Printed box | printed round the ESP and the adapter ([hub box](hub-box.md)) |
+| A 5 V USB-C wall plug (1 A is plenty) | always on |
 | A label | the 8-digit setup code `build.sh` prints on its first build |
 
 1. Copy `firmware/tilt_hub/main/secrets.h.example` to `secrets.h` and fill in the Wi-Fi network.
 2. `firmware/tilt_hub/build.sh -p <USB port> flash`. The first build makes the setup code: put it on the label.
-3. In the Tilt app, the Blinds page shows "New Tilt Hub found": Connect, and type the code.
+3. Print the box round the ESP and the adapter ([hub box](hub-box.md)). Flash first: the box has no way in afterward.
+4. Plug the hub into the wall plug. In the Tilt app, the Blinds page shows "New Tilt Hub found": Connect, and type
+   the code.
 
-A printed case for the hub is not designed yet. Later updates come over Wi-Fi (`tools/flash_hub.sh`, or "Update
+Later updates come over Wi-Fi (`tools/flash_hub.sh`, or "Update
 Tilt Hub" on the hub page in the app).
 
 ## If something is wrong
