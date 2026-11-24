@@ -132,8 +132,8 @@ static Ctrl ctrls[MAX_CTRL];
 static CtrlLink links[MAX_CTRL];
 // Per controller (flash "proof"): it has sent a proven push (from then on only proven ones count), and the boot count
 // of the newest one (an older boot's push is never taken again).
-struct Proof { uint8_t on; uint32_t bn; };
-static Proof proofs[MAX_CTRL];
+struct PushProof { uint8_t on; uint32_t bn; };
+static PushProof proofs[MAX_CTRL];
 static void proofsSave();
 static uint32_t constrain_u(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 struct OtaAck { bool ok, num; uint32_t next; };   // a controller's answer to a firmware piece (num: it gave an offset)
