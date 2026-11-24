@@ -154,6 +154,8 @@ CONFIG_SUPPORT_PUSH_AV_STREAM_TRANSPORT_CLUSTER=n
 # The hub makes its own Apple Home setup code on its first start (hub.cpp homeCodeBegin), not the public test code
 CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER=y
 CONFIG_ENABLE_TEST_SETUP_PARAMS=n
+# Its maker and product names come from hub.cpp (TiltInfo): "Tilt", "Tilt Hub", not the SDK's TEST_VENDOR
+CONFIG_CUSTOM_DEVICE_INSTANCE_INFO_PROVIDER=y
 
 # Bluetooth stays on after Apple Home has added the hub: it looks for new controllers
 CONFIG_USE_BLE_ONLY_FOR_COMMISSIONING=n

@@ -53,6 +53,8 @@
 #include <esp_matter_providers.h>
 #include <bootloader_random.h>
 #include <platform/CommissionableDataProvider.h>
+#include <platform/ESP32/ConfigurationManagerImpl.h>
+#include <platform/internal/GenericDeviceInstanceInfoProvider.h>
 #include <crypto/CHIPCryptoPAL.h>
 #include <setup_payload/SetupPayload.h>
 #include <setup_payload/ManualSetupPayloadGenerator.h>
@@ -138,8 +140,11 @@ static bool hubTrial = false;                    // the hub runs new firmware it
 static volatile uint32_t homeWindowUntil = 0;    // the owner asked to add the hub to Apple Home: pairing open until then
 static volatile int otaFor = -1;                 // the controller being updated (one at a time)
 static std::string homeManual, homeQr;           // the code to type and the QR text (USB log, and to the controllers)
+static std::string shareManual, shareQr;         // the one-time code for another home app (shareCodeJson)
+static volatile uint32_t shareUntil = 0;          // that code's pairing window is open until then (0: none)
 static volatile bool inHome = false;             // added to Apple Home (or another Matter home)
 static std::string homesJson();                  // the homes it is in, read fresh (below)
+static std::string shareCodeJson();              // a one-time code for another home app (below)
 static SemaphoreHandle_t stateMx;              // ctrls[] (not the per-controller request lock)
 static nvs_handle_t nv;
 static void proofsSave() { nvs_set_blob(nv, "proof", proofs, sizeof proofs); nvs_commit(nv); }
@@ -336,6 +341,8 @@ static endpoint_t *makeTile(int c, int p, uint16_t resumeId, const char *name) {
     char label[33];
     strlcpy(label, name && name[0] ? name : "Blinds", sizeof label);
     cluster::bridged_device_basic_information::attribute::create_node_label(bi, label, strlen(label));
+    char vn[] = "Tilt";
+    cluster::bridged_device_basic_information::attribute::create_vendor_name(bi, vn, strlen(vn));
     char pn[] = "Tilt blind";
     cluster::bridged_device_basic_information::attribute::create_product_name(bi, pn, strlen(pn));
     char uid[24];
@@ -1436,11 +1443,14 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     homeWindowUntil = (ms() + 900000) | 1;
     chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
       auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+      // A window open for an Alexa code takes only that code: swap it for one that takes the hub's own code.
+      if (mgr.IsCommissioningWindowOpen() && shareUntil && (int32_t)(shareUntil - ms()) > 0) { mgr.CloseCommissioningWindow(); shareUntil = 0; }
       if (!mgr.IsCommissioningWindowOpen())
         mgr.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
     }, 0);
   }
   if (path == "/api/homecode") return "{\"ok\":1,\"code\":\"" + homeManual + "\",\"qr\":\"" + homeQr + "\"," + homesJson() + "}";
+  if (path == "/api/sharecode") return shareCodeJson();   // a one-time code for a second home app (Alexa)
   if (path == "/api/backups") return backupsJson();
   if (path == "/api/backup") return backupJson(qv(q, "id").c_str());
   if (path == "/api/replace") return replaceJson(qv(q, "old").c_str(), qv(q, "new").c_str());
@@ -1564,6 +1574,15 @@ struct HomeCodeProvider : chip::DeviceLayer::CommissionableDataProvider {
   CHIP_ERROR SetSetupPasscode(uint32_t) override { return CHIP_ERROR_NOT_IMPLEMENTED; }
 };
 static HomeCodeProvider homeCodeProvider;
+// The maker and product names Apple Home and Alexa show (Basic Information): Tilt's own, not the SDK's "TEST_VENDOR".
+// Everything else (serial, dates, versions) as the SDK keeps it.
+struct TiltInfo : chip::DeviceLayer::Internal::GenericDeviceInstanceInfoProvider<chip::DeviceLayer::Internal::ESP32Config> {
+  TiltInfo() : GenericDeviceInstanceInfoProvider(chip::DeviceLayer::ConfigurationManagerImpl::GetDefaultInstance()) {}
+  static CHIP_ERROR put(const char *s, char *buf, size_t n) { if (strlen(s) >= n) return CHIP_ERROR_BUFFER_TOO_SMALL; strcpy(buf, s); return CHIP_NO_ERROR; }
+  CHIP_ERROR GetVendorName(char *buf, size_t n) override { return put("Tilt", buf, n); }
+  CHIP_ERROR GetProductName(char *buf, size_t n) override { return put("Tilt Hub", buf, n); }
+};
+static TiltInfo tiltInfo;
 static void homeCodeBegin() {                      // before Bluetooth and Matter start (the random source needs the radio off)
   size_t n = sizeof homeCode;
   if (nvs_get_blob(nv, "homecode", &homeCode, &n) != ESP_OK || !homeCodeKeep(homeCode, n)) {
@@ -1583,6 +1602,7 @@ static void homeCodeBegin() {                      // before Bluetooth and Matte
     }
   }
   esp_matter::set_custom_commissionable_data_provider(&homeCodeProvider);
+  esp_matter::set_custom_device_instance_info_provider(&tiltInfo);
   chip::PayloadContents p;
   p.vendorID = CONFIG_DEVICE_VENDOR_ID;
   p.productID = CONFIG_DEVICE_PRODUCT_ID;
@@ -1598,6 +1618,66 @@ static void homeCodeBegin() {                      // before Bluetooth and Matte
     homeQr.assign(q.data(), q.size());
     printf("HUB SETUP CODE %s  QR %s\n", homeManual.c_str(), homeQr.c_str());   // USB log
   }
+}
+
+// ---- a one-time code for another home app (Alexa, Google Home, SmartThings), issue #18
+// Matter lets a device be in several homes. A hub already in one gets the next by an "enhanced" pairing window: a
+// fresh random code, good for 15 minutes and one home, over the home Wi-Fi only (Apple Home's "Turn On Pairing Mode"
+// does the same). Every Matter home app must take this kind of code. A hub in no home yet gives its own code, opened
+// as for Apple Home (Bluetooth too, so the app can give it Wi-Fi). Asking again while a code is still good gives
+// the same code, so a second tap does not break the first.
+static std::string shareCodeJson() {
+  if (!matterUp) return "{\"ok\":0,\"err\":\"the hub's Matter is not running yet: try again in a minute\"}";
+  chip::DeviceLayer::PlatformMgr().LockChipStack();
+  auto &srv = chip::Server::GetInstance();
+  auto &mgr = srv.GetCommissioningWindowManager();
+  bool homed = srv.GetFabricTable().FabricCount() > 0;
+  bool same = homed && shareUntil && (int32_t)(shareUntil - ms()) > 60000 && mgr.IsCommissioningWindowOpen();
+  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+  if (!homed) {                                  // the first home: the hub's own code (like /api/homecode)
+    homeWindowUntil = (ms() + 900000) | 1;
+    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
+      auto &m = chip::Server::GetInstance().GetCommissioningWindowManager();
+      if (!m.IsCommissioningWindowOpen()) m.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
+    }, 0);
+    return "{\"ok\":1,\"code\":\"" + homeManual + "\",\"qr\":\"" + homeQr + "\",\"mins\":15,\"first\":1," + homesJson() + "}";
+  }
+  if (!same) {
+    uint32_t pin;
+    uint16_t disc;
+    uint8_t salt[32];
+    do esp_fill_random(&pin, sizeof pin); while (!setupPinValid(pin %= 100000000));   // the radio is on: true random
+    esp_fill_random(&disc, sizeof disc);
+    disc &= 0xFFF;
+    esp_fill_random(salt, sizeof salt);
+    chip::Crypto::Spake2pVerifier v;
+    if (v.Generate(1000, chip::ByteSpan(salt), pin) != CHIP_NO_ERROR) return "{\"ok\":0,\"err\":\"could not make a code\"}";
+    chip::DeviceLayer::PlatformMgr().LockChipStack();
+    chip::FabricIndex fi = chip::kUndefinedFabricIndex;
+    chip::VendorId vid = chip::VendorId::Common;
+    for (const auto &f : srv.GetFabricTable()) { fi = f.GetFabricIndex(); vid = f.GetVendorId(); break; }   // "opened by": its first home
+    mgr.CloseCommissioningWindow();              // a window still open (the start-up one, an older code) goes
+    CHIP_ERROR e = mgr.OpenEnhancedCommissioningWindow(chip::System::Clock::Seconds32(900), disc, v, 1000, chip::ByteSpan(salt), fi, vid);
+    chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+    if (e != CHIP_NO_ERROR) { ESP_LOGE(TAG, "share window: %" CHIP_ERROR_FORMAT, e.Format()); return "{\"ok\":0,\"err\":\"the hub could not open pairing\"}"; }
+    chip::PayloadContents p;
+    p.vendorID = CONFIG_DEVICE_VENDOR_ID;
+    p.productID = CONFIG_DEVICE_PRODUCT_ID;
+    p.rendezvousInformation.Emplace(chip::RendezvousInformationFlag::kOnNetwork);
+    p.discriminator.SetLongValue(disc);
+    p.setUpPINCode = pin;
+    char manual[chip::kManualSetupLongCodeCharLength + 1], qr[chip::QRCodeBasicSetupPayloadGenerator::kMaxQRCodeBase38RepresentationLength + 1];
+    chip::MutableCharSpan m(manual), q(qr);
+    if (chip::ManualSetupPayloadGenerator(p).payloadDecimalStringRepresentation(m) != CHIP_NO_ERROR ||
+        chip::QRCodeBasicSetupPayloadGenerator(p).payloadBase38Representation(q) != CHIP_NO_ERROR)
+      return "{\"ok\":0,\"err\":\"could not make a code\"}";
+    shareManual = manualCodeDashed(std::string(m.data(), m.size()));
+    shareQr.assign(q.data(), q.size());
+    shareUntil = (ms() + 900000) | 1;
+    ESP_LOGI(TAG, "pairing open for another home app for 15 minutes");
+  }
+  int mins = (int)(((int32_t)(shareUntil - ms())) / 60000);
+  return "{\"ok\":1,\"code\":\"" + shareManual + "\",\"qr\":\"" + shareQr + "\",\"mins\":" + std::to_string(mins < 1 ? 1 : mins) + "," + homesJson() + "}";
 }
 
 // The hub itself on Bonjour (_tilthub._tcp): its address and whether it has an owner (a new hub says owned=0).
@@ -1647,12 +1727,12 @@ static void event_cb(const ChipDeviceEvent *ev, intptr_t) {
 // ---- the status light (docs: firmware/tilt_hub/README.md, the app's hub page). Off when all is well; bright and
 // plain when something needs a look. The most urgent one shows:
 //   blinking white   factory reset (BOOT held)
-//   blinking blue    being added to Apple Home right now
+//   blinking blue    being added to Apple Home or Alexa right now
 //   flashing red     a problem: no Wi-Fi (once in a home: a new hub gets its Wi-Fi from Apple Home as it is added),
 //                    no Thread network, Matter not running, or a controller set up with the hub silent for 30 min
 //                    (not in the first 90 s after a start, while all that comes up)
 //   blinking purple  installing an update (the hub's own, or one it sends to a controller)
-//   solid blue       ready to be added to Apple Home
+//   solid blue       ready to be added to Apple Home or Alexa
 //   solid green      a new controller nearby, waiting for setup in the app
 //   slow yellow      a controller's battery is too low to move its blinds (its `low` flag)
 static volatile int resetHeld = 0;               // resetTask: tenths of a second BOOT has been held (1000: resetting)

@@ -9,6 +9,8 @@ struct HubView: View {
     @State private var home: HomeSetup.Code?
     @State private var opening = false             // asking for the code / Apple's add screen is open
     @State private var homeTask: Task<Void, Never>?
+    @State private var alexa: AlexaCode?
+    @State private var askingAlexa = false
     @State private var problem: String?
     @State private var confirmLeave = false
     @State private var removing: PhoneKey?
@@ -26,14 +28,20 @@ struct HubView: View {
                         if let up = i.up { LabeledContent("Running for", value: Self.span(up)) }
                     } header: { Text("Tilt Hub") }
                     Section {
-                        LabeledContent("Status", value: hub.inHome ? "Added" : "Not added yet")
-                        if hub.isOwner && !hub.inHome {
-                            Button { openHome() } label: { Label(opening ? "Opening Apple Home…" : "Add Tilt Hub to Apple Home", systemImage: "homekit") }.disabled(opening)
-                        }
-                    } header: { Text("Apple Home") } footer: {
+                        IntegrationRow(icon: "homekit", tint: .orange, name: "Apple Home",
+                                       detail: hub.inHome ? "Home app, Siri and Control Center" : "Add the hub once: every blind shows up",
+                                       added: hub.inHome, busy: opening, canAdd: hub.isOwner) { openHome() }
+                            .contextMenu { if hub.isOwner && !hub.inHome { Button("Show the Code Instead", systemImage: "number") { openHome(showCode: true) } } }
+                        IntegrationRow(icon: "mic.fill", tint: alexaTint, name: "Alexa",
+                                       detail: hub.inAlexa ? "Say \u{201C}Alexa, open\u{201D} and a blind\u{2019}s name" : "Open and close the blinds with your Echo",
+                                       added: hub.inAlexa, busy: askingAlexa, canAdd: hub.isOwner) { addAlexa() }
+                            .contextMenu { if hub.isOwner && hub.inAlexa { Button("Add to Another Alexa Home", systemImage: "plus") { addAlexa() } } }
+                    } header: { Text("Integrations") } footer: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Add the hub once: every controller on it shows up in Apple Home by itself.")
-                            if hub.isOwner && !hub.inHome { Button("Show the code instead") { openHome(showCode: true) }.font(.footnote).disabled(opening) }
+                            Text(hub.isOwner && !(hub.inHome && hub.inAlexa)
+                                 ? "Use one or both: they work side by side. To take the hub out of one, remove it in that app."
+                                 : "To take the hub out of one, remove it in that app.")
+                            if hub.isOwner && !hub.inHome { Button("Show the Apple Home code instead") { openHome(showCode: true) }.font(.footnote).disabled(opening) }
                         }
                     }
                     Section {
@@ -120,6 +128,7 @@ struct HubView: View {
         .refreshable { await load() }
         .task { await load() }
         .sheet(item: $home, onDismiss: { Task { await load() } }) { HomeSheet(info: $0).presentationDetents([.large]) }
+        .sheet(item: $alexa, onDismiss: { Task { await load() } }) { AlexaSheet(info: $0).presentationDetents([.large]) }
         .onDisappear { homeTask?.cancel() }
     }
     /// This iPhone is the hub's only owner (leaving would leave the hub with nobody to let people in).
@@ -147,6 +156,18 @@ struct HubView: View {
             } catch { if !Task.isCancelled { problem = error.localizedDescription } }   // the page was closed: nothing to say
         }
     }
+    /// A one-time code from the hub, then the sheet with it and the steps in the Alexa app.
+    private func addAlexa() {
+        guard !askingAlexa else { return }
+        askingAlexa = true; problem = nil
+        Task {
+            defer { askingAlexa = false }
+            do {
+                let s = try await hub.shareCode()
+                alexa = AlexaCode(code: s.code, mins: s.mins, first: s.first)
+            } catch { problem = error.localizedDescription }
+        }
+    }
     static func signal(_ dbm: Int) -> String { "\(dbm) dBm (\(dbm > -60 ? "strong" : dbm > -75 ? "good" : dbm > -85 ? "weak" : "very weak"))" }
     static func span(_ s: Int) -> String { s < 3600 ? "\(s / 60) min" : s < 86400 ? "\(s / 3600) h" : "\(s / 86400) d" }
 }
@@ -157,10 +178,10 @@ private struct HubLight {
     let color: Color, look: String, what: String
     static let all: [HubLight] = [
         .init(color: .white, look: "Blinking white", what: "Factory reset: the BOOT button is held."),
-        .init(color: .blue, look: "Blinking blue", what: "Being added to Apple Home right now."),
+        .init(color: .blue, look: "Blinking blue", what: "Being added to Apple Home or Alexa right now."),
         .init(color: .red, look: "Flashing red", what: "A problem: the hub has no Wi-Fi or Thread network, its Matter (Apple Home) side is not running, or a controller has not checked in for 30 minutes."),
         .init(color: .purple, look: "Blinking purple", what: "Installing an update, its own or a controller's."),
-        .init(color: .blue, look: "Solid blue", what: "Ready to be added to Apple Home."),
+        .init(color: .blue, look: "Solid blue", what: "Ready to be added to Apple Home or Alexa."),
         .init(color: .green, look: "Solid green", what: "A new controller is nearby, waiting for setup in Tilt."),
         .init(color: .yellow, look: "Slow yellow blink", what: "A controller's battery is too low to move its blinds."),
     ]

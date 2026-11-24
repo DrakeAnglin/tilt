@@ -13,6 +13,7 @@ blinds; each blind gets one tilter.
 | 6 | Build the controller: PCB, then box | [PCB build](pcb-build.md), [box assembly](controller-box.md#assembly) |
 | 7 | Set up in the Tilt app | below |
 | 8 | Add to Apple Home | below |
+| 9 | Add to Alexa (if you have an Echo) | below |
 
 ## 1. Measure your blinds
 The tilter is drawn for the owner's cordless blinds: a headrail about 55.5 × 36.5 mm inside, a 4 mm square steel
@@ -85,6 +86,21 @@ To share the blinds, the Owner invites the people they live with from the room's
 
 Each controller makes its own setup code. **Show each blind separately** (same section) chooses one tile per blind or
 one for the room; changing it restarts the controller.
+
+## 9. Add to Alexa
+With a Tilt Hub, the blinds can also be in Alexa, so an Echo opens and closes them by voice. Apple Home keeps working:
+Matter lets the hub be in both. It needs an Echo with Matter on the same Wi-Fi as the hub: Amazon lists which ones
+([Matter on Alexa](https://developer.amazon.com/docs/alexaplus/smarthome/matter-support)). Alexa opens, closes and sets
+a percent; check the battery in Tilt or Apple Home (Amazon lists no battery for blinds).
+1. In Tilt, open **Settings > Tilt Hub**. Under **Integrations**, tap **Add** next to **Alexa** (owners only).
+2. Tilt shows a one-time code, good for 15 minutes. Tap **Open Alexa**: it copies the code and opens the Alexa app.
+3. In Alexa: **Devices**, **+**, **Add Device**, **Other**, **Matter**, say **Yes** to the Matter logo, then
+   **Try numeric code** and paste the code. If Alexa says the device is not Matter certified, continue.
+4. Alexa finds one blind per tile (as in Apple Home). Put each in a room.
+5. Say **"Alexa, open the living room blinds"** or **"Alexa, close the living room blinds"**.
+
+Names come from Tilt: rename a blind in Tilt, not in Alexa. To take the hub out of Alexa, remove it in the Alexa app.
+A code adds one Alexa home. After it is used or 15 minutes pass, tap again for a new one.
 
 ## The Tilt Hub
 

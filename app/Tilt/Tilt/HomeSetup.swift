@@ -30,6 +30,11 @@ enum HomeSetup {
     struct HubHome: Sendable { let node: String?; let vendor: Int? }
     /// Apple's two Matter maker numbers: Apple (4937, 0x1349) and Apple Keychain (4996, 0x1384).
     static let appleVendors: Set<Int> = [4937, 4996]
+    /// Amazon's Matter maker number (4631, 0x1217): an Alexa home.
+    static let alexaVendors: Set<Int> = [4631]
+    /// Is the Tilt Hub in Alexa? One of its Matter home connections was made by Amazon. (Alexa removes its connection
+    /// when the hub is removed in the Alexa app.)
+    static func inAlexa(hubHomes: [HubHome]) -> Bool { hubHomes.contains { $0.vendor.map(alexaVendors.contains) ?? false } }
 
     /// Is the Tilt Hub in Apple Home? The hub counts a home for each Matter home connection it has, but Apple adds two
     /// (the home and the iPhone's iCloud Keychain) and leaves the Keychain one when the hub is removed in the Home app.

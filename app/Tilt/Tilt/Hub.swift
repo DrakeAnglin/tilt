@@ -217,6 +217,16 @@ final class HubWatch {
         let h: H = try await call("/api/homecode")
         return (h.code, h.qr, h.home ?? 0)
     }
+    /// A one-time code to add the hub to another home app (Alexa): fresh, good for `mins` minutes and one home. A hub
+    /// in no home yet gives its own code instead (`first`).
+    func shareCode() async throws -> (code: String, qr: String, mins: Int, first: Bool) {
+        struct S: Decodable { let ok: Int; let err: String?; let code: String?; let qr: String?; let mins: Int?; let first: Int? }
+        let s: S = try await call("/api/sharecode")
+        guard s.ok == 1, let code = s.code, let qr = s.qr else { throw TiltError((s.err ?? "The Tilt Hub could not make a code.").capitalizedFirst) }
+        return (code, qr, s.mins ?? 15, s.first == 1)
+    }
+    /// In Alexa: the hub has a Matter home connection made by Amazon.
+    var inAlexa: Bool { HomeSetup.inAlexa(hubHomes: (info?.homes ?? []).map { .init(node: $0.node, vendor: $0.vendor) }) }
     struct Backup: Decodable, Identifiable, Hashable { let id: String; let name: String; let when: Int }
     func backups() async -> [Backup] {
         struct L: Decodable { let b: [Backup] }

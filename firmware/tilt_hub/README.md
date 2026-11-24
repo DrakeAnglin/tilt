@@ -30,11 +30,15 @@ Thread share its antenna), and the firmware is updated over USB.
 - **Factory reset:** hold BOOT (not RST) for 10 s; the light blinks white, then fast. Keeps the setup code only.
 - **Status light** (the board's color LED, GPIO8, at full brightness; the one-color LED on GPIO15 stays dark). Off
   when all is well. Otherwise the most urgent of: blinking white (factory reset), blinking blue (being added to Apple
-  Home), flashing red (no Wi-Fi once in a home, no Thread network, Matter not running, or a controller set up with
+  Home or Alexa), flashing red (no Wi-Fi once in a home, no Thread network, Matter not running, or a controller set up with
   the hub silent for 30 minutes; not in the first 90 s after a start), blinking purple (installing an update), solid
-  blue (ready to be added), solid green (a new controller waiting for setup), slow yellow blink (a controller's
+  blue (ready to be added, or an Alexa code is open), solid green (a new controller waiting for setup), slow yellow blink (a controller's
   battery too low to move its blinds). The app's hub page
   lists them too. `/api/light` (owner) sets the lights by hand for a minute, to tell which is which on a new board.
+- **Alexa and other home apps** (issue #18). `/api/sharecode` (owner) gives a one-time code for a second Matter home:
+  a fresh random passcode in an enhanced pairing window (15 minutes, one home, Wi-Fi only), the same kind Apple
+  Home's "Turn On Pairing Mode" makes. A second ask while it is good gives the same code. A hub in no home yet gives
+  its own code instead (`first: 1`). The app shows it under Alexa on the hub page and opens the Alexa app.
 - **Hub page** in the app (Settings > Tilt Hub): every controller's battery, signal and last check-in.
 
 The protocol between hub and controller is described at the top of `../blinds_matter/main/hub_link.h`.
