@@ -532,6 +532,11 @@ int main() {
     sq["t"] = "-300,40,300"; sq["mask"] = "15"; sq["sym"] = "Bed.Double\"x";
     g = sceneOfArgs(sarg, 3);
     CHECK(g.mask == 7 && g.t[0] == -100 && g.t[1] == 40 && g.t[2] == 100 && g.sym == "ed.oublex", "Scene values brought into range, icon cleaned");
+    CHECK(sceneName("Movie \"night\"", 47) == "Movie \"night\"", "a Scene name keeps its quotes");
+    CHECK(sceneName("Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", 47) == "Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", "curly apostrophe, accent and emoji kept");
+    CHECK(sceneName("a\nb\x01" "c", 47) == "abc", "control characters dropped");
+    CHECK(sceneName("abcd\xF0\x9F\x8E\xAC", 6) == "abcd", "a name cut to fit never ends inside a character");
+    CHECK(sceneName("ab  ", 47) == "ab" && sceneName(std::string(60, 'x'), 47).size() == 47, "trailing spaces trimmed, 47 bytes at most");
     sq["mask"] = "1"; sq["t"] = "20";
     g = sceneOfArgs(sarg, 3);
     CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");

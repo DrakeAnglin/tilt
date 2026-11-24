@@ -3,14 +3,14 @@
 // Anyone paired may read and write them (a Guest too); the state is under the controller lock (lock.h).
 #pragma once
 #include <vector>
-#include "store.h"                               // nvs, cleanText
+#include "store.h"                               // nvs
 #include "wire.h"
 #include "api.h"                                 // arg, sendJson, ok, fail, Lock
 
 const int SCENES = 16;
-struct SceneSlot { uint32_t gid, ver; char name[24]; char sym[20]; uint8_t mask; int8_t tilt[PORTS]; };   // gid 0 = unused
+struct SceneSlot { uint32_t gid, ver; char name[48]; char sym[20]; uint8_t mask; int8_t tilt[PORTS]; };   // gid 0 = unused
 struct SceneTable { uint32_t magic; SceneSlot s[SCENES]; } scn;
-const uint32_t SCN_MAGIC = 0x53434E01;
+const uint32_t SCN_MAGIC = 0x53434E02;            // 02: names are 48 bytes of UTF-8
 void scenesSave() { nvs.putBytes("scn", &scn, sizeof scn); }
 void scenesBegin() {
   if (nvs.getBytes("scn", &scn, sizeof scn) != sizeof scn || scn.magic != SCN_MAGIC) { memset(&scn, 0, sizeof scn); scn.magic = SCN_MAGIC; }
@@ -49,8 +49,8 @@ esp_err_t hScene(httpd_req_t *r) {
   SceneSlot &s = scn.s[at];
   memset(&s, 0, sizeof s);
   s.gid = w.gid; s.ver = w.ver; s.mask = w.mask;
-  cleanText(s.name, sizeof s.name, w.name);
-  if (!s.name[0]) strlcpy(s.name, "Scene", sizeof s.name);
+  std::string nm = sceneName(w.name, sizeof s.name - 1);          // as typed (UTF-8), not cleanText: see wire.h
+  strlcpy(s.name, nm.empty() ? "Scene" : nm.c_str(), sizeof s.name);
   strlcpy(s.sym, w.sym.c_str(), sizeof s.sym);
   for (int p = 0; p < PORTS; p++) s.tilt[p] = w.t[p];
   scenesSave();

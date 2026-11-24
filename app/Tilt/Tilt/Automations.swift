@@ -17,6 +17,7 @@ final class SceneStore {
     private var read: [String: [SceneSlot]] = [:]       // per controller, as last read
     private var localOnly: Set<String> = []             // controllers whose firmware does not keep Scenes: their part stays on this phone
     private var lastLoad = Date.distantPast
+    private var edits = 0                               // saves so far: a read that started before one is out of date
 
     /// Keep the copy on this phone.
     func save() { Scenes.save(scenes) }
@@ -46,6 +47,7 @@ final class SceneStore {
     /// Read every controller's Scenes and put them together with this phone's copy. Returns what each one answered.
     private func refresh(_ controllers: [Controller]) async -> [String: [SceneSlot]] {
         lastLoad = Date()
+        let startEdits = edits
         var got: [String: [SceneSlot]] = [:], old: Set<String> = []
         await withTaskGroup(of: (String, [SceneSlot]?, Bool).self) { g in
             for c in controllers {
@@ -56,6 +58,7 @@ final class SceneStore {
             }
             for await (id, l, isOld) in g { if let l { got[id] = l } else if isOld { old.insert(id) } }
         }
+        if edits != startEdits { return got }            // a save landed meanwhile: this read is older than it, keep what the save left
         read = got; localOnly = old
         let known = Set(controllers.map(\.id))           // a controller taken off this phone takes its blinds out of the Scenes here
         scenes = ScenePlan.scenes(read: got, kept: scenes.map { var s = $0; s.tilts = s.tilts.filter { known.contains($0.key.controller) }; return s })
@@ -66,6 +69,8 @@ final class SceneStore {
     /// Save (or delete) a Scene on every controller it covers, and keep the copy here.
     func save(_ scene: BlindScene, delete: Bool = false, controllers: [Controller]) async throws {
         var s = scene
+        s.name = ScenePlan.fitName(s.name)                  // what the controller keeps, so every phone reads back the same
+        if s.name.isEmpty { s.name = "Scene" }
         s.tilts = s.tilts.filter { t in controllers.contains { $0.id == t.key.controller } }
         if s.gid == 0 { s.gid = UInt32.random(in: 1...UInt32.max) }
         s.ver = UInt32(Date().timeIntervalSince1970)
@@ -77,6 +82,7 @@ final class SceneStore {
         do { writes = try ScenePlan.writes(s, delete: delete, read: read, localOnly: localOnly, ports: ports) }
         catch .full(let c) { throw TiltError("\(name(c)) already has \(ScenePlan.perController) scenes.") }
         catch .notRead(let c) { throw TiltError("\(name(c)) did not answer. Try again when it is reachable.") }
+        edits += 1
         do {
             for w in writes {
                 try await controllers.first { $0.id == w.controller }?.client.setScene(w.value)
@@ -369,7 +375,10 @@ struct SceneEditor: View {
         NavigationStack {
             Form {
             Group {
-                Section("Name") { TextField("Name", text: $scene.name) }
+                Section("Name") {
+                    TextField("Name", text: $scene.name)
+                        .onChange(of: scene.name) { if ScenePlan.limitName(scene.name) != scene.name { scene.name = ScenePlan.limitName(scene.name) } }
+                }
                 Section("Icon") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -407,7 +416,7 @@ struct SceneEditor: View {
             .navigationTitle("Scene").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { done(scene); dismiss() }.disabled(scene.tilts.isEmpty || scene.name.isEmpty) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { done(scene); dismiss() }.disabled(scene.tilts.isEmpty || ScenePlan.fitName(scene.name).isEmpty) }
             }
         }
     }

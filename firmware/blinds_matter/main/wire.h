@@ -94,8 +94,22 @@ inline std::string scenesJson(const WireScene *s, int n, int max, int ports) {
   j += "]}";
   return j;
 }
+// A Scene's name as the controller keeps it: UTF-8 as typed (quotes, accents, emoji), without control characters, at
+// most `maxBytes` bytes, never cut inside a character, no trailing spaces. The app limits names the same way
+// (ScenePlan.fitName), so what was typed is what every phone reads back.
+inline std::string sceneName(const std::string &in, size_t maxBytes) {
+  std::string o;
+  for (unsigned char c : in) if (c >= 32 && c != 127) o += (char)c;
+  if (o.size() > maxBytes) {
+    size_t n = maxBytes;
+    while (n > 0 && ((unsigned char)o[n] & 0xC0) == 0x80) n--;      // back to the start of the character that does not fit
+    o.resize(n);
+  }
+  while (!o.empty() && o.back() == ' ') o.pop_back();
+  return o;
+}
 // A Scene write, from the query. Out-of-range values are brought into range; the icon keeps only a-z, 0-9 and dots
-// (an SF Symbol name). The name is cleaned by the caller (cleanText), as every name typed in the app.
+// (an SF Symbol name). The name is kept as typed (sceneName, by the caller).
 template <class Arg> WireScene sceneOfArgs(Arg arg, int ports) {
   WireScene s{};
   s.gid = strtoul(arg("gid").c_str(), nullptr, 10);

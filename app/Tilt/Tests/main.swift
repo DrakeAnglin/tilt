@@ -215,6 +215,10 @@ let away = ScenePlan.scenes(read: ["den": homeScenes["den"]!], kept: [movie])
 check(away[0].tilts[atHall(1)] == 0 && away[0].tilts[atDen(2)] == -50, "a controller that did not answer: its part comes from the phone's copy")
 check((try? ScenePlan.writes(movie, read: ["den": []])) == nil, "saving a Scene with blinds on a controller that did not answer is refused")
 check((try? ScenePlan.writes(movie, read: ["den": []], localOnly: ["hall"]))?.count == 1, "old firmware: its part stays on the phone, the rest is saved")
+// Names: kept as typed (quotes, curly apostrophe, accents, emoji), cut like the controller cuts them (wire.h sceneName).
+check(ScenePlan.fitName("Mom\u{2019}s caf\u{E9} \u{1F3AC}") == "Mom\u{2019}s caf\u{E9} \u{1F3AC}" && ScenePlan.fitName("Movie \"night\"") == "Movie \"night\"", "a Scene name is kept as typed")
+check(ScenePlan.fitName(String(repeating: "x", count: 46) + "\u{1F3AC}") == String(repeating: "x", count: 46), "a name that does not fit is cut before the character, at 47 bytes")
+check(ScenePlan.fitName("a\nb ") == "ab" && ScenePlan.limitName("ab ") == "ab ", "control characters dropped; trailing spaces only trimmed on save")
 // Made while its controller could not keep Scenes yet (old firmware): after the update it is kept, not taken for deleted.
 let onPhone = BlindScene(name: "Read", symbol: "book", tilts: [atHall(0): 40], gid: 77, ver: 300)
 let afterUpdate = ScenePlan.scenes(read: ["den": [], "hall": []], kept: [onPhone])
