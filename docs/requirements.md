@@ -50,7 +50,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | M-1 | Must | Everything except electronics, motors, and screws/fasteners is **3D printable** on a Bambu-class printer |
 | M-2 | Must | Motor fits **inside the existing headrail** (inner section ≈ 55.5 × 36 mm, see [cross-section](reference/headrail-cross-section.png)) |
 | M-3 | Must | **Reversible install**: no permanent changes to the blinds (no cutting/drilling of the headrail) |
-| M-4 | Should | Low drive noise: printed helical gears, grease; TPU isolation only if tests show it's needed |
+| M-4 | Should | Low drive noise: printed helical gears, grease, felt pads between the tilter and the rail |
 | M-5 | Should | Parametric CAD so other people (MakerWorld) can adapt it to their headrail size and tilt rod shape |
 | M-6 | Must | Gears and their faces print without supports (the tilter's tray lid needs support under one shelf); assembly with common M3 / M1.6 screws and M3 heat-set inserts |
 | M-7 | Must | Controller box fits **inside a headrail**, under the tilt rod |

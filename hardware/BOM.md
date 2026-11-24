@@ -34,6 +34,10 @@ White PLA for the housing and most gears, white PETG for the four parts that rub
 | M1.6 × 4 socket screw (holds the N20 to the motor shell) | 2 | 1 kit | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) |
 | Ø2 × 6 mm stainless dowel pin (4 planet axles, 1 worm top pin) | 5 | 50 | [HARFINGTON 2 × 6 mm](https://www.amazon.com/s?k=HARFINGTON+50pcs+Dowel+Pins+M2+2mm+x+6mm+304+Stainless+Steel) |
 | PTFE grease, Super Lube 21030 | a little | 1 tube | [B000XBH9HI](https://www.amazon.com/dp/B000XBH9HI) |
+| Stick-on **felt** pad, about 8 mm across and 1.5 to 2 mm tall (the same pack as the box's feet) | 6 (4 under, 1 on each side) | from the box's pack | search "felt pads 8 mm" |
+
+The felt pads keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use felt, not
+rubber: rubber still passes the vibration on. Where they go: [tilter build, step 9](mechanical/stl/tilter/README.md#assembly).
 
 ### Cord to the controller
 | Part | Per tilter | Buy | Link |
@@ -82,7 +86,7 @@ J3 (a 6-way socket for a separate USB-C board) is not used: USB plugs into the 6
 | M3 heat-set insert | 3 | from the tilter's 100 | |
 | M3 × 10 flat-head screw | 3 | from the M3 kit below | |
 | M2 × 6 self-tapping screw (charger) | 2 | 1 small pack | search "M2 x 6 self tapping screw" |
-| **Stick-on pad, about 8 mm across and 1.5 to 2 mm tall: felt, rubber or a clear silicone bumper** | **4** | 1 pack (they come 50 to 200 to a sheet) | search "felt pads 8 mm" or "clear rubber bumper feet 8 mm" |
+| **Stick-on pad, about 8 mm across and 1.5 to 2 mm tall: felt, rubber or a clear silicone bumper** | **4** | 1 pack of felt (they come 50 to 200 to a sheet; one pack covers the tilters too) | search "felt pads 8 mm" or "clear rubber bumper feet 8 mm" |
 
 The pads lift the box off the rail floor so it does not pinch the blind's lift cord, which runs down the middle of the
 rail: one pad in each corner, none in the middle. Where they go:
