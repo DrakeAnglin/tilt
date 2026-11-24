@@ -13,6 +13,7 @@ on:
       - .github/workflows/release.yml
       - tools/release_firmware.py
       - tools/release_ci.py
+      - tools/release_build.sh
 
 concurrency:
   group: firmware-release           # one release at a time: each one builds on the last firmware.json
@@ -24,8 +25,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # esp-matter 1.5 on ESP-IDF 5.5.5, the same as the Mac (pinned, so a release builds the same way twice).
-    container: espressif/esp-matter:release-v1.5_idf_v5.5.5@sha256:51e890d6e913be195d273384eb93785bc9e64c35751a13fdd02c79ff06c07273
     # The signing key is only given to tag runs. Keep both secrets in the "release" environment, allowed for
     # fw-v* and hub-v* tags only (docs/firmware-release.md).
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
@@ -36,13 +35,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Tools
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          pip3 install --break-system-packages --quiet detools
-          mkdir -p ~/esp ~/.tilt
-          ln -sfn "$IDF_PATH" ~/esp/esp-idf          # build.sh looks in ~/esp, as on the Mac
-          ln -sfn "$ESP_MATTER_PATH" ~/esp/esp-matter
       - name: Which release
         id: tag
         env:
@@ -60,43 +52,24 @@ jobs:
             echo "Dry run from a pull request" > notes.txt
           fi
           cat "$GITHUB_OUTPUT"
-      - name: Logic tests
-        run: tools/firmware_tests.sh
-      - name: Signing key
+      - name: Make room
+        # The esp-matter image is about 20 GB unpacked; a fresh runner has about 14 GB free.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+      - name: Build, sign and check
         env:
-          KEY: ${{ secrets.FIRMWARE_SIGNING_KEY }}
+          FIRMWARE_SIGNING_KEY: ${{ github.event_name == 'push' && secrets.FIRMWARE_SIGNING_KEY || '' }}
+          KIND: ${{ steps.tag.outputs.kind }}
+          CHANNEL: ${{ steps.tag.outputs.channel || 'beta' }}
           EVENT: ${{ github.event_name }}
         run: |
-          umask 077
-          if [ "$EVENT" = push ]; then
-            [ -n "$KEY" ] || { echo "::error::no FIRMWARE_SIGNING_KEY secret"; exit 1; }
-            printf '%s\n' "$KEY" > ~/.tilt/firmware-signing-key.pem
-          else
-            openssl ecparam -name prime256v1 -genkey -noout -out ~/.tilt/firmware-signing-key.pem     # throwaway
-          fi
-      - name: What is published now
-        run: python3 tools/release_ci.py fetch
-      - name: Build and sign the controller
-        if: steps.tag.outputs.kind != 'hub'
-        env:
-          CHANNEL: ${{ steps.tag.outputs.channel || 'beta' }}
-        run: python3 tools/release_firmware.py "$CHANNEL" --notes "$(cat notes.txt)" || { tail -50 firmware/blinds_matter/build-release.log; exit 1; }
-      - name: Build and sign the Tilt Hub
-        if: steps.tag.outputs.kind != 'controller'
-        run: python3 tools/release_firmware.py --hub --notes "$(cat notes.txt)" || { tail -50 firmware/tilt_hub/build-release.log; exit 1; }
-      - name: Check the signatures
-        run: |
-          # Every image ends in its signature: check it with the public half of the key, as the controller does.
-          openssl ec -in ~/.tilt/firmware-signing-key.pem -pubout -out pub.pem 2>/dev/null
-          python3 tools/release_ci.py verify pub.pem
-          rm -f ~/.tilt/firmware-signing-key.pem
-      - name: Files for the release
-        run: |
-          mkdir -p upload
-          python3 tools/release_ci.py files | xargs -I{} cp {} upload/
+          if [ "$EVENT" = push ] && [ -z "$FIRMWARE_SIGNING_KEY" ]; then echo "::error::no FIRMWARE_SIGNING_KEY secret"; exit 1; fi
+          # esp-matter 1.5 on ESP-IDF 5.5.5, the same as the Mac (pinned, so a release builds the same way twice).
+          docker run --rm -v "$PWD:/w" -w /w -e FIRMWARE_SIGNING_KEY -e KIND -e CHANNEL --entrypoint /bin/bash \
+            espressif/esp-matter:release-v1.5_idf_v5.5.5@sha256:51e890d6e913be195d273384eb93785bc9e64c35751a13fdd02c79ff06c07273 \
+            -c '. "$IDF_PATH/export.sh" >/dev/null && tools/release_build.sh'
           cp notes.txt upload/notes.txt
-          cat firmware/releases/firmware.json
-          ls -l upload
       - uses: actions/upload-artifact@v4
         with:
           name: release
