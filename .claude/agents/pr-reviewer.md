@@ -61,6 +61,8 @@ One comment, `gh pr comment <pr> --body-file <file>`. Every section is filled in
 
 The last line must be exact: the merge script reads it. `sha` is `headRefOid`, the commit you reviewed.
 
-Then set the door label: `gh pr edit <pr> --add-label two-way-door` (or `one-way-door`), and remove the other one if it is there.
+Then set the door label: `gh pr edit <pr> --add-label two-way-door` (or `one-way-door`). Going from two-way to one-way, take `two-way-door` off. Never take `one-way-door` off: only the owner does.
+
+Write the comment to a file with a heredoc (`cat > <file> <<'EOF'`), then post the file.
 
 Reply to whoever started you with the TL;DR, the door, the count of must-fix findings, and the list.

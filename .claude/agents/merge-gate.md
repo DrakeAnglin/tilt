@@ -57,7 +57,7 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 
 More than three `factory-review` comments on the pull request: **human**, "too many rounds of review".
 
-Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge, `--add-label needs-human` for human. Remove the other one if it is there. Never add `needs-human` without this comment.
+Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge; for human, `--add-label needs-human` and take `auto-merge-ok` off. Never take `needs-human` off: only the owner does. If it is already on, the verdict is **human**, and you say what the owner still has to confirm. Never add `needs-human` without this comment.
 
 Last, put the same thing where the owner looks first, the pull request body: replace what is under its `## Human Review` heading (add the heading at the end if it is missing) with `Not needed.` or your **Why** and **Confirm** lines. `gh pr view <pr> --json body --jq .body`, change only that section, `gh pr edit <pr> --body-file <file>`.
 

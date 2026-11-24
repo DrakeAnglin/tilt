@@ -7,6 +7,7 @@
 set -eu
 PR=${1:?usage: merge_pr.sh <pr> [--check]}
 MODE=${2:-}
+[ -z "$MODE" ] || [ "$MODE" = --check ] || { echo "usage: merge_pr.sh <pr> [--check]" >&2; exit 2; }
 
 MAX_LINES=400
 MAX_REVIEWS=3
@@ -21,7 +22,7 @@ no() { NO="$NO
 wait_for() { WAIT="$WAIT
 - $1"; }
 
-[ "$(get .state)" = OPEN ] || no "pull request is not open"
+[ "$(get .state)" = OPEN ] || { echo "#$PR is not open ($(get .state)). Nothing to do."; exit 1; }
 [ "$(get .isDraft)" = false ] || wait_for "pull request is a draft"
 [ "$(get .baseRefName)" = main ] || no "base is not main"
 [ "$(get .isCrossRepository)" = false ] || no "comes from a fork"

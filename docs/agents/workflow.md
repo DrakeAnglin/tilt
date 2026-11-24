@@ -16,7 +16,7 @@ How one agent takes one issue from request to `main`, without a person in the lo
    `git fetch origin && git worktree add .claude/worktrees/issue-<n> -b issue-<n>-<short-name> origin/main`, then work there.
 3. **Build it.** Read `CONTEXT.md` and the ADRs for the area. Write the test first where there is a place for one (`/tdd`). Small commits.
 4. **Check locally.** `tools/agent/check.sh` must pass.
-5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create`. Write the body with the `/pr` skill, in the template's shape: `Closes #<n>`, summary, evidence, door, blast radius, what could go wrong.
+5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create`. Write the body in the template's shape (Matt Pocock's `pr` skill, when installed, is the guide): `Closes #<n>`, summary, evidence, door, blast radius, what could go wrong.
 6. **Wait for CI.** `gh pr checks <pr> --watch`. Red? Fix it, push, wait again.
 7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its own summary, evidence, merge danger and findings as a comment on the pull request.
 8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Three rounds at most; the merge script counts them, and after that it goes to a human.

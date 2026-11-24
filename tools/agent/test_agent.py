@@ -36,6 +36,32 @@ BLOCKED = [
     'eval git push origin main',
     'bash -c \'gh pr merge 5\'',
     'git push origin "main',                       # open quote: cannot be read, so blocked
+    '# ship it\ngit push origin main',
+    'git status # check\ngit push origin HEAD:main',
+    '# merge\ngh pr merge 51 --squash',
+    'git push origin \\\nmain',
+    'gh \\\npr merge 51',
+    'if tools/agent/check.sh; then git push origin main; fi',
+    'for p in 51; do gh pr merge $p --squash; done',
+    'true && { git push origin main; }',
+    '! git push origin main',
+    'bash -lc "gh pr merge 51"',
+    'sh -ec "git push origin main"',
+    'timeout 60 git push origin main',
+    'echo 51 | xargs gh pr merge',
+    'echo `git push origin main`',
+    'echo $(gh pr merge 51)',
+    'git checkout main && git merge issue-5 && git push',
+    'git push origin heads/main',
+    'git push --branches origin',
+    'git -ccore.hooksPath=/x push origin issue-5',
+    'GIT_CONFIG_COUNT=1 git push origin issue-5',
+    'gh api -X POST repos/DrakeAnglin/tilt/merges',
+    'gh api -X PATCH repos/DrakeAnglin/tilt/git/refs/heads/main -f sha=abc',
+    'gh pr edit 51 --remove-label needs-human',
+    'gh pr edit 51 --add-label auto-merge-ok --remove-label needs-human',
+    'gh pr edit 51 --remove-label=one-way-door',
+    "cat > f <<'EOF'\ntext\nEOF\ngit push origin main",
 ]
 
 ALLOWED = [
@@ -54,6 +80,18 @@ ALLOWED = [
     'tools/agent/merge_pr.sh 51',
     'ls main',
     'echo "git push origin main"',
+    "cat > /tmp/body.md <<'EOF'\nIt doesn't matter what is in here.\ngh pr merge 51\ngit push origin main\nEOF",
+    "git commit -F - <<'EOF'\nDon't push to main\nEOF",
+    'gh pr comment 51 --body-file - <<EOF\nA lone " quote\nEOF\ngit status',
+    'git config --get core.hooksPath',
+    'git config core.hooksPath .githooks',
+    'gh api repos/DrakeAnglin/tilt/pulls/51/merge',
+    'gh pr edit 51 --add-label needs-human',
+    'gh pr edit 51 --remove-label auto-merge-ok',
+    'gh pr edit 51 --add-label two-way-door',
+    'timeout 60 tools/agent/check.sh',
+    'if git diff --quiet; then echo clean; fi',
+    'git commit -m "first line\n\nsecond; line # not a comment"',
 ]
 
 
@@ -65,6 +103,15 @@ class Guard(unittest.TestCase):
     def test_allowed(self):
         for line in ALLOWED:
             self.assertIsNone(guard.check(line, cwd='/'), line)
+
+
+    def test_bad_input_blocks(self):
+        import subprocess
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'guard.py')
+        run = lambda text: subprocess.run([sys.executable, script], input=text, capture_output=True, text=True).returncode
+        self.assertEqual(run('not json'), 2)
+        self.assertEqual(run('{"tool_input": {"command": "ls"}}'), 0)
+        self.assertEqual(run('{"tool_input": {"command": "gh pr merge 5"}}'), 2)
 
 
 if __name__ == '__main__':

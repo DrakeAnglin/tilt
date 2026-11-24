@@ -31,7 +31,7 @@ When unsure, call it one-way.
 6. Under 400 changed lines.
 7. No human-only path is touched (below).
 
-A label the owner sets by hand wins: a pull request with `needs-human` or `one-way-door` is never merged by an agent.
+`needs-human` and `one-way-door` stick: a pull request with either is never merged by an agent, and only the owner takes them off.
 
 **A human merges** in every other case, and the pull request always says why. See below.
 
@@ -41,7 +41,7 @@ Three things, each with the same parts, so the owner can read any one of them al
 
 | Who | Where | What |
 | --- | --- | --- |
-| Author | The pull request body (`/pr` skill, the template) | Summary, Evidence, Merge Danger: door, blast radius, what could go wrong |
+| Author | The pull request body (the template; Matt Pocock's `pr` skill has the same shape) | Summary, Evidence, Merge Danger: door, blast radius, what could go wrong |
 | `pr-reviewer` | A comment | Its own TL;DR, Summary, Evidence and Merge Danger, written from the diff, then the findings |
 | `merge-gate` | A comment | TL;DR of the verdict, door, blast radius, what could go wrong, then the seven rules as notes |
 
