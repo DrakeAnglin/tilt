@@ -133,9 +133,16 @@ def build(bx, cyl, uni, cut, isect, rbox, obox, cone=None):
     ahw = h['adp_w'] / 2 + h['adp_side']
     box = cut(box, bx(H['web_x1'], H['lip_x0'], -ahw, ahw, fz, zp))
     box = cut(box, bx(H['web_x0'] - 0.01, H['web_x1'] + 0.01, -ahw, ahw, fz + h['web_step'], zp))
-    # the plug's hole in the lip, closed all round
+    # the plug's hole in the lip, closed all round, with full-round ends like the plug itself
+    def stadium(x0, x1, hw_, hz):
+        """A USB-C plug's outline along X on the plugs' center line: half width hw_, half thickness hz, round ends."""
+        b = bx(x0, x1, -(hw_ - hz), hw_ - hz, H['zc'] - hz, H['zc'] + hz)
+        for s in (1, -1):
+            b = uni(b, cyl((x0, s * (hw_ - hz), H['zc']), (x1, s * (hw_ - hz), H['zc']), hz))
+        return b
+
     phw, phz = h['plug_w'] / 2 + h['slot'], h['plug_t'] / 2 + h['slot_z']
-    box = cut(box, bx(H['lip_x0'] - 0.01, L + 0.01, -phw, phw, H['zc'] - phz, H['zc'] + phz))
+    box = cut(box, stadium(H['lip_x0'] - 0.01, L + 0.01, phw, phz))
     # pinholes under the buttons, up through the tubes
     for x, y in H['btn'].values():
         box = cut(box, cyl((x, y, -0.01), (x, y, H['tube_top'] + 0.01), h['pin_d'] / 2))
@@ -162,6 +169,5 @@ def build(bx, cyl, uni, cut, isect, rbox, obox, cone=None):
     for n, (x, y) in H['btn'].items():
         P.append(('ESP32-C6 ' + n, bx(x - bl / 2, x + bl / 2, y - bw / 2, y + bw / 2, H['esp_face'] - bh, H['esp_face'])))
     P.append(('Adapter body', bx(H['adp_x0'], H['adp_x1'], -h['adp_w'] / 2, h['adp_w'] / 2, fz, fz + h['adp_h'])))
-    P.append(('Adapter plug', bx(H['adp_x1'], H['tip'], -h['plug_w'] / 2, h['plug_w'] / 2,
-                                 H['zc'] - h['plug_t'] / 2, H['zc'] + h['plug_t'] / 2)))
+    P.append(('Adapter plug', stadium(H['adp_x1'], H['tip'], h['plug_w'] / 2, h['plug_t'] / 2)))
     return {'Box': [('Hub box', box)], 'Parts': P}
