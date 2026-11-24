@@ -45,8 +45,8 @@ struct HubView: View {
                         }
                     }
                     Section {
-                        if case let n = i.new, !n.isEmpty {
-                            Label("\(n.count) new controller\(n.count == 1 ? "" : "s") nearby, waiting for setup", systemImage: "sparkles")
+                        if !i.new.isEmpty {
+                            Label("\(i.new.count) new controller\(i.new.count == 1 ? "" : "s") nearby, waiting for setup", systemImage: "sparkles")
                         }
                         if i.c.isEmpty { Text("No controllers yet.").foregroundStyle(.secondary) }
                         ForEach(i.c) { m in

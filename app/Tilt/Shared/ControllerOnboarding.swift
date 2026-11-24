@@ -94,7 +94,8 @@ extension HubClient {
                   (try? await controller.markHubKey(cid: cid)) != nil else { return HubAdmission(hubCid: cid, done: false) }
             return HubAdmission(hubCid: cid, done: true)
         }
-        if let s = try? await controller.state(), s.hkey == 0 {
+        guard let s = try? await controller.state() else { return HubAdmission(hubCid: cid, done: false) }     // ask again later
+        if s.hkey == 0 {
             guard (try? await controller.markHubKey(cid: cid)) != nil else { return HubAdmission(hubCid: cid, done: false) }
         }
         return HubAdmission(hubCid: cid, done: true)

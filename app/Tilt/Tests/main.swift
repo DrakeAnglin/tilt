@@ -386,6 +386,11 @@ let bctrl = controllerOnHub(blog, hubWaiting: Cell(false), hkey: Cell(0))      /
 let bhub = HubClient(transport: Scripted(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: hubCidOnNew) })
 _ = await bhub.admitHub(on: bctrl, controllerId: "new1")
 check(blog.count("ctrl /api/approve") == 0 && blog.count("ctrl /api/hubkey") == 1, "already in, the controller not told: only the key is told")
+let slog = Recorder()                                // the controller's state cannot be read: not done, so it is asked again
+let sctrl = ControllerClient(transport: Scripted(name: "ctrl", log: slog, address: "10.0.0.2/c/new1") { c in
+    cmdPath(c) == Api.keys ? #"{"keys":[{"cid":"\#(hubCidOnNew)","name":"Tilt Hub","owner":0,"me":0,"wait":0}]}"# : "not json"
+})
+check(await bhub.admitHub(on: sctrl, controllerId: "new1") == HubAdmission(hubCid: hubCidOnNew, done: false), "a state that cannot be read is not done")
 let nhub = HubClient(transport: Scripted(name: "hub", log: blog, address: "10.0.0.2/hub") { _ in hubInfoJSON("new1", hubCid: nil) })
 check(await nhub.admitHub(on: bctrl, controllerId: "new1") == HubAdmission(hubCid: nil, done: false), "the hub has not asked yet: nothing is let in")
 

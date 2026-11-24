@@ -188,7 +188,8 @@ final class HubWatch {
     func restarted() async { conn = nil; await refresh() }
     /// In Alexa: the hub has a Matter home connection made by Amazon.
     var inAlexa: Bool { HomeSetup.inAlexa(hubHomes: (info?.homes ?? []).map { .init(node: $0.node, vendor: $0.vendor) }) }
-    /// The hub's own request to join a controller (to move its blinds for Apple Home), if it has made one.
+    /// The hub's own request to join a controller (to move its blinds for Apple Home), if it has made one. From the
+    /// last /api/info this watch read, asking again only when it is not there (HubClient.hubCid always asks).
     func hubCid(for controller: String) async -> String? {
         if let c = info?.c.first(where: { $0.id == controller })?.hubCid { return c }
         await refresh()

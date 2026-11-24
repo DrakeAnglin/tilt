@@ -15,6 +15,7 @@ actor DemoHub: ControllerTransport {
     private var started = Date()
     private var people: [[String: Any]] = [["cid": "demo", "name": "You", "owner": 1, "me": 1, "wait": 0, "code": ""]]
 
+    private func cmdPath(_ command: String) -> String { String(command.split(separator: "?").first ?? "") }
     func answer(_ command: String) -> Data {
         let parts = command.split(separator: "?", maxSplits: 1)
         let path = String(parts.first ?? "")
@@ -32,17 +33,17 @@ actor DemoHub: ControllerTransport {
                    "c": [room], "homes": [], "home": 0, "new": []]
         case HubApi.keys:
             out = ["ok": 1, "keys": people]
-        case "/api/approve":
+        case cmdPath(HubApi.approve(cid: "", true, owner: false)):
             if let i = people.firstIndex(where: { $0["cid"] as? String == q["cid"] }), people[i]["wait"] as? Int == 1 {
                 if q["ok"] == "1" { people[i]["wait"] = 0; people[i]["owner"] = q["owner"] == "1" ? 1 : 0 } else { people.remove(at: i) }
             } else { out = ["ok": 0, "err": "no such phone"] }
-        case "/api/revoke":
+        case cmdPath(HubApi.revoke(cid: "")):
             if q["cid"] == "demo" { out = ["ok": 0, "err": "you cannot remove yourself"] } else { people.removeAll { $0["cid"] as? String == q["cid"] } }
         case HubApi.network:
             out = ["ok": 1, "ds": "0e080000000000010000"]
         case HubApi.backups:
             out = ["ok": 1, "b": []]
-        case "/api/backup":
+        case cmdPath(HubApi.backup(id: "")):
             out = ["ok": 0, "err": "no backup of that controller"]
         case HubApi.homeCode, HubApi.shareCode:
             out = ["ok": 0, "err": "Apple Home is not available in the demo."]
