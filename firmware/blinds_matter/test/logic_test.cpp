@@ -104,6 +104,13 @@ struct SimTilter : Tilter {
   float lo = -1e9f, hi = 1e9f;  // hard stops (unwrapped degrees)
   float blindLo = -1, blindHi = -1;  // the sensor sees nothing while the rod is past blindLo or before blindHi (reads 0); -1 = never
   uint32_t wandAt = 0; float wandBy = 0;   // a hand turns the wand this much at this time
+  uint32_t handAt = 0, handMs = 0; float handRate = 0;   // a hand turning the wand steadily (deg/s) for a while
+  uint32_t glitchAt = 0, glitchMs = 0; float glitchBy = 0;   // the reading is off by this much for a while
+  int spikeEvery = 0; float spikeBy = 0; int reads = 0;      // every Nth reading is off by this much (brush noise)
+  bool firstZero = false;       // the first reading after the sensor wakes is 0 (Left, 2026-11-23)
+  bool strainZeros = false;     // straining against an end stop, the PWM sensor reads 0 in bursts (Left, 2026-11-23)
+  uint32_t motorAfterHand = 0;  // ms the motor ran once the hand started
+  float rodMin = 1e9f, rodMax = -1e9f;   // how far the rod went, either way
   int dir = 0, duty = 0;
   int8_t sign = 1;
   TiltMemory mem;
@@ -114,18 +121,27 @@ struct SimTilter : Tilter {
   void step(uint32_t dt) {
     t += dt;
     if (wandAt && t >= wandAt) { rod += wandBy; gear += wandBy; wandAt = 0; }
+    if (handMs && t >= handAt && t < handAt + handMs) { rod += handRate * dt / 1000.0f; gear += handRate * dt / 1000.0f; }
+    if (handMs && t >= handAt && dir) motorAfterHand += dt;
     gear += phys * dir * degPerS * duty / 100.0f * dt / 1000.0f;
     if (gear > rod + play / 2) rod = gear - play / 2;
     if (gear < rod - play / 2) rod = gear + play / 2;
     if (rod > hi) rod = hi;
     if (rod < lo) rod = lo;
     gear = std::min(std::max(gear, rod - play / 2), rod + play / 2);
+    rodMin = std::min(rodMin, rod); rodMax = std::max(rodMax, rod);
   }
   float wrapped() { return fmodf(fmodf(rod, 360.0f) + 360.0f, 360.0f); }
   bool inBlind() { float a = wrapped(); return blindLo >= 0 && (a >= blindLo || a <= blindHi); }
   uint32_t ms() override { return t; }
   bool wake() override { return true; }
-  float angle() override { return inBlind() ? 0 : fmodf(wrapped() + (dir ? 3.0f : 0) + 360.0f, 360.0f); }
+  float angle() override {
+    if (firstZero) { firstZero = false; return 0; }
+    float g = dir && glitchMs && t >= glitchAt && t < glitchAt + glitchMs ? glitchBy : 0;   // motor noise: only while it runs
+    if (spikeEvery && ++reads % spikeEvery == 0) g += spikeBy;
+    if (strainZeros && dir && (rod <= lo + 0.5f || rod >= hi - 0.5f) && ++reads % 60 < 15) return 0;
+    return inBlind() ? 0 : fmodf(wrapped() + (dir ? 3.0f : 0) + g + 360.0f, 360.0f);
+  }
   bool noReading() override { return inBlind(); }
   float note(float a) override { return a; }
   void motor(int d, int pct) override { dir = d; duty = pct; }
@@ -182,8 +198,55 @@ static void tilterTests() {
     if (s.endMsg != "reached") printf("    ended \"%s\" at tilt %.1f, log: %s\n", s.endMsg.c_str(), t, s.log.c_str()); }
   { SimTilter s; s.sign = 2; s.lo = 270; s.go(50);                // right direction, but something blocks the blind
     CHECK(s.endMsg == "blocked (stalled)" && s.sign == 2 && s.keeps == 0, "blocked: the learned direction stays"); }
-  { SimTilter s; s.wandAt = 6000; s.wandBy = 12; float t = s.go(50);
-    CHECK(s.endMsg == "reached" && near(t, 50, 5), "a wand turn during the move: still reaches"); }
+  { SimTilter s; s.wandAt = 6000; s.wandBy = 6; float t = s.go(50);
+    CHECK(s.endMsg == "reached" && near(t, 50, 5), "a small bump on the wand during the move: still reaches"); }
+  // A hand on the wand wins: the motor stops and the learned direction stays (2026-11-23: Left flipped its direction
+  // when the wand was turned during a follow, then drove to closed up).
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.handAt = 2000; s.handMs = 3000; s.handRate = 25; s.go(50);
+    CHECK(s.endMsg == "stopped: turned by hand" && s.sign == 2 && s.keeps == 0, "hand against the motor: it stops, direction kept");
+    CHECK(s.motorAfterHand < 2000, "slow hand against the motor: the motor stops within 2 s");
+    if (s.motorAfterHand >= 2000 || s.endMsg != "stopped: turned by hand") printf("    ended \"%s\", motor ran %u ms after the hand, sign %d, log: %s\n", s.endMsg.c_str(), s.motorAfterHand, s.sign, s.log.c_str()); }
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.handAt = 2000; s.handMs = 1500; s.handRate = 60; s.go(50);
+    CHECK(s.endMsg == "stopped: turned by hand" && s.motorAfterHand < 1000, "a quick wand turn against the motor: stops within 1 s");
+    if (s.motorAfterHand >= 1000) printf("    motor ran %u ms after the hand\n", s.motorAfterHand); }
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.handAt = 1000; s.handMs = 4000; s.handRate = -40; s.go(50);   // the same way as the motor, and on past the target
+    CHECK(s.motorAfterHand < 2500 && s.sign == 2, "a hand turning the same way and on past the target: the motor does not fight it for long");
+    if (s.motorAfterHand >= 2500) printf("    ended \"%s\", motor ran %u ms after the hand\n", s.endMsg.c_str(), s.motorAfterHand); }
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.mem.lastRaw = 1; s.handAt = 300; s.handMs = 3000; s.handRate = 25; s.go(50);
+    CHECK(s.endMsg == "stopped: turned by hand" && s.sign == 2 && s.motorAfterHand < 1500, "hand at the start, while the gear play is taken up: it stops too"); }
+  { SimTilter s; s.degPerS = 15; s.sign = 1; s.handAt = 2000; s.handMs = 3000; s.handRate = 25; s.go(50);
+    CHECK(s.endMsg == "stopped: turned by hand" && s.sign > 0, "hand against a direction not yet learned: stops, does not flip it"); }
+  // A bad reading that makes it look like the wrong way, near the end: the direction must not be "learned" backwards.
+  { SimTilter s; s.degPerS = 15; s.sign = 1; s.glitchAt = 4500; s.glitchMs = 600; s.glitchBy = 30; s.go(50);
+    CHECK(s.sign > 0, "a bad reading: the right direction is not turned round and kept");
+    if (s.sign <= 0) printf("    ended \"%s\", sign %d, log: %s\n", s.endMsg.c_str(), s.sign, s.log.c_str()); }
+  // Middle, 2026-11-23: a burst of bad readings toward the target (short of it), then true again. Not "the wrong way".
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.glitchAt = 1500; s.glitchMs = 120; s.glitchBy = 35; float t = s.go(-60);
+    CHECK(s.endMsg == "reached" && near(t, -60, 5) && s.sign == 2 && s.log.empty(), "a burst of readings toward the target: carries on, no turning round");
+    if (s.endMsg != "reached" || !s.log.empty()) printf("    ended \"%s\" at tilt %.1f, log: %s\n", s.endMsg.c_str(), t, s.log.c_str()); }
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.spikeEvery = 7; s.spikeBy = 25; float t = s.go(50);
+    CHECK(s.endMsg == "reached" && near(t, 50, 5) && s.sign == 2, "single bad readings, moving and stopped: not a hand, still reaches");
+    if (s.endMsg != "reached") printf("    ended \"%s\" at tilt %.1f, log: %s\n", s.endMsg.c_str(), t, s.log.c_str()); }
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.hi = 400 - 4; s.strainZeros = true;
+    s.go(-100);                                                 // closed down at 40 (400 unwrapped), the stop 4 degrees short of it
+    CHECK(s.endMsg == "reached (end stop)", "closed down against the stop, readings of 0 while it strains: reached");
+    if (s.endMsg != "reached (end stop)") printf("    ended \"%s\", log: %s\n", s.endMsg.c_str(), s.log.c_str()); }
+  // Left, 2026-11-23: from closed up (against its stop) to Open, across the sensor's zero. Its first reading after
+  // waking was 0, and pulling off the stop it reads 0 in bursts. It must go straight to Open, not first push further into closed up.
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.set.marks = Marks{295.7f, 35.4f, 146.3f}; s.set.graceMs = 8000;
+    s.rod = s.gear = 296.4f; s.lo = 295.5f; s.mem.lastRaw = -1; s.strainZeros = true; s.blindLo = 357; s.blindHi = 3; s.firstZero = true;
+    float t = s.go(0);
+    CHECK(s.endMsg == "reached" && near(t, 0, 5) && s.sign == 2 && s.log.empty(), "closed up to Open with bad readings at the stop: straight there");
+    if (s.endMsg != "reached" || !s.log.empty()) printf("    ended \"%s\" at tilt %.1f, log: %s\n", s.endMsg.c_str(), t, s.log.c_str()); }
+  // Setup's first move (2026-11-23, Right): wires the other way round, at closed down, going to Open. It may turn past
+  // closed down first, but only a little before it turns round, not for seconds.
+  { SimTilter s; s.degPerS = 15; s.play = 20; s.set.graceMs = 8000; s.set.marks = Marks{161.3f, 270.0f, 10.6f};
+    s.rod = s.gear = 10.6f + 360; s.sign = 1; s.phys = -1;
+    float t = s.go(0);
+    float past = s.rodMax - (10.6f + 360);                       // degrees beyond closed down (the angle rising)
+    CHECK(s.endMsg == "reached" && near(t, 0, 5) && s.sign == -2, "setup, wires the other way: reaches Open, direction learned");
+    CHECK(past < 20, "setup, wires the other way: only a little past closed down before turning round");
+    if (past >= 20 || s.endMsg != "reached") printf("    ended \"%s\" at tilt %.1f, %.1f deg past closed down, log: %s\n", s.endMsg.c_str(), t, past, s.log.c_str()); }
   { SimTilter s; s.set.marks = Marks{300, 10, 100}; s.rod = s.gear = 50; s.blindLo = 351; s.blindHi = 4;
     float t = s.go(100);                                         // passes the PWM sensor's zero on the way
     CHECK(s.endMsg == "reached" && !s.last.stalled && near(t, 100, 5), "no reading at the sensor's zero is not a stall"); }

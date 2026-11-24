@@ -334,8 +334,10 @@ void motionTick() {
 void watchStop() { if (watchOn && watchPort >= 0 && !movingPort(watchPort)) sensorOff(watchPort); watchOn = false; watchPort = -1; handBusy = false; }
 // ---- turned by hand: with "blinds follow each other" on, a blind that is turned with its wand takes the others along.
 // The idle look-round (motionTick) sees a blind away from where the controller left it; its sensor then stays on
-// until it has held still for 0.7 s, and the other blinds are sent to the same tilt.
+// until it has held still for HAND_STILL_MS, and the other blinds are sent to the same tilt. Long enough that a pause
+// while turning the wand does not start the others half way (they would run while the hand is still at work).
 const float HAND_TILT = 6.0f;                  // a change of this much (tilt units) starts it
+const uint32_t HAND_STILL_MS = 1500;
 float handLast = 0;
 uint32_t handStill = 0, handSince = 0;
 void handCheck(int p, uint32_t now) {          // p has just been read (motor stopped)
@@ -352,7 +354,7 @@ void handTick(uint32_t now) {                  // from watchTick, every 100 ms, 
   if (bs[p].blind) { handStill = now; return; }
   if (fabsf(angDiff(bs[p].ang, handLast)) > 0.7f) { handLast = bs[p].ang; handStill = now; }
   bool timeout = now - handSince > 60000;
-  if (now - handStill < 700 && !timeout) return;
+  if (now - handStill < HAND_STILL_MS && !timeout) return;
   float t = constrain(bs[p].tilt, -100.0f, 100.0f);
   bool moved = !timeout && !isnan(t) && fabsf(t - handRef[p]) >= HAND_TILT * 0.6f;
   handRef[p] = bs[p].tilt;
@@ -393,7 +395,9 @@ const char *setMark(int p, const String &w) {
   float st = steadyAngle(p);
   if (isnan(st)) return "the slats are still moving: let them settle, then tap again";
   noteAngle(p, st);
-  if (w == "up") c.up = bs[p].ang;
+  // Setup starts (closed up is its first mark): the first move after it checks the motor's direction again, so a
+  // motor or tilter changed since is learned afresh. The direction is kept as the first guess.
+  if (w == "up") { c.up = bs[p].ang; c.motSign = c.motSign < 0 ? -1 : 1; }
   else if (w == "open") c.open = bs[p].ang;
   else if (w == "down") c.down = bs[p].ang;
   else return "unknown mark";
