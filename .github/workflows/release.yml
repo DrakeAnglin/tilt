@@ -47,7 +47,7 @@ jobs:
             git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"     # the annotated tag, with its message
             git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main: tag a commit in main"; exit 1; }
             python3 tools/release_ci.py check-tag "$TAG" >> "$GITHUB_OUTPUT"
-            git for-each-ref "refs/tags/$TAG" --format='%(contents)' | sed '/-----BEGIN PGP/,$d' > notes.txt
+            git for-each-ref "refs/tags/$TAG" --format='%(contents)' | sed '/-----BEGIN /,$d' > notes.txt
           else
             V=$(python3 -c "import sys; sys.path.insert(0,'tools'); import release_ci; print(release_ci.code_version('controller'))")
             printf 'kind=both\nversion=%s\n' "$V" >> "$GITHUB_OUTPUT"
