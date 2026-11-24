@@ -50,7 +50,8 @@ H = dict(
     # The mark on the bed face: the app icon's three slats (app/Tilt/make_icon.swift: strokes 72 wide, +-215 along,
     # +-78 across, 230 apart) and "tilt" beside them, engraved. Sized for a 0.4 nozzle: no groove under 0.8 wide.
     # Looking at the face with the plug to the right, it reads left to right
-    mark_depth=0.4, logo_h=8.0, logo_x=26.4, text_x=31.4, text_size=6.5,
+    mark_depth=0.4, logo_h=8.0, logo_x=26.2, text_x=31.6, text_size=7.2,
+    logo_stroke=1.3,                              # slats thicker than the icon's (0.84 at this size): three passes, like the letters
     pin_d=1.8,                                    # pinholes (a paper clip is about 1 mm)
     tube_d=4.4, tube_gap=2.5,                     # guide tube round each pinhole; it ends this far under the board's face
                                                   # (button height not measured: 2.0 assumed)
@@ -149,17 +150,25 @@ def build(bx, cyl, uni, cut, isect, rbox, obox, cone=None):
         if cone:
             box = cut(box, cone((x, y, -0.01), h['pin_d'] / 2 + h['pin_sink'] + 0.01, (x, y, h['pin_sink']), h['pin_d'] / 2))
 
-    # the three slats (the driver adds the word beside them)
+    # the three slats (the driver adds the word beside them), on the icon's centers, strokes logo_stroke wide. 'Mark' is the same shape as a part of its own: it fills
+    # the engraving flush, for a two-color print
     k = h['logo_h'] / (2 * 230 + 2 * 78 + 72)
-    for i in (-1, 0, 1):
+
+    def slat(i):
         a = (h['logo_x'] - 215 * k, i * 230 * k - 78 * k)
         b = (h['logo_x'] + 215 * k, i * 230 * k + 78 * k)
         ln = math.hypot(b[0] - a[0], b[1] - a[1])
         u = ((b[0] - a[0]) / ln, (b[1] - a[1]) / ln, 0)
-        slat = obox(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, h['mark_depth'] / 2 - 0.01), u, (-u[1], u[0], 0), ln, 72 * k, h['mark_depth'] + 0.02)
+        t = obox(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, h['mark_depth'] / 2 - 0.01), u, (-u[1], u[0], 0), ln, h['logo_stroke'], h['mark_depth'] + 0.02)
         for q in (a, b):
-            slat = uni(slat, cyl((q[0], q[1], -0.02), (q[0], q[1], h['mark_depth']), 36 * k))
-        box = cut(box, slat)
+            t = uni(t, cyl((q[0], q[1], -0.02), (q[0], q[1], h['mark_depth']), h['logo_stroke'] / 2))
+        return t
+
+    mark = None
+    for i in (-1, 0, 1):
+        box = cut(box, slat(i))
+        mark = slat(i) if mark is None else uni(mark, slat(i))
+    mark = isect(mark, bx(0, L, -hw, hw, 0, h['mark_depth']))
 
     P = []
     P.append(('ESP32-C6 board', bx(H['esp_x0'], H['esp_x1'], -h['esp_w'] / 2, h['esp_w'] / 2, H['esp_face'], H['esp_back'])))
@@ -170,4 +179,4 @@ def build(bx, cyl, uni, cut, isect, rbox, obox, cone=None):
         P.append(('ESP32-C6 ' + n, bx(x - bl / 2, x + bl / 2, y - bw / 2, y + bw / 2, H['esp_face'] - bh, H['esp_face'])))
     P.append(('Adapter body', bx(H['adp_x0'], H['adp_x1'], -h['adp_w'] / 2, h['adp_w'] / 2, fz, fz + h['adp_h'])))
     P.append(('Adapter plug', stadium(H['adp_x1'], H['tip'], h['plug_w'] / 2, h['plug_t'] / 2)))
-    return {'Box': [('Hub box', box)], 'Parts': P}
+    return {'Box': [('Hub box', box)], 'Mark': [('Hub mark', mark)], 'Parts': P}
