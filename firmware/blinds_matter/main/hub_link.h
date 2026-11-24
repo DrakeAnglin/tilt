@@ -57,9 +57,8 @@ static bool hubAddrOk = false;
 static sockaddr_in6 hubHelloAddr;                // where the hub's last hello came from (not proven: only for sending)
 static bool hubHelloOk = false;
 
-// One Thread message carries about 1.2 KB; a longer answer to the hub goes in pieces of this size (the hub joins them).
-const size_t HUB_PIECE = 1000;
-const int HUB_PIECES_MAX = 16;
+// One Thread message carries about 1.2 KB; a longer answer to the hub goes in pieces (tilt_link.h LINK_PIECE, the hub
+// joins them).
 bool hubOk() { return hubSeen && millis() - hubSeen < 1200000; }   // heard from the hub in the last 20 minutes
 
 static uint32_t backupCrc();
@@ -171,7 +170,7 @@ esp_err_t hFactory(httpd_req_t *r) {
   if (arg(r, "sure") != "yes") return fail(r, "add sure=yes");
   event("factory reset");
   if (hubSock >= 0 && hubAddrOk) {               // tell the hub: gone (with proof, so nobody else can say it)
-    std::string g = "G00" + hubMac("ctl-bye" + std::string((const char *)bootId, 4));
+    std::string g = dgEncode(DG_BYE, 0x3030, hubMac(proofText(Proof::CtlBye, bootId, "")));   // seq "00"
     sendto(hubSock, g.data(), g.size(), 0, (sockaddr *)&hubAddr, sizeof hubAddr);
   }
   ok(r);
@@ -253,7 +252,7 @@ static bool hubTime(const std::string &s) {     // "epoch.mac"
   size_t dot = s.find('.');
   if (dot == std::string::npos) return false;
   std::string ts = s.substr(0, dot);
-  if (!hubMacOk("hub-time" + std::string((const char *)bootId, 4) + ts, s.substr(dot + 1))) return false;
+  if (!hubMacOk(proofText(Proof::HubTime, bootId, ts), s.substr(dot + 1))) return false;
   long t = atol(ts.c_str());
   if (t < 1700000000 || t <= lastT) return false;   // never an older one again
   lastT = t;
@@ -333,7 +332,7 @@ static void hubFastPoll() {                      // check in quickly while the f
 static const char *hubOta(char t, const std::string &in, std::string &out) {
   if (t == 'B') {
     size_t dot = in.find('.');
-    if (dot == std::string::npos || !hubMacOk("hub-ota" + std::string((const char *)bootId, 4) + in.substr(0, dot), in.substr(dot + 1))) {
+    if (dot == std::string::npos || !hubMacOk(proofText(Proof::HubOta, bootId, in.substr(0, dot)), in.substr(dot + 1))) {
       out = "{\"err\":\"not from the Tilt Hub\"}"; return "403";
     }
     // The begin carries the hub's time ("@epoch"): each one must be newer than the last, so a recorded one does nothing.
@@ -481,24 +480,13 @@ static void hubTask(void *) {
         if (t == 'E') { lastESt = st; lastEOut = out; lastEAt = millis() ? millis() : 1; }
       }
     } else out = "{\"err\":\"unknown request\"}";
-    std::string body(st, 3);
-    body += out;
-    if (body.size() <= HUB_PIECE) {                // most answers: one message
-      std::string rep(1, (char)tolower(t));
-      rep.append(buf + 1, 2);
-      rep += body;
-      sendto(hubSock, rep.data(), rep.size(), 0, (sockaddr *)&from, fl);
-    } else {                                       // a long one (the log, a backup): '#' seq, piece, count, then a part
-      int count = (int)((body.size() + HUB_PIECE - 1) / HUB_PIECE);
-      if (count > HUB_PIECES_MAX) { body = "500{\"err\":\"answer too long for the Tilt Hub\"}"; count = 1; }
-      for (int i = 0; i < count; i++) {
-        std::string rep(1, '#');
-        rep.append(buf + 1, 2);
-        rep += (char)i; rep += (char)count;
-        rep.append(body, i * HUB_PIECE, HUB_PIECE);
-        sendto(hubSock, rep.data(), rep.size(), 0, (sockaddr *)&from, fl);
-        if (i + 1 < count) vTaskDelay(pdMS_TO_TICKS(15));   // let the radio send it before queuing the next
-      }
+    // Most answers are one message; a long one (the log, a backup) goes in pieces ('#' seq, piece, count, part).
+    uint16_t seq = (uint16_t)((uint8_t)buf[1] << 8 | (uint8_t)buf[2]);
+    std::vector<std::string> reps = dgAnswerDatagrams(t, seq, std::string(st, 3) + out);
+    if (reps.empty()) reps = dgAnswerDatagrams(t, seq, "500{\"err\":\"answer too long for the Tilt Hub\"}");
+    for (size_t i = 0; i < reps.size(); i++) {
+      sendto(hubSock, reps[i].data(), reps[i].size(), 0, (sockaddr *)&from, fl);
+      if (i + 1 < reps.size()) vTaskDelay(pdMS_TO_TICKS(15));   // let the radio send it before queuing the next
     }
   }
 }
@@ -591,8 +579,9 @@ void hubTick() {
   lastPct = pct;
   hubWantsStatus = false;
   static uint32_t pushN = 0;
-  std::string m = "S00" + j, mac = hubMac("ctl-push" + std::string((const char *)bootId, 4) + j + std::to_string(++pushN));
-  if (!mac.empty()) m += "\n" + std::to_string(pushN) + "." + mac;   // no hub key yet (setup): the hub takes it without
+  ++pushN;
+  // No hub key yet (setup): no proof, and the hub takes it without.
+  std::string m = dgEncode(DG_PUSH, 0x3030, pushPayload(j, pushN, hubMac(proofText(Proof::CtlPush, bootId, j + std::to_string(pushN)))));
   int sent = sendto(hubSock, m.data(), m.size(), 0, (sockaddr *)&d, sizeof d);
   static int fails = 0;
   if (sent != (int)m.size() && fails++ < 3) event("status to hub not sent (errno %d)", errno);

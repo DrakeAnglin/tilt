@@ -65,6 +65,8 @@
 #include "logic.h"                               // battLevel (the controller's own rules)
 #include "home_view.h"                          // what Home sees, the same rules as a controller on Wi-Fi
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm: the same as the controller's
+#include "tilt_link.h"                           // the link to the controllers: proofs, pushes, datagrams, sealed frames
+#include "ctrl_link.h"                           // CtrlLink: one controller's boot id and counter, behind one lock
 #include "secrets.h"                             // WIFI_SSID, WIFI_PASSWORD (bench: until Apple Home gives the network)
 // HUB_SETUP_PIN: on the hub's label; made by build.sh, never in the repo. It is copied to flash at the first start, so
 // update files (built with TILT_RELEASE) carry no code at all.
@@ -94,7 +96,7 @@ struct Saved {
   uint16_t ep[PORTS];                            // Home tiles (Matter endpoints, 0 = none): ep[0] alone = all the blinds,
   uint8_t sep;                                   //   or with sep = 1 one tile per blind (the controller's "hksep")
 };
-enum KeyState : uint8_t { KEY_NONE = 0, KEY_ASKED = 1, KEY_IN = 2 };   // no key / asked to join, waiting / let in
+// KeyState (ctrl_link.h): no key / asked to join, waiting / let in
 enum OtaState { OTA_NONE = 0, OTA_SENDING = 1, OTA_CHECKING = 2, OTA_DONE = 3, OTA_FAILED = 4 };   // the app reads these numbers
 struct SavedV1 { char id[13]; uint8_t keyState; uint8_t cid[8], key[32]; uint16_t ep[PORTS]; };
 struct Ctrl {
@@ -105,9 +107,6 @@ struct Ctrl {
   sockaddr_in6 addr;
   bool addrOk;
   uint32_t seen;                                 // ms of the last message from it
-  uint8_t boot[4];
-  bool bootOk;
-  uint64_t ctr;
   int closeUp, pct, low;
   struct B { char name[33]; int hid, ok, tilt, tgt, mov; } b[PORTS];
   int sep;                                       // what the controller says now (-1 = not heard yet)
@@ -128,6 +127,9 @@ struct Ctrl {
   SemaphoreHandle_t mx;                          // one request to this controller at a time
 };
 static Ctrl ctrls[MAX_CTRL];
+// The link to each controller (its boot id, the hub's counter): apart from ctrls[] so a new controller in a place gets
+// a clean Ctrl while its link keeps its locks.
+static CtrlLink links[MAX_CTRL];
 // Per controller (flash "proof"): it has sent a proven push (from then on only proven ones count), and the boot count
 // of the newest one (an older boot's push is never taken again).
 struct Proof { uint8_t on; uint32_t bn; };
@@ -175,7 +177,7 @@ static int findCtrl(const char *id) { for (int i = 0; i < MAX_CTRL; i++) if (ctr
 // ---- UDP to the controllers: send one request, wait for its answer
 static int sock = -1;
 struct Pending { uint16_t seq; bool used, done; std::string ans; SemaphoreHandle_t sem; in6_addr to;   // to: only its answer counts
-                 std::string part[16]; uint16_t have; uint8_t count; };                             // a long answer, in pieces
+                 PieceJoin join; };                                                                 // a long answer, in pieces
 static Pending pend[8];
 static SemaphoreHandle_t pendMx;
 static uint16_t nextSeq = 1;
@@ -193,20 +195,14 @@ static int ask(int c, char type, const std::string &payload, std::string &ans, u
     if (!nextSeq) nextSeq = 1;
     if (slot >= 0) {
       Pending &p = pend[slot];
-      p.used = true; p.done = false; p.seq = seq; p.ans.clear(); p.to = k.addr.sin6_addr; p.have = 0; p.count = 0;
-      for (auto &s : p.part) s.clear();
+      p.used = true; p.done = false; p.seq = seq; p.ans.clear(); p.to = k.addr.sin6_addr; p.join.reset();
       xSemaphoreTake(p.sem, 0);
     }
     xSemaphoreGive(pendMx);
     if (slot < 0) break;
-    std::string m(1, type);
-    m += (char)(seq >> 8); m += (char)(seq & 0xFF);
-    m += payload;
+    std::string m = dgEncode(type, seq, payload);
     sendto(sock, m.data(), m.size(), 0, (sockaddr *)&k.addr, sizeof k.addr);
-    if (xSemaphoreTake(pend[slot].sem, pdMS_TO_TICKS(waitMs)) == pdTRUE && pend[slot].ans.size() >= 3) {
-      st = atoi(pend[slot].ans.substr(0, 3).c_str());
-      ans = pend[slot].ans.substr(3);
-    }
+    if (xSemaphoreTake(pend[slot].sem, pdMS_TO_TICKS(waitMs)) == pdTRUE) st = dgStatus(pend[slot].ans, ans);
     xSemaphoreTake(pendMx, portMAX_DELAY);
     pend[slot].used = false;
     xSemaphoreGive(pendMx);
@@ -217,29 +213,15 @@ static int ask(int c, char type, const std::string &payload, std::string &ans, u
 
 // ---- the hub's own key for each controller (it moves blinds like a phone would)
 static int rng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
-// The proof on messages between the hub and a controller that has let the hub in (and been told which key is the
-// hub's): the first 16 bytes of HMAC-SHA256 with the link key, in hex. Protocol: blinds_matter/main/hub_link.h.
-static std::string macOf(int c, const std::string &what) {
-  if (ctrls[c].s.keyState != KEY_IN) return "";
-  uint8_t link[32], m[32];
-  const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-  mbedtls_md_hmac(md, ctrls[c].s.key, 32, (const uint8_t *)"tilt-hub-link", 13, link);
-  mbedtls_md_hmac(md, link, 32, (const uint8_t *)what.data(), what.size(), m);
-  return hexOf(m, 16);
-}
-static bool macOk(int c, const std::string &what, const std::string &mac) {
-  std::string want = macOf(c, what);
-  if (want.empty() || mac.size() != want.size()) return false;
-  uint8_t d = 0;
-  for (size_t i = 0; i < want.size(); i++) d |= want[i] ^ mac[i];
-  return d == 0;
-}
+// The link key for the proofs on messages between the hub and a controller that has let the hub in (and been told
+// which key is the hub's). False when there is none. Protocol: blinds_matter/main/tilt_link.h.
+static bool linkOf(int c, uint8_t link[32]) { return ctrls[c].s.keyState == KEY_IN && linkKey(ctrls[c].s.key, link); }
 static void cleanName(char *out, size_t n, const std::string &in);
 // Ask to join, as "Tilt Hub" (the controller's /x/ask). The owner lets it in from the app.
 static void askToJoin(int c) {
   mbedtls_ecp_group grp; mbedtls_mpi d, z; mbedtls_ecp_point Q, Qp;
   mbedtls_ecp_group_init(&grp); mbedtls_mpi_init(&d); mbedtls_mpi_init(&z); mbedtls_ecp_point_init(&Q); mbedtls_ecp_point_init(&Qp);
-  uint8_t cpub[65], dpub[65], shared[32], okm[32], info[9 + 130];
+  uint8_t cpub[65], dpub[65], shared[32], okm[32];
   size_t cn = 0, n = 0;
   bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_ecdh_gen_public(&grp, &d, &Q, rng, nullptr) == 0 &&
             mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &cn, cpub, sizeof cpub) == 0 && cn == 65;
@@ -259,8 +241,7 @@ static void askToJoin(int c) {
        mbedtls_ecp_point_read_binary(&grp, &Qp, dpub, 65) == 0 && mbedtls_ecdh_compute_shared(&grp, &z, &Qp, &d, rng, nullptr) == 0 &&
        mbedtls_mpi_write_binary(&z, shared, 32) == 0;
   if (ok) {
-    memcpy(info, "blinds-v1", 9); memcpy(info + 9, cpub, 65); memcpy(info + 74, dpub, 65);
-    ok = mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), nullptr, 0, shared, 32, info, sizeof info, okm, 32) == 0 && unhex(cid, ctrls[c].s.cid, 8);
+    ok = deriveKey(shared, "", cpub, dpub, okm) && unhex(cid, ctrls[c].s.cid, 8);
   }
   if (ok) {
     xSemaphoreTake(stateMx, portMAX_DELAY);
@@ -273,41 +254,46 @@ static void askToJoin(int c) {
   if (j) cJSON_Delete(j);
   mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&d); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&Q); mbedtls_ecp_point_free(&Qp);
 }
+// ctrlCommand's way to the network and to the hub's saved key for one controller (ctrl_link.h).
+struct HubSeam : LinkSeam {
+  int c;
+  explicit HubSeam(int c) : c(c) {}
+  int ask(char type, const std::string &payload, std::string &ans) override { return ::ask(c, type, payload, ans); }
+  KeyState hubKey(uint8_t key[32], uint8_t cid[8]) override {
+    xSemaphoreTake(stateMx, portMAX_DELAY);
+    KeyState ks = (KeyState)ctrls[c].s.keyState;
+    if (ks != KEY_NONE) { memcpy(key, ctrls[c].s.key, 32); memcpy(cid, ctrls[c].s.cid, 8); }
+    xSemaphoreGive(stateMx);
+    return ks;
+  }
+  void dropped() override {
+    xSemaphoreTake(stateMx, portMAX_DELAY);
+    ctrls[c].s.keyState = KEY_NONE; proofs[c] = {};
+    saveCtrls(); proofsSave();
+    xSemaphoreGive(stateMx);
+  }
+  void letIn() override {
+    xSemaphoreTake(stateMx, portMAX_DELAY);
+    bool now = ctrls[c].s.keyState == KEY_ASKED;
+    if (now) { ctrls[c].s.keyState = KEY_IN; saveCtrls(); }
+    xSemaphoreGive(stateMx);
+    if (now) ESP_LOGI(TAG, "%s: Tilt Hub let in", ctrls[c].s.id);
+  }
+  uint64_t clockMs() override { return (uint64_t)time(nullptr) * 1000ULL + ms() % 1000; }
+};
 // A command with the hub's key: "/api/home?b=0&lift=5000". Returns the controller's JSON answer, or "" on failure.
+// Any task may call it (moves, care, updates): the link keeps one command at a time and one counter (ctrl_link.h).
 static std::string ctrlCommand(int c, const std::string &cmd) {
-  Ctrl &k = ctrls[c];
-  if (k.s.keyState == KEY_NONE) return "";
-  for (int attempt = 0; attempt < 2; attempt++) {
-    if (!k.bootOk) {
-      std::string h;
-      if (ask(c, 'H', "", h) != 200) return "";
-      cJSON *j = cJSON_Parse(h.c_str());
-      const char *b = j ? cJSON_GetStringValue(cJSON_GetObjectItem(j, "boot")) : nullptr;
-      k.bootOk = b && unhex(b, k.boot, 4);
-      if (j) cJSON_Delete(j);
-      if (!k.bootOk) return "";
-    }
-    uint64_t now = (uint64_t)time(nullptr) * 1000ULL + ms() % 1000;
-    k.ctr = now > k.ctr ? now : k.ctr + 1;
-    std::string pkt(20 + cmd.size() + 16, 0);
-    uint8_t *p = (uint8_t *)&pkt[0], aad[17];
-    memcpy(p, k.s.cid, 8);
-    memcpy(p + 8, k.boot, 4);
-    for (int i = 0; i < 8; i++) p[12 + i] = (uint8_t)(k.ctr >> (56 - 8 * i));
-    memcpy(aad, "blinds-v1", 9); memcpy(aad + 9, k.s.cid, 8);
-    gcm(true, k.s.key, p + 8, aad, 17, (const uint8_t *)cmd.data(), cmd.size(), p + 20, p + 20 + cmd.size());
-    std::string ans;
-    int st = ask(c, 'X', pkt, ans);
-    if (st == 409) { k.bootOk = false; continue; }  // the controller restarted (new boot id): once more
-    if (st == 403 && ans.find("waiting") != std::string::npos) { ESP_LOGW(TAG, "%s: Tilt Hub is waiting to be let in (open the owner's Tilt app)", k.s.id); return ""; }
-    if (st != 200 || ans.size() < 28) { ESP_LOGW(TAG, "%s: command %s failed (%d) %s", k.s.id, cmd.c_str(), st, st == 200 ? "" : ans.c_str()); if (st == 401) { k.s.keyState = KEY_NONE; proofs[c] = {}; saveCtrls(); proofsSave(); } return ""; }
-    std::string out(ans.size() - 28, 0);
-    uint8_t aad2[30];
-    memcpy(aad2, "blinds-v1r", 10); memcpy(aad2 + 10, k.s.cid, 8); memcpy(aad2 + 18, p + 8, 12);
-    const uint8_t *a = (const uint8_t *)ans.data();
-    if (!gcm(false, k.s.key, a, aad2, 30, a + 12, out.size(), (uint8_t *)&out[0], (uint8_t *)(a + 12 + out.size()))) return "";
-    if (k.s.keyState != KEY_IN) { k.s.keyState = KEY_IN; saveCtrls(); ESP_LOGI(TAG, "%s: Tilt Hub let in", k.s.id); }
-    return out;
+  HubSeam seam(c);
+  CallResult r = links[c].call(seam, cmd);
+  const char *id = ctrls[c].s.id;
+  switch (r.why) {
+    case CallResult::OK: return r.out;
+    case CallResult::NO_KEY: case CallResult::NO_HELLO: break;
+    case CallResult::WAITING: ESP_LOGW(TAG, "%s: Tilt Hub is waiting to be let in (open the owner's Tilt app)", id); break;
+    case CallResult::SEAL: ESP_LOGW(TAG, "%s: command %s could not be sealed", id, cmd.c_str()); break;
+    case CallResult::BAD_REPLY: ESP_LOGW(TAG, "%s: command %s: the answer did not open", id, cmd.c_str()); break;
+    default: ESP_LOGW(TAG, "%s: command %s failed (%d) %s", id, cmd.c_str(), r.st, r.out.c_str()); break;
   }
   return "";
 }
@@ -478,7 +464,8 @@ static void udpTask(void *) {
       xSemaphoreTake(stateMx, portMAX_DELAY);
       for (int i = 0; i < MAX_CTRL; i++) if (ctrls[i].used && ctrls[i].addrOk && sameAddr(ctrls[i].addr, from)) {
         // One that let the hub in proves it is really leaving (anyone else could say it for it).
-        if (ctrls[i].s.keyState == KEY_IN && (!ctrls[i].bootOk || !macOk(i, "ctl-bye" + std::string((const char *)ctrls[i].boot, 4), std::string(buf + 3, n - 3)))) continue;
+        uint8_t link[32];
+        if (ctrls[i].s.keyState == KEY_IN && (!linkOf(i, link) || !links[i].proofOkNow(link, Proof::CtlBye, "", std::string(buf + 3, n - 3)))) continue;
         std::string inst = ctrls[i].s.id;
         for (auto &ch : inst) ch = toupper(ch);
         mdns_service_remove_for_host((inst + " via Tilt Hub").c_str(), "_tilt", "_tcp", nullptr);
@@ -548,19 +535,12 @@ static void udpTask(void *) {
       if (otaAcks) xQueueSend(otaAcks, &a, 0);
       continue;
     }
-    if (t == '#' && n > 5) {                   // a piece of a long answer: '#' seq, piece, count, part
-      int i = (uint8_t)buf[3], count = (uint8_t)buf[4];
-      if (count < 2 || count > 16 || i >= count) continue;
+    if (t == DG_PIECES && n > 5) {             // a piece of a long answer: '#' seq, piece, count, part
+      std::string piece(buf + 3, n - 3);
       xSemaphoreTake(pendMx, portMAX_DELAY);
       for (auto &p : pend) {
         if (!p.used || p.done || p.seq != seq || memcmp(&p.to, &from.sin6_addr, 16)) continue;
-        if (p.count && p.count != count) break;
-        p.count = count;
-        p.part[i].assign(buf + 5, n - 5);
-        p.have |= 1 << i;
-        if (p.have == (1 << count) - 1) {
-          p.ans.clear();
-          for (int k = 0; k < count; k++) { p.ans += p.part[k]; p.part[k].clear(); }
+        if (p.join.add(piece, p.ans) == PieceJoin::DONE) {
           p.done = true;
           xSemaphoreGive(p.sem);
           for (auto &k : ctrls) if (k.used && k.addrOk && sameAddr(k.addr, from)) k.seen = ms() ? ms() : 1;
@@ -580,8 +560,8 @@ static void udpTask(void *) {
     }
     // A status push: JSON, then (from a controller that has let the hub in) "\n" count "." proof.
     buf[n] = 0;
-    char *nl = strchr(buf + 3, '\n');
-    std::string json(buf + 3, nl ? nl - (buf + 3) : n - 3), tail = nl ? std::string(nl + 1) : std::string();
+    PushIn push = pushParse(std::string(buf + 3, n - 3));
+    const std::string &json = push.json;
     cJSON *j = cJSON_Parse(json.c_str());
     const char *id = j ? cJSON_GetStringValue(cJSON_GetObjectItem(j, "id")) : nullptr;
     const char *pb = j ? cJSON_GetStringValue(cJSON_GetObjectItem(j, "boot")) : nullptr;
@@ -590,17 +570,18 @@ static void udpTask(void *) {
     xSemaphoreTake(stateMx, portMAX_DELAY);
     int c = findCtrl(id);
     bool isNew = c < 0;
-    if (c >= 0 && ctrls[c].s.keyState == KEY_IN) {    // let the hub in: a proven push, never an old one (boot count, then count)
-      size_t dot = tail.find('.');
-      uint32_t pn = dot == std::string::npos ? 0 : strtoul(tail.c_str(), nullptr, 10);
+    if (c >= 0 && ctrls[c].s.keyState == KEY_IN) {    // let the hub in: a proven push, never an old one (tilt_link.h pushAccept)
       cJSON *bnj = cJSON_GetObjectItem(j, "bn");
       uint32_t bn = cJSON_IsNumber(bnj) ? (uint32_t)bnj->valuedouble : 0;
-      bool proven = pn && macOk(c, "ctl-push" + std::string((const char *)boot, 4) + json + std::to_string(pn), tail.substr(dot + 1));
-      bool fresh = bn > proofs[c].bn || (bn == proofs[c].bn && (strcmp(pb, ctrls[c].pushBoot) || pn > ctrls[c].pushN));
-      if (proven && fresh) {
-        ctrls[c].pushN = pn;
-        if (!proofs[c].on || bn != proofs[c].bn) { proofs[c].on = 1; proofs[c].bn = bn; proofsSave(); }
-      } else if (proofs[c].on || proven) {       // once it proves its pushes, nothing else counts (nor an old one)
+      uint8_t link[32];
+      bool proven = push.n && linkOf(c, link) && proofOk(link, Proof::CtlPush, boot, json + std::to_string(push.n), push.mac);
+      PushState was;
+      was.on = proofs[c].on; was.bn = proofs[c].bn; was.boot = ctrls[c].pushBoot; was.n = ctrls[c].pushN;
+      PushResult pr = pushAccept(was, proven, bn, pb, push.n);
+      if (pr.verdict == PushVerdict::Take) {
+        ctrls[c].pushN = pr.state.n;
+        if (pr.save) { proofs[c].on = 1; proofs[c].bn = pr.state.bn; proofsSave(); }
+      } else if (pr.verdict == PushVerdict::Refuse) {   // once it proves its pushes, nothing else counts (nor an old one)
         static uint32_t told = 0;
         if (ms() - told > 60000) { told = ms(); ESP_LOGW(TAG, "%s: a push without a good proof was ignored", id); }
         xSemaphoreGive(stateMx); cJSON_Delete(j); continue;
@@ -619,6 +600,7 @@ static void udpTask(void *) {
       if (c >= 0) {                              // a clean place (the request lock stays)
         SemaphoreHandle_t m = ctrls[c].mx;
         ctrls[c] = Ctrl{};
+        links[c].reset();
         Ctrl &f = ctrls[c];
         f.mx = m; f.pct = -1; f.sep = -1; f.own = -1;
         for (auto &b : f.b) b.tilt = b.tgt = INT32_MIN;
@@ -631,9 +613,10 @@ static void udpTask(void *) {
     Ctrl &k = ctrls[c];
     // Answer with the time (the controller's Schedules need it), with the proof so it can trust it.
     {
-      std::string ts = std::to_string((long)time(nullptr)), mac = macOf(c, "hub-time" + std::string((const char *)boot, 4) + ts);
+      uint8_t link[32];
+      std::string ts = std::to_string((long)time(nullptr)), mac = linkOf(c, link) ? proof(link, Proof::HubTime, boot, ts) : "";
       if (!mac.empty() && time(nullptr) > 1700000000) {
-        std::string ack = std::string("s") + buf[1] + buf[2] + "200" + ts + "." + mac;
+        std::string ack = dgEncode(DG_TIME, seq, dgAnswer(200, ts + "." + mac));
         sendto(sock, ack.data(), ack.size(), 0, (sockaddr *)&from, fl);
       }
     }
@@ -658,7 +641,8 @@ static void udpTask(void *) {
     const char *bt = cJSON_GetStringValue(cJSON_GetObjectItem(j, "boot"));
     if (bt && strlen(bt) == 8 && strcmp(bt, k.pushBoot)) {   // it restarted: its new boot id (for the hub's own commands too)
       strlcpy(k.pushBoot, bt, sizeof k.pushBoot);
-      k.bootOk = unhex(bt, k.boot, 4);
+      uint8_t nb[4];
+      if (unhex(bt, nb, 4)) links[c].setBoot(nb); else links[c].forgetBoot();
     }
     cJSON *bl = cJSON_GetObjectItem(j, "b");
     for (int p = 0; p < PORTS && bl; p++) {
@@ -877,7 +861,8 @@ static void otaTask(void *arg) {
   uint32_t CH = pieceBytes, WIN = piecesInFlight;               // a controller that keeps its radio on takes big pieces
   std::string ans;
   if (ctrlCommand(c, "/api/s").empty()) { otaFail(k, "the controller did not answer"); otaFor = -1; vTaskDelete(nullptr); return; }   // fresh boot id
-  std::string sz = std::to_string(stageSize) + (stageDelta ? ",d" : "") + "@" + std::to_string((long)time(nullptr)), mac = k.bootOk ? macOf(c, "hub-ota" + std::string((const char *)k.boot, 4) + sz) : "";
+  uint8_t link[32];
+  std::string sz = std::to_string(stageSize) + (stageDelta ? ",d" : "") + "@" + std::to_string((long)time(nullptr)), mac = linkOf(c, link) ? links[c].proofNow(link, Proof::HubOta, sz) : "";
   if (mac.empty()) { otaFail(k, "the hub has no key on this controller yet"); otaFor = -1; vTaskDelete(nullptr); return; }
   int st = ask(c, 'B', sz + "." + mac, ans, 45000);   // an older controller erases its whole slot first
   if (st != 200) { otaFail(k, st == 403 ? "updates are locked (allow them first)" : st ? "the controller refused to start" : "no answer"); otaFor = -1; vTaskDelete(nullptr); return; }
@@ -915,7 +900,7 @@ static void otaTask(void *arg) {
   ESP_LOGI(TAG, "%s: %lu bytes sent in %lu s, checking", k.s.id, (unsigned long)stageSize, (unsigned long)((ms() - t0) / 1000));
   st = ask(c, 'E', "", ans, 15000);
   if (st != 200) { cJSON *j = cJSON_Parse(ans.c_str()); const char *e = j ? cJSON_GetStringValue(cJSON_GetObjectItem(j, "err")) : nullptr; otaFail(k, e ? e : "the controller did not take it"); if (j) cJSON_Delete(j); }
-  else { k.otaSt = OTA_DONE; k.otaPct = 100; k.bootOk = false; ESP_LOGI(TAG, "%s: update accepted, it restarts", k.s.id); }
+  else { k.otaSt = OTA_DONE; k.otaPct = 100; links[c].forgetBoot(); ESP_LOGI(TAG, "%s: update accepted, it restarts", k.s.id); }
   otaFor = -1;
   vTaskDelete(nullptr);
 }
@@ -1061,10 +1046,7 @@ static void announce(int c) {
   k.announced = e == ESP_OK;
   ESP_LOGI(TAG, "announced %s as %s: %s", inst.c_str(), host.c_str(), esp_err_to_name(e));
 }
-static const char *reason(int st) {
-  switch (st) { case 200: return "200 OK"; case 400: return "400 Bad Request"; case 401: return "401 Unauthorized"; case 403: return "403 Forbidden";
-    case 409: return "409 Conflict"; case 429: return "429 Too Many Requests"; case 500: return "500 Internal Server Error"; default: return "504 Gateway Timeout"; }
-}
+static const char *reason(int st) { return statusLine(st); }   // tilt_link.h: one table for the link and the app
 static esp_err_t hRelay(httpd_req_t *r) {
   const char *u = r->uri + 3;                    // after "/c/"
   char id[13] = {0};
@@ -1134,7 +1116,7 @@ static std::string infoJson() {
   esp_openthread_lock_acquire(portMAX_DELAY);
   int channel = otLinkGetChannel(esp_openthread_get_instance());
   esp_openthread_lock_release();
-  std::string j = "{\"ok\":1,\"hub\":\"tilt\",\"fw\":\"" + std::string(esp_app_get_description()->version) + "\",\"up\":" + std::to_string(ms() / 1000) +
+  std::string j = "{\"ok\":1,\"hub\":\"tilt\",\"proto\":" + std::to_string(LINK_PROTO) + ",\"fw\":\"" + std::string(esp_app_get_description()->version) + "\",\"up\":" + std::to_string(ms() / 1000) +
                   ",\"ip\":\"" + hubIp() + "\",\"wifi\":" + std::to_string(wifiRssi) + ",\"ch\":" + std::to_string(channel) + ",\"c\":[";
   xSemaphoreTake(stateMx, portMAX_DELAY);
   bool first = true;
@@ -1467,21 +1449,23 @@ static std::string hubCommand(int slot, const std::string &cmd) {
 }
 // POST /hub/x: id (8) | nonce (12: boot 4 | counter 8) | ciphertext | tag (16); the answer: nonce | ciphertext | tag.
 static int secDo(const std::string &b, std::string &resp) {
-  if (b.size() < 8 + 12 + 16 + 1) { resp = "{\"err\":\"short\"}"; return 400; }
-  const uint8_t *p = (const uint8_t *)b.data(), *nonce = p + 8, *ct = p + 20;
-  size_t n = b.size() - 36;
-  uint64_t ctr = 0;
-  for (int i = 4; i < 12; i++) ctr = (ctr << 8) | nonce[i];
-  uint8_t aad[17], key[32];
-  memcpy(aad, "blinds-v1", 9); memcpy(aad + 9, p, 8);
-  std::string cmd(n, 0);
-  xSemaphoreTake(keyMx, portMAX_DELAY);
+  Frame f;
+  std::string cmd;
+  uint8_t key[32];                               // a copy: the reply is sealed with it even if the phone is removed meanwhile
   int slot = -1;
-  for (int i = 0; i < 8; i++) if (hkeys[i].used && !memcmp(hkeys[i].id, p, 8)) slot = i;
-  if (slot < 0) { xSemaphoreGive(keyMx); resp = "{\"err\":\"not paired\"}"; return 401; }
-  if (memcmp(nonce, hboot, 4) || ctr <= hlast[slot]) { xSemaphoreGive(keyMx); resp = "{\"err\":\"stale\",\"boot\":\"" + hexOf(hboot, 4) + "\"}"; return 409; }
-  memcpy(key, hkeys[slot].key, 32);
-  if (!gcm(false, key, nonce, aad, 17, ct, n, (uint8_t *)&cmd[0], (uint8_t *)(ct + n))) {
+  xSemaphoreTake(keyMx, portMAX_DELAY);
+  FrameErr e = frameOpen(b, [&](const Frame &fr, uint8_t k[32]) {
+    for (int i = 0; i < 8; i++) if (hkeys[i].used && !memcmp(hkeys[i].id, fr.cid, 8)) slot = i;
+    if (slot < 0) return FrameErr::NotPaired;
+    if (memcmp(fr.nonce, hboot, 4) || fr.ctr <= hlast[slot]) return FrameErr::Stale;
+    memcpy(k, hkeys[slot].key, 32);
+    memcpy(key, hkeys[slot].key, 32);
+    return FrameErr::Ok;
+  }, f, cmd);
+  if (e == FrameErr::Short) { xSemaphoreGive(keyMx); resp = "{\"err\":\"short\"}"; return 400; }
+  if (e == FrameErr::NotPaired) { xSemaphoreGive(keyMx); resp = "{\"err\":\"not paired\"}"; return 401; }
+  if (e == FrameErr::Stale) { xSemaphoreGive(keyMx); resp = "{\"err\":\"stale\",\"boot\":\"" + hexOf(hboot, 4) + "\"}"; return 409; }
+  if (e == FrameErr::BadKey) {
     bool claim = hkeys[slot].used == 3;
     if (claim) {                                 // a first owner with the wrong setup code: the place goes
       memset(&hkeys[slot], 0, sizeof hkeys[slot]);
@@ -1491,7 +1475,7 @@ static int secDo(const std::string &b, std::string &resp) {
     resp = claim ? "{\"err\":\"wrong setup code\"}" : "{\"err\":\"bad key\"}";
     return 401;
   }
-  hlast[slot] = ctr;
+  hlast[slot] = f.ctr;
   if (hkeys[slot].used == 3) {                   // the right code: this phone is the owner now
     hkeys[slot].used = 1; pinFails = 0;
     keysSave();
@@ -1502,16 +1486,15 @@ static int secDo(const std::string &b, std::string &resp) {
   xSemaphoreGive(keyMx);
   if (waiting) { resp = "{\"err\":\"waiting\"}"; return 403; }
   std::string out = hubCommand(slot, cmd);
-  resp.assign(12 + out.size() + 16, 0);
-  uint8_t *o = (uint8_t *)&resp[0], aad2[30];
-  esp_fill_random(o, 12);
-  memcpy(aad2, "blinds-v1r", 10); memcpy(aad2 + 10, p, 8); memcpy(aad2 + 18, nonce, 12);
-  gcm(true, key, o, aad2, 30, (const uint8_t *)out.data(), out.size(), o + 12, o + 12 + out.size());
+  uint8_t rnd[12];
+  esp_fill_random(rnd, sizeof rnd);
+  resp = replySeal(key, f.cid, f.nonce, rnd, out);
+  if (resp.empty()) { resp = "{\"err\":\"seal\"}"; return 500; }   // never an empty "200" (it was not checked before)
   return 200;
 }
 static std::string helloJson() {
   return "{\"id\":\"" + hubId() + "\",\"name\":\"Tilt Hub\",\"fw\":\"" + std::string(esp_app_get_description()->version) + "\",\"boot\":\"" + hexOf(hboot, 4) +
-         "\",\"owned\":" + (hubOwned() ? "1" : "0") + ",\"kind\":\"hub\"}";
+         "\",\"owned\":" + (hubOwned() ? "1" : "0") + ",\"kind\":\"hub\",\"proto\":" + std::to_string(LINK_PROTO) + "}";
 }
 static esp_err_t sendStatus(httpd_req_t *r, int st, const std::string &body, bool binary = false) {
   httpd_resp_set_status(r, reason(st));

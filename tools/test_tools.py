@@ -171,6 +171,23 @@ class BlindsClient(unittest.TestCase):
         self.assertEqual(len(ka), 32)
         self.assertEqual(blinds_client.confirm(ka), blinds_client.confirm(kb))
 
+    def test_link_vectors(self):
+        # The hub link's shared vectors (firmware/blinds_matter/test/wire/link.json): the file is what
+        # link_vectors.py makes, and this client seals, opens and derives keys the same way.
+        import json
+        import link_vectors
+        path = os.path.join(HERE, '../firmware/blinds_matter/test/wire/link.json')
+        with open(path) as f:
+            text = f.read()
+        self.assertEqual(text, link_vectors.text(), 'regenerate: python3 tools/link_vectors.py > ' + path)
+        v = {k: (bytes.fromhex(x) if k not in ('pushJson', 'pushN', 'timeMsg', 'otaMsg', 'salt', 'ctr', 'cmd', 'replyOut') else x)
+             for k, x in json.loads(text).items()}
+        self.assertEqual(blinds_client.derive_key(v['shared'], None, v['cpub'], v['dpub']), v['key'])
+        self.assertEqual(blinds_client.derive_key(v['shared'], v['salt'].encode(), v['cpub'], v['dpub']), v['keySalted'])
+        self.assertEqual(blinds_client.seal(v['key'], v['cid'], v['boot'], int(v['ctr']), v['cmd']), v['frame'])
+        self.assertEqual(blinds_client.seal(v['keySalted'], v['cid'], v['boot'], int(v['ctr']), v['cmd']), v['frameSalted'])
+        self.assertEqual(blinds_client.open_reply(v['key'], v['cid'], v['frame'], v['reply']), v['replyOut'])
+
     def test_store_is_private(self):
         old = blinds_client.STORE
         with tempfile.TemporaryDirectory() as d:

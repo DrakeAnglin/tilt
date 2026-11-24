@@ -274,8 +274,8 @@ std::string helloJson() {
   // img: the running firmware's SHA-256 (as esptool shows it), so an update can be a patch made from exactly it.
   static std::string img;
   if (img.empty()) { uint8_t h[32]; if (esp_partition_get_sha256(esp_ota_get_running_partition(), h) == ESP_OK) img = hexOf(h, 32); }
-  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d}", ctrlId().c_str(),
-     jq(cfg.name).c_str(), img.c_str(), hexOf(bootId, 4).c_str(), owned() ? 1 : 0, openApi, homesPaired() ? 1 : 0, hubOk() ? 1 : 0);
+  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d,\"proto\":%d}", ctrlId().c_str(),
+     jq(cfg.name).c_str(), img.c_str(), hexOf(bootId, 4).c_str(), owned() ? 1 : 0, openApi, homesPaired() ? 1 : 0, hubOk() ? 1 : 0, LINK_PROTO);
   return j;
 }
 esp_err_t hHello(httpd_req_t *r) { return plain(r, "200 OK", helloJson()); }
