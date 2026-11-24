@@ -24,7 +24,7 @@ How one agent takes one issue from request to `main`, without a person in the lo
 10. **Merge or hand over.**
     - Merge: `tools/agent/merge_pr.sh <pr>`. It checks the rules again and squash-merges.
     - Human: the `needs-human` label, always with a comment that says why: a TL;DR first, notes after. Then notify the owner (below), tell them the TL;DR and stop. Do not merge.
-11. **Clean up.** The issue closes itself through `Closes #<n>`. Worktrees clean themselves: `tools/agent/clean_worktrees.sh` removes every worktree under `.claude/worktrees/` whose pull request is merged or closed, with its local branch and build folders. It runs after every merge (`merge_pr.sh`) and at the start of every session, and keeps anything that could be lost (uncommitted changes, commits not in the pull request, no pull request, detached HEAD). When the owner merges or closes your pull request on GitHub, the next session clears your worktree. Run it with `--dry-run` to see what it would do.
+11. **Clean up.** The issue closes itself through `Closes #<n>`. Worktrees clean themselves: `tools/agent/clean_worktrees.sh` removes every worktree under `.claude/worktrees/` whose pull request is merged or closed, with its local branch and build folders. It runs after every merge (`merge_pr.sh`) and at the start of every session, and keeps anything that could be lost (uncommitted changes, commits not in the pull request, no pull request, detached HEAD). When the owner merges or closes your pull request on GitHub, the next session clears your worktree. Run it with `--dry-run` to see what it would do. Removal also deletes files Git ignores, so keep local-only files (secrets, `.env`) in the main checkout, never only in a worktree.
 
 ## Merge conflicts
 

@@ -135,6 +135,15 @@ class Guard(unittest.TestCase):
         self.assertEqual(run('{"tool_input": {"command": "gh pr merge 5"}}'), 2)
 
 
+class ShellSyntaxTest(unittest.TestCase):
+    def test_agent_scripts_parse(self):
+        import glob, subprocess
+        here = os.path.dirname(os.path.abspath(__file__))
+        for script in sorted(glob.glob(os.path.join(here, '*.sh'))):
+            r = subprocess.run(['sh', '-n', script], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, script + ': ' + r.stderr)
+
+
 class CleanWorktreesTest(unittest.TestCase):
     """tools/agent/clean_worktrees.sh with a fake gh."""
 
@@ -150,6 +159,7 @@ class CleanWorktreesTest(unittest.TestCase):
             git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root')
             wts = os.path.join(repo, '.claude', 'worktrees')
             prs = {}
+            git('worktree', 'add', '-q', '--detach', os.path.join(wts, 'loose'))
             for name, state in [('done', 'MERGED'), ('closed', 'CLOSED'), ('open', 'OPEN'), ('dirty', 'MERGED'), ('extra', 'MERGED'), ('nopr', None)]:
                 path = os.path.join(wts, name)
                 git('worktree', 'add', '-q', '-b', 'b-' + name, path)
@@ -170,7 +180,7 @@ class CleanWorktreesTest(unittest.TestCase):
             env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ['PATH'])
             out = subprocess.run([script], cwd=repo, env=env, capture_output=True, text=True).stdout
             left = sorted(os.listdir(wts))
-            self.assertEqual(left, ['dirty', 'extra', 'nopr', 'open'], out)
+            self.assertEqual(left, ['dirty', 'extra', 'loose', 'nopr', 'open'], out)
             branches = git('branch', '--format=%(refname:short)').split()
             self.assertNotIn('b-done', branches)
             self.assertNotIn('b-closed', branches)
