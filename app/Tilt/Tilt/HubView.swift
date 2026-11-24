@@ -74,6 +74,20 @@ struct HubView: View {
                     } header: { Text("People") } footer: {
                         Text("To add someone: on your home Wi-Fi, they open Tilt and tap Ask to Join on the Tilt Hub. You let them in here." + (hub.isOwner ? " Swipe left on someone to remove them." : ""))
                     }
+                    Section {
+                        ForEach(HubLight.all, id: \.what) { l in
+                            HStack(spacing: 12) {
+                                Circle().fill(l.color).overlay(Circle().stroke(.secondary.opacity(0.4), lineWidth: 1)).frame(width: 14, height: 14)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(l.look).font(.subheadline.weight(.semibold))
+                                    Text(l.what).font(.footnote).foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    } header: { Text("The Hub's Light") } footer: {
+                        Text("The light is off when all is well. Only one shows at a time: the most urgent.")
+                    }
                     if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
                     Section {
                         Button("Remove Tilt Hub", role: .destructive) { confirmLeave = true }
@@ -135,6 +149,21 @@ struct HubView: View {
     }
     static func signal(_ dbm: Int) -> String { "\(dbm) dBm (\(dbm > -60 ? "strong" : dbm > -75 ? "good" : dbm > -85 ? "weak" : "very weak"))" }
     static func span(_ s: Int) -> String { s < 3600 ? "\(s / 60) min" : s < 86400 ? "\(s / 3600) h" : "\(s / 86400) d" }
+}
+
+/// What the hub's status light means (the hub's statusTask in firmware/tilt_hub/main/hub.cpp: keep them the same).
+/// Most urgent first.
+private struct HubLight {
+    let color: Color, look: String, what: String
+    static let all: [HubLight] = [
+        .init(color: .white, look: "Blinking white", what: "Factory reset: the BOOT button is held."),
+        .init(color: .blue, look: "Blinking blue", what: "Being added to Apple Home right now."),
+        .init(color: .red, look: "Flashing red", what: "A problem: the hub has no Wi-Fi or Thread network, its Matter (Apple Home) side is not running, or a controller has not checked in for 30 minutes."),
+        .init(color: .purple, look: "Blinking purple", what: "Installing an update, its own or a controller's."),
+        .init(color: .blue, look: "Solid blue", what: "Ready to be added to Apple Home."),
+        .init(color: .green, look: "Solid green", what: "A new controller is nearby, waiting for setup in Tilt."),
+        .init(color: .yellow, look: "Slow yellow blink", what: "A controller's battery is too low to move its blinds."),
+    ]
 }
 
 /// One controller on the hub: name, battery and last check-in; signal only when it is worth knowing about.
