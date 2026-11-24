@@ -14,7 +14,11 @@ What each step leans on:
 - **Conflicts**: yours to fix, by "Merge conflicts" in the workflow doc. Check before review, before merging, and after merging.
 - **Merge**: `tools/agent/merge_pr.sh <n>`. If it refuses, it says why. Fix that, or hand over. Never go around it.
 
+Never end a turn while waiting for CI, a build or a lock: run it in the background so it wakes you ("Waiting" in the workflow doc).
+
 Done means one of two things, and you say which:
 
 1. Merged: the pull request link, what changed, and any issues you filed on the way.
 2. Waiting for the owner: the pull request link, the `needs-human` reason, and what to look at. Send the push notification first ("Notifying the owner" in the workflow doc).
+
+Anything else ("CI is running, I'll merge once it passes") is not done. Keep going.

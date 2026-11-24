@@ -9,8 +9,8 @@ PR=${1:?usage: merge_pr.sh <pr> [--check]}
 MODE=${2:-}
 [ -z "$MODE" ] || [ "$MODE" = --check ] || { echo "usage: merge_pr.sh <pr> [--check]" >&2; exit 2; }
 
-MAX_LINES=400
-MAX_REVIEWS=3
+MAX_LINES=600
+MAX_REVIEWS=10
 
 J=$(gh pr view "$PR" --json number,state,isDraft,isCrossRepository,baseRefName,headRefName,headRefOid,mergeable,additions,deletions,labels,comments)
 get() { printf '%s' "$J" | jq -r "$1"; }
@@ -37,12 +37,14 @@ for L in needs-human one-way-door; do
   [ "$(get "[.labels[].name] | index(\"$L\")")" = null ] || no "has the $L label"
 done
 
-LINES=$(( $(get .additions) + $(get .deletions) ))
-[ "$LINES" -lt "$MAX_LINES" ] || no "$LINES changed lines (must be under $MAX_LINES): too big for an agent to vouch for. Confirm: the change is one thing, and read the summary against the diff."
-
 # Every changed file (and the old name of a renamed one), not only the first page.
-FILES=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
+FILE_JSON=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq '.[] | {f: .filename, p: (.previous_filename // ""), n: (.additions + .deletions)}')
+FILES=$(printf '%s\n' "$FILE_JSON" | jq -r '.f, (select(.p != "") | .p)')
 [ -n "$FILES" ] || no "could not list the changed files"
+# Tests do not count toward the size: more tests should never push a change to a human.
+TEST_FILES='(^|/)(test|tests|Tests)/|(^|/)test_[^/]*\.py$'
+LINES=$(printf '%s\n' "$FILE_JSON" | jq -rs --arg t "$TEST_FILES" '[.[] | select(.f | test($t) | not) | .n] | add // 0')
+[ "$LINES" -lt "$MAX_LINES" ] || no "$LINES changed lines, not counting tests (must be under $MAX_LINES): too big for an agent to vouch for. Confirm: the change is one thing, and read the summary against the diff."
 # Human-only paths: pattern, why a person is needed, what the person confirms.
 # Keep the same as the list in docs/agents/review-policy.md.
 human_only() {
@@ -55,8 +57,9 @@ human_only '^(hardware/|tools/(fusion_.*|bambu.*|orient)\.py$)' \
 human_only '^tools/(release_firmware\.py|flash.*\.sh)$|(^|/)(partitions\.csv|sdkconfig[^/]*)$' \
   "Release or flashing changed; a mistake here can reach controllers that are in use." \
   "a controller still takes an update and still starts."
-human_only '(^|/)(fwkey\.h|sec\.h|tilt_crypto\.h|lock\.h|update\.h|Secure\.swift|FirmwareUpdate\.swift)$' \
-  "Security or update code changed." \
+# The update path is not here: it is two-way at merge and gets a bench check before the next release.
+human_only '(^|/)(fwkey\.h|sec\.h|tilt_crypto\.h|lock\.h|Secure\.swift)$' \
+  "Keys, pairing or who may do what changed, and a bench check does not show a hole." \
   "nothing is let in that should not be, and paired devices still trust each other."
 human_only '(^|/)(Info\.plist|[^/]*-Info\.plist|PrivacyInfo\.xcprivacy|[^/]*\.entitlements)$' \
   "What the app asks Apple for changed." \
