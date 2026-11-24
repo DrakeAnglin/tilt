@@ -36,6 +36,7 @@
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
 #include <driver/gpio.h>
+#include "lights.h"
 #include <host/ble_hs.h>
 #include <host/ble_gap.h>
 #include <esp_openthread.h>
@@ -1380,6 +1381,13 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     return "{\"ok\":1}";
   }
   if (!owner) return "{\"ok\":0,\"err\":\"only the hub's owner can do that\"}";
+  if (path == "/api/light") {                    // test: which light is which on this board (lights.h). For a minute.
+    lightTestUntil = (ms() + 60000) | 1;
+    std::string l = qv(q, "l");
+    if (l == "15") { gpio_set_level(GPIO_NUM_15, qv(q, "v") == "1" ? 1 : 0); return "{\"ok\":1}"; }
+    if (l == "8") { rgbSet(atoi(qv(q, "r").c_str()), atoi(qv(q, "g").c_str()), atoi(qv(q, "b").c_str())); return "{\"ok\":1}"; }
+    return "{\"ok\":0,\"err\":\"l=15&v=0|1 or l=8&r=&g=&b=\"}";
+  }
   if (path == "/api/resetpeople") {              // forget every phone: the next one to connect becomes the owner.
     xSemaphoreTake(keyMx, portMAX_DELAY);        // (Its controllers, their Home tiles and Apple Home stay.)
     memset(hkeys, 0, sizeof hkeys);
@@ -1636,6 +1644,64 @@ static void event_cb(const ChipDeviceEvent *ev, intptr_t) {
   }
 }
 
+// ---- the status light (docs: firmware/tilt_hub/README.md, the app's hub page). Off when all is well; bright and
+// plain when something needs a look. The most urgent one shows:
+//   blinking white   factory reset (BOOT held)
+//   blinking blue    being added to Apple Home right now
+//   flashing red     a problem: no Wi-Fi (once in a home: a new hub gets its Wi-Fi from Apple Home as it is added),
+//                    no Thread network, Matter not running, or a controller set up with the hub silent for 30 min
+//                    (not in the first 90 s after a start, while all that comes up)
+//   blinking purple  installing an update (the hub's own, or one it sends to a controller)
+//   solid blue       ready to be added to Apple Home
+//   solid green      a new controller nearby, waiting for setup in the app
+//   slow yellow      a controller's battery is too low to move its blinds (its `low` flag)
+static volatile int resetHeld = 0;               // resetTask: tenths of a second BOOT has been held (1000: resetting)
+static volatile bool pairOpen = false, pairing = false;   // Matter, read on its own thread (statusTask asks)
+static void statusTask(void *) {
+  // The board's one-color LED (GPIO15) lights when its pin is high: kept dark, the color light (GPIO8) says it all.
+  gpio_reset_pin(GPIO_NUM_15);
+  gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
+  gpio_set_level(GPIO_NUM_15, 0);
+  uint32_t shown = 0xFFFFFFFF;                   // the color now on the light (0xRRGGBB), to send only changes
+  int role = 0;
+  bool wifi = false;
+  for (int tick = 0;; tick++) {
+    vTaskDelay(pdMS_TO_TICKS(100));
+    if ((int32_t)(lightTestUntil - ms()) > 0) { shown = 0xFFFFFFFF; continue; }   // the owner's light test (/api/light)
+    if (tick % 10 == 0) {                        // once a second: Thread and Matter
+      esp_openthread_lock_acquire(portMAX_DELAY);
+      role = otThreadGetDeviceRole(esp_openthread_get_instance());
+      esp_openthread_lock_release();
+      wifi = hubIp() != "0.0.0.0";
+      if (matterUp) chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
+        pairOpen = chip::Server::GetInstance().GetCommissioningWindowManager().IsCommissioningWindowOpen();
+        pairing = chip::Server::GetInstance().GetFailSafeContext().IsFailSafeArmed();
+      }, 0);
+    }
+    uint32_t now = ms();
+    bool silent = false, low = false, fresh = false;
+    for (int c = 0; c < MAX_CTRL; c++) {
+      const Ctrl &k = ctrls[c];
+      if (!k.used || k.s.keyState != KEY_IN) continue;   // not set up with the hub (new, or factory reset): not missed
+      if (now > 1800000 && (!k.seen || now - k.seen > 1800000)) silent = true;
+      if (k.low) low = true;
+    }
+    for (auto &n : newOnes) if (n.seen && now - n.seen < 300000) fresh = true;
+    bool problem = now > 90000 && (!matterUp || (!wifi && inHome) || role < OT_DEVICE_ROLE_CHILD || silent);
+    auto blink = [&](int onTicks, int offTicks) { return tick % (onTicks + offTicks) < onTicks; };
+    uint32_t want = 0;
+    if (resetHeld >= 1000) want = blink(1, 1) ? 0xFFFFFF : 0;
+    else if (resetHeld >= 5) want = blink(3, 3) ? 0xFFFFFF : 0;
+    else if (pairing) want = blink(2, 2) ? 0x0000FF : 0;
+    else if (problem) want = blink(5, 5) ? 0xFF0000 : 0;
+    else if (otaFor >= 0) want = blink(2, 2) ? 0xA000FF : 0;
+    else if (pairOpen) want = 0x0000FF;
+    else if (fresh) want = 0x00FF00;
+    else if (low) want = blink(10, 20) ? 0xFFA000 : 0;
+    if (want != shown) { rgbSet(want >> 16, (want >> 8) & 0xFF, want & 0xFF); shown = want; }
+  }
+}
+
 // ---- factory reset: hold the BOOT button (GPIO9) for 10 seconds. Everything is forgotten (Apple Home, the Thread
 // network, the controllers, the backups) except the hub's own setup code, as if it were printed on a label.
 static void resetTask(void *) {
@@ -1644,19 +1710,16 @@ static void resetTask(void *) {
   io.mode = GPIO_MODE_INPUT;
   io.pull_up_en = GPIO_PULLUP_ENABLE;
   gpio_config(&io);
-  // The board's LED (GPIO15) shows it: off normally, slow blink while BOOT is held, fast blink as it resets.
-  gpio_reset_pin(GPIO_NUM_15);
-  gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
-  const int LED_OFF = 1;                         // the SuperMini's LED lights when the pin is low
-  gpio_set_level(GPIO_NUM_15, LED_OFF);
+  // The status light shows it (statusTask): white blinking while BOOT is held, fast as it resets.
   int held = 0;
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(100));
     held = gpio_get_level(GPIO_NUM_9) == 0 ? held + 1 : 0;
-    gpio_set_level(GPIO_NUM_15, held >= 5 && (held / 5) % 2 ? !LED_OFF : LED_OFF);
+    resetHeld = held;
     if (held == 30) ESP_LOGW(TAG, "BOOT held: keep holding for a factory reset");
     if (held < 100) continue;
-    for (int i = 0; i < 20; i++) { gpio_set_level(GPIO_NUM_15, i % 2); vTaskDelay(pdMS_TO_TICKS(60)); }
+    resetHeld = 1000;                            // resetting: fast white
+    vTaskDelay(pdMS_TO_TICKS(1200));
     ESP_LOGW(TAG, "factory reset");
     HomeCode keep = homeCode;
     nvs_close(nv);
@@ -1770,6 +1833,8 @@ extern "C" void app_main() {
   xTaskCreate(moveTask, "moves", 6144, nullptr, 5, nullptr);
   xTaskCreate(careTask, "care", 8192, nullptr, 4, nullptr);
   httpBegin();
+  rgbBegin();                                    // the color light's pulse channel, once, before anyone uses it
   xTaskCreate(resetTask, "reset", 3072, nullptr, 2, nullptr);
+  xTaskCreate(statusTask, "status", 4096, nullptr, 2, nullptr);
   ESP_LOGI(TAG, "Tilt Hub %s started", esp_app_get_description()->version);
 }
