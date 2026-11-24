@@ -11,7 +11,7 @@ Built by [Controller.py](../hardware/mechanical/fusion/Controller/Controller.py)
 |---|---|
 | Size | **157.4 × 51.8 × 23.0 mm**. Both long sides have 45° bevels, top and bottom. Nothing on the sides: the box is narrower than the rail and the rod in its groove keeps it in place, so the same box fits rails of other widths |
 | Prints | `hardware/mechanical/stl/controller/controller_tray.stl` and `controller_lid.stl`. Both files already lie the way they print (tray floor down, lid top face down): drop them on the plate as they are. White PLA, no supports |
-| Hardware | 3 × M3 heat-set inserts, 3 × M3 × 10 flat-head screws, 2 × M2 × 6 self-tapping screws (charger), 4 × stick-on pads about 8 mm across and 1.5 to 2 mm tall: felt, rubber or clear bumpers ([BOM](../hardware/BOM.md#box)) |
+| Hardware | 3 × M3 heat-set inserts, 3 × M3 × 10 flat-head screws, 2 × M2 × 6 self-tapping screws (charger), 4 × stick-on felt pads about 8 mm across and 1.5 to 2 mm tall ([BOM](../hardware/BOM.md#box)) |
 | Check | Collision check of every part against the tray, the lid and each other, and the stays-inside check (nothing comes out through a wall or the floor): both clean |
 
 End A has the three RJ12 jacks. End B has the charger's USB-C and the solar opening.
@@ -37,7 +37,7 @@ Solder the PCB first: [PCB build guide](pcb-build.md). The charger harness and b
 6. Solar lead (if used): plug first through the opening in end wall B (6 × 4.7 mm, the plug fits through), along
    the floor on the room side, into J8.
 7. Lid on. Turn the box over and drive the 3 M3 × 10 screws up through the floor, snug only.
-8. **Feet.** With the box still upside down, wipe the floor clean and stick on **4 pads** (felt, rubber or clear bumpers), one in each
+8. **Feet.** With the box still upside down, wipe the floor clean and stick on **4 felt pads**, one in each
    corner, about 10 mm in from the ends and the sides. Keep them off the three screw heads. The pads lift the box off
    the rail floor. **Leave the middle of the floor clear from end to end:** the blind's lift cord runs down the middle
    of the rail, under the box.

@@ -81,6 +81,7 @@ Grease every gear as it goes in.
 9. **Felt pads.** Stick 4 felt pads under the floor, one in each corner, and 1 on the middle of each long side wall.
    They keep the tilter off the metal rail, which would otherwise carry the motor's buzz into the room. Felt, not
    rubber: rubber still passes the vibration on.
+   If the rod binds once it is in, use thinner pads, or leave the side ones off.
 10. **Into the rail**, then push the rod through. Turn the wand a little if it stops.
 
 Plug the cord in and set the blind up in the app: [build guide](../../../../docs/build-guide.md).
