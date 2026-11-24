@@ -42,6 +42,14 @@ struct PhoneKey: Decodable, Identifiable, Equatable { let cid: String; let name:
 /// {"ok":1} or {"ok":0,"err":"…"}, sometimes with more.
 struct CommandAnswer: Decodable { let ok: Int; let err: String?; let proof: String?; let prob: String? }
 
+enum People {
+    /// The people a person sees on a controller: the Tilt Hub's own key left out (the app lets it in unseen), this phone
+    /// first, then requests to join.
+    static func shown(_ all: [PhoneKey], hubCid: String?) -> [PhoneKey] {
+        all.filter { $0.cid != hubCid }.sorted { ($0.me, $0.wait ?? 0) > ($1.me, $1.wait ?? 0) }
+    }
+}
+
 struct ControllerClient: Sendable {
     let transport: any ControllerTransport
 
@@ -73,6 +81,13 @@ struct ControllerClient: Sendable {
     func developerInfo() async -> [String: Any] {
         guard let d = try? await transport.call(Api.dev) else { return [:] }
         return (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] ?? [:]
+    }
+    /// Which way a Port's motor turns, as the controller learned it on the first move after setup (-1: its wires are
+    /// the other way round). Nil when the controller does not say.
+    func motorSign(blind: Int) async -> Int? {
+        struct Dev: Decodable { struct P: Decodable { let sign: Int? }; let p: [P]? }
+        guard let d = try? await transport.call(Api.dev), let p = (try? JSONDecoder().decode(Dev.self, from: d))?.p, p.indices.contains(blind) else { return nil }
+        return p[blind].sign
     }
     func log() async -> [String] {
         guard let d = try? await transport.call(Api.log), let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [] }
