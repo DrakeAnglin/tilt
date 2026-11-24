@@ -45,3 +45,15 @@ Say what was seen, where (file and line), and how to see it again. Do not fix it
 | `needs-human` | The owner reviews and merges this one |
 
 The review rules are in [review-policy.md](review-policy.md).
+
+## The site
+
+The public website is its own repo, `DrakeAnglin/tilt-site`, checked out next to this one: `../tilt-site` from the main checkout, `../../../../tilt-site` from a worktree here. It has the same workflow with its own rules: it is public, and a merge there goes live.
+
+A change to the site, such as a new help page or a link to a release that is already out, is its own issue and its own pull request in that repo. Publishing a release is not a site change: it is one-way and the owner's, by the policy here.
+
+1. File the issue there: `gh issue create -R DrakeAnglin/tilt-site ...`. That repo is public, so nothing private goes in it. Naming the issue here as `DrakeAnglin/tilt#<n>` is fine; quoting from it is not.
+2. Work it in a worktree of that repo, by that repo's `docs/agents/workflow.md` and `docs/agents/review-policy.md`. If that repo's `main` does not have those files yet, do not push or merge there: open the pull request, add `needs-human` with a comment saying why, and tell the owner.
+3. Link the two pull requests to each other in their summaries.
+
+If the site change only makes sense once the change here is in `main`, merge here first.
