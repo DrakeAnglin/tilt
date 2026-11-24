@@ -56,6 +56,8 @@ Tests cannot vouch for these, or they are the rules themselves:
 - `tools/firmware_tests.sh`, `tools/app_tests.sh`: what the tests run. Adding tests is fine; changing how they run is not.
 - `fwkey.h`, `sec.h`, `tilt_crypto.h`, `lock.h`, `update.h`, `Secure.swift`, `FirmwareUpdate.swift`, `*.entitlements`, `Info.plist`, `PrivacyInfo.xcprivacy`: security, updates and what Apple reviews.
 - `docs/adr/`, `docs/requirements.md`: decisions are the owner's.
-- `.github/`, `.claude/`, `.githooks/`, `tools/agent/`, `docs/agents/`, `CLAUDE.md`: the factory itself. An agent does not change its own rules.
+- `docs/agents/review-policy.md`, `.claude/agents/`, `.claude/settings.json`, `tools/agent/`, `.githooks/`, `.github/workflows/`: what decides a merge. That is this policy, the reviewer and the gate, the merge script, the guard and CI. An agent does not approve that for itself.
+
+Everything else about how agents work is open to them: `docs/agents/workflow.md` and the other agent docs, `.claude/skills/`, `CLAUDE.md`, the pull request template.
 
 The script's list is in `tools/agent/merge_pr.sh`, with the why and the what-to-confirm for each line. Keep the two the same.

@@ -67,8 +67,9 @@ human_only '^(docs/adr/|docs/requirements\.md$)' \
 human_only '^tools/(firmware_tests|app_tests)\.sh$' \
   "How the tests run changed." \
   "no test was dropped or weakened."
-human_only '^(tools/agent/|docs/agents/|\.github/|\.claude/|\.githooks/|CLAUDE\.md$)' \
-  "The agents' own rules changed, and an agent does not approve its own rules." \
+# Only what decides a merge. Workflow docs, skills, CLAUDE.md and the pull request template are open to agents.
+human_only '^(tools/agent/|docs/agents/review-policy\.md$|\.github/workflows/|\.claude/agents/|\.claude/settings[^/]*\.json$|\.githooks/)' \
+  "What decides a merge changed (policy, reviewer, gate, merge script, guard or CI), and an agent does not approve that for itself." \
   "the rules still say what you want: who may merge, the doors, the human-only list."
 
 # CI: the 'ci' check must have passed, and nothing may be failing or still running.
