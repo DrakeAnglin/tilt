@@ -89,9 +89,8 @@ void recoverTick() {                             // from webTick, once a second
     return;
   }
   int p = recover.port;
-  if (watchPort >= 0 && watchPort != p) watchStop();
-  watchPort = p; handBusy = false; watchUntil = now + 3000;      // keep this blind's sensor read, as a setup screen does
-  setupSeen = now ? now : 1;                                     // and the other blinds do not follow these twists
+  hand.setupOpen(p, now);                        // keep this blind's sensor read, as a setup screen does, and the
+                                                 // other blinds do not follow these twists
   float t = bs[p].tilt;
   if (isnan(t)) return;
   bool hit = recover.step == 0 ? t >= 85 : recover.step == 1 ? t <= -85 : fabsf(t) <= 20;

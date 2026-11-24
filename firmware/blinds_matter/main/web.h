@@ -150,7 +150,7 @@ esp_err_t hSet(httpd_req_t *r) {
   if (k == "name") cleanText(cfg.name, sizeof cfg.name, v);
   else if (k == "closeUp") cfg.closeUp = n ? 1 : 0;
   else if (k == "loc") { float la = NAN, lo = NAN; if (sscanf(v.c_str(), "%f,%f", &la, &lo) != 2 || fabsf(la) > 90 || fabsf(lo) > 180) return fail(r, "bad place"); sx.lat = la; sx.lon = lo; sxSave(); }
-  else if (k == "sync") { syncMode = n ? 1 : 0; syncSave(); for (int i = 0; i < PORTS; i++) handRef[i] = NAN; }   // start fresh: no following of old turns
+  else if (k == "sync") { syncMode = n ? 1 : 0; syncSave(); hand.reset(); }   // start fresh: no following of old turns
   else if (k == "par") { parMode = n ? 1 : 0; syncSave(); }
   else if (k == "hksep") { hkSeparate = n ? 1 : 0; nvs.putUChar("hksep", hkSeparate); restartSoon = true; }   // Home's layout changes: restart
   else if (k == "tune.grace") { tune.graceMs = constrain(n, 0, 30000); tuneSave(); }
@@ -231,11 +231,7 @@ esp_err_t hWatch(httpd_req_t *r) {              // setup is open for this blind:
   Lock l;
   int p = argi(r, "b");
   if (p < 0 || p >= PORTS) return fail(r, "no such blind");
-  if (watchPort >= 0 && watchPort != p) watchStop();
-  watchPort = p;
-  handBusy = false;
-  watchUntil = millis() + 3000;
-  setupSeen = millis() ? millis() : 1;           // a setup screen is open: turning by hand is expected, the others stay put
+  hand.setupOpen(p, millis());                   // a setup screen is open: turning by hand is expected, the others stay put
   return ok(r);
 }
 esp_err_t hTrace(httpd_req_t *r) {              // the recording of the last move

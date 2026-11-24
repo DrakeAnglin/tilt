@@ -4,9 +4,7 @@ import CryptoKit
 import Foundation
 
 extension TiltActions {
-    static func scenes() -> [BlindScene] {
-        UserDefaults.standard.data(forKey: Prefs.scenes).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
-    }
+    static func scenes() -> [BlindScene] { Scenes.load() }
 }
 
 struct SetBlindsIntent: AppIntent {
@@ -15,11 +13,10 @@ struct SetBlindsIntent: AppIntent {
     @Parameter(title: "Percent open", inclusiveRange: (0, 100)) var percent: Int
     static var parameterSummary: some ParameterSummary { Summary("Set the blinds to \(\.$percent)% open") }
     func perform() async throws -> some IntentResult {
-        // The controller closes toward its own "Close" side: ask for the matching share of the way there.
         var reached = 0
         for (_, client) in TiltActions.clients() {
             guard let s = try? await client.state() else { continue }
-            let t = (s.closeUp == 1 ? 1 : -1) * (100 - percent)
+            let t = TiltMath.tilt(percentOpen: percent, closeUp: s.closeUp == 1)
             for (i, b) in s.b.enumerated() where b.ready { if (try? await client.go(blind: i, tilt: t)) != nil { reached += 1 } }
         }
         if reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
@@ -45,10 +42,8 @@ struct RunSceneIntent: AppIntent {
     static var parameterSummary: some ParameterSummary { Summary("Run \(\.$scene)") }
     func perform() async throws -> some IntentResult {
         guard let sc = TiltActions.scenes().first(where: { $0.id == scene.id }) else { throw TiltError("That scene no longer exists.") }
-        let clients = Dictionary(uniqueKeysWithValues: TiltActions.clients().map { ($0.0.id, $0.1) })
-        var reached = 0
-        for (t, tilt) in sc.tilts { if let c = clients[t.controller], (try? await c.go(blind: t.blind, tilt: tilt)) != nil { reached += 1 } }
-        if reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
+        let clients = Dictionary(TiltActions.clients().map { ($0.0.id, $0.1) }, uniquingKeysWith: { a, _ in a })
+        if await Scenes.run(sc, clients: clients).reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
         return .result()
     }
 }
