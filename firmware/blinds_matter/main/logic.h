@@ -146,6 +146,34 @@ inline bool fwIsOlder(const char *candidate, const char *running) {
   return false;
 }
 
+// ---- which slot a new phone key takes (sec.h pairDo). used: 0 free, 1 paired, 2 asked to join and waiting; waitMs:
+// how long each waiting one has waited (a very large number when not known). At most two asks wait: a new ask takes
+// the place of one that has waited over 10 minutes. A recovery (people.h) is never kept out by waiting asks (the
+// phone's own ask and the Tilt Hub's are often among them): it takes a free slot, else the oldest waiting ask.
+// Returns the slot, KEY_TWO_WAITING or KEY_FULL.
+const int KEY_TWO_WAITING = -1, KEY_FULL = -2;
+inline int keySlot(const uint8_t *used, const uint32_t *waitMs, int n, bool ask, bool recovering) {
+  int waiting = 0, oldest = -1;
+  for (int i = 0; i < n; i++) if (used[i] == 2) { waiting++; if (oldest < 0 || waitMs[i] > waitMs[oldest]) oldest = i; }
+  if (ask && !recovering && waiting >= 2) {
+    for (int i = 0; i < n; i++) if (used[i] == 2 && waitMs[i] > 600000) return i;
+    return KEY_TWO_WAITING;
+  }
+  for (int i = 0; i < n; i++) if (!used[i]) return i;
+  if (recovering && oldest >= 0) return oldest;
+  return KEY_FULL;
+}
+
+// ---- an answer kept for a request that may come again: the hub sends a request a second time when no answer came
+// (its answer was lost, or late), and an ask or a recovery must not run twice for the same key (hub_link.h).
+struct KeptAnswer {
+  std::string in, out;
+  const char *st = nullptr;
+  uint32_t at = 0;
+  bool again(const std::string &req, uint32_t now, uint32_t forMs = 30000) const { return st && in == req && now - at < forMs; }
+  void keep(const std::string &req, const char *status, const std::string &answer, uint32_t now) { in = req; st = status; out = answer; at = now; }
+};
+
 // ---- the requests the Tilt Hub may send this controller (hub_link.h); anything else is ignored, never answered
 inline bool hubAsks(char t) { return t && strchr("HXAQRBWEs", t); }
 

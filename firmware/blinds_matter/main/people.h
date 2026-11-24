@@ -113,7 +113,7 @@ const char *recoverDo(const std::string &b, std::string &out) {
   }
   if (p < 0) { out = "{\"err\":\"no blind is set up, so there is nothing to turn\"}"; return "409 Conflict"; }
   if (busy) { out = "{\"err\":\"a recovery is already under way. Try again in two minutes.\"}"; return "429 Too Many Requests"; }
-  const char *st = pairDo(b, out, true);
+  const char *st = pairDo(b, out, true, true);
   if (strcmp(st, "200 OK")) return st;
   uint8_t id[8];
   unhex(jsonStr(out, "cid"), id, 8);

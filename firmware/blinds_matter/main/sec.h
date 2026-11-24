@@ -122,7 +122,7 @@ bool hubMacOk(const std::string &what, const std::string &mac) {
 // ---- pairing
 // Returns the HTTP-style status ("200 OK", ...) and fills out with the JSON answer. Over Bluetooth ('P', 'A') and through
 // the hub ('A'); recoverDo (people.h) starts with an ask too.
-const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
+const char *pairDo(const std::string &b, std::string &out, bool ask = false, bool recovering = false) {
   std::string pubB64 = jsonStr(b, "pub");
   uint8_t cpub[65];
   size_t n = 0;
@@ -157,13 +157,13 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
 
   KeysLock kl;                                 // the key is ready: claim a slot now (the slow part ran unlocked)
   if (!first != owned()) { out = "{\"err\":\"another phone paired at the same moment. Try again.\"}"; return "409 Conflict"; }
-  int slot = -1;
-  if (ask && asksWaiting() >= 2) {               // at most two waiting: a new ask takes the place of one older than 10 minutes
-    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && (!askAt[i] || millis() - askAt[i] > 600000)) { slot = i; break; }
-    if (slot < 0) { out = "{\"err\":\"two requests are waiting already. Try again later.\"}"; return "429 Too Many Requests"; }
-  }
-  else for (int i = 0; i < MAX_KEYS; i++) if (!keys[i].used) { slot = i; break; }
+  uint8_t used[MAX_KEYS];                        // the slot rule (logic.h keySlot): at most two asks wait, a recovery always gets in
+  uint32_t waited[MAX_KEYS];
+  for (int i = 0; i < MAX_KEYS; i++) { used[i] = keys[i].used; waited[i] = askAt[i] ? millis() - askAt[i] : UINT32_MAX; }
+  int slot = keySlot(used, waited, MAX_KEYS, ask, recovering);
+  if (slot == KEY_TWO_WAITING) { out = "{\"err\":\"two requests are waiting already. Try again later.\"}"; return "429 Too Many Requests"; }
   if (slot < 0) { out = "{\"err\":\"no room for another phone\"}"; return "403 Forbidden"; }
+  if (keys[slot].used == 2) event("%s's request to join was replaced by a newer one", keys[slot].name);
   ClientKey &k = keys[slot];
   memset(&k, 0, sizeof k);
   k.used = ask ? 2 : 1; k.role = first ? 1 : 0;

@@ -233,5 +233,14 @@ check(!HomeSetup.inAlexa(hubHomes: [keychain, home]), "Apple's two connections o
 check(!HomeSetup.inAlexa(hubHomes: []) && !HomeSetup.inAlexa(hubHomes: [.init(node: nil, vendor: nil)]), "no homes, or a hub too old to give makers: not in Alexa")
 check(!HomeSetup.inAlexa(hubHomes: [.init(node: "00000000000000AA", vendor: 4447)]), "another maker's home: not Alexa")
 check(!HomeSetup.inHome(hubSays: true, hubHomes: [alexa], appleNodes: [0x77]), "in Alexa only: not in Apple Home")
+// Recovery progress through the hub: a lost answer or two does not end it, three in a row do.
+do {
+    var poll = RecoveryPoll()
+    check(!poll.missed() && !poll.missed(), "two lost answers: keep watching")
+    poll.answered()
+    check(!poll.missed() && !poll.missed(), "an answer starts the count again")
+    check(poll.missed(), "three in a row: give up")
+}
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

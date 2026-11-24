@@ -1,5 +1,6 @@
-// What every command handler uses to read its command and answer it: a secured command (sec.h secDo) that came over
-// Bluetooth or through the Tilt Hub. (There is no web server: httpd_req_t is only the handlers' signature.) Also the handlers' lock (Lock) and the request bookkeeping beside it.
+// What every command handler uses to read its command and answer it: a secured command (sec.h secDo) that came
+// over Bluetooth or through the Tilt Hub. (There is no web server: httpd_req_t is only the handlers' signature.)
+// Also the handlers' lock (Lock) and the request bookkeeping beside it.
 #pragma once
 #include <esp_http_server.h>
 #include "ardu.h"

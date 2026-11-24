@@ -78,9 +78,13 @@ struct RecoverSheet: View {
         problem = nil
         Task {
             do { blind = try await model.recover(host: host) } catch { problem = error.localizedDescription; return }
+            var poll = RecoveryPoll()
             while !done {
-                guard let r = await Secure.recovery(host) else { break }
-                step = r.step; left = r.left
+                do {
+                    guard let r = try await Secure.recovery(host) else { break }   // over: it let this phone in, or ran out
+                    poll.answered()
+                    step = r.step; left = r.left
+                } catch { if poll.missed() { break } }
                 try? await Task.sleep(for: .seconds(1))
             }
             try? await Task.sleep(for: .seconds(2))          // the app notices it was let in on its next read

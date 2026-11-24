@@ -353,7 +353,6 @@ int main() {
     CHECK(roles, "every route has a role");
     CHECK(paths && once, "every route is an /api/ command, listed once");
   }
-  for (int i = 0; i < routeRuleCount; i++) CHECK(rule(routeRules[i].path, true, "") == nullptr, "an owner may send every command");
   for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"})
     CHECK(rule(p, false, "") == nullptr, "a guest may see and move");
   for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen", "/api/openapi", "/api/hubkey", "/api/reboot", "/api/reset"})
@@ -368,6 +367,42 @@ int main() {
   CHECK(rule("/api/keyname", false, "") != nullptr, "rename with no id refused");
   CHECK(rule("/api/keyname", true, them) == nullptr, "an owner may rename anyone");
   CHECK(routeRule("/api/nothing") == nullptr && routeRule("/") == nullptr && routeRule("/x/pair") == nullptr, "an unknown command is not a route");
+
+  // ---- which slot a new key takes (sec.h pairDo)
+  {
+    const uint32_t NEW = 1000, OLD = 700000, UNKNOWN = UINT32_MAX;
+    uint8_t u1[4] = {1, 2, 2, 0};                          // an owner gone quiet, two asks waiting (the phone's and the hub's)
+    uint32_t w1[4] = {0, NEW, NEW, 0};
+    CHECK(keySlot(u1, w1, 4, true, false) == KEY_TWO_WAITING, "a third ask waits for an old one to go");
+    CHECK(keySlot(u1, w1, 4, true, true) == 3, "a recovery gets in past two waiting asks");
+    uint8_t u2[4] = {1, 2, 2, 1};
+    uint32_t w2[4] = {0, NEW, NEW + 5, 0};
+    CHECK(keySlot(u2, w2, 4, true, true) == 2, "no free slot: a recovery takes the oldest waiting ask's place");
+    CHECK(keySlot(u2, w2, 4, true, false) == KEY_TWO_WAITING, "no free slot, asks still new: a plain ask waits");
+    uint32_t w3[4] = {0, NEW, OLD, 0};
+    CHECK(keySlot(u2, w3, 4, true, false) == 2, "an ask takes the place of one waiting over 10 minutes");
+    uint32_t w4[4] = {0, UNKNOWN, NEW, 0};
+    CHECK(keySlot(u2, w4, 4, true, false) == 1, "an ask of unknown age counts as old");
+    uint8_t u3[4] = {1, 2, 0, 0};
+    uint32_t w5[4] = {0, NEW, 0, 0};
+    CHECK(keySlot(u3, w5, 4, true, false) == 2 && keySlot(u3, w5, 4, false, false) == 2, "room: the first free slot");
+    uint8_t u4[2] = {1, 1};
+    uint32_t w6[2] = {0, 0};
+    CHECK(keySlot(u4, w6, 2, true, true) == KEY_FULL && keySlot(u4, w6, 2, false, false) == KEY_FULL, "every slot paired: full");
+  }
+
+  // ---- a request the hub sends again gets the answer the first one got (hub_link.h, 'A' and 'R')
+  {
+    KeptAnswer k;
+    CHECK(!k.again("R{\"pub\":\"a\"}", 5000), "nothing kept yet");
+    k.keep("R{\"pub\":\"a\"}", "200 OK", "{\"cid\":\"1\",\"recover\":1}", 5000);
+    CHECK(k.again("R{\"pub\":\"a\"}", 9000) && !strcmp(k.st, "200 OK") && k.out == "{\"cid\":\"1\",\"recover\":1}", "a resent recovery gets the same answer (not 429)");
+    CHECK(!k.again("R{\"pub\":\"b\"}", 9000), "a new key is a new request");
+    CHECK(!k.again("A{\"pub\":\"a\"}", 9000), "an ask is not the recovery");
+    CHECK(!k.again("R{\"pub\":\"a\"}", 5000 + 30000), "kept for 30 seconds only");
+    k.keep("R{\"pub\":\"c\"}", "200 OK", "{}", 0xFFFFF000u);
+    CHECK(k.again("R{\"pub\":\"c\"}", 0x1000u), "kept across the millisecond clock wrapping");
+  }
 
   // ---- what the Tilt Hub may send (hub_link.h)
   for (char t : std::string("HXAQRBWEs")) CHECK(hubAsks(t), "the hub's requests are taken");

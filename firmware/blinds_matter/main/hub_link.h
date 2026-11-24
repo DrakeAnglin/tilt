@@ -434,6 +434,7 @@ static void hubTask(void *) {
   static const char *lastESt = nullptr;          // the answer to the last 'E' (a repeated 'E' gets it again)
   static std::string lastEOut;
   static uint32_t lastEAt = 0;
+  static KeptAnswer lastJoin;                    // the last ask or recovery ('A', 'R'): the same one sent again gets the same answer
   for (;;) {
     sockaddr_in6 from;
     socklen_t fl = sizeof from;
@@ -473,9 +474,14 @@ static void hubTask(void *) {
       bool fromHub = false;
       st = secDo(in, out, nullptr, &fromHub);
       if (st[0] == '2') { awake(); hubLinkSeen = millis() ? millis() : 1; if (fromHub) heard(); }
-    } else if (t == 'A') { st = pairDo(in, out, true); if (st[0] == '2') awake(); }
-    else if (t == 'R') { st = recoverDo(in, out); if (st[0] == '2') awake(); }
-    else if (t == 'Q') { out = recoverStateJson(); st = "200"; }
+    } else if ((t == 'A' || t == 'R') && lastJoin.again(std::string(1, t) + in, millis())) { st = lastJoin.st; out = lastJoin.out; }   // its answer was lost
+    else if (t == 'A' || t == 'R') {
+      st = t == 'A' ? pairDo(in, out, true) : recoverDo(in, out);
+      if (st[0] == '2') { awake(); lastJoin.keep(std::string(1, t) + in, st, out, millis()); }
+    } else if (t == 'Q') {
+      out = recoverStateJson(); st = "200";
+      if (out.find("\"on\":1") != std::string::npos) awake();   // a recovery is running: its next poll comes in a second
+    }
     else if (t == 'B') { st = hubOta(t, in, out); if (st[0] == '2') { heard(); awake(); } }
     else if (t == 'E' && !hubOtaActive && lastESt && millis() - lastEAt < 30000) { st = lastESt; out = lastEOut; }   // its answer was lost
     else if (t == 'W' || t == 'E') {             // pieces only from where the proven begin came from
