@@ -16,14 +16,14 @@ How one agent takes one issue from request to `main`, without a person in the lo
    `git fetch origin && git worktree add .claude/worktrees/issue-<n> -b issue-<n>-<short-name> origin/main`, then work there.
 3. **Build it.** Read `CONTEXT.md` and the ADRs for the area. Write the test first where there is a place for one (`/tdd`). Small commits.
 4. **Check locally.** `tools/agent/check.sh` must pass.
-5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create` using the template: `Closes #<n>`, summary, evidence, door, blast radius.
+5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create`. Write the body with the `/pr` skill, in the template's shape: `Closes #<n>`, summary, evidence, door, blast radius, what could go wrong.
 6. **Wait for CI.** `gh pr checks <pr> --watch`. Red? Fix it, push, wait again.
-7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its findings and the door on the pull request.
+7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its own summary, evidence, merge danger and findings as a comment on the pull request.
 8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Three rounds at most; the merge script counts them, and after that it goes to a human.
 9. **Gate.** Start the `merge-gate` agent with the pull request number. It reads the review and the policy and decides: merge, or human.
 10. **Merge or hand over.**
     - Merge: `tools/agent/merge_pr.sh <pr>`. It checks the rules again and squash-merges.
-    - Human: the `needs-human` label and one comment saying what to look at. Tell the owner and stop. Do not merge.
+    - Human: the `needs-human` label, always with a comment that says why: a TL;DR first, notes after. Tell the owner the TL;DR and stop. Do not merge.
 11. **Clean up.** After a merge: remove the worktree (`git worktree remove`), delete the local branch. The issue closes itself through `Closes #<n>`.
 
 ## Things found on the way

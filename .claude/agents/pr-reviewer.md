@@ -28,13 +28,24 @@ Something wrong that this pull request did not cause is not a finding. List it u
 
 ## Post the review
 
-One comment, `gh pr comment <pr> --body-file <file>`, in this shape:
+One comment, `gh pr comment <pr> --body-file <file>`. Every section is filled in, every time. Write them yourself from the diff: do not copy the author's pull request body, check it. Short and plain; no preamble.
 
 ```
 ## Review of <short sha>
 
+**TL;DR:** <one sentence: what this changes and whether it is safe to merge>
+
+### Summary
+<what the change really does, in a few lines, a sketch or a file tree. Say where it differs from what the author wrote.>
+
+### Evidence
+- **Before:** <the failing test or wrong output, as you saw it or as CI shows it>
+- **After:** <the passing test or right output. Say "not shown" when there is none.>
+
+### Merge Danger
 **Door:** two-way | one-way. <one line why>
-**Blast radius:** <one word>
+**Blast Radius:** <one word: docs, tools, app, firmware, hardware, release>
+**What could go wrong:** <what breaks, and for whom, if this is wrong after merge. "Nothing outside the changed files" is a fine answer when true.>
 
 ### Must fix
 - `file:line` what is wrong and why (or "None")
@@ -52,4 +63,4 @@ The last line must be exact: the merge script reads it. `sha` is `headRefOid`, t
 
 Then set the door label: `gh pr edit <pr> --add-label two-way-door` (or `one-way-door`), and remove the other one if it is there.
 
-Reply to whoever started you with the door, the count of must-fix findings, and the list.
+Reply to whoever started you with the TL;DR, the door, the count of must-fix findings, and the list.

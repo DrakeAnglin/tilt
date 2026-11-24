@@ -81,6 +81,22 @@ if [ -n "$NO" ]; then
   if [ "$MODE" != --check ]; then
     gh pr edit "$PR" --add-label needs-human >/dev/null
     gh pr edit "$PR" --remove-label auto-merge-ok >/dev/null 2>&1 || true
+    # The label never stands alone: say why, once per commit.
+    # Leave out "has the label": whoever set it has said why already.
+    WHY=$(printf '%s\n' "$NO" | grep '^- ' | grep -v 'has the needs-human label' || true)
+    if [ -n "$WHY" ] && [ "$(get "[.comments[].body | select(contains(\"factory-human sha=$SHA\"))] | length")" = 0 ]; then
+      FIRST=$(printf '%s\n' "$WHY" | sed -n '1s/^- //p' | cut -c1-120)
+      COUNT=$(printf '%s\n' "$WHY" | grep -c '^- ')
+      [ "$COUNT" -le 1 ] || FIRST="$FIRST; and $((COUNT - 1)) more below"
+      gh pr comment "$PR" --body "## Needs human review
+
+**TL;DR:** An agent may not merge this: $FIRST. The owner reviews and merges on GitHub.
+
+### Notes
+$WHY
+
+<!-- factory-human sha=$SHA -->" >/dev/null
+    fi
   fi
   exit 1
 fi

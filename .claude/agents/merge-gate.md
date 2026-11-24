@@ -24,26 +24,34 @@ A review whose `sha` is not the current head is out of date: **human**, with the
 
 ## Post
 
-One comment, `gh pr comment <pr> --body-file <file>`:
+One comment, `gh pr comment <pr> --body-file <file>`. The decision comes from the review comment's Summary, Evidence and Merge Danger, checked against the diff.
+
+A `human` verdict always says why. The owner reads the TL;DR first and may read nothing else, so it has to stand on its own: the reason, and the one thing to look at.
 
 ```
 ## Gate: merge | human
 
+**TL;DR:** <merge: one sentence on why it is safe. human: why a person is needed and what to look at, in one or two sentences.>
+
+**Door:** <two-way|one-way> · **Blast Radius:** <one word>
+**What could go wrong:** <one line, from the review, corrected if you disagree>
+
+### Notes
 1. Two-way door: yes/no
 2. CI green on the reviewed commit: yes/no
 3. Nothing left to fix: yes/no
 4. Tested, or docs only: yes/no
 5. Does the issue and nothing else: yes/no
 6. Under 400 lines: yes/no
-7. No human-only path: yes/no
+7. No human-only path: yes/no <name the paths when no>
 
-<for human: one or two lines on what the owner should look at>
+<for human, when useful: where to start reading, by file>
 
 <!-- factory-gate sha=<full head sha> verdict=<merge|human> -->
 ```
 
 More than three `factory-review` comments on the pull request: **human**, "too many rounds of review".
 
-Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge, `--add-label needs-human` for human. Remove the other one if it is there.
+Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge, `--add-label needs-human` for human. Remove the other one if it is there. Never add `needs-human` without this comment.
 
-Reply with the verdict and the reason.
+Reply with the verdict and the TL;DR.

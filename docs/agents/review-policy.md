@@ -33,7 +33,19 @@ When unsure, call it one-way.
 
 A label the owner sets by hand wins: a pull request with `needs-human` or `one-way-door` is never merged by an agent.
 
-**A human merges** in every other case. The agent adds the `needs-human` label, says why in one comment on the pull request, and stops.
+**A human merges** in every other case, and the pull request always says why. See below.
+
+## What goes on the pull request
+
+Three things, each with the same parts, so the owner can read any one of them alone:
+
+| Who | Where | What |
+| --- | --- | --- |
+| Author | The pull request body (`/pr` skill, the template) | Summary, Evidence, Merge Danger: door, blast radius, what could go wrong |
+| `pr-reviewer` | A comment | Its own TL;DR, Summary, Evidence and Merge Danger, written from the diff, then the findings |
+| `merge-gate` | A comment | TL;DR of the verdict, door, blast radius, what could go wrong, then the seven rules as notes |
+
+**`needs-human` never stands alone.** Whoever adds the label, the gate or `merge_pr.sh`, also leaves a comment that starts with a TL;DR: why a person is needed and what to look at. Notes come after it.
 
 ## Human-only paths
 
