@@ -34,6 +34,10 @@ esp_err_t sendJson(httpd_req_t *r, const std::string &j) {
 esp_err_t ok(httpd_req_t *r) { return sendJson(r, "{\"ok\":1}"); }
 esp_err_t fail(httpd_req_t *r, const char *e) { return sendJson(r, std::string("{\"ok\":0,\"err\":") + jq(e) + "}"); }
 esp_err_t done(httpd_req_t *r, const char *e) { return e ? fail(r, e) : ok(r); }
+struct QuietLock {                        // mx for a moment, from a task that is not handling a request (it does not count as use)
+  QuietLock() { xSemaphoreTake(mx, portMAX_DELAY); }
+  ~QuietLock() { xSemaphoreGive(mx); }
+};
 struct Lock {                             // every handler holds this (mx, lock.h) while it touches the blinds
   Lock() { xSemaphoreTake(mx, portMAX_DELAY); lastWeb = millis() ? millis() : 1; }
   ~Lock() { xSemaphoreGive(mx); pokeBlinds(); }

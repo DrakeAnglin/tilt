@@ -113,25 +113,26 @@ void plogPush(uint32_t at, float rest, float tempC) {
   plogAcc = {0, 0, stats.motorMs, 0, 0, 0, 0};
 }
 #endif
-void cfgDefaults() {
-  memset(&cfg, 0, sizeof cfg);
-  cfg.magic = CFG_MAGIC;
-  strlcpy(cfg.name, "Blinds", sizeof cfg.name);
-  cfg.closeUp = 1;
-  cfg.battMode = 0;
-  cfg.checkinMin = 15;
-  cfg.txPower = 15;
-  strlcpy(cfg.tz, "CST6CDT,M3.2.0,M11.1.0", sizeof cfg.tz);
-  strlcpy(cfg.tzName, "America/Chicago", sizeof cfg.tzName);
+void cfgDefaultsOf(Settings &c) {             // (a handler puts them in place with cfgApply, motion.h)
+  memset(&c, 0, sizeof c);
+  c.magic = CFG_MAGIC;
+  strlcpy(c.name, "Blinds", sizeof c.name);
+  c.closeUp = 1;
+  c.battMode = 0;
+  c.checkinMin = 15;
+  c.txPower = 15;
+  strlcpy(c.tz, "CST6CDT,M3.2.0,M11.1.0", sizeof c.tz);
+  strlcpy(c.tzName, "America/Chicago", sizeof c.tzName);
   for (int i = 0; i < PORTS; i++) {
-    snprintf(cfg.b[i].name, sizeof cfg.b[i].name, "Blind %d", i + 1);
-    cfg.b[i].up = cfg.b[i].open = cfg.b[i].down = NAN;
-    cfg.b[i].motSign = 1;
-    cfg.b[i].speed = 100;
-    cfg.b[i].fav = 50;
+    snprintf(c.b[i].name, sizeof c.b[i].name, "Blind %d", i + 1);
+    c.b[i].up = c.b[i].open = c.b[i].down = NAN;
+    c.b[i].motSign = 1;
+    c.b[i].speed = 100;
+    c.b[i].fav = 50;
   }
-  for (int i = 0; i < SCHEDS; i++) { cfg.sched[i].days = 0x7F; cfg.sched[i].mask = 0; cfg.sched[i].minute = 8 * 60; }   // mask 0 = unused slot
+  for (int i = 0; i < SCHEDS; i++) { c.sched[i].days = 0x7F; c.sched[i].mask = 0; c.sched[i].minute = 8 * 60; }   // mask 0 = unused slot
 }
+void cfgDefaults() { cfgDefaultsOf(cfg); }
 void cfgSave() { nvs.putBytes("cfg", &cfg, sizeof cfg); }
 void syncSave() { nvs.putUChar("sync", syncMode); nvs.putUChar("par", parMode); }
 void tuneSave() { nvs.putBytes("tune", &tune, sizeof tune); }

@@ -29,6 +29,7 @@ Move *cur = &mvs[0];            // the one being worked on right now
 #define MVX (*cur)
 struct Use { Move *old; Use(int p) : old(cur) { cur = &mvs[p]; } ~Use() { cur = old; } };   // "work on port p's move in this scope"
 bool motOn[PORTS] = {false, false, false};
+bool motorsHeld = false;                       // restarting (web.h restartNow): no motor may start again
 bool movingPort(int p) { return mvs[p].kind != MV_NONE; }
 bool moving() { for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) return true; return false; }
 int firstMoving() { for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) return i; return -1; }
@@ -44,6 +45,12 @@ bool movable(int p) { return movableRule(cfg.b[p].hidden, calibrated(p), bs[p].s
 float arcX(int p, float ang) { return arcXOf(marksOf(p), ang); }           // degrees from open, + toward closed-up
 float tiltOf(int p, float ang) { return tiltOfMarks(marksOf(p), ang); }
 float xOfTilt(int p, float t) { return xOfTiltMarks(marksOf(p), t); }
+// What Apple Home, the app and the hub are all told about a blind (one answer, so they never disagree). tilt is the
+// Current tilt (NAN: unknown or not set up); busy: moving or waiting its turn.
+struct BlindReport { float tilt; bool busy; float target; bool movable; };
+BlindReport blindNow(int p) {
+  return {currentTiltOf(marksOf(p), movingPort(p), mvs[p].live, bs[p].tilt), movingPort(p) || bs[p].queued, bs[p].target, movable(p)};
+}
 
 // ---- hardware
 void motorRaw(int p, int d, int pct) {        // DRV8833 slow decay: one input high, PWM the other (both high = brake)
@@ -233,6 +240,7 @@ bool beginMove(int kind, int p) {             // leaves cur on port p
 // Go to a tilt. Returns nullptr if accepted, else why not.
 const char *startTilt(int p, float t) {
   if (p < 0 || p >= PORTS) return "no such blind";
+  if (motorsHeld) return "restarting";
   if (const char *e = cannotMoveWhy(calibrated(p), bs[p].seen, bs[p].present, battOkToMove())) return e;   // logic.h
   t = constrain(t, -100.0f, 100.0f);
   bool others = false;
@@ -252,6 +260,7 @@ const char *startTilt(int p, float t) {
 }
 const char *startAngle(int p, float deg) {    // developer: go to a raw sensor angle
   if (p < 0 || p >= PORTS) return "no such blind";
+  if (motorsHeld) return "restarting";
   if (!battOkToMove()) return "battery too low";
   Use u(p);
   beginMove(MV_ANGLE, p);
@@ -262,6 +271,7 @@ const char *startAngle(int p, float deg) {    // developer: go to a raw sensor a
 // at an end (the stall check below reads the sensor every few ms), so the phone doesn't judge the end over a slow link.
 const char *jog(int p, int d, int pct, uint32_t ms, bool seek) {
   if (p < 0 || p >= PORTS) return "no such blind";
+  if (motorsHeld) return "restarting";
   if (!battOkToMove()) return "battery too low";
   ms = min(ms, (uint32_t)(seek ? 30000 : 2000));
   Use u(p);
@@ -301,6 +311,29 @@ struct EspMoves : MoveSeam {
 } espMoves;
 MoveResult moveBlinds(const MoveAsk &a) { return moveRequest(a, espMoves); }
 void moveStop() { rampCancel(); stopAll("stopped"); }   // the app's or Home's stop: also ends a gentle move
+
+// ---- settings changes: the one way a handler writes cfg. A move steers by its blind's Marks and motor direction, so
+// a blind whose Marks or direction change has its move (running, queued or gentle) ended first. Then the new settings
+// are kept, its tilt is worked out again from the new Marks, and they are saved. (A running move that learns its motor
+// direction writes that itself: tilter.h.)
+bool blindCfgChanged(int p, const BlindCfg &n) { return steeringChanged(marksOf(p), cfg.b[p].motSign, Marks{n.up, n.open, n.down}, n.motSign); }
+void cfgApply(const Settings &n) {
+  Settings next = n;
+  bool hit[PORTS];
+  for (int p = 0; p < PORTS; p++) {
+    int8_t was = cfg.b[p].motSign;
+    hit[p] = blindCfgChanged(p, next.b[p]);
+    if (hit[p]) {
+      ramp[p].on = false;
+      if (bs[p].queued) { bs[p].queued = false; bs[p].target = NAN; }
+      if (movingPort(p)) { Use u(p); stopNow(MVX, tilters[p], "stopped: settings changed"); }
+    }
+    if (next.b[p].motSign == was) next.b[p].motSign = cfg.b[p].motSign;   // what the stopped move learned is kept
+  }
+  cfg = next;
+  for (int p = 0; p < PORTS; p++) if (hit[p]) { noteAngle(p, bs[p].ang); hand.forget(p); }
+  cfgSave();
+}
 
 bool uiActive();                               // app_main.cpp
 void motionTick() {
@@ -374,8 +407,9 @@ float steadyAngle(int p) {
 const char *setMark(int p, const String &w) {
   if (p < 0 || p >= PORTS) return "no such blind";
   if (moving()) return "wait until it stops";
-  BlindCfg &c = cfg.b[p];
-  if (w == "clear") { c.up = c.open = c.down = NAN; cfgSave(); noteAngle(p, bs[p].ang); event("%s: marks cleared", c.name); return nullptr; }
+  Settings n = cfg;
+  BlindCfg &c = n.b[p];
+  if (w == "clear") { c.up = c.open = c.down = NAN; cfgApply(n); event("%s: marks cleared", c.name); return nullptr; }
   hand.setupOpen(p, millis());                 // keep its sensor on: steadyAngle reads it
   watchSync(p);
   if (!bs[p].present) return "no tilter plugged in";
@@ -388,8 +422,7 @@ const char *setMark(int p, const String &w) {
   else if (w == "open") c.open = bs[p].ang;
   else if (w == "down") c.down = bs[p].ang;
   else return "unknown mark";
-  cfgSave();
-  noteAngle(p, bs[p].ang);
+  cfgApply(n);                                 // the tilt is worked out again from the new mark
   hand.marked(p, millis());
   event("%s: marked %s at %.1f deg", c.name, w.c_str(), bs[p].ang);
   return nullptr;

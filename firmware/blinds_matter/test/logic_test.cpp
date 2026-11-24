@@ -341,6 +341,37 @@ static void handWatchTests() {
     CHECK(h.tick(600).watchPort < 0 && std::isnan(h.ref[0]), "follow: a blind that cannot move is never watched"); }
 }
 
+// Settings that change under a running move (motion.h cfgApply), and the one Current tilt everyone is told.
+static void settingsChangeTests() {
+  Marks k{200, 290, 40}, none{NAN, NAN, NAN};
+  CHECK(!steeringChanged(k, 1, k, 1) && !steeringChanged(none, 1, none, 1), "steering: the same Marks (unmarked too) are no change");
+  CHECK(!steeringChanged(k, 1, k, 2) && !steeringChanged(k, -2, k, -1), "steering: the motor direction learned or forgotten is no change");
+  CHECK(steeringChanged(k, 1, none, 1) && steeringChanged(k, 1, Marks{200, 291, 40}, 1), "steering: Marks cleared or moved");
+  CHECK(steeringChanged(k, 2, k, -1), "steering: the motor direction turned round");
+  // Current tilt always wins (CONTEXT.md): what the sensor reads, not the Target.
+  CHECK(near(currentTiltOf(k, false, NAN, 40), 40, 0.01), "Current tilt: at rest, the last true reading (not the Target)");
+  CHECK(near(currentTiltOf(k, true, 245, 0), 50, 0.01), "Current tilt: while moving, the live reading");
+  CHECK(near(currentTiltOf(k, true, NAN, 12), 12, 0.01), "Current tilt: moving, no live reading yet: the last true one");
+  CHECK(std::isnan(currentTiltOf(none, true, 245, 30)) && std::isnan(currentTiltOf(none, false, NAN, 30)), "Current tilt: not set up is unknown, moving or not");
+  // Marks cleared mid-move: the move ends at once and cleanly, not at a stall or the time limit.
+  { SimTilter s; s.degPerS = 15;
+    Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = -100;
+    while (m.kind != MV_NONE && s.t < 1500) { s.step(10); moveTick(m, s, s.t); }
+    bool wasRunning = m.kind != MV_NONE && s.dir != 0;
+    s.set.marks = none; uint32_t at = s.t;
+    while (m.kind != MV_NONE && s.t < at + 30000) { s.step(10); moveTick(m, s, s.t); }
+    CHECK(wasRunning && m.kind == MV_NONE && s.endMsg == "stopped: Setup changed" && s.dir == 0, "Marks cleared mid-move: the move ends, motor off");
+    CHECK(s.t - at < 1000 && s.sign == 1 && s.keeps == 0, "Marks cleared mid-move: within a second, nothing learned from it"); }
+  { SimTilter s; s.degPerS = 15; s.sign = 2;               // the gate stops it before the settings change under it
+    Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = -100;
+    while (m.kind != MV_NONE && s.t < 1500) { s.step(10); moveTick(m, s, s.t); }
+    stopNow(m, s, "stopped: settings changed");
+    CHECK(m.kind == MV_NONE && s.dir == 0 && s.endMsg == "stopped: settings changed" && s.sign == 2, "settings change: the move is ended at once, direction kept"); }
+  { SimTilter s; Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = 50;   // still waking its sensor
+    stopNow(m, s, "stopped: settings changed");
+    CHECK(m.kind == MV_NONE && s.dir == 0 && s.endMsg == "stopped: settings changed", "settings change while waking: ended, nothing read"); }
+}
+
 int main() {
   // ---- angles
   CHECK(near(angDiff(10, 350), 20, 1e-4), "angDiff crosses zero forward");
@@ -384,6 +415,7 @@ int main() {
   sensorTests();
   tilterTests();
   handWatchTests();
+  settingsChangeTests();
 
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");
