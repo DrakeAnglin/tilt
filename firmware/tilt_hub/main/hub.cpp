@@ -145,6 +145,10 @@ static volatile uint32_t shareUntil = 0;          // that code's pairing window 
 static volatile bool inHome = false;             // added to Apple Home (or another Matter home)
 static std::string homesJson();                  // the homes it is in, read fresh (below)
 static std::string shareCodeJson();              // a one-time code for another home app (below)
+// A home app is adding the hub right now (Matter fail-safe armed): its pairing window must not be closed. Call with
+// the CHIP stack lock held.
+static bool homeBeingAdded() { return chip::Server::GetInstance().GetFailSafeContext().IsFailSafeArmed(); }
+static const char *BUSY_JSON = "{\"ok\":0,\"err\":\"a home app is adding the Tilt Hub right now: try again in a minute\"}";
 static SemaphoreHandle_t stateMx;              // ctrls[] (not the per-controller request lock)
 static nvs_handle_t nv;
 static void proofsSave() { nvs_set_blob(nv, "proof", proofs, sizeof proofs); nvs_commit(nv); }
@@ -1439,15 +1443,20 @@ static std::string hubCommand(int slot, const std::string &cmd) {
   if (path == "/api/homecode" && matterUp) {      // open Apple Home's pairing now (Apple's add screen comes next)
     // Also when the hub still counts a home: the owner asked, and that home may be gone (removed in its own app
     // without the hub hearing of it). Matter allows a hub in several homes. The automatic window (above) stays for a
-    // hub in no home only.
-    homeWindowUntil = (ms() + 900000) | 1;
-    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
-      auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+    // hub in no home only. The check and the window change happen in one go (under the lock), so the code given is
+    // always the one the window takes.
+    chip::DeviceLayer::PlatformMgr().LockChipStack();
+    auto &mgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+    bool busy = homeBeingAdded();
+    if (!busy) {
       // A window open for an Alexa code takes only that code: swap it for one that takes the hub's own code.
       if (mgr.IsCommissioningWindowOpen() && shareUntil && (int32_t)(shareUntil - ms()) > 0) { mgr.CloseCommissioningWindow(); shareUntil = 0; }
       if (!mgr.IsCommissioningWindowOpen())
         mgr.OpenBasicCommissioningWindow(chip::System::Clock::Seconds16(900), chip::CommissioningWindowAdvertisement::kAllSupported);
-    }, 0);
+    }
+    chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+    if (busy) return BUSY_JSON;
+    homeWindowUntil = (ms() + 900000) | 1;
   }
   if (path == "/api/homecode") return "{\"ok\":1,\"code\":\"" + homeManual + "\",\"qr\":\"" + homeQr + "\"," + homesJson() + "}";
   if (path == "/api/sharecode") return shareCodeJson();   // a one-time code for a second home app (Alexa)
@@ -1633,7 +1642,9 @@ static std::string shareCodeJson() {
   auto &mgr = srv.GetCommissioningWindowManager();
   bool homed = srv.GetFabricTable().FabricCount() > 0;
   bool same = homed && shareUntil && (int32_t)(shareUntil - ms()) > 60000 && mgr.IsCommissioningWindowOpen();
+  bool busy = homeBeingAdded();
   chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+  if (busy && !same) return BUSY_JSON;            // its window stays; the code still good is given (same) as before
   if (!homed) {                                  // the first home: the hub's own code (like /api/homecode)
     homeWindowUntil = (ms() + 900000) | 1;
     chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) {
@@ -1656,7 +1667,8 @@ static std::string shareCodeJson() {
     chip::FabricIndex fi = chip::kUndefinedFabricIndex;
     chip::VendorId vid = chip::VendorId::Common;
     for (const auto &f : srv.GetFabricTable()) { fi = f.GetFabricIndex(); vid = f.GetVendorId(); break; }   // "opened by": its first home
-    mgr.CloseCommissioningWindow();              // a window still open (the start-up one, an older code) goes
+    if (homeBeingAdded()) { chip::DeviceLayer::PlatformMgr().UnlockChipStack(); return BUSY_JSON; }   // began just now
+    mgr.CloseCommissioningWindow();             // a window still open (the start-up one, an older code) goes
     CHIP_ERROR e = mgr.OpenEnhancedCommissioningWindow(chip::System::Clock::Seconds32(900), disc, v, 1000, chip::ByteSpan(salt), fi, vid);
     chip::DeviceLayer::PlatformMgr().UnlockChipStack();
     if (e != CHIP_NO_ERROR) { ESP_LOGE(TAG, "share window: %" CHIP_ERROR_FORMAT, e.Format()); return "{\"ok\":0,\"err\":\"the hub could not open pairing\"}"; }
