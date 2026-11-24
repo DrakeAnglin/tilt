@@ -58,7 +58,22 @@ def commands(line):
         else:
             now.append(word)
     out.append(now)
-    return [c for c in out if c]
+    return [c for c in (without_redirects(c) for c in out) if c]
+
+
+def without_redirects(words):
+    """A command's words with '2>&1', '> file', '< file' taken out: they are not arguments."""
+    out, skip = [], False
+    for word in words:
+        if skip:
+            skip = False
+        elif word and set(word) <= set('<>&') and ('<' in word or '>' in word):
+            if out and out[-1].isdigit():
+                out.pop()                   # the 2 of 2>&1
+            skip = True                     # and what it points at
+        else:
+            out.append(word)
+    return out
 
 
 def on_main(cwd):
@@ -86,10 +101,10 @@ def check_git(args, cwd, state):
         return HOOK
     if sub == 'config' and any(a.lower() == 'core.hookspath' for a in args):
         values = [a for a in args if not a.startswith('-') and a.lower() != 'core.hookspath']
-        reading = not values or any(a in ('--get', '--get-all', '-l', '--list') for a in args)
+        reading = (not values or '--get' in args or '--get-all' in args) and '--unset' not in args and '--unset-all' not in args
         if not reading and values != ['.githooks']:
             return HOOK
-    if sub in ('checkout', 'switch') and 'main' in args:
+    if sub in ('checkout', 'switch') and args[-1:] == ['main'] and not any(a in ('-b', '-B', '-c', '-C', '--') for a in args):
         state['main'] = True
     if sub != 'push':
         return None
@@ -101,7 +116,7 @@ def check_git(args, cwd, state):
     refs = [r for r in names[1:] if r != ':']          # names[0] is the remote
     for ref in refs:
         to = ref.lstrip('+').split(':')[-1]
-        if to == 'main' or to.endswith('/main'):
+        if to in ('main', 'heads/main', 'refs/heads/main'):
             return MAIN
     if (not refs or 'HEAD' in refs) and (state.get('main') or on_main(cwd)):
         return MAIN
@@ -155,7 +170,7 @@ def check(line, cwd=None, depth=0, state=None):
         return 'could not read this command (open quote?). Write it more simply.'
     for words in cmds:
         while words:
-            if words[0].startswith('GIT_CONFIG'):
+            if re.match(r'^GIT_CONFIG_(COUNT|KEY|VALUE|PARAMETERS)', words[0]):
                 return HOOK
             if words[0] in PREFIXES or re.match(r'^[A-Za-z_][A-Za-z0-9_]*=', words[0]):
                 words = words[1:]

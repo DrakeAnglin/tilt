@@ -53,6 +53,10 @@ BLOCKED = [
     'echo $(gh pr merge 51)',
     'git checkout main && git merge issue-5 && git push',
     'git push origin heads/main',
+    'git push origin main 2>&1 | tail -3',
+    'git push origin HEAD:main > /dev/null',
+    'git checkout main && git merge issue-5 && git push 2>&1 | tail -3',
+    'git config --unset core.hooksPath',
     'git push --branches origin',
     'git -ccore.hooksPath=/x push origin issue-5',
     'GIT_CONFIG_COUNT=1 git push origin issue-5',
@@ -84,6 +88,11 @@ ALLOWED = [
     "git commit -F - <<'EOF'\nDon't push to main\nEOF",
     'gh pr comment 51 --body-file - <<EOF\nA lone " quote\nEOF\ngit status',
     'git config --get core.hooksPath',
+    'git push origin fix/main',
+    'git checkout -b issue-12 main && git push -u origin HEAD',
+    'GIT_CONFIG_GLOBAL=/dev/null git status',
+    'git push -u origin issue-12 2>&1 | tail -3',
+    'tools/agent/check.sh > /tmp/out.txt 2>&1',
     'git config core.hooksPath .githooks',
     'gh api repos/DrakeAnglin/tilt/pulls/51/merge',
     'gh pr edit 51 --add-label needs-human',
@@ -104,6 +113,18 @@ class Guard(unittest.TestCase):
         for line in ALLOWED:
             self.assertIsNone(guard.check(line, cwd='/'), line)
 
+
+    def test_plain_push_from_main(self):
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as repo:
+            subprocess.run(['git', 'init', '-q', '-b', 'main', repo], check=True)
+            for line in ['git push', 'git push 2>&1', 'git push > /dev/null', 'git push origin 2>&1 | tail',
+                         'git commit -am x && git push 2>&1 | tail -3', 'git push -u origin HEAD']:
+                self.assertIsNotNone(guard.check(line, cwd=repo), line)
+            subprocess.run(['git', '-C', repo, 'checkout', '-q', '-b', 'issue-5'], check=True)
+            for line in ['git push', 'git push 2>&1 | tail -3', 'git push -u origin HEAD']:
+                self.assertIsNone(guard.check(line, cwd=repo), line)
 
     def test_bad_input_blocks(self):
         import subprocess
