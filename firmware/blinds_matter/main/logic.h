@@ -152,8 +152,8 @@ inline const char *permitRule(bool secure, bool owner, bool plainOpen, bool isUp
                               const std::string &cidArg, const std::string &ownCid) {
   if (!secure) return (isUpdate || plainOpen) ? nullptr : "use the app";   // an update checks its own signature
   if (owner) return nullptr;
-  // a user: see the blinds and move them, see the people, rename only themself
-  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"}) if (path == ok) return nullptr;
+  // a user: see the blinds and move them, see the people, rename only themself, make and change Scenes
+  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys", "/api/scenes", "/api/scene"}) if (path == ok) return nullptr;
   if (path == "/api/keyname" && !cidArg.empty() && cidArg == ownCid) return nullptr;
   return "only the owner can do that";
 }

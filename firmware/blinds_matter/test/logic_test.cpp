@@ -1,7 +1,8 @@
-// Tests for main/logic.h, main/home_view.h, main/request.h, main/tilter.h and main/wire.h, run on the Mac:
+// Tests for main/logic.h, main/handwatch.h, main/home_view.h, main/request.h, main/tilter.h and main/wire.h, run on the Mac:
 // tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
 #include "../main/home_view.h"
+#include "../main/handwatch.h"
 #include "../main/request.h"
 #include "../main/tilter.h"
 #include "../main/wire.h"
@@ -254,6 +255,92 @@ static void tilterTests() {
     CHECK(s.endMsg == "already there" && s.dir == 0, "already there: the motor never runs"); }
 }
 
+// Follow and the watch (handwatch.h), driven the way motionTick drives it: with no watch, an idle look at one blind
+// every 350 ms; with a watch, its blind read every 100 ms. tilt[] is where each blind really is (a hand moves it).
+struct WandSim {
+  HandWatch h;
+  float tilt[PORTS] = {0, 0, 0};
+  bool blindSpot = false;                             // the watched blind's sensor gives no reading
+  uint32_t now = 1000, lastIdle = 0, lastRead = 0;
+  int idle = 0, follows = 0, from = -1;
+  float to = NAN;
+  float ang(int p) { return 290 - tilt[p] * 0.9f; }
+  void step() {                                       // 10 ms
+    now += 10;
+    HandWatchNow w = h.tick(now);
+    if (w.followFrom >= 0) { follows++; from = w.followFrom; to = w.followTilt; return; }
+    if (w.watchPort >= 0) {
+      if (now - lastRead >= 100) { lastRead = now; int p = w.watchPort; h.reading(p, tilt[p], ang(p), blindSpot, now); }
+      return;
+    }
+    if (now - lastIdle >= 350) { lastIdle = now; h.reading(idle, tilt[idle], ang(idle), false, now); idle = (idle + 1) % PORTS; }
+  }
+  void run(uint32_t ms) { for (uint32_t e = 0; e < ms; e += 10) step(); }
+  void turn(int p, float by, uint32_t ms) {           // a hand turns blind p's wand steadily
+    int n = ms / 10;
+    for (int i = 0; i < n; i++) { tilt[p] += by / n; step(); }
+  }
+};
+static void handWatchTests() {
+  { WandSim s; s.run(2000);                            // every blind looked at: where the controller left them
+    s.turn(0, 40, 2000);
+    s.run(1400);
+    CHECK(s.follows == 0, "follow: not while the hand may still be at work");
+    s.run(3000);
+    CHECK(s.follows == 1 && s.from == 0 && near(s.to, 40, 1), "follow: a wand turn makes the others follow");
+    s.run(10000);
+    CHECK(s.follows == 1, "follow: exactly once"); }
+  { WandSim s; s.run(2000);
+    s.turn(1, 20, 1000);
+    s.run(1200);                                       // a pause under 1.5 s
+    CHECK(s.follows == 0, "follow: a pause under 1.5 s does not start the others early");
+    s.turn(1, 30, 1000);
+    s.run(3000);
+    CHECK(s.follows == 1 && s.from == 1 && near(s.to, 50, 1), "follow: after the pause, the whole turn is followed"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 4, 1000); s.run(5000);
+    CHECK(s.follows == 0 && s.h.tick(s.now).watchPort < 0, "follow: a small bump is not a turn"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 40, 1000);                               // a hand watch is under way
+    s.h.setupOpen(2, s.now);                           // and a setup screen opens
+    s.run(3000);
+    CHECK(s.follows == 0, "follow: an open Setup screen stops it");
+    for (int k = 0; k < 5; k++) { s.h.setupOpen(2, s.now); s.turn(1, -10, 1000); }   // turning wands while Setup is open
+    s.run(20000);
+    CHECK(s.follows == 0, "follow: wands turned while Setup is open are not followed, then or later"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 40, 500);
+    s.blindSpot = true;                                // stuck at the sensor's zero: no reading at all
+    s.run(65000);
+    CHECK(s.follows == 0 && s.h.tick(s.now).watchPort < 0, "follow: the watch gives up after 60 s, nothing followed"); }
+  { WandSim s; s.run(2000);
+    for (int i = 0; i < 70; i++) s.turn(0, i % 2 ? 3 : -3, 1000);   // a hand that never holds still
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: a turn that lasts over 60 s is not followed"); }
+  { WandSim s; s.run(2000);
+    s.tilt[0] = 50;                                    // moved while Follow was off (no readings went to it)
+    s.h.reset();                                       // Follow turned on
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: turning it on starts fresh, old turns are not followed"); }
+  { WandSim s; s.run(2000);                            // a recovery: the blind is turned to its ends by hand
+    for (int k = 0; k < 6; k++) { s.h.setupOpen(0, s.now); s.turn(0, k % 2 ? -60 : 60, 1000); }
+    s.run(25000);
+    CHECK(s.follows == 0, "follow: recovery turns are not followed"); }
+  { WandSim s; s.run(2000);
+    s.h.motorStarted(); s.tilt[2] = -70; s.h.motorLeft(2, -70);   // a motor moved it
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: a blind moved by its motor is not followed"); }
+  { WandSim s; s.run(2000);
+    s.turn(0, 40, 1000);
+    s.h.motorStarted();                                // the app moves this blind while its wand is being turned
+    CHECK(s.h.tick(s.now).watchPort < 0, "follow: a motor starting ends the watch");
+    s.tilt[0] = 10; s.h.motorLeft(0, 10);              // and leaves it at 10
+    s.run(5000);
+    CHECK(s.follows == 0, "follow: the turn before the motor moved it is not followed"); }
+  { HandWatch h; h.reading(0, NAN, 100, false, 100); h.reading(0, NAN, 200, false, 500);
+    CHECK(h.tick(600).watchPort < 0 && std::isnan(h.ref[0]), "follow: a blind that cannot move is never watched"); }
+}
+
 int main() {
   // ---- angles
   CHECK(near(angDiff(10, 350), 20, 1e-4), "angDiff crosses zero forward");
@@ -296,6 +383,7 @@ int main() {
   // ---- one blind's Move, on a simulated Tilter
   sensorTests();
   tilterTests();
+  handWatchTests();
 
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");
@@ -342,8 +430,8 @@ int main() {
   CHECK(permitRule(false, false, true, false, "/api/set", "", "") == nullptr, "plain open before pairing or with the switch");
   CHECK(permitRule(false, false, false, true, "/api/update", "", "") == nullptr, "update checks its own signature");
   CHECK(permitRule(true, true, false, false, "/api/set", "", me) == nullptr, "owner may change settings");
-  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"})
-    CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move");
+  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys", "/api/scenes", "/api/scene"})
+    CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move, and make Scenes");
   for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen"})
     CHECK(permitRule(true, false, false, false, p, "", me) != nullptr, "user refused owner-only command");
   CHECK(permitRule(true, false, false, false, "/api/keyname", me, me) == nullptr, "user may rename themself");
@@ -425,6 +513,34 @@ int main() {
   got = slotOfArgs(arg, 3);
   CHECK(got.mask == 7 && got.tilt == -100 && got.min == 1439, "out-of-range values are brought into range (mask to 3 Ports)");
   CHECK(slotOfArgs(arg, 2).mask == 3, "the mask follows the number of Ports");
+
+  // ---- Scenes on the wire: the same fixture the app's tests read and write
+  {
+    WireScene fs[2] = {{4000000000u, 1795319000u, "Movie \"night\"", "film", 5, {-100, 0, -100}},
+                       {7u, 1795300000u, "Morning", "sunrise", 2, {0, 50, 0}}};
+    std::string fixSc = readFile("wire/scenes.json");
+    CHECK(!fixSc.empty() && scenesJson(fs, 2, 16, 3) == fixSc, "/api/scenes matches wire/scenes.json byte for byte");
+    if (scenesJson(fs, 2, 16, 3) != fixSc) printf("  got: %s\n", scenesJson(fs, 2, 16, 3).c_str());
+    std::string sw = readFile("wire/scene_write.txt");        // the app's command that writes the first fixture Scene
+    std::map<std::string, std::string> sq;
+    std::stringstream ss(sw.substr(sw.find('?') + 1));
+    for (std::string kv; std::getline(ss, kv, '&');) { size_t e = kv.find('='); sq[kv.substr(0, e)] = e == std::string::npos ? "" : kv.substr(e + 1); }
+    auto sarg = [&](const char *k) { auto it = sq.find(k); return it == sq.end() ? std::string() : it->second; };
+    WireScene g = sceneOfArgs(sarg, 3);
+    CHECK(sw.rfind("/api/scene?", 0) == 0 && g.gid == fs[0].gid && g.ver == fs[0].ver && g.sym == "film" && g.mask == 5 &&
+          g.t[0] == -100 && g.t[1] == 0 && g.t[2] == -100, "the Scene write reads back as the fixture's Scene");
+    sq["t"] = "-300,40,300"; sq["mask"] = "15"; sq["sym"] = "Bed.Double\"x";
+    g = sceneOfArgs(sarg, 3);
+    CHECK(g.mask == 7 && g.t[0] == -100 && g.t[1] == 40 && g.t[2] == 100 && g.sym == "ed.oublex", "Scene values brought into range, icon cleaned");
+    CHECK(sceneName("Movie \"night\"", 47) == "Movie \"night\"", "a Scene name keeps its quotes");
+    CHECK(sceneName("Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", 47) == "Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", "curly apostrophe, accent and emoji kept");
+    CHECK(sceneName("a\nb\x01" "c", 47) == "abc", "control characters dropped");
+    CHECK(sceneName("abcd\xF0\x9F\x8E\xAC", 6) == "abcd", "a name cut to fit never ends inside a character");
+    CHECK(sceneName("ab  ", 47) == "ab" && sceneName(std::string(60, 'x'), 47).size() == 47, "trailing spaces trimmed, 47 bytes at most");
+    sq["mask"] = "1"; sq["t"] = "20";
+    g = sceneOfArgs(sarg, 3);
+    CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");
+  }
 
   // ---- Apple Home setup code: kept once made
   CHECK(setupPinValid(1) && setupPinValid(99999998) && setupPinValid(24681357), "ordinary passcodes are valid");

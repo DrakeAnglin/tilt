@@ -15,6 +15,7 @@ import bambu  # noqa: E402
 import bambu_project  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
+import release_ci  # noqa: E402
 import release_firmware  # noqa: E402
 
 try:
@@ -32,6 +33,76 @@ class ReleaseFirmware(unittest.TestCase):
             return b'\x02' + bytes([len(v)]) + v
         body = integer(r) + integer(s)
         self.assertEqual(release_firmware.der_to_raw(b'\x30' + bytes([len(body)]) + body), r + s)
+
+
+    def test_stable_also_goes_to_beta_unless_beta_is_newer(self):
+        e = lambda v: {'version': v, 'file': 'tilt-%s.bin' % v}
+        self.assertEqual(release_firmware.add_to_listing({}, 'stable', e('2.3.0'))['beta']['version'], '2.3.0')
+        l = release_firmware.add_to_listing({'beta': e('2.3.0-beta2')}, 'stable', e('2.3.0'))
+        self.assertEqual(l['beta']['version'], '2.3.0')          # the beta it came from is not newer
+        l = release_firmware.add_to_listing({'beta': e('2.4.0-beta1')}, 'stable', e('2.3.1'))
+        self.assertEqual(l['beta']['version'], '2.4.0-beta1')    # a newer beta stays
+        l = release_firmware.add_to_listing({'stable': e('2.3.0')}, 'beta', e('2.4.0-beta1'))
+        self.assertEqual(l['stable']['version'], '2.3.0')        # a beta never touches stable
+
+
+class ReleaseCI(unittest.TestCase):
+    def test_parse_tag(self):
+        self.assertEqual(release_ci.parse_tag('fw-v2.3.0'), ('controller', '2.3.0', 'stable'))
+        self.assertEqual(release_ci.parse_tag('fw-v2.3.0-beta1'), ('controller', '2.3.0-beta1', 'beta'))
+        self.assertEqual(release_ci.parse_tag('hub-v0.3.4'), ('hub', '0.3.4', 'hub'))
+        for bad in ['v2.3.0', 'fw-2.3.0', 'fw-v2.3', 'fw-v2.3.0 ', 'firmware-2.3.0']:
+            with self.assertRaises(ValueError): release_ci.parse_tag(bad)
+
+    def test_code_versions_parse(self):
+        self.assertRegex(release_ci.code_version('controller'), r'^\d+\.\d+\.\d+')
+        self.assertRegex(release_ci.code_version('hub'), r'^\d+\.\d+\.\d+')
+
+    def test_raw_to_der_undoes_der_to_raw(self):
+        for raw in [b'\x80' + b'\x11' * 31 + b'\x00\x22' + b'\x33' * 30, b'\x01' * 64, b'\x00' * 31 + b'\x05' + b'\xff' * 32]:
+            self.assertEqual(release_firmware.der_to_raw(release_ci.raw_to_der(raw)), raw)
+
+    def test_signed_part(self):
+        self.assertEqual(release_ci.signed_part(b'IMG' + b's' * 64 + b'TILTSIG1'), (b'IMG', b's' * 64))
+        self.assertEqual(release_ci.signed_part(b'P' + b's' * 64 + b'TILTDLT1'), (b'P', b's' * 64))
+        with self.assertRaises(ValueError): release_ci.signed_part(b'x' * 80)
+
+    def test_fetch_and_verify_check_only_what_was_built(self):
+        """fetch() downloads every file firmware.json names plus older images; verify() then checks only new files."""
+        import json, subprocess
+        site = {'firmware.json': json.dumps({'stable': {'version': '2.2.0', 'file': 'tilt-2.2.0.bin', 'patches': [{'file': 'tilt-2.2.0-from-2.1.0.patch'}]},
+                                             'hub': {'version': '0.3.3', 'file': 'tilt-hub-0.3.3.bin'}}).encode(),
+                'tilt-2.1.0.bin': b'old', 'tilt-2.2.0.bin': b'new', 'tilt-2.2.0-from-2.1.0.patch': b'p', 'tilt-hub-0.3.3.bin': b'h'}
+        releases = [{'draft': False, 'prerelease': False, 'published_at': '2026-11-0%d' % i,
+                     'assets': [{'name': n, 'browser_download_url': 'u:' + n} for n in names]}
+                    for i, names in [(1, ['tilt-2.1.0.bin']), (2, list(site))]]
+        get = release_ci._get
+        release_ci._get = lambda url: json.dumps(releases).encode() if url.startswith('https://api') else site[url[2:]]
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                release_ci.fetch(d)
+                self.assertEqual(sorted(release_ci.fetched_names(d)), sorted(n for n in site if n != 'firmware.json'))
+                self.assertLess(os.path.getmtime(os.path.join(d, 'tilt-2.1.0.bin')), os.path.getmtime(os.path.join(d, 'tilt-2.2.0.bin')))
+                key, pub = os.path.join(d, 'k.pem'), os.path.join(d, 'p.pem')
+                subprocess.run(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', key], check=True)
+                subprocess.run(['openssl', 'ec', '-in', key, '-pubout', '-out', pub], check=True, capture_output=True)
+                old_key, release_firmware.KEY = release_firmware.KEY, key
+                try:
+                    img = b'image' * 50
+                    open(os.path.join(d, 'tilt-2.3.0.bin'), 'wb').write(img + release_firmware.sign(img) + b'TILTSIG1')
+                finally:
+                    release_firmware.KEY = old_key
+                release_ci.verify(pub, d)                   # the fetched files are not signed with this key: skipped
+                open(os.path.join(d, 'tilt-2.3.0.bin'), 'r+b').write(b'X')
+                with self.assertRaises(SystemExit): release_ci.verify(pub, d)
+        finally:
+            release_ci._get = get
+
+    def test_listed_files_names_every_image_and_patch_once(self):
+        listing = {'stable': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                   'beta': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                   'hub': {'file': 'tilt-hub-0.3.4.bin'}}
+        self.assertEqual(release_ci.listed_files(listing), ['tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin'])
 
 
 class Orient(unittest.TestCase):

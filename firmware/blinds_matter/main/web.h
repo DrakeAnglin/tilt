@@ -1,5 +1,5 @@
 // The JSON interface the Tilt app talks to, on ESP-IDF's HTTP server: the pages, the routes, and webTick.
-// Schedules, firmware upload and the people handlers live in their own files, included here at the top.
+// Schedules, Scenes, firmware upload and the people handlers live in their own files, included here at the top.
 #pragma once
 #include <esp_http_server.h>
 #include <esp_ota_ops.h>
@@ -14,10 +14,12 @@
 #include "wire.h"                                // the wire contract for /api/cfg and Schedule slots
 #include "api.h"                                 // the reply helpers and Lock
 #include "schedules.h"
+#include "scenes.h"
 #include "update.h"
+#include "ota.h"                                 // trialVerdict
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev28"
+#define FW_VERSION "2.3.0-dev30"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 
@@ -156,7 +158,7 @@ esp_err_t hSet(httpd_req_t *r) {
   if (k == "name") cleanText(cfg.name, sizeof cfg.name, v);
   else if (k == "closeUp") cfg.closeUp = n ? 1 : 0;
   else if (k == "loc") { float la = NAN, lo = NAN; if (sscanf(v.c_str(), "%f,%f", &la, &lo) != 2 || fabsf(la) > 90 || fabsf(lo) > 180) return fail(r, "bad place"); sx.lat = la; sx.lon = lo; sxSave(); }
-  else if (k == "sync") { syncMode = n ? 1 : 0; syncSave(); for (int i = 0; i < PORTS; i++) handRef[i] = NAN; }   // start fresh: no following of old turns
+  else if (k == "sync") { syncMode = n ? 1 : 0; syncSave(); hand.reset(); }   // start fresh: no following of old turns
   else if (k == "par") { parMode = n ? 1 : 0; syncSave(); }
   else if (k == "hksep") { hkSeparate = n ? 1 : 0; nvs.putUChar("hksep", hkSeparate); restartSoon = true; }   // Home's layout changes: restart
   else if (k == "tune.grace") { tune.graceMs = constrain(n, 0, 30000); tuneSave(); }
@@ -237,11 +239,7 @@ esp_err_t hWatch(httpd_req_t *r) {              // setup is open for this blind:
   Lock l;
   int p = argi(r, "b");
   if (p < 0 || p >= PORTS) return fail(r, "no such blind");
-  if (watchPort >= 0 && watchPort != p) watchStop();
-  watchPort = p;
-  handBusy = false;
-  watchUntil = millis() + 3000;
-  setupSeen = millis() ? millis() : 1;           // a setup screen is open: turning by hand is expected, the others stay put
+  hand.setupOpen(p, millis());                   // a setup screen is open: turning by hand is expected, the others stay put
   return ok(r);
 }
 esp_err_t hTrace(httpd_req_t *r) {              // the recording of the last move
@@ -258,10 +256,19 @@ esp_err_t hTrace(httpd_req_t *r) {              // the recording of the last mov
   return sendJson(r, j);
 }
 esp_err_t hAwake(httpd_req_t *r) { Lock l; keepAwakeUntil = millis() + (uint32_t)constrain(argi(r, "min"), 0, 720) * 60000; return ok(r); }
+// Keep the firmware on trial: it is the one this controller starts from from now on (hKeep, and trialTick below).
+void trialKeep() {
+  if (!otaPending) return;
+  esp_ota_mark_app_valid_cancel_rollback();
+  otaPending = false;
+  stats.otaOk++;
+  statsSave();
+  event("new firmware %s confirmed", FW_VERSION);
+}
 // Keep the firmware that is on trial (sent by tools/flash_matter.sh once it has checked the board).
 esp_err_t hKeep(httpd_req_t *r) {
   Lock l;
-  if (otaPending) { esp_ota_mark_app_valid_cancel_rollback(); otaPending = false; stats.otaOk++; statsSave(); event("new firmware %s confirmed", FW_VERSION); }
+  trialKeep();
   return ok(r);
 }
 
@@ -306,7 +313,7 @@ esp_err_t hBackup(httpd_req_t *r);
 esp_err_t hRestore(httpd_req_t *r);
 const Route routes[] = {
   {"/", HTTP_GET, hRoot}, {"/api/s", HTTP_GET, hState}, {"/api/dev", HTTP_GET, hDev}, {"/api/cfg", HTTP_GET, hCfg}, {"/api/log", HTTP_GET, hLog},
-  {"/api/hist", HTTP_GET, hHist}, {"/api/set", HTTP_GET, hSet}, {"/api/sched", HTTP_GET, hSched}, {"/api/go", HTTP_GET, hGo}, {"/api/stop", HTTP_GET, hStop},
+  {"/api/hist", HTTP_GET, hHist}, {"/api/set", HTTP_GET, hSet}, {"/api/sched", HTTP_GET, hSched}, {"/api/scenes", HTTP_GET, hScenes}, {"/api/scene", HTTP_GET, hScene}, {"/api/go", HTTP_GET, hGo}, {"/api/stop", HTTP_GET, hStop},
   {"/api/jog", HTTP_GET, hJog}, {"/api/angle", HTTP_GET, hAngle}, {"/api/mark", HTTP_GET, hMark}, {"/api/reset", HTTP_GET, hReset}, {"/api/reboot", HTTP_GET, hReboot},
   {"/api/awake", HTTP_GET, hAwake},
   {"/api/keep", HTTP_GET, hKeep}, {"/api/watch", HTTP_GET, hWatch}, {"/api/trace", HTTP_GET, hTrace},
@@ -329,31 +336,21 @@ void webBegin() {
 }
 
 extern volatile uint32_t hubLinkSeen;            // hub_link.h
-// Once a second, from the blinds task (the lock is held).
-void webTick() {
-  uint32_t now = millis();
-  // A new firmware is on trial until Thread to the Tilt Hub has worked for a minute.
+// A new firmware is on trial until Thread to the Tilt Hub has worked for a minute (ota.h trialVerdict).
+static void trialTick(uint32_t now) {
   static uint32_t hubSince = 0;
-  bool linkUp = hubOk() || (hubLinkSeen && now - hubLinkSeen < 120000);
-  if (linkUp && !hubSince) hubSince = now ? now : 1;
-  if (!linkUp) hubSince = 0;
-  hubTick();
-  if (otaPending) {
-    if (hubSince && now - hubSince > 60000) {
-      esp_ota_mark_app_valid_cancel_rollback();
-      otaPending = false;
-      stats.otaOk++;
-      statsSave();
-      event("new firmware %s confirmed", FW_VERSION);
-    } else if (!hubSince && now > 300000 && hubJoined()) {   // it has a hub to reach (setup is done) and did not
-      event("new firmware could not reach the Tilt Hub: going back");
-      vTaskDelay(pdMS_TO_TICKS(200));
-      esp_ota_mark_app_invalid_rollback_and_reboot();
-    }
+  hubSince = trialLinkSince(hubSince, trialLinkUp(hubOk(), hubLinkSeen, now), now);
+  if (!otaPending) return;
+  TrialVerdict v = trialVerdict(now, hubSince, hubJoined());
+  if (v == TRIAL_KEEP) trialKeep();
+  else if (v == TRIAL_ROLLBACK) {
+    event("new firmware could not reach the Tilt Hub: going back");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_ota_mark_app_invalid_rollback_and_reboot();
   }
-  schedRun();
-  rampTick();
-  recoverTick();
+}
+// Once an hour: the battery history (and, on a developer build, the power log's temperature).
+static void histTick() {
   static uint32_t lastHist = 0;
   uint32_t ep = time(nullptr);
   if (lastHist > ep || ep - lastHist >= 3600) {
@@ -362,16 +359,38 @@ void webTick() {
     histPush(vbatRest);
 #ifdef TILT_DEVLOG
     if (!first) { float t = 0; if (tsens) temperature_sensor_get_celsius(tsens, &t); plogPush(ep, vbatRest, t); }
+#else
+    (void)first;
 #endif
   }
+}
 #ifdef TILT_DEVLOG
+static void devlogTick() {
   static uint32_t lastPl = 0;
   uint32_t nowMs = millis();
   if (!lastPl && otaPending) plogAcc.flags |= 2;   // this start is new firmware on trial
   if (lastPl) plogTick(vin, powered, nowMs - lastPl);
   lastPl = nowMs ? nowMs : 1;
+}
 #endif
+static void powerTick() {                        // input power connected or gone: a line in the log
   static bool wasPowered = powered;
   if (wasPowered != powered) { wasPowered = powered; event(powered ? "input power connected (%.2f V)" : "on battery (%.2f V)", powered ? vin : vbatRest); }
+}
+static void restartTick() {                      // asked for (an update, a setting): motors off first
   if (restartSoon) { vTaskDelay(pdMS_TO_TICKS(600)); for (int i = 0; i < PORTS; i++) { motorRaw(i, 0, 0); digitalWrite(P_EN[i], LOW); } esp_restart(); }
+}
+// Once a second, from the blinds task (the lock is held).
+void webTick() {
+  trialTick(millis());
+  hubTick();
+  schedRun();
+  rampTick();
+  recoverTick();
+  histTick();
+#ifdef TILT_DEVLOG
+  devlogTick();
+#endif
+  powerTick();
+  restartTick();
 }

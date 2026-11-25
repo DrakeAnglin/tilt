@@ -8,6 +8,7 @@ How one agent takes one issue from request to `main`, without a person in the lo
 - **Nothing goes to `main` except through a pull request.** No direct pushes. Merging is done by `tools/agent/merge_pr.sh` or by the owner on GitHub, never by `gh pr merge`.
 - **Stay on the issue.** Something else found on the way becomes a new issue, not part of this change.
 - **Do not stop to ask** unless the issue cannot be understood, or the review policy says a human decides.
+- **Never end a turn while waiting.** See "Waiting" below. A session that ends with "once CI passes I'll merge" never merges: nothing wakes it again.
 
 ## Steps
 
@@ -15,16 +16,30 @@ How one agent takes one issue from request to `main`, without a person in the lo
 2. **Branch in a worktree.** If the session is not already in its own worktree:
    `git fetch origin && git worktree add .claude/worktrees/issue-<n> -b issue-<n>-<short-name> origin/main`, then work there.
 3. **Build it.** Read `CONTEXT.md` and the ADRs for the area. Write the test first where there is a place for one (`/tdd`). Small commits.
-4. **Check locally.** `tools/agent/check.sh` must pass.
+4. **Check locally.** `tools/agent/check.sh` must pass. Changed anything under `firmware/`? Build both firmwares too (`firmware/blinds_matter/build.sh`, `firmware/tilt_hub/build.sh`, in the background: see "Waiting") and put the result in Evidence with the commit: `ESP builds: both ok at <short sha>`. CI does not build firmware, so without this line the gate cannot merge.
 5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create`. Write the body in the template's shape (Matt Pocock's `pr` skill, when installed, is the guide): `Closes #<n>`, summary, evidence, door, blast radius, what could go wrong. Last, turn on the app's watch for the pull request (Auto-fix: `set_monitor` with `auto_fix`), so this session is woken on a conflict, a red CI or a comment. If that tool is not there or is not approved, go on without it.
-6. **Wait for CI.** `gh pr checks <pr> --watch`. Red? Fix it, push, wait again.
-7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its own summary, evidence, merge danger and findings as a comment on the pull request.
-8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Three rounds at most; the merge script counts them, and after that it goes to a human.
+6. **Wait for CI.** `gh pr checks <pr> --watch` as a background command (see "Waiting"). Red? Fix it, push, wait again. Start the review (step 7) while CI runs; you do not need to wait for green to review.
+7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its own summary, evidence, merge danger and findings as a comment on the pull request. If the agent type is not there (the session started outside this repo), start a `general-purpose` agent on Sonnet and have it read `.claude/agents/pr-reviewer.md` and follow it. The same goes for `merge-gate`.
+8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Every must-fix and every "not yet" from the gate is yours to fix, not the owner's: a missing test, a missing build, a bug. Ten rounds at most; the merge script counts them, and after that it goes to a human.
 9. **Gate.** Start the `merge-gate` agent with the pull request number. It reads the review and the policy and decides: merge, or human.
 10. **Merge or hand over.**
     - Merge: `tools/agent/merge_pr.sh <pr>`. It checks the rules again and squash-merges.
     - Human: the `needs-human` label, always with a comment that says why: a TL;DR first, notes after. Then notify the owner (below), tell them the TL;DR and stop. Do not merge.
-11. **Clean up.** After a merge: remove the worktree (`git worktree remove`), delete the local branch. The issue closes itself through `Closes #<n>`.
+11. **Clean up.** The issue closes itself through `Closes #<n>`. Worktrees clean themselves: `tools/agent/clean_worktrees.sh` removes every worktree under `.claude/worktrees/` whose pull request is merged or closed, with its local branch and build folders. It runs after every merge (`merge_pr.sh`) and at the start of every session, and keeps anything that could be lost (uncommitted changes, commits not in the pull request, no pull request, detached HEAD). When the owner merges or closes your pull request on GitHub, the next session clears your worktree. Run it with `--dry-run` to see what it would do. Removal also deletes files Git ignores, so keep local-only files (secrets, `.env`) in the main checkout, never only in a worktree.
+
+## Waiting
+
+CI, a firmware build, a build lock, another pull request merging: all of these take minutes, and none of them wakes this session when it is done. The app's Auto-fix wakes it only on a red CI, a conflict or a comment, never on green.
+
+So never end a turn to wait. Instead:
+
+- Run the wait as a **background Bash command** (`run_in_background`), for example `gh pr checks <pr> --watch` or the build script. The session is woken when it exits, and goes on with the next step.
+- Under about ten minutes, a foreground command with a long `timeout` is fine too.
+- While it runs, do the next thing that does not need it: start `pr-reviewer`, write the pull request body, file what you found on the way.
+
+The "never poll CI" rule for this app means no loops of `sleep` and no scheduled wake-ups. One background `--watch` is not polling.
+
+A turn ends only when the pull request is merged, or it has `needs-human` and the owner has been notified. Anything else is not done: keep going.
 
 ## Merge conflicts
 
@@ -41,7 +56,7 @@ Other pull requests merge while yours is open, and yours can stop merging cleanl
 1. `git fetch origin && git merge origin/main`. Merge, never rebase or force push: the review is tied to commits.
 2. Fix each conflict so that what both sides meant is kept. Two new sections in the same place: keep both. Read the other pull request to see what it meant (`git log origin/main -- <file>`).
 3. `tools/agent/check.sh`, commit the merge, push.
-4. Have `pr-reviewer` look again: the review is for the commit before. Then the gate. Each review counts toward the three-round limit, so a pull request that keeps conflicting ends up with the owner.
+4. Have `pr-reviewer` look again: the review is for the commit before. Then the gate. Each review counts toward the ten-round limit, so a pull request that keeps conflicting ends up with the owner.
 
 **Someone else's pull request** that your merge put into conflict: if its worktree is on this Mac under `.claude/worktrees/` and has nothing uncommitted, resolve it there the same way and leave a comment on the pull request saying what you did and that it needs review again. Otherwise leave a comment and do not touch the branch.
 
@@ -70,7 +85,8 @@ Say what was seen, where (file and line), and how to see it again. Do not fix it
 | --- | --- |
 | `ready-for-agent` | The owner says an agent may pick this issue up on its own |
 | `needs-triage` | Filed by an agent; the owner has not looked yet |
-| `two-way-door` / `one-way-door` | The reviewer's door for a pull request |
+| `two-way-door` / `one-way-door` | The reviewer's door for a pull request: exactly one. It says how easy going back is; it does not stop a merge |
+| `bench-check` | On the staging list: check it on real hardware when the next release is staged. Never blocks a merge |
 | `auto-merge-ok` | The gate says the agent may merge |
 | `needs-human` | The owner reviews and merges this one |
 

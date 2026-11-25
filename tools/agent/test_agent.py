@@ -64,7 +64,6 @@ BLOCKED = [
     'gh api -X PATCH repos/DrakeAnglin/tilt/git/refs/heads/main -f sha=abc',
     'gh pr edit 51 --remove-label needs-human',
     'gh pr edit 51 --add-label auto-merge-ok --remove-label needs-human',
-    'gh pr edit 51 --remove-label=one-way-door',
     "cat > f <<'EOF'\ntext\nEOF\ngit push origin main",
 ]
 
@@ -98,6 +97,8 @@ ALLOWED = [
     'gh pr edit 51 --add-label needs-human',
     'gh pr edit 51 --remove-label auto-merge-ok',
     'gh pr edit 51 --add-label two-way-door',
+    'gh pr edit 51 --add-label two-way-door --remove-label one-way-door',
+    'gh pr edit 51 --remove-label=one-way-door',
     'timeout 60 tools/agent/check.sh',
     'if git diff --quiet; then echo clean; fi',
     'git commit -m "first line\n\nsecond; line # not a comment"',
@@ -133,6 +134,90 @@ class Guard(unittest.TestCase):
         self.assertEqual(run('not json'), 2)
         self.assertEqual(run('{"tool_input": {"command": "ls"}}'), 0)
         self.assertEqual(run('{"tool_input": {"command": "gh pr merge 5"}}'), 2)
+
+class OnlyAddsTests(unittest.TestCase):
+    """tools/agent/only_adds_tests.awk: may an agent merge this change to a test script?"""
+
+    AWK = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'only_adds_tests.awk')
+
+    def ok(self, patch):
+        import subprocess
+        return subprocess.run(['awk', '-f', self.AWK], input=patch, text=True).returncode == 0
+
+    ADD = ('@@ -1,7 +1,9 @@\n #!/bin/sh\n-# Run the logic tests.\n+# Run the logic tests and the link test.\n'
+           ' set -e\n "$OUT/logic_test"\n+c++ -std=c++17 -o "$OUT/link_test" link_test.cpp\n+"$OUT/link_test"\n')
+
+    def test_adding_a_test_is_fine(self):
+        self.assertTrue(self.ok(self.ADD))
+
+    def test_removing_a_command_is_not(self):
+        self.assertFalse(self.ok('@@ -1,3 +1,2 @@\n set -e\n-"$OUT/logic_test"\n'))
+        self.assertFalse(self.ok('@@ -1,3 +1,2 @@\n-set -e\n "$OUT/logic_test"\n'))
+        self.assertFalse(self.ok('@@ -1,2 +1,2 @@\n-#!/bin/sh\n+#!/bin/bash\n'))
+
+    def test_hiding_a_failure_is_not(self):
+        for line in ['"$OUT/link_test" || true', '"$OUT/link_test" ||:', 'set +e', 'exit 0',
+                     'if x; then exit; fi', 'exec true', 'a && exit 0; b',
+                     '"$X" || echo skipped', '"$X" || return 0', 'set +o errexit', 'trap "exit 0" EXIT',
+                     '"$X" &', '[ -f x ] || { echo no; exit 1; }']:
+            self.assertFalse(self.ok('@@ -1,1 +1,2 @@\n set -e\n+' + line + '\n'), line)
+
+    def test_a_cleanup_trap_is_fine(self):
+        self.assertTrue(self.ok('@@ -1,1 +1,2 @@\n set -e\n+trap \'rm -rf "$OUT"\' EXIT\n'))
+
+    def test_an_empty_patch_is_not(self):
+        self.assertFalse(self.ok(''))
+
+class ShellSyntaxTest(unittest.TestCase):
+    def test_agent_scripts_parse(self):
+        import glob, subprocess
+        here = os.path.dirname(os.path.abspath(__file__))
+        for script in sorted(glob.glob(os.path.join(here, '*.sh'))):
+            r = subprocess.run(['sh', '-n', script], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, script + ': ' + r.stderr)
+
+
+class CleanWorktreesTest(unittest.TestCase):
+    """tools/agent/clean_worktrees.sh with a fake gh."""
+
+    def test_removes_only_finished_clean_worktrees(self):
+        import subprocess, tempfile, json
+        here = os.path.dirname(os.path.abspath(__file__))
+        script = os.path.join(here, 'clean_worktrees.sh')
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.realpath(os.path.join(tmp, 'repo'))
+            git = lambda *a, cwd=repo: subprocess.run(['git', '-C', cwd, *a], check=True, capture_output=True, text=True).stdout.strip()
+            os.makedirs(repo)
+            git('init', '-q', '-b', 'main')
+            git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root')
+            wts = os.path.join(repo, '.claude', 'worktrees')
+            prs = {}
+            git('worktree', 'add', '-q', '--detach', os.path.join(wts, 'loose'))
+            for name, state in [('done', 'MERGED'), ('closed', 'CLOSED'), ('open', 'OPEN'), ('dirty', 'MERGED'), ('extra', 'MERGED'), ('nopr', None)]:
+                path = os.path.join(wts, name)
+                git('worktree', 'add', '-q', '-b', 'b-' + name, path)
+                git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', name, cwd=path)
+                if state:
+                    prs['b-' + name] = {'number': len(prs) + 1, 'state': state, 'headRefOid': git('rev-parse', 'HEAD', cwd=path)}
+            with open(os.path.join(wts, 'dirty', 'new.txt'), 'w') as f:
+                f.write('x')
+            git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'after', cwd=os.path.join(wts, 'extra'))
+            os.makedirs(os.path.join(wts, 'done', 'firmware', 'x', 'build'))
+            # Fake gh: answers "gh pr list --head <branch> ... --jq <expr>" from the table above.
+            bin_dir = os.path.join(tmp, 'bin')
+            os.makedirs(bin_dir)
+            fake = os.path.join(bin_dir, 'gh')
+            with open(fake, 'w') as f:
+                f.write('#!/usr/bin/env python3\nimport sys, json\nprs = json.loads(%r)\na = sys.argv\nb = a[a.index("--head") + 1]\np = prs.get(b)\nprint(f"{p[\'number\']} {p[\'state\']} {p[\'headRefOid\']}" if p else "")\n' % json.dumps(prs))
+            os.chmod(fake, 0o755)
+            env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ['PATH'])
+            out = subprocess.run([script], cwd=repo, env=env, capture_output=True, text=True).stdout
+            left = sorted(os.listdir(wts))
+            self.assertEqual(left, ['dirty', 'extra', 'loose', 'nopr', 'open'], out)
+            branches = git('branch', '--format=%(refname:short)').split()
+            self.assertNotIn('b-done', branches)
+            self.assertNotIn('b-closed', branches)
+            self.assertIn('b-open', branches)
 
 
 if __name__ == '__main__':

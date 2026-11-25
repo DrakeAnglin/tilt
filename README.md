@@ -46,7 +46,7 @@ Only the current version of each thing is kept here. Older versions are in the G
 | `tools/orient.py`, `tools/bambu.py` | Turn the STLs to print orientation; build the Bambu Studio projects (PLA plate + PETG plate) |
 | `tools/fusion_controller.py` | Builds the controller box in Fusion |
 | `tools/flash.sh` | Builds the controller firmware and installs it through the Tilt Hub |
-| `tools/release_firmware.py` | Builds and signs a public firmware release |
+| `tools/release_firmware.py` | Builds and signs a public firmware release (a version tag runs it in GitHub Actions: `docs/firmware-release.md`) |
 | `tools/blinds_client.py` | Talks to a controller over its secured channel (testing) |
 | `tools/pcb_guide.py` | Generates the PCB build guide and its pictures |
 | `tools/firmware_tests.sh`, `tools/app_tests.sh`, `tools/test_tools.py` | Tests |

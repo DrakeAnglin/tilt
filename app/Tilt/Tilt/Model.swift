@@ -108,6 +108,14 @@ final class Controller: Identifiable {
         }
         requests = asks
     }
+    /// The people on this controller as the person sees them (People.shown: the hub's own key left out, this phone
+    /// first). Notes when this phone's role changed (an owner made it a user, or the other way round).
+    func people() async throws -> [PhoneKey] {
+        let hubCid = record.onHub ? await HubWatch.shared.hubCid(for: id) : nil
+        let list = People.shown(try await client.people(), hubCid: hubCid)
+        if let me = list.first(where: { $0.me == 1 }), (me.owner == 1) != record.owner { record.owner = me.owner == 1; changed?() }
+        return list
+    }
     /// Let a phone that asked to join in (as an owner or a user), or turn it down.
     func answer(_ r: PhoneKey, approve: Bool, owner: Bool = false) async {
         do { try await client.approve(cid: r.cid, approve, owner: owner) } catch { lastError = error.localizedDescription }
@@ -210,14 +218,7 @@ final class AppModel {
         keep(c)
         save()
         c.start()
-        // Two sample scenes, so the demo shows what scenes are for (removed again with the demo room).
-        let store = SceneStore.shared
-        if store.scenes.isEmpty {
-            let all = (0..<ControllerLimits.fallback.ports).map { BlindTarget(controller: Demo.id, blind: $0) }      // the demo room has the usual 3 Ports
-            store.scenes = [BlindScene(name: "Morning", symbol: "sunrise", tilts: Dictionary(uniqueKeysWithValues: all.map { ($0, 0) })),
-                            BlindScene(name: "Movie", symbol: "film", tilts: Dictionary(uniqueKeysWithValues: all.map { ($0, -100) }))]
-            store.save()
-        }
+        Task { await SceneStore.shared.load(controllers) }      // the demo room keeps two sample Scenes, like a controller would
     }
     var hasDemo: Bool { controllers.contains { $0.id == Demo.id } }
     /// No owner is left to approve: start getting in by turning a blind's wand. Returns the blind to turn.
@@ -250,11 +251,6 @@ final class AppModel {
         }
         if changed { save() }
     }
-    func setOwner(_ c: Controller, _ owner: Bool) {
-        guard c.record.owner != owner else { return }
-        c.record.owner = owner
-        save()
-    }
     /// Start over on this iPhone: every room, its key and any unfinished setup is removed (the controllers and the hub
     /// are not touched; set them up again from Add).
     func eraseAll() {
@@ -272,10 +268,7 @@ final class AppModel {
         BatteryAlerts.forget(id: c.id)
         UserDefaults.standard.removeObject(forKey: Prefs.lastSeen(c.id))
         controllers.removeAll { $0.id == c.id }
-        let store = SceneStore.shared                       // scenes that only moved this controller's blinds go with it
-        let before = store.scenes.count
-        store.scenes.removeAll { !$0.tilts.isEmpty && $0.tilts.keys.allSatisfy { $0.controller == c.id } }
-        if store.scenes.count != before { store.save() }
+        SceneStore.shared.prune(controller: c.id)          // scenes that only moved this controller's blinds go with it
         waiting.removeAll { $0.id == c.id }
         save()
     }

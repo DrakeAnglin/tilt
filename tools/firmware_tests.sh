@@ -1,13 +1,19 @@
 #!/bin/sh
-# Run the firmware's logic tests on the Mac (no hardware, no ESP-IDF):
-#   firmware/blinds_matter/test/logic_test.cpp   the controller
-#   firmware/tilt_hub/test/hub_test.cpp          the Tilt Hub (needs mbedtls: see below)
+# Run the firmware's tests on the Mac (no hardware, no ESP-IDF):
+#   firmware/blinds_matter/test/logic_test.cpp   the controller's logic
+#   firmware/blinds_matter/test/ota_test.cpp     a firmware file through the hub, with files signed by
+#                                                tools/release_firmware.py with a throwaway key (needs python3, openssl)
+#   firmware/tilt_hub/test/hub_test.cpp          the Tilt Hub's people rules and update-file checks (needs mbedtls: see below)
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=$(mktemp -d)
+trap 'rm -rf "$OUT"' EXIT
 cd "$ROOT/firmware/blinds_matter/test"
 c++ -std=c++17 -Wall -Wextra -O1 -o "$OUT/logic_test" logic_test.cpp
 "$OUT/logic_test"
+python3 make_ota_files.py "$OUT"
+c++ -std=c++17 -Wall -Wextra -O1 -o "$OUT/ota_test" ota_test.cpp
+"$OUT/ota_test" "$OUT"
 
 # The hub test checks real signatures, with mbedtls (the library the firmware uses): the system's if it has one
 # (CI: apt-get install libmbedtls-dev; a Mac: brew install mbedtls), else built here from ESP-IDF's copy.
