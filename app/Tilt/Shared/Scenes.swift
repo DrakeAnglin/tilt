@@ -1,13 +1,9 @@
-// Scenes: a name and a tilt for some blinds, kept on this phone and run from the app, Siri and Shortcuts. The rules
-// live here, once: how they are kept, how one is run, and which go when a controller is removed.
+// Scenes: a name and a tilt for some blinds, kept on the controllers (ScenePlan.swift) with a copy on this phone, and
+// run from the app, Siri and Shortcuts. The phone-side rules live here, once: how the copy is kept, how one is run,
+// and which go when a controller is removed.
 import Foundation
 
-struct BlindScene: Identifiable, Codable, Equatable {
-    var id = UUID()
-    var name = "New Scene"
-    var symbol = "sun.max"
-    var tilts: [BlindTarget: Int] = [:]
-}
+// BlindScene lives in ScenePlan.swift (with how Scenes are kept on the controllers).
 
 enum Scenes {
     static func load(_ d: UserDefaults = .standard) -> [BlindScene] {

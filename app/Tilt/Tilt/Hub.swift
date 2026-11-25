@@ -293,6 +293,8 @@ struct HubInfo: Decodable, Sendable {
     /// key: the hub's own key on it (2 let in, 1 waiting for an owner, 0 none). rssi: Thread signal (127: not attached).
     struct Member: Decodable, Sendable, Identifiable {
         let id: String, name: String, fw: String?, key: Int, seenS: Int, pct: Int, low: Int?, rssi: Int?, lqi: Int?
+        /// On the charging cable: 1 yes, 0 no (nil: a hub or controller too old to say).
+        let chg: Int?
         /// A firmware update through the hub: 1 sending (otaPct), 2 checking, 3 done, 4 failed (otaErr).
         let ota: Int?, otaPct: Int?, otaErr: String?
         /// The hub's own key on this controller: its request to join is let in by the app, never shown.

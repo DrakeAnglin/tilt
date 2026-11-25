@@ -1,5 +1,5 @@
 // The JSON interface the Tilt app talks to, on ESP-IDF's HTTP server: the pages, the routes, and webTick.
-// Schedules, firmware upload and the people handlers live in their own files, included here at the top.
+// Schedules, Scenes, firmware upload and the people handlers live in their own files, included here at the top.
 #pragma once
 #include <esp_http_server.h>
 #include <esp_ota_ops.h>
@@ -14,10 +14,11 @@
 #include "wire.h"                                // the wire contract for /api/cfg and Schedule slots
 #include "api.h"                                 // the reply helpers and Lock
 #include "schedules.h"
+#include "scenes.h"
 #include "update.h"
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev29"
+#define FW_VERSION "2.3.0-dev31"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 

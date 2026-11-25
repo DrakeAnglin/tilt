@@ -2,7 +2,7 @@
 // handler table from it, logic.h permitRule decides from its roles, and test/logic_test.cpp checks it. No ESP-IDF here.
 //
 //   OWNER  only an Owner
-//   GUEST  an Owner or a Guest (see the blinds and move them, see the people)
+//   GUEST  an Owner or a Guest (see the blinds and move them, see the people, make and change Scenes)
 //   SELF   an Owner, or a Guest when the command's "cid" is the Guest's own (renaming themself)
 #pragma once
 #include <string>
@@ -12,6 +12,7 @@ enum Who { OWNER, GUEST, SELF };
 #define TILT_ROUTES(R) \
   R("/api/s", hState, GUEST) R("/api/cfg", hCfg, GUEST) R("/api/go", hGo, GUEST) R("/api/stop", hStop, GUEST) \
   R("/api/home", hHome, GUEST) R("/api/backup", hBackup, GUEST) R("/api/keys", hKeys, GUEST) \
+  R("/api/scenes", hScenes, GUEST) R("/api/scene", hScene, GUEST) \
   R("/api/keyname", hKeyName, SELF) \
   R("/api/dev", hDev, OWNER) R("/api/log", hLog, OWNER) R("/api/hist", hHist, OWNER) R("/api/set", hSet, OWNER) \
   R("/api/sched", hSched, OWNER) R("/api/jog", hJog, OWNER) R("/api/angle", hAngle, OWNER) R("/api/mark", hMark, OWNER) \
