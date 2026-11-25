@@ -472,8 +472,8 @@ int main() {
   CHECK(permitRule(false, false, true, false, "/api/set", "", "") == nullptr, "plain open before pairing or with the switch");
   CHECK(permitRule(false, false, false, true, "/api/update", "", "") == nullptr, "update checks its own signature");
   CHECK(permitRule(true, true, false, false, "/api/set", "", me) == nullptr, "owner may change settings");
-  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"})
-    CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move");
+  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys", "/api/scenes", "/api/scene"})
+    CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move, and make Scenes");
   for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen"})
     CHECK(permitRule(true, false, false, false, p, "", me) != nullptr, "user refused owner-only command");
   CHECK(permitRule(true, false, false, false, "/api/keyname", me, me) == nullptr, "user may rename themself");
@@ -555,6 +555,34 @@ int main() {
   got = slotOfArgs(arg, 3);
   CHECK(got.mask == 7 && got.tilt == -100 && got.min == 1439, "out-of-range values are brought into range (mask to 3 Ports)");
   CHECK(slotOfArgs(arg, 2).mask == 3, "the mask follows the number of Ports");
+
+  // ---- Scenes on the wire: the same fixture the app's tests read and write
+  {
+    WireScene fs[2] = {{4000000000u, 1795319000u, "Movie \"night\"", "film", 5, {-100, 0, -100}},
+                       {7u, 1795300000u, "Morning", "sunrise", 2, {0, 50, 0}}};
+    std::string fixSc = readFile("wire/scenes.json");
+    CHECK(!fixSc.empty() && scenesJson(fs, 2, 16, 3) == fixSc, "/api/scenes matches wire/scenes.json byte for byte");
+    if (scenesJson(fs, 2, 16, 3) != fixSc) printf("  got: %s\n", scenesJson(fs, 2, 16, 3).c_str());
+    std::string sw = readFile("wire/scene_write.txt");        // the app's command that writes the first fixture Scene
+    std::map<std::string, std::string> sq;
+    std::stringstream ss(sw.substr(sw.find('?') + 1));
+    for (std::string kv; std::getline(ss, kv, '&');) { size_t e = kv.find('='); sq[kv.substr(0, e)] = e == std::string::npos ? "" : kv.substr(e + 1); }
+    auto sarg = [&](const char *k) { auto it = sq.find(k); return it == sq.end() ? std::string() : it->second; };
+    WireScene g = sceneOfArgs(sarg, 3);
+    CHECK(sw.rfind("/api/scene?", 0) == 0 && g.gid == fs[0].gid && g.ver == fs[0].ver && g.sym == "film" && g.mask == 5 &&
+          g.t[0] == -100 && g.t[1] == 0 && g.t[2] == -100, "the Scene write reads back as the fixture's Scene");
+    sq["t"] = "-300,40,300"; sq["mask"] = "15"; sq["sym"] = "Bed.Double\"x";
+    g = sceneOfArgs(sarg, 3);
+    CHECK(g.mask == 7 && g.t[0] == -100 && g.t[1] == 40 && g.t[2] == 100 && g.sym == "ed.oublex", "Scene values brought into range, icon cleaned");
+    CHECK(sceneName("Movie \"night\"", 47) == "Movie \"night\"", "a Scene name keeps its quotes");
+    CHECK(sceneName("Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", 47) == "Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", "curly apostrophe, accent and emoji kept");
+    CHECK(sceneName("a\nb\x01" "c", 47) == "abc", "control characters dropped");
+    CHECK(sceneName("abcd\xF0\x9F\x8E\xAC", 6) == "abcd", "a name cut to fit never ends inside a character");
+    CHECK(sceneName("ab  ", 47) == "ab" && sceneName(std::string(60, 'x'), 47).size() == 47, "trailing spaces trimmed, 47 bytes at most");
+    sq["mask"] = "1"; sq["t"] = "20";
+    g = sceneOfArgs(sarg, 3);
+    CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");
+  }
 
   // ---- Apple Home setup code: kept once made
   CHECK(setupPinValid(1) && setupPinValid(99999998) && setupPinValid(24681357), "ordinary passcodes are valid");

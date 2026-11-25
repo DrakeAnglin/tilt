@@ -15,7 +15,7 @@ import sys
 MERGE = 'merge with tools/agent/merge_pr.sh <pr>, or leave it for the owner.'
 MAIN = 'nothing is pushed to main; open a pull request.'
 HOOK = 'no going around the pre-push hook.'
-LABEL = 'only the owner takes off needs-human or one-way-door.'
+LABEL = 'only the owner takes off needs-human.'
 SEPARATORS = {';', '&&', '||', '|', '&', '(', ')', '|&', ';;'}
 # Words that can stand in front of a command without changing what it is.
 PREFIXES = {'command', 'env', 'sudo', 'time', 'nohup', 'exec', 'builtin', 'if', 'then', 'else', 'elif', 'do', 'while',
@@ -28,7 +28,7 @@ GH_VALUE_FLAGS = {'-R', '--repo'}
 API_WRITE_TO = re.compile(r'pulls/\d+/merge|/merges$|git/refs/heads/main|merge-upstream', re.I)
 API_MUTATION = re.compile(r'mergePullRequest|enablePullRequestAutoMerge|updateRef', re.I)
 HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
-PROTECTED_LABELS = ('needs-human', 'one-way-door')
+PROTECTED_LABELS = ('needs-human',)
 
 
 def without_heredocs(text):

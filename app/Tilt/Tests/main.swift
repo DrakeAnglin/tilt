@@ -49,6 +49,34 @@ check(low.isLow && !ok.isLow, "under 20% on battery is low")
 check(!chargingLow.isLow, "charging is not low")
 check(empty.isLow && empty.tooLowToMove, "too low to move is low even while charging")
 
+// ---- battery notices (Shared/BatteryNotice.swift): one rule for the controller's own reading and the hub's
+for b in [low, ok, chargingLow, empty, ControllerState.Battery(v: 4.2, pct: 100, st: "full", low: 0)] {
+    let hub = BatteryReading.fromHub(pct: b.pct, low: b.low, chg: b.charging ? 1 : 0)
+    check(hub == b.reading && hub?.isLow == b.isLow, "the hub's report and the controller's own reading agree (\(b.pct)% \(b.st))")
+}
+check(BatteryReading.fromHub(pct: 15, low: 0, chg: 1)?.isLow == false, "charging on a hub is never low")
+check(BatteryReading.fromHub(pct: 15, low: 0, chg: nil)?.isLow == true, "an older hub that does not say: low, as before")
+check(BatteryReading.fromHub(pct: 19, low: 0, chg: 0)?.isLow == true && BatteryReading.fromHub(pct: 20, low: 0, chg: 0)?.isLow == false, "the hub path uses lowPercent (20)")
+check(BatteryReading.fromHub(pct: -1, low: 0, chg: 0) == nil, "no reading yet from the hub: nothing to judge")
+let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+check(BatteryNotice.decide(low.reading, lastSent: nil, now: t0) == .low(pct: 15), "low and never sent: send")
+check(BatteryNotice.decide(chargingLow.reading, lastSent: nil, now: t0) == nil, "charging: no notice")
+check(BatteryNotice.decide(empty.reading, lastSent: nil, now: t0) == nil, "too low to move but on the cable: no notice (it is charging)")
+check(BatteryNotice.decide(BatteryReading(pct: 2, charging: false, tooLowToMove: true), lastSent: nil, now: t0) == .tooLowToMove, "too low to move on battery: send")
+check(BatteryNotice.decide(low.reading, lastSent: t0, now: t0.addingTimeInterval(86400)) == nil, "within a day of the last one: wait")
+check(BatteryNotice.decide(low.reading, lastSent: t0, now: t0.addingTimeInterval(86401)) != nil, "a day later: again")
+check(BatteryNotice.low(pct: 15).title(name: "Den") == "Den: battery low" && BatteryNotice.low(pct: 15).body.contains("15%"), "the notice wording")
+final class FakeNotifier: Notifier {
+    var sent: [(key: String, title: String, at: Date)] = []
+    func lastSent(_ key: String) -> Date? { sent.last { $0.key == key }?.at }
+    func send(_ key: String, title: String, body: String, at: Date) { sent.append((key, title, at)) }
+}
+let fn = FakeNotifier()
+BatteryNotices.check(id: "aa", name: "Den", reading: low.reading, via: fn, now: t0)
+BatteryNotices.check(id: "aa", name: "Den", reading: BatteryReading.fromHub(pct: 12, low: 0, chg: 0)!, via: fn, now: t0.addingTimeInterval(3600))
+BatteryNotices.check(id: "bb", name: "Office", reading: low.reading, via: fn, now: t0.addingTimeInterval(3600))
+check(fn.sent.map(\.key) == ["lowbatt.aa", "lowbatt.bb"], "once a day per controller, whichever path the reading came by")
+
 // ---- asleep / not reachable wording
 let seenAt = Date(timeIntervalSince1970: 1_800_000_000)
 check(TiltWords.away(lastSeen: seenAt.addingTimeInterval(-30), now: seenAt) == "Unreachable · last seen just now", "unreachable, seen moments ago")
@@ -169,6 +197,71 @@ check((try? SchedulePlan.writes(wake, slots: full))?.first { $0.controller == "h
 // a controller with 2 Ports: a target on a third Port is left out of its mask
 let twoPorts = try SchedulePlan.writes(wake, slots: ["den": emptySlots(), "hall": emptySlots()], ports: ["den": 2])
 check(twoPorts.first { $0.controller == "den" }?.value.mask == 0b001, "the mask follows the controller's Ports")
+
+// ---- Scenes on the controllers (Shared/ScenePlan.swift), and their shared wire fixture
+let scData = try Data(contentsOf: wireDir.appendingPathComponent("scenes.json"))
+let scList = try JSONDecoder().decode(SceneList.self, from: scData)
+check(scList.max == 16 && scList.sc.count == 2 && scList.sc[0].gid == 4_000_000_000 && scList.sc[0].name == "Movie \"night\"" && scList.sc[0].t == [-100, 0, -100], "the Scenes decode")
+let sceneWrite = try String(contentsOf: wireDir.appendingPathComponent("scene_write.txt"), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+check(ControllerClient.sceneCommand(scList.sc[0]) == sceneWrite, "writing the first Scene back is the fixture's command")
+try await fc.setScene(scList.sc[0])
+check(await fake.sent.last == sceneWrite, "the client sends that command")
+struct OldFirmware: ControllerTransport {
+    var host: String { "old" }
+    func move(to host: String) async {}
+    func call(_ command: String) async throws -> Data { Data(#"{"ok":0,"err":"unknown command"}"#.utf8) }
+}
+check(try await ControllerClient(transport: OldFirmware()).scenes() == nil, "firmware without Scenes: nil, not an error")
+let demoScenes = try await demo.scenes() ?? []
+check(demoScenes.map(\.name) == ["Morning", "Movie"], "the demo room keeps two sample Scenes")
+
+let atDen = { (b: Int) in BlindTarget(controller: "den", blind: b) }, atHall = { (b: Int) in BlindTarget(controller: "hall", blind: b) }
+var homeScenes: [String: [SceneSlot]] = ["den": [], "hall": []]
+func applyScenes(_ ws: [SceneWrite], to r: inout [String: [SceneSlot]]) {
+    for w in ws { r[w.controller]!.removeAll { $0.gid == w.value.gid }; if w.value.mask != 0 { r[w.controller]!.append(w.value) } }
+}
+let movie = BlindScene(name: "Movie", symbol: "film", tilts: [atDen(0): -100, atDen(2): -50, atHall(1): 0], gid: 9, ver: 100)
+applyScenes(try ScenePlan.writes(movie, read: homeScenes), to: &homeScenes)
+check(homeScenes["den"]![0].mask == 0b101 && homeScenes["den"]![0].t == [-100, 0, -50] && homeScenes["hall"]![0].mask == 0b010, "a Scene is split by controller")
+// A second phone (another Apple account, a Guest) has no copy: it sees the same Scene from the controllers alone.
+let guestSees = ScenePlan.scenes(read: homeScenes, kept: [])
+check(guestSees.count == 1 && guestSees[0].tilts == movie.tilts && guestSees[0].name == "Movie" && guestSees[0].gid == 9, "another phone puts the whole Scene back together")
+check(guestSees[0].id == BlindScene.id(for: 9) && ScenePlan.scenes(read: homeScenes, kept: [])[0].id == guestSees[0].id, "the same id on every load (Shortcuts keep working)")
+check(ScenePlan.scenes(read: homeScenes, kept: [movie])[0].id == movie.id, "the phone that made it keeps its own id")
+// The second phone edits it: the newest name wins, and the first phone sees the change.
+var renamed = guestSees[0]; renamed.name = "Film"; renamed.ver = 200; renamed.tilts[atHall(1)] = nil
+applyScenes(try ScenePlan.writes(renamed, read: homeScenes), to: &homeScenes)
+check(homeScenes["hall"]!.isEmpty, "a controller with no blinds left in the Scene loses its part")
+let mine = ScenePlan.scenes(read: homeScenes, kept: [movie])
+check(mine.count == 1 && mine[0].name == "Film" && mine[0].tilts == [atDen(0): -100, atDen(2): -50], "the first phone sees the other phone's edit")
+// Mixed versions (a save that reached only one controller): the newest name, each controller's own tilts.
+var split = homeScenes; split["hall"] = [SceneSlot(gid: 9, ver: 150, name: "Old", sym: "moon", mask: 1, t: [30, 0, 0])]
+let mixed = ScenePlan.scenes(read: split, kept: [])
+check(mixed[0].name == "Film" && mixed[0].tilts[atHall(0)] == 30, "mixed versions: the newest name, every controller's tilts")
+// A controller that did not answer: the phone's copy fills in its part; saving needs it.
+let away = ScenePlan.scenes(read: ["den": homeScenes["den"]!], kept: [movie])
+check(away[0].tilts[atHall(1)] == 0 && away[0].tilts[atDen(2)] == -50, "a controller that did not answer: its part comes from the phone's copy")
+check((try? ScenePlan.writes(movie, read: ["den": []])) == nil, "saving a Scene with blinds on a controller that did not answer is refused")
+check((try? ScenePlan.writes(movie, read: ["den": []], localOnly: ["hall"]))?.count == 1, "old firmware: its part stays on the phone, the rest is saved")
+// Names: kept as typed (quotes, curly apostrophe, accents, emoji), cut like the controller cuts them (wire.h sceneName).
+check(ScenePlan.fitName("Mom\u{2019}s caf\u{E9} \u{1F3AC}") == "Mom\u{2019}s caf\u{E9} \u{1F3AC}" && ScenePlan.fitName("Movie \"night\"") == "Movie \"night\"", "a Scene name is kept as typed")
+check(ScenePlan.fitName(String(repeating: "x", count: 46) + "\u{1F3AC}") == String(repeating: "x", count: 46), "a name that does not fit is cut before the character, at 47 bytes")
+check(ScenePlan.fitName("a\nb ") == "ab" && ScenePlan.limitName("ab ") == "ab ", "control characters dropped; trailing spaces only trimmed on save")
+// Made while its controller could not keep Scenes yet (old firmware): after the update it is kept, not taken for deleted.
+let onPhone = BlindScene(name: "Read", symbol: "book", tilts: [atHall(0): 40], gid: 77, ver: 300)
+let afterUpdate = ScenePlan.scenes(read: ["den": [], "hall": []], kept: [onPhone])
+check(afterUpdate == [onPhone], "a Scene never on a controller survives the controller's update (to be put there)")
+check(ScenePlan.scenes(read: homeScenes, kept: [])[0].seen, "a Scene read from a controller counts as seen")
+// Deleted on another phone: gone here too.
+applyScenes(try ScenePlan.writes(mine[0], delete: true, read: homeScenes), to: &homeScenes)
+check(homeScenes["den"]!.isEmpty && ScenePlan.scenes(read: homeScenes, kept: mine).isEmpty, "a Scene deleted on another phone is gone here too")
+// A Scene from before the controllers kept them (an older app's copy, no gid): kept, to be put on the controllers.
+let oldCopy = Data(#"[{"id":"7A1C2B3D-0000-4000-8000-000000000001","name":"Morning","symbol":"sunrise","tilts":[{"controller":"den","blind":0},0]}]"#.utf8)
+if let olds = try? JSONDecoder().decode([BlindScene].self, from: oldCopy) {
+    check(olds[0].gid == 0 && ScenePlan.scenes(read: homeScenes, kept: olds) == olds, "an older app's Scenes load, not yet on the controllers")
+} else { check(false, "an older app's Scenes decode") }
+let fullScenes = Array(repeating: SceneSlot(gid: 1, ver: 1, name: "x", sym: "", mask: 1, t: [0, 0, 0]), count: 16)
+check((try? ScenePlan.writes(movie, read: ["den": fullScenes, "hall": []])) == nil, "a controller with 16 Scenes takes no new one")
 
 // ---- Bluetooth setup (Shared/Bluetooth.swift): the same frames as Frame
 final class FakeRadio: @unchecked Sendable {      // a controller in setup mode, answering over Bluetooth

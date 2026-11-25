@@ -19,6 +19,9 @@ actor Demo: ControllerTransport {
         i == 0 ? ["on": 1, "days": 127, "mask": 7, "min": 0, "tilt": -100, "kind": 2, "off": 0, "ramp": 10, "gid": 1]
                : ["on": 0, "days": 0, "mask": 0, "min": 0, "tilt": 0, "kind": 0, "off": 0, "ramp": 0, "gid": 0]
     }
+    // Two sample Scenes, so the demo shows what Scenes are for (they go with the demo room).
+    private var scenes: [[String: Any]] = [["gid": 1, "ver": 1, "name": "Morning", "sym": "sunrise", "mask": 7, "t": [0, 0, 0]],
+                                           ["gid": 2, "ver": 1, "name": "Movie", "sym": "film", "mask": 7, "t": [-100, -100, -100]]]
     private let speed = 40.0                         // tilt units a second, about like the real tilter
 
     private func tilt(_ b: Blind, at now: Date) -> Double {
@@ -73,6 +76,15 @@ actor Demo: ControllerTransport {
         case "/api/sched":
             if let i = Int(q["i"] ?? ""), slots.indices.contains(i) {
                 for k in ["on", "days", "mask", "min", "tilt", "kind", "off", "ramp", "gid"] { slots[i][k] = Int(q[k] ?? "") ?? 0 }
+            }
+        case Api.scenes:
+            out = ["max": ScenePlan.perController, "sc": scenes]
+        case "/api/scene":
+            let gid = Int(q["gid"] ?? "") ?? 0, mask = Int(q["mask"] ?? "") ?? 0
+            scenes.removeAll { $0["gid"] as? Int == gid }
+            if mask != 0 {
+                scenes.append(["gid": gid, "ver": Int(q["ver"] ?? "") ?? 0, "name": q["name"] ?? "", "sym": q["sym"] ?? "", "mask": mask,
+                               "t": (q["t"] ?? "").split(separator: ",").map { Int($0) ?? 0 }])
             }
         case "/api/set":
             let k = q["k"] ?? "", v = q["v"] ?? ""

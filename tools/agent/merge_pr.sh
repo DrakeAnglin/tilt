@@ -33,9 +33,7 @@ case "$(get .mergeable)" in
 esac
 
 # A label set by hand, or by the gate, wins over everything else.
-for L in needs-human one-way-door; do
-  [ "$(get "[.labels[].name] | index(\"$L\")")" = null ] || no "has the $L label"
-done
+[ "$(get '[.labels[].name] | index("needs-human")')" = null ] || no "has the needs-human label"
 
 # Every changed file (and the old name of a renamed one), not only the first page.
 FILE_JSON=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq '.[] | {f: .filename, p: (.previous_filename // ""), n: (.additions + .deletions)}')
@@ -68,13 +66,18 @@ human_only '(^|/)(Info\.plist|[^/]*-Info\.plist|PrivacyInfo\.xcprivacy|[^/]*\.en
 human_only '^(docs/adr/|docs/requirements\.md$)' \
   "A decision or requirement changed, and those are the owner's." \
   "you agree with the decision as written."
-human_only '^tools/(firmware_tests|app_tests)\.sh$' \
-  "How the tests run changed." \
-  "no test was dropped or weakened."
+# The test scripts: adding a test to the run is fine; changing how the tests run is not.
+# only_adds_tests.awk says which: removed lines are only comments, and no added line can hide a failure.
+AWK="$(dirname "$0")/only_adds_tests.awk"
+for F in $(printf '%s\n' "$FILES" | grep -E '^tools/(firmware_tests|app_tests)\.sh$' | sort -u || true); do
+  PATCH=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq ".[] | select(.filename == \"$F\" and .status == \"modified\") | .patch // \"\"")
+  printf '%s\n' "$PATCH" | awk -f "$AWK" ||
+    no "How the tests run changed, not only which tests run. Confirm: no test was dropped or weakened. Files: $F"
+done
 # Only what decides a merge. Workflow docs, skills, CLAUDE.md and the pull request template are open to agents.
 human_only '^(tools/agent/|docs/agents/review-policy\.md$|\.github/workflows/|\.claude/agents/|\.claude/settings[^/]*\.json$|\.githooks/)' \
   "What decides a merge changed (policy, reviewer, gate, merge script, guard or CI), and an agent does not approve that for itself." \
-  "the rules still say what you want: who may merge, the doors, the human-only list."
+  "the rules still say what you want: who may merge, the doors, the blast radius, the human-only list."
 
 # CI: the 'ci' check must have passed, and nothing may be failing or still running.
 CHECKS=$(gh pr checks "$PR" --json name,bucket 2>/dev/null) || true
@@ -97,7 +100,12 @@ GATE=$(markers factory-gate | jq -r 'last // ""')
 if [ -z "$REVIEW" ]; then wait_for "no review yet (run the pr-reviewer agent)"
 elif [ "$(field "$REVIEW" sha)" != "$SHA" ]; then wait_for "the review is for an older commit (run pr-reviewer again)"
 else
-  [ "$(field "$REVIEW" door)" = two-way ] || no "The review says one-way door: no going back once shipped. Confirm: you want this, and the reason in the review holds."
+  # The door is not a rule: the blast radius and the review decide (docs/agents/review-policy.md).
+  case "$(field "$REVIEW" blast)" in
+    small|medium) ;;
+    large) no "The review says the blast radius is large: a mistake reaches devices, people's data or accounts on merge. Confirm: you want this now, and the reason in the review holds." ;;
+    *) wait_for "the review has no blast radius (run pr-reviewer again)" ;;
+  esac
   [ "$(field "$REVIEW" must-fix)" = 0 ] || wait_for "the review has must-fix findings"
 fi
 if [ -z "$GATE" ]; then wait_for "no gate verdict yet (run the merge-gate agent)"
@@ -143,3 +151,5 @@ echo "#$PR passes every rule."
 gh pr merge "$PR" --squash --match-head-commit "$SHA"
 git push origin --delete "$(get .headRefName)" >/dev/null 2>&1 || true
 echo "Merged #$PR."
+# Clear out worktrees whose pull requests are done (this one goes on the next run, from another folder).
+"$(dirname "$0")/clean_worktrees.sh" || true

@@ -218,14 +218,7 @@ final class AppModel {
         keep(c)
         save()
         c.start()
-        // Two sample scenes, so the demo shows what scenes are for (removed again with the demo room).
-        let store = SceneStore.shared
-        if store.scenes.isEmpty {
-            let all = (0..<ControllerLimits.fallback.ports).map { BlindTarget(controller: Demo.id, blind: $0) }      // the demo room has the usual 3 Ports
-            store.scenes = [BlindScene(name: "Morning", symbol: "sunrise", tilts: Dictionary(uniqueKeysWithValues: all.map { ($0, 0) })),
-                            BlindScene(name: "Movie", symbol: "film", tilts: Dictionary(uniqueKeysWithValues: all.map { ($0, -100) }))]
-            store.save()
-        }
+        Task { await SceneStore.shared.load(controllers) }      // the demo room keeps two sample Scenes, like a controller would
     }
     var hasDemo: Bool { controllers.contains { $0.id == Demo.id } }
     /// No owner is left to approve: start getting in by turning a blind's wand. Returns the blind to turn.
