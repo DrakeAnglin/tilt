@@ -53,7 +53,13 @@ Some changes are only safe to release once they have run on real hardware. The r
 5. The change does what the issue asked and nothing else.
 6. No human-only path is touched (below).
 
-Doubt about a rule is not a reason to hand over. Say what you are unsure about. Hand over only when a rule is clearly not met, or a person can judge something here that the tests and the review cannot.
+Doubt about a rule is not a reason to hand over. Say what you are unsure about and decide.
+
+**These are never a reason to hand over, and never a Human Review item**, however they are worded:
+
+- **A choice the issue left open.** The author makes it, by `docs/requirements.md`, the ADRs and `CONTEXT.md`, and writes it in the pull request under **Choices made**. The reviewer checks each choice against those docs; a wrong or unwritten choice is must-fix. If no doc settles it and it changes what a person can do (who may do what, what a guest sees), the author asks on the issue before building, not on the pull request after.
+- **"Confirm the rule is what you want" or "accept this trade-off".** A rule in the code (a role, a limit, a timeout) is pinned by a test, and the test is the check. Reading the code is the reviewer's job.
+- **A hardware run.** That is staging.
 
 **A finding is the author's to fix, never a reason to hand over.** A bug, a missing test, a missing build or something the issue asked for and did not get goes back to the author as must-fix, and the author fixes it and asks for review again, up to ten rounds. The owner gets a pull request only for what a person must judge: a large blast radius, a human-only path, or ten rounds without a clean result.
 
@@ -71,7 +77,7 @@ Three things, each with the same parts, so the owner can read any one of them al
 | `pr-reviewer` | A comment | Its own TL;DR, Summary, Evidence and Merge Danger, written from the diff, then the findings |
 | `merge-gate` | A comment | TL;DR of the verdict, door, blast radius, what could go wrong, then the six rules as notes |
 
-**`needs-human` never stands alone.** It always comes with two things: **why** a person is needed (what a person can judge here that tests and agents cannot), and **what to confirm** (three checks at most, each naming a file). The gate writes them in its comment and in the pull request body under `## Human Review`. `merge_pr.sh` writes them in a comment when it is the one that refuses.
+**`needs-human` never stands alone.** It always comes with two things: **why** a person is needed (which reason in "Who merges"), and **what to confirm** (three checks at most). A check is something only a person can do, such as agree to a change in the merge rules. Never "every role is what you want", "you accept that ...", "run this on hardware" or "read this function". The gate writes them in its comment and in the pull request body under `## Human Review`. `merge_pr.sh` writes them in a comment when it is the one that refuses.
 
 ## Human-only paths
 
