@@ -85,8 +85,8 @@ Say what was seen, where (file and line), and how to see it again. Do not fix it
 | --- | --- |
 | `ready-for-agent` | The owner says an agent may pick this issue up on its own |
 | `needs-triage` | Filed by an agent; the owner has not looked yet |
-| `two-way-door` / `one-way-door` | The reviewer's door for a pull request |
-| `bench-check` | Merged, but check it on real hardware before the next firmware release |
+| `two-way-door` / `one-way-door` | The reviewer's door for a pull request: exactly one. It says how easy going back is; it does not stop a merge |
+| `bench-check` | On the staging list: check it on real hardware when the next release is staged. Never blocks a merge |
 | `auto-merge-ok` | The gate says the agent may merge |
 | `needs-human` | The owner reviews and merges this one |
 
