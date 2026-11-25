@@ -35,6 +35,7 @@
 #include <esp_coexist.h>
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
+#include <esp_heap_caps.h>
 #include <driver/gpio.h>
 #include "lights.h"
 #include <host/ble_hs.h>
@@ -1528,6 +1529,21 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     return r;
   }
   if (path == "/api/net") return netJson();
+  if (path == "/api/mem" && owner) {             // where the memory goes: free, biggest block, and each task's stack low point
+    multi_heap_info_t h; heap_caps_get_info(&h, MALLOC_CAP_INTERNAL);
+    std::string j = "{\"ok\":1,\"free\":" + std::to_string(h.total_free_bytes) + ",\"big\":" + std::to_string(h.largest_free_block) +
+                    ",\"used\":" + std::to_string(h.total_allocated_bytes) + ",\"min\":" + std::to_string(h.minimum_free_bytes) +
+                    ",\"blocks\":" + std::to_string(h.allocated_blocks) + ",\"tasks\":{";
+    UBaseType_t n = uxTaskGetNumberOfTasks() + 4;
+    TaskStatus_t *t = (TaskStatus_t *)malloc(n * sizeof(TaskStatus_t));
+    if (t) {
+      n = uxTaskGetSystemState(t, n, nullptr);
+      for (UBaseType_t i = 0; i < n; i++)
+        j += std::string(i ? "," : "") + "\"" + t[i].pcTaskName + "\":" + std::to_string(t[i].usStackHighWaterMark);
+      free(t);
+    }
+    return j + "}}";
+  }
   if (path == "/api/testalert") { alertRaise(htopic, "test", 9, "Tilt Hub"); return "{\"ok\":1}"; }   // a push to the hub's owners, to try the path
   if (path == "/api/hubupdate") { hubUpdUntil = (ms() + 300000) | 1; return "{\"ok\":1}"; }   // one hub update, 5 minutes
   if (path == "/api/upload") {                   // allow one firmware upload for this controller, for 5 minutes
@@ -1632,7 +1648,7 @@ static esp_err_t hInfo(httpd_req_t *r) { return sendStatus(r, 200, "{\"hub\":\"t
 static void httpBegin() {
   httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
   hc.uri_match_fn = httpd_uri_match_wildcard;
-  hc.stack_size = 10240;
+  hc.stack_size = 6144;                         // uses about 2 KB (/api/mem)
   hc.lru_purge_enable = true;
   hc.max_open_sockets = 5;
   hc.max_uri_handlers = 12;
