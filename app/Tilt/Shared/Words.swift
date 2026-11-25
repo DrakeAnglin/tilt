@@ -58,6 +58,6 @@ extension ControllerState.Battery {
     var charging: Bool { st != "battery" }
     /// Below the motor cut-off: the controller won't move any blind until it is charged.
     var tooLowToMove: Bool { low == 1 }
-    /// Worth a warning: too low to move, or on battery and under lowPercent.
-    var isLow: Bool { tooLowToMove || (!charging && pct < Self.lowPercent) }
+    /// Worth a warning (the rule is BatteryReading.isLow, Shared/BatteryNotice.swift).
+    var isLow: Bool { reading.isLow }
 }

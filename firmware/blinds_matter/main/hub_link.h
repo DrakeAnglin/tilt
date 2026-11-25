@@ -66,8 +66,8 @@ static uint32_t backupCrc();
 // What the hub needs to show the blinds in Apple Home. Whole numbers, so it only changes when a blind really moves.
 std::string hubStatusJson(int pct) {
   std::string j;
-  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"boot\":\"%s\",\"bn\":%lu,\"sep\":%d,\"pct\":%d,\"low\":%d,\"closeUp\":%d,\"mv\":%d,\"cv\":%lu,\"own\":%d,\"b\":[", ctrlId().c_str(),
-     jq(cfg.name).c_str(), hexOf(bootId, 4).c_str(), (unsigned long)bootN, hkSeparate, pct, battOkToMove() ? 0 : 1, cfg.closeUp, firstMoving(), (unsigned long)backupCrc(), owned() ? 1 : 0);
+  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"boot\":\"%s\",\"bn\":%lu,\"sep\":%d,\"pct\":%d,\"low\":%d,\"chg\":%d,\"closeUp\":%d,\"mv\":%d,\"cv\":%lu,\"own\":%d,\"b\":[", ctrlId().c_str(),
+     jq(cfg.name).c_str(), hexOf(bootId, 4).c_str(), (unsigned long)bootN, hkSeparate, pct, battOkToMove() ? 0 : 1, strcmp(chargeState(), "battery") ? 1 : 0, cfg.closeUp, firstMoving(), (unsigned long)backupCrc(), owned() ? 1 : 0);
   for (int i = 0; i < PORTS; i++) {
     bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
     ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, movable(i) ? 1 : 0,
