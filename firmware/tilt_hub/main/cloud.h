@@ -119,6 +119,7 @@ static bool ckSign(const std::string &date, const std::string &body, const std::
 // before, 18-25 KB at the lowest; ckPost logs it). With less than CK_NEED_HEAP free, or while a firmware file is
 // coming in or going out, Wi-Fi and Matter could run short, so the alert waits (-2) until the hub is calmer.
 static const size_t CK_NEED_HEAP = 45000;
+static size_t ckMemBefore, ckMemLow, ckMemWorst = SIZE_MAX;   // the last send: free before and at its lowest; the lowest of any send
 static bool cloudBusy();                         // hub.cpp: an update is on
 static int ckPost(const char *env, const char *op, const std::string &body, std::string &resp) {
   static const char HOST[] = "api.apple-cloudkit.com";
@@ -160,7 +161,9 @@ static int ckPost(const char *env, const char *op, const std::string &body, std:
     if (off == req.size() && all.compare(0, 5, "HTTP/") == 0 && all.size() > 12) st = atoi(all.c_str() + 9);
   }
   esp_tls_conn_destroy(tls);
-  ESP_LOGI(TAG, "iCloud %s: %d; memory free %u before, %u at the lowest", op, st, (unsigned)freeBefore, (unsigned)esp_get_minimum_free_heap_size());
+  ckMemBefore = freeBefore; ckMemLow = esp_get_minimum_free_heap_size();
+  if (ckMemLow < ckMemWorst) ckMemWorst = ckMemLow;
+  ESP_LOGI(TAG, "iCloud %s: %d; memory free %u before, %u at the lowest", op, st, (unsigned)freeBefore, (unsigned)ckMemLow);
   heap_caps_monitor_local_minimum_free_size_stop();
   size_t hb = all.find("\r\n\r\n");
   if (hb != std::string::npos) resp = all.substr(hb + 4);
@@ -274,7 +277,8 @@ static int alertsWaiting() {
 // For the app's hub page: is there a key, how many wait, how the last try went.
 static std::string cloudJson() {
   return std::string("\"cloud\":{\"key\":") + (ckKeyOk ? "1" : "0") + ",\"wait\":" + std::to_string(alertsWaiting()) + ",\"st\":" + std::to_string(ckLastStatus) +
-         ",\"okAt\":" + std::to_string(ckLastOkAt) + (ckLastErr[0] ? ",\"err\":\"" + std::string(ckLastErr) + "\"" : std::string()) + "}";
+         ",\"okAt\":" + std::to_string(ckLastOkAt) +
+         (ckMemBefore ? ",\"mem\":[" + std::to_string(ckMemBefore) + "," + std::to_string(ckMemLow) + "," + std::to_string(ckMemWorst) + "]" : std::string()) + (ckLastErr[0] ? ",\"err\":\"" + std::string(ckLastErr) + "\"" : std::string()) + "}";
 }
 static void cloudBegin() {
   alertMx = xSemaphoreCreateMutex();

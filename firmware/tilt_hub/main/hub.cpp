@@ -2040,9 +2040,9 @@ extern "C" void app_main() {
   if (esp_netif_get_netif_impl_name(esp_openthread_get_netif(), ifr.ifr_name) != ESP_OK ||
       setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof ifr) != 0) ESP_LOGE(TAG, "the controllers' port could not be kept to Thread (errno %d)", errno);
   else ESP_LOGI(TAG, "controllers' port: Thread only (%s)", ifr.ifr_name);
-  xTaskCreate(udpTask, "udp", 6144, nullptr, 6, nullptr);
+  xTaskCreate(udpTask, "udp", 5120, nullptr, 6, nullptr);
   xTaskCreate(moveTask, "moves", 6144, nullptr, 5, nullptr);
-  xTaskCreate(careTask, "care", 8192, nullptr, 4, nullptr);
+  xTaskCreate(careTask, "care", 6144, nullptr, 4, nullptr);
   httpBegin();
   rgbBegin();                                    // the color light's pulse channel, once, before anyone uses it
   xTaskCreate(resetTask, "reset", 3072, nullptr, 2, nullptr);
