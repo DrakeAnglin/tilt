@@ -7,6 +7,7 @@
 //   controller -> hub   '#' | seq | piece (1) | count (1) | part   an answer longer than 1000 bytes (status and answer),
 //                                                        in up to 16 pieces; the hub joins them before passing it on
 //   controller -> hub   'S' | "00" | status JSON           pushed when something changed, and every 10 minutes
+//                                                        (b[].st: stalls since this start, for the hub's alerts)
 //   controller -> hub   'L' | "00" | one event log line
 //   controller -> hub   'G' | "00"                          leaving (factory reset): the hub stops announcing it
 //   hub -> controller   's' | seq | "200" | epoch "." mac   the hub's answer to a push: the time, for the Schedules
@@ -41,6 +42,7 @@
 #include "sec.h"
 #include "home_view.h"
 #include "update.h"                              // otaWindow, fwSignatureOk, otaPending
+#include "ota.h"                                 // OtaReceiver: the decisions about a firmware file
 #include <esp_delta_ota.h>
 
 const uint16_t HUB_PORT = 49100;
@@ -50,7 +52,7 @@ volatile uint32_t hubSeen = 0;                   // millis of the last message f
 volatile uint32_t hubLinkSeen = 0;
 volatile bool hubWantsStatus = false;
 static uint32_t bootN = 0;                       // counts every start (flash): pushes carry it, so an old one is never taken again
-static volatile bool hubOtaStallReq = false;     // the blinds task saw an update stall; the hub task stops it            // the hub said hello (it may have restarted): push the status now
+static volatile bool hubOtaStallReq = false;     // the blinds task saw an update stall; the hub task stops it
 static int hubSock = -1;
 static sockaddr_in6 hubAddr;                     // where the hub last answered from (Thread build)
 static bool hubAddrOk = false;
@@ -70,8 +72,8 @@ std::string hubStatusJson(int pct) {
      jq(cfg.name).c_str(), hexOf(bootId, 4).c_str(), (unsigned long)bootN, hkSeparate, pct, battOkToMove() ? 0 : 1, strcmp(chargeState(), "battery") ? 1 : 0, cfg.closeUp, firstMoving(), (unsigned long)backupCrc(), owned() ? 1 : 0);
   for (int i = 0; i < PORTS; i++) {
     bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
-    ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, movable(i) ? 1 : 0,
-       jn(live ? tiltOf(i, mvs[i].live) : bs[i].tilt, 0).c_str(), jn(bs[i].target, 0).c_str(), (movingPort(i) || bs[i].queued) ? 1 : 0);
+    ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d,\"st\":%u}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, movable(i) ? 1 : 0,
+       jn(live ? tiltOf(i, mvs[i].live) : bs[i].tilt, 0).c_str(), jn(bs[i].target, 0).c_str(), (movingPort(i) || bs[i].queued) ? 1 : 0, (unsigned)movesStalled[i]);
   }
   j += "]}";
   return j;
@@ -262,159 +264,77 @@ static bool hubTime(const std::string &s) {     // "epoch.mac"
   return true;
 }
 // ---- a firmware file, through the hub. An owner allowed it (/api/otaopen) and the file carries a valid release
-// signature. The new firmware starts on trial.
-//   'B' size[",d"] "." mac   begin ("d": a patch)     'W' offset (4, big end) + bytes     'E' end: check, restart
-// Each 'W' is answered with the next offset wanted ("200" + offset, or "409" + offset when one was missed).
-// Two kinds of file:
-//   full    image | signature (64) | "TILTSIG1"
-//   patch   header (64: magic, the running image's SHA-256) | detools patch | signature of the new image (64) |
-//           signature of the patch file (64, for the hub) | "TILTDLT1"
+// signature. The new firmware starts on trial. The messages, the two kinds of file and every decision: ota.h
+// (OtaReceiver). Here: what it does to this controller (OtaSink).
 // A patch is only what changed since the firmware this controller runs (esp_delta_ota): usually a tenth of the size,
-// so it comes over Thread in about a minute. Either way the controller checks the signature of the image it ends up
-// with, so a patch can never make anything the full file could not.
-volatile bool hubOtaActive = false;
-static volatile uint32_t hubOtaLast = 0;         // set by the hub task, read by the blinds task
-bool hubOtaBusy() { return hubOtaActive && (int32_t)(millis() - hubOtaLast) < 30000; }
-static esp_ota_handle_t hubOtaH;
-static const esp_partition_t *hubOtaTo;
-static uint32_t hubOtaGot;
-static mbedtls_sha256_context hubOtaSha;        // of the image being written (for a patch: what the patch makes)
-static uint8_t hubOtaTail[136];                  // the end of the file, held back until 'E'
-static int hubOtaTailN;
-static bool hubOtaGood;
-static bool hubOtaDelta;
-static esp_delta_ota_handle_t hubDelta;
-static uint8_t hubDeltaHdr[64];
-static int hubDeltaHdrN;
-static const char DLT_MAGIC[8] = {'T', 'I', 'L', 'T', 'D', 'L', 'T', '1'};
-static int hubOtaTailLen() { return hubOtaDelta ? 136 : 72; }
-// Where the new image's bytes go (the file itself, or what the patch makes): flash, and the hash for the signature.
-static esp_err_t hubOtaOut(const uint8_t *b, size_t n, void *) {
-  if (esp_ota_write(hubOtaH, b, n) != ESP_OK) return ESP_FAIL;
-  mbedtls_sha256_update(&hubOtaSha, b, n);
-  return ESP_OK;
-}
-static esp_err_t hubDeltaSrc(uint8_t *b, size_t n, int off, void *) {
-  return esp_partition_read(esp_ota_get_running_partition(), off, b, n);
-}
-// The patch bytes as they come: first its header (made for this exact firmware?), then the patch itself.
-static bool hubDeltaFeed(const uint8_t *b, int n) {
-  if (hubDeltaHdrN < 64) {
-    int k = n < 64 - hubDeltaHdrN ? n : 64 - hubDeltaHdrN;
-    memcpy(hubDeltaHdr + hubDeltaHdrN, b, k);
-    hubDeltaHdrN += k; b += k; n -= k;
-    if (hubDeltaHdrN == 64) {
-      uint8_t mine[32];
-      uint32_t magic = hubDeltaHdr[0] | hubDeltaHdr[1] << 8 | hubDeltaHdr[2] << 16 | (uint32_t)hubDeltaHdr[3] << 24;
-      if (magic != 0xfccdde10 || esp_partition_get_sha256(esp_ota_get_running_partition(), mine) != ESP_OK || memcmp(mine, hubDeltaHdr + 4, 32)) {
-        event("update refused: the patch is for another firmware");
-        return false;
-      }
-    }
+// so it comes over Thread in about a minute.
+struct EspOtaSink : OtaSink {
+  esp_ota_handle_t h = 0;
+  const esp_partition_t *to = nullptr;
+  mbedtls_sha256_context sha;                    // of the image being written (for a patch: what the patch makes)
+  esp_delta_ota_handle_t patch = nullptr;
+  // Where the new image's bytes go (the file itself, or what the patch makes): flash, and the hash for the signature.
+  static esp_err_t out(const uint8_t *b, size_t n, void *me) {
+    EspOtaSink *k = (EspOtaSink *)me;
+    if (esp_ota_write(k->h, b, n) != ESP_OK) return ESP_FAIL;
+    mbedtls_sha256_update(&k->sha, b, n);
+    return ESP_OK;
   }
-  return n <= 0 || esp_delta_ota_feed_patch(hubDelta, b, n) == ESP_OK;
-}
-static void hubOtaStop() {
-  if (hubOtaDelta && hubDelta) { esp_delta_ota_deinit(hubDelta); hubDelta = nullptr; }
-  esp_ota_abort(hubOtaH);
-}
-// While a file comes in, keep the radio on (like a mains-powered device) so the hub can send at full speed instead of
-// one piece per check-in; back to sleeping once it is done or stalls.
-static void hubRadioOn(bool on) {
-  esp_openthread_lock_acquire(portMAX_DELAY);
-  otInstance *ot = esp_openthread_get_instance();
-  otLinkModeConfig m = otThreadGetLinkMode(ot);
-  if (m.mRxOnWhenIdle != on) { m.mRxOnWhenIdle = on; otThreadSetLinkMode(ot, m); }
-  esp_openthread_lock_release();
-}
-static void hubFastPoll() {                      // check in quickly while the file comes in
-  chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) { chip::app::ICDNotifier::GetInstance().NotifyNetworkActivityNotification(); }, 0);
-}
-static const char *hubOta(char t, const std::string &in, std::string &out) {
-  if (t == 'B') {
-    size_t dot = in.find('.');
-    if (dot == std::string::npos || !hubMacOk("hub-ota" + std::string((const char *)bootId, 4) + in.substr(0, dot), in.substr(dot + 1))) {
-      out = "{\"err\":\"not from the Tilt Hub\"}"; return "403";
-    }
-    // The begin carries the hub's time ("@epoch"): each one must be newer than the last, so a recorded one does nothing.
-    // (A hub from before this change sends none: still accepted, owner-allowed window only.)
-    static long lastB = 0;
-    size_t at = in.find('@');
-    if (at != std::string::npos && at < dot) {
-      long tb = atol(in.c_str() + at + 1);
-      if (tb <= lastB || (time(nullptr) > 1700000000 && labs(tb - (long)time(nullptr)) > 600)) { out = "{\"err\":\"an old update request\"}"; return "403"; }
-      lastB = tb;
-    }
-    if (!openApi && (int32_t)(otaWindow - millis()) <= 0) { out = "{\"err\":\"updates are locked: the owner must allow them from the app\"}"; return "403"; }
-    if (hubOtaActive) { hubOtaStop(); hubRadioOn(false); }
-    hubOtaActive = false;
-    hubOtaLast = millis();
-    { Lock l; stopAll("stopped"); }
-    hubOtaDelta = in.substr(0, dot).find(",d") != std::string::npos;
-    hubOtaTo = esp_ota_get_next_update_partition(nullptr);
-    // Erase as the pieces come in, not all at once: erasing 1.9 MB stops the radio for many seconds.
-    if (!hubOtaTo || esp_ota_begin(hubOtaTo, OTA_WITH_SEQUENTIAL_WRITES, &hubOtaH) != ESP_OK) { out = "{\"err\":\"could not start the update\"}"; return "500"; }
-    if (hubOtaDelta) {
-      esp_delta_ota_cfg_t dc = {};
-      dc.read_cb_with_user_data = hubDeltaSrc;
-      dc.write_cb_with_user_data = hubOtaOut;
-      hubDelta = esp_delta_ota_init(&dc);
-      hubDeltaHdrN = 0;
-      if (!hubDelta) { esp_ota_abort(hubOtaH); out = "{\"err\":\"could not start the patch\"}"; return "500"; }
-    }
-    mbedtls_sha256_init(&hubOtaSha); mbedtls_sha256_starts(&hubOtaSha, 0);
-    hubOtaGot = 0; hubOtaTailN = 0; hubOtaGood = true; hubOtaActive = true;
-    event("update through the hub: %s bytes%s", in.substr(0, in.find(',') < dot ? in.find(',') : dot).c_str(), hubOtaDelta ? " (a patch)" : "");
-    hubFastPoll();
-    hubRadioOn(true);
-    out = "0";
-    return "200";
+  static esp_err_t src(uint8_t *b, size_t n, int off, void *) { return esp_partition_read(esp_ota_get_running_partition(), off, b, n); }
+  bool open() override {
+    to = esp_ota_get_next_update_partition(nullptr);
+    if (!to || esp_ota_begin(to, OTA_WITH_SEQUENTIAL_WRITES, &h) != ESP_OK) return false;
+    mbedtls_sha256_init(&sha); mbedtls_sha256_starts(&sha, 0);
+    return true;
   }
-  if (!hubOtaActive) { out = "{\"err\":\"no update going\"}"; return "409"; }
-  hubOtaLast = millis();
-  if (t == 'W') {
-    hubFastPoll();
-    if (in.size() < 5) { out = std::to_string(hubOtaGot); return "400"; }
-    const uint8_t *b = (const uint8_t *)in.data();
-    uint32_t off = (uint32_t)b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3];
-    if (off != hubOtaGot) { out = std::to_string(hubOtaGot); return "409"; }   // missed one: send from here again
-    // The end of the file is the signatures, so it is held back until the end.
-    static uint8_t buf[1200 + 136];
-    int n = in.size() - 4, T = hubOtaTailLen();
-    if (n > 1200) { out = std::to_string(hubOtaGot); return "400"; }
-    memcpy(buf, hubOtaTail, hubOtaTailN);
-    memcpy(buf + hubOtaTailN, b + 4, n);
-    int have = hubOtaTailN + n, wr = have > T ? have - T : 0;
-    if (wr && hubOtaGood) hubOtaGood = hubOtaDelta ? hubDeltaFeed(buf, wr) : hubOtaOut(buf, wr, nullptr) == ESP_OK;
-    hubOtaTailN = have - wr;
-    memcpy(hubOtaTail, buf + wr, hubOtaTailN);
-    hubOtaGot += n;
-    out = std::to_string(hubOtaGot);
-    return hubOtaGood ? "200" : "500";
+  bool openPatch() override {
+    esp_delta_ota_cfg_t dc = {};
+    dc.read_cb_with_user_data = src;
+    dc.write_cb_with_user_data = out;
+    dc.user_data = this;
+    patch = esp_delta_ota_init(&dc);
+    return patch != nullptr;
   }
-  // 'E'
-  hubOtaActive = false;
-  hubRadioOn(false);
-  if (hubOtaDelta && hubOtaGood) hubOtaGood = esp_delta_ota_finalize(hubDelta) == ESP_OK;
-  if (hubOtaDelta && hubDelta) { esp_delta_ota_deinit(hubDelta); hubDelta = nullptr; }
-  int T = hubOtaTailLen();
-  bool signedFile = hubOtaGood && hubOtaTailN == T && !memcmp(hubOtaTail + T - 8, hubOtaDelta ? DLT_MAGIC : SIG_MAGIC, 8);
-  uint8_t hash[32];
-  mbedtls_sha256_finish(&hubOtaSha, hash); mbedtls_sha256_free(&hubOtaSha);
-  if (!hubOtaGood) { esp_ota_abort(hubOtaH); out = hubOtaDelta ? "{\"err\":\"the patch did not fit this firmware\"}" : "{\"err\":\"the update broke off\"}"; return "500"; }
-  // The image's signature is the first 64 bytes of the end, for both kinds.
-  if (!signedFile || !fwSignatureOk(hash, hubOtaTail)) { esp_ota_abort(hubOtaH); event("update refused: bad signature"); out = "{\"err\":\"the file's signature is not valid\"}"; return "403"; }
-  if (esp_ota_end(hubOtaH) != ESP_OK) { out = "{\"err\":\"the file was not accepted\"}"; return "500"; }
-  esp_app_desc_t nd;
-  if (esp_ota_get_partition_description(hubOtaTo, &nd) != ESP_OK || fwIsOlder(nd.version, FW_VERSION)) {
-    event("update refused: %s is older than %s", nd.version, FW_VERSION);
-    out = "{\"err\":\"that firmware is older than the one it runs\"}"; return "403";
+  bool write(const uint8_t *b, size_t n) override { return patch ? esp_delta_ota_feed_patch(patch, b, n) == ESP_OK : out(b, n, this) == ESP_OK; }
+  bool finishPatch() override { return esp_delta_ota_finalize(patch) == ESP_OK; }
+  void closePatch() override { if (patch) { esp_delta_ota_deinit(patch); patch = nullptr; } }
+  void hash(uint8_t o[32]) override { mbedtls_sha256_finish(&sha, o); mbedtls_sha256_free(&sha); }
+  bool verify(const uint8_t hs[32], const uint8_t sig[64]) override { return fwSignatureOk(hs, sig); }
+  bool finalize() override { return esp_ota_end(h) == ESP_OK; }
+  bool newVersion(std::string &v) override {
+    esp_app_desc_t d;
+    if (esp_ota_get_partition_description(to, &d) != ESP_OK) return false;
+    v = d.version;
+    return true;
   }
-  if (esp_ota_set_boot_partition(hubOtaTo) != ESP_OK) { out = "{\"err\":\"the file was not accepted\"}"; return "500"; }
-  event("signed update accepted (through the hub)");
-  { Lock l; statsSave(); restartSoon = true; }
-  out = "{\"ok\":1}";
-  return "200";
+  bool setBoot() override { return esp_ota_set_boot_partition(to) == ESP_OK; }
+  void abort() override { closePatch(); esp_ota_abort(h); }
+  bool runningSha(uint8_t o[32]) override { return esp_partition_get_sha256(esp_ota_get_running_partition(), o) == ESP_OK; }
+  // While a file comes in, keep the radio on (like a mains-powered device) so the hub can send at full speed instead of
+  // one piece per check-in; back to sleeping once it is done or stalls.
+  void radio(bool on) override {
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *ot = esp_openthread_get_instance();
+    otLinkModeConfig m = otThreadGetLinkMode(ot);
+    if (m.mRxOnWhenIdle != on) { m.mRxOnWhenIdle = on; otThreadSetLinkMode(ot, m); }
+    esp_openthread_lock_release();
+  }
+  void stopBlinds() override { Lock l; stopAll("stopped"); }
+  void fastPoll() override {                     // check in quickly while the file comes in
+    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) { chip::app::ICDNotifier::GetInstance().NotifyNetworkActivityNotification(); }, 0);
+  }
+  void accepted() override { Lock l; statsSave(); restartSoon = true; }
+  void log(const std::string &line) override { event("%s", line.c_str()); }
+};
+static EspOtaSink hubOtaSink;
+static OtaReceiver hubOtaRx(hubOtaSink, FW_VERSION);
+bool hubOtaBusy() { return hubOtaRx.busy(millis()); }
+// 'B': the proof first (only the hub may start one), then the receiver's own checks.
+static OtaReply hubOtaBegin(const std::string &in) {
+  size_t dot = in.find('.');
+  if (dot == std::string::npos || !hubMacOk("hub-ota" + std::string((const char *)bootId, 4) + in.substr(0, dot), in.substr(dot + 1)))
+    return {"403", "{\"err\":\"not from the Tilt Hub\"}"};
+  return hubOtaRx.begin(in.substr(0, dot), (long)time(nullptr), openApi || (int32_t)(otaWindow - millis()) > 0, millis());
 }
 static void hubTask(void *) {
   hubSock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
@@ -429,20 +349,11 @@ static void hubTask(void *) {
   timeval tmo = {1, 0};                          // wake once a second: an update that stalled is stopped here
   setsockopt(hubSock, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof tmo);
   static char buf[2400];
-  static const char *lastESt = nullptr;          // the answer to the last 'E' (a repeated 'E' gets it again)
-  static std::string lastEOut;
-  static uint32_t lastEAt = 0;
   for (;;) {
     sockaddr_in6 from;
     socklen_t fl = sizeof from;
     int n = recvfrom(hubSock, buf, sizeof buf, 0, (sockaddr *)&from, &fl);
-    if (hubOtaStallReq) {
-      hubOtaStallReq = false;
-      if (hubOtaActive && (int32_t)(millis() - hubOtaLast) > 30000) {
-        hubOtaActive = false; hubOtaStop(); hubRadioOn(false);
-        event("update through the hub stopped (nothing came for 30 s)");
-      }
-    }
+    if (hubOtaStallReq) { hubOtaStallReq = false; hubOtaRx.stopIfStalled(millis()); }
     if (n < 0) { if (errno != EAGAIN && errno != EWOULDBLOCK) vTaskDelay(pdMS_TO_TICKS(100)); continue; }   // never spin on an error
     // Only what the hub sends. (Anything else, such as this controller's own multicast or an answer, is ignored:
     // answering it could start an endless exchange.) Pairing as the first owner is Bluetooth only, never over Thread.
@@ -472,14 +383,11 @@ static void hubTask(void *) {
       st = secDo(in, out, nullptr, &fromHub);
       if (st[0] == '2') { awake(); hubLinkSeen = millis() ? millis() : 1; if (fromHub) heard(); }
     } else if (t == 'A') { st = pairDo(in, out, true); if (st[0] == '2') awake(); }
-    else if (t == 'B') { st = hubOta(t, in, out); if (st[0] == '2') { heard(); awake(); } }
-    else if (t == 'E' && !hubOtaActive && lastESt && millis() - lastEAt < 30000) { st = lastESt; out = lastEOut; }   // its answer was lost
+    else if (t == 'B') { OtaReply r = hubOtaBegin(in); st = r.status; out = r.out; if (st[0] == '2') { heard(); awake(); } }
+    else if (t == 'E' && !hubOtaRx.going()) { OtaReply r = hubOtaRx.end(millis()); st = r.status; out = r.out; }   // its answer was lost: the same again
     else if (t == 'W' || t == 'E') {             // pieces only from where the proven begin came from
-      if (!hubOtaActive || !hubAddrOk || memcmp(&from.sin6_addr, &hubAddr.sin6_addr, 16)) { out = "{\"err\":\"no update going\"}"; st = "409"; }
-      else {
-        st = hubOta(t, in, out);
-        if (t == 'E') { lastESt = st; lastEOut = out; lastEAt = millis() ? millis() : 1; }
-      }
+      if (!hubOtaRx.going() || !hubAddrOk || memcmp(&from.sin6_addr, &hubAddr.sin6_addr, 16)) { out = "{\"err\":\"no update going\"}"; st = "409"; }
+      else { OtaReply r = t == 'W' ? hubOtaRx.piece(in, millis()) : hubOtaRx.end(millis()); st = r.status; out = r.out; }
     } else out = "{\"err\":\"unknown request\"}";
     std::string body(st, 3);
     body += out;
@@ -547,7 +455,7 @@ void hubTick() {
     rejoinAt = now + 3000;
   }
   if (rejoinAt && (int32_t)(now - rejoinAt) >= 0) { rejoinAt = 0; hubApply(); }
-  if (hubOtaActive && (int32_t)(now - hubOtaLast) > 30000) hubOtaStallReq = true;   // the hub task stops it
+  if (hubOtaRx.stalled(now)) hubOtaStallReq = true;   // the hub task stops it
   // Nobody owns it yet (new, or just reset): keep it findable over Bluetooth until it is set up. Matter's window
   // closes after 15 minutes; open it again (the Tilt service advertises with it).
   static uint32_t lastOpen = 0;

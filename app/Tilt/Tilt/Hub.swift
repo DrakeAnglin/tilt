@@ -64,6 +64,7 @@ final class HubWatch {
     private var browser: NWBrowser?
     private var poll: Task<Void, Never>?
     private var misses = 0
+    private var firstMiss: Date?
     private var conn: HubClient?
 
     func start() {
@@ -86,7 +87,7 @@ final class HubWatch {
             }
         }
     }
-    func stop() { browser?.cancel(); browser = nil; poll?.cancel(); poll = nil; answering = nil; misses = 0 }   // ask afresh when the app comes back
+    func stop() { browser?.cancel(); browser = nil; poll?.cancel(); poll = nil; answering = nil; misses = 0; firstMiss = nil }   // ask afresh when the app comes back
 
     private func noteFound(_ f: FoundHub?) {
         found = f                                   // nil: the hub is gone from the Wi-Fi (unplugged, or this iPhone left home)
@@ -108,11 +109,16 @@ final class HubWatch {
         do {
             let i = try await client().info()
             guard current() else { return }
-            misses = 0; answering = true; info = i
+            misses = 0; answering = true; info = i; firstMiss = nil
+            Task { await HubOffline.answered() }
             inHome = HomeSetup.inHome(hubSays: (i.home ?? 0) == 1, hubHomes: (i.homes ?? []).map { .init(node: $0.node, vendor: $0.vendor) },
                                       appleNodes: AppleHomes.shared.nodeIDs)
             newNearby = i.new.count
             if var r = record, r.waiting { r.waiting = false; r.code = nil; save(r) }     // the owner let this iPhone in
+            if isOwner, var r = record {                                                     // the hub's push alerts: watched on every check, so a
+                if let t = i.topic, !t.isEmpty, t != r.topic { r.topic = t; save(r) }      // phone that joined before them gets them too
+                if let t = r.topic { Task { await Cloud.watch(topic: t) } }
+            }
             if let ps = try? await client().people(), current() {
                 everyone = ps
                 if let me = ps.first(where: { $0.me == 1 }), var r = record, r.owner != (me.owner == 1) {     // made owner, or user
@@ -132,7 +138,9 @@ final class HubWatch {
         } catch {
             guard current() else { return }
             misses += 1
+            if firstMiss == nil { firstMiss = Date() }
             if misses >= 2 || answering == nil { answering = false; newNearby = 0 }
+            if misses >= 2, isOwner, let since = firstMiss { Task { await HubOffline.missed(since: since) } }
         }
     }
 

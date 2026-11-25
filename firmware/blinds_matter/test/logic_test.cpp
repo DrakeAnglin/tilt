@@ -1,4 +1,5 @@
-// Tests for main/logic.h, main/handwatch.h, main/home_view.h, main/request.h, main/tilter.h and main/wire.h, run on the Mac:
+// Tests for main/logic.h, main/handwatch.h, main/home_view.h, main/request.h, main/tilter.h, main/wire.h and the Tilt
+// Hub's alert_rules.h, run on the Mac:
 // tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
 #include "../main/home_view.h"
@@ -6,6 +7,7 @@
 #include "../main/request.h"
 #include "../main/tilter.h"
 #include "../main/wire.h"
+#include "../../tilt_hub/main/alert_rules.h"
 #include <cstdio>
 #include <ctime>
 #include <fstream>
@@ -430,8 +432,8 @@ int main() {
   CHECK(permitRule(false, false, true, false, "/api/set", "", "") == nullptr, "plain open before pairing or with the switch");
   CHECK(permitRule(false, false, false, true, "/api/update", "", "") == nullptr, "update checks its own signature");
   CHECK(permitRule(true, true, false, false, "/api/set", "", me) == nullptr, "owner may change settings");
-  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys"})
-    CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move");
+  for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys", "/api/scenes", "/api/scene"})
+    CHECK(permitRule(true, false, false, false, p, "", me) == nullptr, "user may see and move, and make Scenes");
   for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen"})
     CHECK(permitRule(true, false, false, false, p, "", me) != nullptr, "user refused owner-only command");
   CHECK(permitRule(true, false, false, false, "/api/keyname", me, me) == nullptr, "user may rename themself");
@@ -514,6 +516,34 @@ int main() {
   CHECK(got.mask == 7 && got.tilt == -100 && got.min == 1439, "out-of-range values are brought into range (mask to 3 Ports)");
   CHECK(slotOfArgs(arg, 2).mask == 3, "the mask follows the number of Ports");
 
+  // ---- Scenes on the wire: the same fixture the app's tests read and write
+  {
+    WireScene fs[2] = {{4000000000u, 1795319000u, "Movie \"night\"", "film", 5, {-100, 0, -100}},
+                       {7u, 1795300000u, "Morning", "sunrise", 2, {0, 50, 0}}};
+    std::string fixSc = readFile("wire/scenes.json");
+    CHECK(!fixSc.empty() && scenesJson(fs, 2, 16, 3) == fixSc, "/api/scenes matches wire/scenes.json byte for byte");
+    if (scenesJson(fs, 2, 16, 3) != fixSc) printf("  got: %s\n", scenesJson(fs, 2, 16, 3).c_str());
+    std::string sw = readFile("wire/scene_write.txt");        // the app's command that writes the first fixture Scene
+    std::map<std::string, std::string> sq;
+    std::stringstream ss(sw.substr(sw.find('?') + 1));
+    for (std::string kv; std::getline(ss, kv, '&');) { size_t e = kv.find('='); sq[kv.substr(0, e)] = e == std::string::npos ? "" : kv.substr(e + 1); }
+    auto sarg = [&](const char *k) { auto it = sq.find(k); return it == sq.end() ? std::string() : it->second; };
+    WireScene g = sceneOfArgs(sarg, 3);
+    CHECK(sw.rfind("/api/scene?", 0) == 0 && g.gid == fs[0].gid && g.ver == fs[0].ver && g.sym == "film" && g.mask == 5 &&
+          g.t[0] == -100 && g.t[1] == 0 && g.t[2] == -100, "the Scene write reads back as the fixture's Scene");
+    sq["t"] = "-300,40,300"; sq["mask"] = "15"; sq["sym"] = "Bed.Double\"x";
+    g = sceneOfArgs(sarg, 3);
+    CHECK(g.mask == 7 && g.t[0] == -100 && g.t[1] == 40 && g.t[2] == 100 && g.sym == "ed.oublex", "Scene values brought into range, icon cleaned");
+    CHECK(sceneName("Movie \"night\"", 47) == "Movie \"night\"", "a Scene name keeps its quotes");
+    CHECK(sceneName("Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", 47) == "Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", "curly apostrophe, accent and emoji kept");
+    CHECK(sceneName("a\nb\x01" "c", 47) == "abc", "control characters dropped");
+    CHECK(sceneName("abcd\xF0\x9F\x8E\xAC", 6) == "abcd", "a name cut to fit never ends inside a character");
+    CHECK(sceneName("ab  ", 47) == "ab" && sceneName(std::string(60, 'x'), 47).size() == 47, "trailing spaces trimmed, 47 bytes at most");
+    sq["mask"] = "1"; sq["t"] = "20";
+    g = sceneOfArgs(sarg, 3);
+    CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");
+  }
+
   // ---- Apple Home setup code: kept once made
   CHECK(setupPinValid(1) && setupPinValid(99999998) && setupPinValid(24681357), "ordinary passcodes are valid");
   CHECK(!setupPinValid(0) && !setupPinValid(99999999) && !setupPinValid(33333333) && !setupPinValid(12345678) &&
@@ -531,6 +561,45 @@ int main() {
   bad = hc; bad.iter = 999;
   CHECK(!homeCodeKeep(bad, sizeof bad), "too few iterations: make one");
   CHECK(manualCodeDashed("12345678901") == "1234-567-8901" && manualCodeDashed("123") == "123", "the manual code is dashed 4-3-4");
+
+  // ---- the Tilt Hub's alert rules: each alert once; the battery's three levels each once
+  {
+    AlertMemo m = {};
+    bool ch = false;
+    CHECK(!alertBattery(m, 55, 0, &ch), "a full battery: nothing");
+    CHECK(!strcmp(alertBattery(m, 19, 0, &ch), "batt-low"), "under 20: low");
+    CHECK(!alertBattery(m, 18, 0, &ch) && !alertBattery(m, 20, 0, &ch) && !alertBattery(m, 19, 0, &ch), "low again, or back at the line: no repeat");
+    CHECK(!strcmp(alertBattery(m, 9, 0, &ch), "batt-crit"), "under 10: critical");
+    CHECK(!alertBattery(m, 8, 0, &ch), "critical again: no repeat");
+    CHECK(!strcmp(alertBattery(m, 7, 1, &ch), "batt-dead"), "too low to move: dead");
+    CHECK(!alertBattery(m, 6, 1, &ch) && !alertBattery(m, 15, 0, &ch), "dead again, or charging a little: nothing");
+    CHECK(!alertBattery(m, 25, 0, &ch) && m.batt == 0, "charged to 25: all levels reset");
+    CHECK(!strcmp(alertBattery(m, 19, 0, &ch), "batt-low"), "and low can come again");
+    AlertMemo d = {};
+    CHECK(!strcmp(alertBattery(d, 12, 1, &ch), "batt-dead") && !alertBattery(d, 5, 0, &ch), "straight to too low to move: one alert, not three");
+    CHECK(!alertBattery(d, -1, 0, &ch) && alertBattLevel(-1, 0) == -1, "no reading yet: nothing");
+  }
+  {
+    AlertMemo m = {};
+    bool ch = false;
+    int st[3] = {2, 0, 0};
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 0 && ch, "the first push only learns the counts");
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 0, "the same counts: nothing");
+    st[1] = 1;
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 2, "blind 2 stalled once: one alert, for it");
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 0, "told once only");
+    int again[3] = {1, 0, 0};
+    CHECK(alertStalls(m, 8, again, 3, &ch) == 1, "after a restart the count starts at 0: its first stall is new");
+    int none[3] = {-1, -1, -1};
+    CHECK(alertStalls(m, 8, none, 3, &ch) == 0, "an older controller (no counts): nothing");
+  }
+  {
+    AlertMemo m = {};
+    CHECK(!alertSilent(m, ALERT_SILENT_MS), "quiet for exactly the check-in allowance: fine");
+    CHECK(alertSilent(m, ALERT_SILENT_MS + 1) && !alertSilent(m, ALERT_SILENT_MS * 3), "silent: one alert, not more");
+    CHECK(alertHeard(m) && !alertHeard(m), "heard again: cleared (no alert for that)");
+    CHECK(alertSilent(m, ALERT_SILENT_MS + 1), "silent again later: a new alert");
+  }
 
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;

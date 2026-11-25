@@ -29,6 +29,12 @@ enum Api {
     static func set(_ key: String, _ value: String) -> String { "/api/set?k=\(key)&v=\(value.urlQuery)" }
     /// The start of a schedule command for one slot; the caller adds the fields.
     static func schedule(slot: Int) -> String { "/api/sched?i=\(slot)&" }
+    /// The Scenes this controller keeps its part of (anyone paired may read and write them).
+    static let scenes = "/api/scenes"
+    /// Save one Scene's part (mask 0 deletes it). `t`: one tilt per Port.
+    static func scene(gid: UInt32, ver: UInt32, name: String, symbol: String, mask: Int, tilts: [Int]) -> String {
+        "/api/scene?gid=\(gid)&ver=\(ver)&name=\(name.urlQuery)&sym=\(symbol.urlQuery)&mask=\(mask)&t=" + tilts.map(String.init).joined(separator: ",")
+    }
     static let homeOpen = "/api/homeopen"
     /// The Tilt Hub's Apple Home setup code, from a controller on that hub (owner).
     /// The Tilt Hub's Thread network that a controller on it keeps (owner), to hand to a new controller.

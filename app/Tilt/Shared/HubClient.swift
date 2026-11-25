@@ -44,6 +44,8 @@ enum HubApi {
 struct HubInfo: Decodable, Sendable {
     let fw: String, up: Int, ip: String, wifi: Int, ch: Int
     let home: Int?
+    /// The hub's own alert name (owners only): its push alerts (iCloud) are filed under it.
+    let topic: String?
     /// Its Matter home connections: `node` is the hub's own ID in each (hex), to find it among Apple Home's accessories.
     let homes: [Home]?
     struct Home: Decodable, Sendable { let node: String?; let vendor: Int? }
