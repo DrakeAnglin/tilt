@@ -68,9 +68,14 @@ human_only '(^|/)(Info\.plist|[^/]*-Info\.plist|PrivacyInfo\.xcprivacy|[^/]*\.en
 human_only '^(docs/adr/|docs/requirements\.md$)' \
   "A decision or requirement changed, and those are the owner's." \
   "you agree with the decision as written."
-human_only '^tools/(firmware_tests|app_tests)\.sh$' \
-  "How the tests run changed." \
-  "no test was dropped or weakened."
+# The test scripts: adding a test to the run is fine; changing how the tests run is not.
+# only_adds_tests.awk says which: removed lines are only comments, and no added line can hide a failure.
+AWK="$(dirname "$0")/only_adds_tests.awk"
+for F in $(printf '%s\n' "$FILES" | grep -E '^tools/(firmware_tests|app_tests)\.sh$' | sort -u || true); do
+  PATCH=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq ".[] | select(.filename == \"$F\" and .status == \"modified\") | .patch // \"\"")
+  printf '%s\n' "$PATCH" | awk -f "$AWK" ||
+    no "How the tests run changed, not only which tests run. Confirm: no test was dropped or weakened. Files: $F"
+done
 # Only what decides a merge. Workflow docs, skills, CLAUDE.md and the pull request template are open to agents.
 human_only '^(tools/agent/|docs/agents/review-policy\.md$|\.github/workflows/|\.claude/agents/|\.claude/settings[^/]*\.json$|\.githooks/)' \
   "What decides a merge changed (policy, reviewer, gate, merge script, guard or CI), and an agent does not approve that for itself." \

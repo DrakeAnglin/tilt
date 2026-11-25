@@ -134,6 +134,38 @@ class Guard(unittest.TestCase):
         self.assertEqual(run('{"tool_input": {"command": "ls"}}'), 0)
         self.assertEqual(run('{"tool_input": {"command": "gh pr merge 5"}}'), 2)
 
+class OnlyAddsTests(unittest.TestCase):
+    """tools/agent/only_adds_tests.awk: may an agent merge this change to a test script?"""
+
+    AWK = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'only_adds_tests.awk')
+
+    def ok(self, patch):
+        import subprocess
+        return subprocess.run(['awk', '-f', self.AWK], input=patch, text=True).returncode == 0
+
+    ADD = ('@@ -1,7 +1,9 @@\n #!/bin/sh\n-# Run the logic tests.\n+# Run the logic tests and the link test.\n'
+           ' set -e\n "$OUT/logic_test"\n+c++ -std=c++17 -o "$OUT/link_test" link_test.cpp\n+"$OUT/link_test"\n')
+
+    def test_adding_a_test_is_fine(self):
+        self.assertTrue(self.ok(self.ADD))
+
+    def test_removing_a_command_is_not(self):
+        self.assertFalse(self.ok('@@ -1,3 +1,2 @@\n set -e\n-"$OUT/logic_test"\n'))
+        self.assertFalse(self.ok('@@ -1,3 +1,2 @@\n-set -e\n "$OUT/logic_test"\n'))
+        self.assertFalse(self.ok('@@ -1,2 +1,2 @@\n-#!/bin/sh\n+#!/bin/bash\n'))
+
+    def test_hiding_a_failure_is_not(self):
+        for line in ['"$OUT/link_test" || true', '"$OUT/link_test" ||:', 'set +e', 'exit 0',
+                     'if x; then exit; fi', 'exec true', 'a && exit 0; b',
+                     '"$X" || echo skipped', '"$X" || return 0', 'set +o errexit', 'trap "exit 0" EXIT',
+                     '"$X" &', '[ -f x ] || { echo no; exit 1; }']:
+            self.assertFalse(self.ok('@@ -1,1 +1,2 @@\n set -e\n+' + line + '\n'), line)
+
+    def test_a_cleanup_trap_is_fine(self):
+        self.assertTrue(self.ok('@@ -1,1 +1,2 @@\n set -e\n+trap \'rm -rf "$OUT"\' EXIT\n'))
+
+    def test_an_empty_patch_is_not(self):
+        self.assertFalse(self.ok(''))
 
 if __name__ == '__main__':
     unittest.main()
