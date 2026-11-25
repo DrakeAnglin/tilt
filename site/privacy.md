@@ -25,8 +25,8 @@ stays with you.
 - **Alerts, also in Tilt's iCloud container:** when something needs an owner (a blind stalled, a battery is low, a
   controller stopped answering, an update failed), your Tilt Hub writes a short alert so iCloud can notify the owners'
   iPhones. An alert holds a random name that only your phones know, the kind of alert, the room's and blind's names, a
-  short detail (such as the battery percent) and a time; no keys, addresses or locations. Each new alert of the same
-  kind replaces the last one.
+  short detail (such as the battery percent) and a time; no keys, addresses or locations. Each new alert replaces the
+  last one of its kind for that blind.
 
 ## What Tilt does not do
 
@@ -47,7 +47,8 @@ policy (Apple's or Amazon's). Tilt sends them only what they need to show and mo
 ## Deleting your information
 
 Remove a controller from Tilt in its settings, or delete the app, to remove what Tilt keeps on your device. An owner
-can remove any phone. Requests in iCloud are removed when answered or taken back.
+can remove any phone. Requests in iCloud are removed when answered or taken back. Alerts stay in iCloud until
+the next alert of the same kind replaces them; they hold nothing that identifies you.
 
 ## Questions
 
