@@ -87,7 +87,7 @@ Setting a blind's Marks. In the app this is **Setup**, always one word ("Setup r
 ### Automation
 
 **Scene**:
-A named set of target tilts across any blinds.
+A named set of target tilts across any blinds. Kept on the controllers (each holds its own blinds' part), so every phone with a key, Owner or Guest, sees and edits the same Scenes ([ADR 0006](docs/adr/0006-scenes-live-on-the-controllers.md)). A phone runs it by moving each blind.
 
 **Schedule**:
 A trigger (clock time, or sunrise/sunset plus an offset) that applies a Scene. Stored on each controller for its own blinds so it runs with the phone away. Gentle wake is a kind of Schedule (a slow ramp), not its own concept.

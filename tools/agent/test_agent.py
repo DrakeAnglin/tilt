@@ -64,7 +64,6 @@ BLOCKED = [
     'gh api -X PATCH repos/DrakeAnglin/tilt/git/refs/heads/main -f sha=abc',
     'gh pr edit 51 --remove-label needs-human',
     'gh pr edit 51 --add-label auto-merge-ok --remove-label needs-human',
-    'gh pr edit 51 --remove-label=one-way-door',
     "cat > f <<'EOF'\ntext\nEOF\ngit push origin main",
 ]
 
@@ -98,6 +97,8 @@ ALLOWED = [
     'gh pr edit 51 --add-label needs-human',
     'gh pr edit 51 --remove-label auto-merge-ok',
     'gh pr edit 51 --add-label two-way-door',
+    'gh pr edit 51 --add-label two-way-door --remove-label one-way-door',
+    'gh pr edit 51 --remove-label=one-way-door',
     'timeout 60 tools/agent/check.sh',
     'if git diff --quiet; then echo clean; fi',
     'git commit -m "first line\n\nsecond; line # not a comment"',
