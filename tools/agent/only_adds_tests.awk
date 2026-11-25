@@ -8,8 +8,8 @@
 #   a test run:    "$OUT/<name>" [args]
 #   a generator:   python3 <file>.py [args]
 #   the cleanup:   trap 'rm -rf "$OUT"' EXIT
-# and none of the commands may hold ; & | ` $( ) { } < > ! (no chaining, no or-else, no subshells,
-# no redirects, no functions, no negation). Anything else, even if harmless, goes to a human.
+# and none of the commands may hold ; & | ` $( ) { } < > ! \ or an open quote (no chaining, no or-else,
+# no subshells, no redirects, no functions, no negation, no joining onto the next line). Anything else, even if harmless, goes to a human.
 BEGIN { bad = 0; lines = 0; hunk = 0 }
 /^@@/ { hunk = 1; next }
 !hunk { next }                              # the file headers (--- a/..., +++ b/...) come before the first hunk
@@ -24,7 +24,9 @@ BEGIN { bad = 0; lines = 0; hunk = 0 }
   body = substr($0, 2)
   if (body ~ /^[ \t]*#/ || body ~ /^[ \t]*$/) { next }
   if (body == "trap 'rm -rf \"$OUT\"' EXIT") { next }
-  if (body ~ /[;&|`(){}<>!]/) { bad = 1; next }
+  if (body ~ /[;&|`(){}<>!\\]/) { bad = 1; next }
+  # An open quote, like a trailing backslash, would swallow the test lines after it.
+  if (gsub(/'/, "'", body) % 2 || gsub(/"/, "\"", body) % 2) { bad = 1; next }
   if (body ~ /^(c\+\+|cc)[ \t]/) { next }
   if (body ~ /^"\$OUT\/[A-Za-z0-9_.-]+"([ \t]|$)/) { next }
   if (body ~ /^python3[ \t]+[A-Za-z0-9_.\/-]+\.py([ \t]|$)/) { next }

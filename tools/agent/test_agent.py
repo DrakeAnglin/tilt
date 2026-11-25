@@ -161,7 +161,8 @@ class OnlyAddsTests(unittest.TestCase):
                      '"$X" || echo skipped', '"$X" || return 0', 'set +o errexit', 'trap "exit 0" EXIT',
                      '"$X" &', '[ -f x ] || { echo no; exit 1; }',
                      '"$X" | tee log', '"$X" && echo ok', '! "$X"', 'if "$X"; then :; fi', 'set -n',
-                     'exit 256', 'if false; then', ": <<'EOF'", 'c++() { :; }', 'cd /', 'echo hi']:
+                     'exit 256', 'if false; then', ": <<'EOF'", 'c++() { :; }', 'cd /', 'echo hi',
+                     'c++ -o "$OUT/a" a.cpp \\', '"$OUT/a" \'', 'c++ -o "$OUT/a a.cpp']:
             self.assertFalse(self.ok('@@ -1,1 +1,2 @@\n set -e\n+' + line + '\n'), line)
 
     def test_a_cleanup_trap_is_fine(self):
