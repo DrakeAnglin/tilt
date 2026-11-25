@@ -148,3 +148,5 @@ echo "#$PR passes every rule."
 gh pr merge "$PR" --squash --match-head-commit "$SHA"
 git push origin --delete "$(get .headRefName)" >/dev/null 2>&1 || true
 echo "Merged #$PR."
+# Clear out worktrees whose pull requests are done (this one goes on the next run, from another folder).
+"$(dirname "$0")/clean_worktrees.sh" || true
