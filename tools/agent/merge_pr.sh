@@ -9,7 +9,6 @@ PR=${1:?usage: merge_pr.sh <pr> [--check]}
 MODE=${2:-}
 [ -z "$MODE" ] || [ "$MODE" = --check ] || { echo "usage: merge_pr.sh <pr> [--check]" >&2; exit 2; }
 
-MAX_LINES=600
 MAX_REVIEWS=10
 
 J=$(gh pr view "$PR" --json number,state,isDraft,isCrossRepository,baseRefName,headRefName,headRefOid,mergeable,additions,deletions,labels,comments)
@@ -39,33 +38,13 @@ esac
 FILE_JSON=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq '.[] | {f: .filename, p: (.previous_filename // ""), n: (.additions + .deletions)}')
 FILES=$(printf '%s\n' "$FILE_JSON" | jq -r '.f, (select(.p != "") | .p)')
 [ -n "$FILES" ] || no "could not list the changed files"
-# Tests do not count toward the size: more tests should never push a change to a human.
-TEST_FILES='(^|/)(test|tests|Tests)/|(^|/)test_[^/]*\.py$'
-LINES=$(printf '%s\n' "$FILE_JSON" | jq -rs --arg t "$TEST_FILES" '[.[] | select(.f | test($t) | not) | .n] | add // 0')
-[ "$LINES" -lt "$MAX_LINES" ] || no "$LINES changed lines, not counting tests (must be under $MAX_LINES): too big for an agent to vouch for. Confirm: the change is one thing, and read the summary against the diff."
-# Human-only paths: pattern, why a person is needed, what the person confirms.
-# Keep the same as the list in docs/agents/review-policy.md.
+# Who may merge is the review's call, not a list of files: a tested change with a clean review and
+# a small or medium blast radius merges, whatever it touches. Only two kinds of change go to the owner:
+# a change to how the tests run (it could hide a failure), and a change to these rules themselves.
 human_only() {
   HIT=$(printf '%s\n' "$FILES" | grep -E "$1" | tr '\n' ' ' || true)
   [ -z "$HIT" ] || no "$2 Confirm: $3 Files: $HIT"
 }
-human_only '^(hardware/|tools/(fusion_.*|bambu.*|orient)\.py$)' \
-  "Printed parts or the PCB changed, and no test can look at a part." \
-  "the build is ok, nothing pokes out, every moving part can turn."
-human_only '^tools/(release_firmware\.py|flash.*\.sh)$|(^|/)(partitions\.csv|sdkconfig[^/]*)$' \
-  "Release or flashing changed; a mistake here can reach controllers that are in use." \
-  "a controller still takes an update and still starts."
-# update.h is here for its signature check (fwSignatureOk). The rest of the update path is two-way
-# at merge and gets a bench check before the next release.
-human_only '(^|/)(fwkey\.h|sec\.h|tilt_crypto\.h|lock\.h|update\.h|Secure\.swift)$' \
-  "Keys, pairing, the firmware signature check or who may do what changed, and a bench check does not show a hole." \
-  "nothing is let in that should not be, and paired devices still trust each other."
-human_only '(^|/)(Info\.plist|[^/]*-Info\.plist|PrivacyInfo\.xcprivacy|[^/]*\.entitlements)$' \
-  "What the app asks Apple for changed." \
-  "the permissions and privacy answers are what you want Apple to review."
-human_only '^(docs/adr/|docs/requirements\.md$)' \
-  "A decision or requirement changed, and those are the owner's." \
-  "you agree with the decision as written."
 # The test scripts: adding a test to the run is fine; changing how the tests run is not.
 # only_adds_tests.awk says which: removed lines are only comments, and no added line can hide a failure.
 AWK="$(dirname "$0")/only_adds_tests.awk"

@@ -16,6 +16,7 @@
 #include "schedules.h"
 #include "scenes.h"
 #include "update.h"
+#include "ota.h"                                 // trialVerdict
 #include "people.h"
 
 #define FW_VERSION "2.3.0-dev30"
@@ -256,10 +257,19 @@ esp_err_t hTrace(httpd_req_t *r) {              // the recording of the last mov
   return sendJson(r, j);
 }
 esp_err_t hAwake(httpd_req_t *r) { Lock l; keepAwakeUntil = millis() + (uint32_t)constrain(argi(r, "min"), 0, 720) * 60000; return ok(r); }
+// Keep the firmware on trial: it is the one this controller starts from from now on (hKeep, and trialTick below).
+void trialKeep() {
+  if (!otaPending) return;
+  esp_ota_mark_app_valid_cancel_rollback();
+  otaPending = false;
+  stats.otaOk++;
+  statsSave();
+  event("new firmware %s confirmed", FW_VERSION);
+}
 // Keep the firmware that is on trial (sent by tools/flash_matter.sh once it has checked the board).
 esp_err_t hKeep(httpd_req_t *r) {
   Lock l;
-  if (otaPending) { esp_ota_mark_app_valid_cancel_rollback(); otaPending = false; stats.otaOk++; statsSave(); event("new firmware %s confirmed", FW_VERSION); }
+  trialKeep();
   return ok(r);
 }
 
@@ -351,30 +361,20 @@ void restartNow(bool rollback, uint32_t waitMs) {
   esp_ota_mark_app_invalid_rollback_and_reboot();  // returns only if refused
   xSemaphoreTake(mx, portMAX_DELAY);
 }
-// Once a second, from the blinds task (the lock is held).
-void webTick() {
-  uint32_t now = millis();
-  // A new firmware is on trial until Thread to the Tilt Hub has worked for a minute.
+// A new firmware is on trial until Thread to the Tilt Hub has worked for a minute (ota.h trialVerdict).
+static void trialTick(uint32_t now) {
   static uint32_t hubSince = 0;
-  bool linkUp = hubOk() || (hubLinkSeen && now - hubLinkSeen < 120000);
-  if (linkUp && !hubSince) hubSince = now ? now : 1;
-  if (!linkUp) hubSince = 0;
-  hubTick();
-  if (otaPending) {
-    if (hubSince && now - hubSince > 60000) {
-      esp_ota_mark_app_valid_cancel_rollback();
-      otaPending = false;
-      stats.otaOk++;
-      statsSave();
-      event("new firmware %s confirmed", FW_VERSION);
-    } else if (!hubSince && now > 300000 && hubJoined()) {   // it has a hub to reach (setup is done) and did not
-      event("new firmware could not reach the Tilt Hub: going back");
-      restartNow(true, 200);
-    }
+  hubSince = trialLinkSince(hubSince, trialLinkUp(hubOk(), hubLinkSeen, now), now);
+  if (!otaPending) return;
+  TrialVerdict v = trialVerdict(now, hubSince, hubJoined());
+  if (v == TRIAL_KEEP) trialKeep();
+  else if (v == TRIAL_ROLLBACK) {
+    event("new firmware could not reach the Tilt Hub: going back");
+    restartNow(true, 200);
   }
-  schedRun();
-  rampTick();
-  recoverTick();
+}
+// Once an hour: the battery history (and, on a developer build, the power log's temperature).
+static void histTick() {
   static uint32_t lastHist = 0;
   uint32_t ep = time(nullptr);
   if (lastHist > ep || ep - lastHist >= 3600) {
@@ -383,16 +383,38 @@ void webTick() {
     histPush(vbatRest);
 #ifdef TILT_DEVLOG
     if (!first) { float t = 0; if (tsens) temperature_sensor_get_celsius(tsens, &t); plogPush(ep, vbatRest, t); }
+#else
+    (void)first;
 #endif
   }
+}
 #ifdef TILT_DEVLOG
+static void devlogTick() {
   static uint32_t lastPl = 0;
   uint32_t nowMs = millis();
   if (!lastPl && otaPending) plogAcc.flags |= 2;   // this start is new firmware on trial
   if (lastPl) plogTick(vin, powered, nowMs - lastPl);
   lastPl = nowMs ? nowMs : 1;
+}
 #endif
+static void powerTick() {                        // input power connected or gone: a line in the log
   static bool wasPowered = powered;
   if (wasPowered != powered) { wasPowered = powered; event(powered ? "input power connected (%.2f V)" : "on battery (%.2f V)", powered ? vin : vbatRest); }
+}
+static void restartTick() {                      // asked for (an update, a setting): motors off and held first
   if (restartSoon) restartNow(false, 600);
+}
+// Once a second, from the blinds task (the lock is held).
+void webTick() {
+  trialTick(millis());
+  hubTick();
+  schedRun();
+  rampTick();
+  recoverTick();
+  histTick();
+#ifdef TILT_DEVLOG
+  devlogTick();
+#endif
+  powerTick();
+  restartTick();
 }
