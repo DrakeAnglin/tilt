@@ -26,7 +26,10 @@ BEGIN { bad = 0; lines = 0; hunk = 0 }
   if (body == "trap 'rm -rf \"$OUT\"' EXIT") { next }
   if (body ~ /[;&|`(){}<>!\\]/) { bad = 1; next }
   # An open quote, like a trailing backslash, would swallow the test lines after it.
-  if (gsub(/'/, "'", body) % 2 || gsub(/"/, "\"", body) % 2) { bad = 1; next }
+  # Strip whole quoted strings left to right, as the shell pairs them; any quote left over is open.
+  rest = body
+  gsub(/"[^"]*"|'[^']*'/, "", rest)
+  if (rest ~ /["']/) { bad = 1; next }
   if (body ~ /^(c\+\+|cc)[ \t]/) { next }
   if (body ~ /^"\$OUT\/[A-Za-z0-9_.-]+"([ \t]|$)/) { next }
   if (body ~ /^python3[ \t]+[A-Za-z0-9_.\/-]+\.py([ \t]|$)/) { next }

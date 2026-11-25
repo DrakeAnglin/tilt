@@ -162,7 +162,8 @@ class OnlyAddsTests(unittest.TestCase):
                      '"$X" &', '[ -f x ] || { echo no; exit 1; }',
                      '"$X" | tee log', '"$X" && echo ok', '! "$X"', 'if "$X"; then :; fi', 'set -n',
                      'exit 256', 'if false; then', ": <<'EOF'", 'c++() { :; }', 'cd /', 'echo hi',
-                     'c++ -o "$OUT/a" a.cpp \\', '"$OUT/a" \'', 'c++ -o "$OUT/a a.cpp']:
+                     'c++ -o "$OUT/a" a.cpp \\', '"$OUT/a" \'', 'c++ -o "$OUT/a a.cpp',
+                     '"$OUT/t" "a\' "b\'', '"$OUT/t" \'a" \'b"']:
             self.assertFalse(self.ok('@@ -1,1 +1,2 @@\n set -e\n+' + line + '\n'), line)
 
     def test_a_cleanup_trap_is_fine(self):
@@ -174,6 +175,9 @@ class OnlyAddsTests(unittest.TestCase):
 
     def test_generator_and_run_with_args_are_fine(self):
         self.assertTrue(self.ok('@@ -1,1 +1,3 @@\n set -e\n+python3 make_ota_files.py "$OUT"\n+"$OUT/ota_test" "$OUT"\n'))
+
+    def test_quotes_inside_quotes_are_fine(self):
+        self.assertTrue(self.ok('@@ -1,1 +1,2 @@\n set -e\n+"$OUT/t" "it\'s" \'say "hi"\'\n'))
 
     def test_an_empty_patch_is_not(self):
         self.assertFalse(self.ok(''))
