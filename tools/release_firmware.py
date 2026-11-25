@@ -12,8 +12,8 @@ firmware/blinds_matter/build-release), checks none of secrets.h's values ended u
                        exactly <old> takes it in about a minute over Thread instead of seven.
   firmware.json        {"stable": {...}, "beta": {...}}  the newest version on each channel; the file name is relative
 Normally the GitHub Action runs this on a version tag and publishes the result (docs/firmware-release.md). By hand:
-put firmware.json and every file it names on a new release of the public site repo (the app reads its latest release):
-  gh release create <tag> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/<each file it names>
+put firmware.json and every file it names on a new release of this repo (the app reads its latest release):
+  gh release create <tag> --repo DrakeAnglin/tilt firmware/releases/firmware.json firmware/releases/<each file it names>
 """
 import argparse, hashlib, json, os, re, subprocess, sys
 

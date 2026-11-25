@@ -122,6 +122,6 @@ A reversed cord would put battery + on IN2, so the continuity check matters.
   a new controller over Bluetooth and hands it the hub's Thread network (sealed, to the controller only), then talks to
   it through the hub over a secured channel with a key per phone (Owner and Guests); the hub cannot read it. Apple
   Home sees the blinds through the hub (added once, with the hub's own setup code).
-- **Firmware updates**: signed release files on the public `DrakeAnglin/tilt-site` repo; the app hands them to the hub,
+- **Firmware updates**: signed release files on this repo's GitHub releases; the app hands them to the hub,
   which feeds them to the controller over Thread
   ([app-store.md](app-store.md)).

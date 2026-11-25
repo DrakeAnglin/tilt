@@ -7,14 +7,14 @@
   python3 tools/release_ci.py files                    every file the new firmware.json names (all go on the new release)
 
 Tags: fw-v<version> is a controller release (stable; a version with a dash, like 2.3.0-beta1, goes to beta),
-hub-v<version> a Tilt Hub release. The app reads only the newest release on DrakeAnglin/tilt-site
+hub-v<version> a Tilt Hub release. The app reads only the newest release on DrakeAnglin/tilt
 (releases/latest/download/firmware.json), so each release carries every file its firmware.json names.
 """
 import json, os, re, sys, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'firmware', 'releases')
-SITE = 'DrakeAnglin/tilt-site'
+SITE = os.environ.get('GITHUB_REPOSITORY', 'DrakeAnglin/tilt')   # where releases are published
 PATCH_BASES = 3                      # release_firmware.py makes patches from the last three controller images
 
 
