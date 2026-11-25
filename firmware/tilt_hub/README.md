@@ -81,10 +81,13 @@ as when the hub last answered) that can't reach the hub for 3 minutes shows it, 
   does not grow.
 - **No internet?** Alerts wait in the hub's flash (10 at most, a week at most) and go once it is back. A try whose
   answer was lost looks first whether iCloud already has that alert, so it never comes twice.
-- **Memory:** a TLS session takes about 30 KB of the hub's memory for a few seconds. The hub sends only with 45 KB
-  free and not while a firmware file is coming in or going out; otherwise the alert waits a minute. Only the two roots
+- **Memory:** a TLS session takes about 22 KB of the hub's memory for a few seconds. The hub sends only with 50 KB
+  free (about 63 KB is free when it is idle) and not while a firmware file is coming in or going out; otherwise the alert waits a minute. Only the two roots
   iCloud's certificate comes from are on the hub (`main/cloud_roots.pem`): if Apple moves to another root, the hub
-  page shows an error and that file needs the new one.
+  page shows an error and that file needs the new one. `/api/mem` (owners) lists free memory and each task's stack low
+  point; `"mem"` in `/api/info`'s `cloud` gives the last send's memory before and at its lowest, and the lowest of any.
+  Wi-Fi and Bluetooth buffers and some task stacks were cut to what a hub needs (`sdkconfig.defaults`, measured the
+  same way): measure again before raising anything.
 - **Both iCloud environments:** the app built from Xcode listens in "development", the App Store app in
   "production"; the hub writes to both. `/api/info` has `cloud` (key there, alerts waiting, last status and error).
 

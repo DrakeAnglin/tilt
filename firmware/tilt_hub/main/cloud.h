@@ -115,10 +115,10 @@ static bool ckSign(const std::string &date, const std::string &body, const std::
 }
 // One signed request, straight over TLS (no HTTP library: the hub has little room). HTTP/1.0, so the answer is
 // never in chunks. Returns the HTTP status (-1: no connection), the answer's body in resp.
-// A TLS session takes about 30 KB of the hub's memory for a few seconds (measured 2026-11-24: about 50 KB free
-// before, 18-25 KB at the lowest; ckPost logs it). With less than CK_NEED_HEAP free, or while a firmware file is
+// A TLS session takes about 22 KB of the hub's memory for a few seconds (measured 2026-11-24 with /api/mem and
+// "mem" in /api/info: about 60 KB free before, 31-41 KB at the lowest). With less than CK_NEED_HEAP free, or while a firmware file is
 // coming in or going out, Wi-Fi and Matter could run short, so the alert waits (-2) until the hub is calmer.
-static const size_t CK_NEED_HEAP = 45000;
+static const size_t CK_NEED_HEAP = 50000;
 static size_t ckMemBefore, ckMemLow, ckMemWorst = SIZE_MAX;   // the last send: free before and at its lowest; the lowest of any send
 static bool cloudBusy();                         // hub.cpp: an update is on
 static int ckPost(const char *env, const char *op, const std::string &body, std::string &resp) {
