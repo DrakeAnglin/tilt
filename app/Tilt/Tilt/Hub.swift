@@ -114,6 +114,10 @@ final class HubWatch {
                                       appleNodes: AppleHomes.shared.nodeIDs)
             newNearby = i.new?.count ?? 0
             if var r = record, r.waiting { r.waiting = false; r.code = nil; save(r) }     // the owner let this iPhone in
+            if isOwner, var r = record {                                                     // the hub's push alerts: watched on every check, so a
+                if let t = i.topic, !t.isEmpty, t != r.topic { r.topic = t; save(r) }      // phone that joined before them gets them too
+                if let t = r.topic { Task { await Cloud.watch(topic: t) } }
+            }
             if let ps = try? await people(), current() {
                 everyone = ps
                 if let me = ps.first(where: { $0.me == 1 }), var r = record, r.owner != (me.owner == 1) {     // made owner, or user
@@ -287,6 +291,8 @@ final class HubWatch {
 /// What the hub says about itself and its controllers (/api/info).
 struct HubInfo: Decodable, Sendable {
     let fw: String?, up: Int?, ip: String?, wifi: Int?, ch: Int?, home: Int?
+    /// The hub's own alert name (owners only): its push alerts (iCloud) are filed under it.
+    let topic: String?
     /// Its Matter home connections: `node` is the hub's own ID in each (hex), to find it among Apple Home's accessories.
     let homes: [Home]?
     struct Home: Decodable, Sendable { let node: String?; let vendor: Int? }
