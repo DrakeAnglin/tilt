@@ -10,8 +10,9 @@ About).
 
 ## Common questions
 
-**The app says a controller is not reachable.** Tilt talks to the controller over your home Wi-Fi. Check that your
-iPhone is on the same network as the controller and that the controller's battery is charged.
+**The app says a blind is not reachable.** Your iPhone talks to the Tilt Hub over your home Wi-Fi, and the hub talks
+to the controllers over Thread. Check that your iPhone is on the same Wi-Fi as the hub, that the hub is plugged in,
+and that the controller's battery is charged.
 
 **Someone else needs to control the blinds.** On your Wi-Fi, they open Tilt, tap Add, and ask to join. You approve
 them in the room's settings, as a User (open and close only) or as an Owner.
