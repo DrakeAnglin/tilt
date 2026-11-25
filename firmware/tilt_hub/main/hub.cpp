@@ -65,7 +65,12 @@
 #include "logic.h"                               // battLevel (the controller's own rules)
 #include "home_view.h"                          // what Home sees, the same rules as a controller on Wi-Fi
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm: the same as the controller's
+#if defined(TILT_RELEASE)                         // an update file carries no Wi-Fi of anyone's
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
+#else
 #include "secrets.h"                             // WIFI_SSID, WIFI_PASSWORD (bench: until Apple Home gives the network)
+#endif
 // HUB_SETUP_PIN: on the hub's label; made by build.sh, never in the repo. It is copied to flash at the first start, so
 // update files (built with TILT_RELEASE) carry no code at all.
 #if __has_include("setup_pin.h") && !defined(TILT_RELEASE)
