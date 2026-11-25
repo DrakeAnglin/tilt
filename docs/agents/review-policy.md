@@ -29,16 +29,18 @@ Who is hurt, and how badly, if the change is wrong after merge. The reviewer giv
 
 Judge by what really happens on merge, not by the worst file name in the diff. If you cannot name who is hurt, it is small.
 
-### Bench check before the next release
+### Bench check: part of staging a release
 
-Some two-way changes are only safe to release once they have run on real hardware. Merging them is fine; releasing them untested is not. The reviewer adds the `bench-check` label and writes what to check in its review. These are:
+A bench check is not part of review. The code is made good first: a clean review, tests, and the firmware builds. A pull request is never flashed to hardware to check it before merge, and a bench check is never a reason to hand a pull request to the owner or to list it under Human Review.
+
+Some changes are only safe to release once they have run on real hardware. The reviewer adds the `bench-check` label and writes in its review what to check. The label only puts the pull request on the staging list. These are:
 
 - The update path: `ota.h`, `FirmwareUpdate.swift`, the hub's update code (`update.h` is human-only, below). A bad update can leave a controller that cannot be updated again.
 - Stored data changes shape: what a controller or hub keeps in flash (`store.h`), what the app keeps (`Store.swift`).
 - The wire format: `wire.h`, `api.h`, `Api.swift`, the hub link, the `test/wire` fixture, when devices or apps already in use would stop understanding each other.
 - Firmware that only runs on the ESP (adapters, tasks, timers) and has no Mac test.
 
-Before a firmware release, the owner works through the merged pull requests with `bench-check` since the last release (`gh pr list --state merged --label bench-check`), then takes the label off.
+**Staging**, before a firmware or app release: build one release candidate from `main`, put it on the bench controllers, hub and phone, and run the checks from every merged pull request with `bench-check` since the last release (`gh pr list --state merged --label bench-check`). A failed check is a new issue and a fix through the normal flow. When all pass, take the labels off and release.
 
 ## Who merges
 

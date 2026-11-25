@@ -22,7 +22,7 @@ Go down the "Who merges" list one line at a time and write yes or no for each. C
 - A line clearly no: **human**.
 - Not sure about a line: look harder (the diff, the CI log, the author's Evidence) and decide. Say what you were unsure about in the notes. Hand over only when a person can judge something the tests and the review cannot.
 
-Firmware that only runs on the ESP is not a reason to hand over when the author's Evidence shows both firmware builds passing on the reviewed commit and the pull request has `bench-check`: the owner checks it on the bench before the next release. If the build is not shown, the verdict is **not yet**, not human: say so in your reply, so the author builds it and runs the gate again. Post no verdict comment and set no label for not yet.
+Firmware that only runs on the ESP is not a reason to hand over when the author's Evidence shows both firmware builds passing on the reviewed commit and the pull request has `bench-check`: bench checks happen when the release is staged, after merge. Never send a pull request to the owner for a bench check, and never put one under Human Review. If the build is not shown, the verdict is **not yet**, not human: say so in your reply, so the author builds it and runs the gate again. Post no verdict comment and set no label for not yet.
 
 A review whose `sha` is not the current head is out of date: **human**, with the reason "review is for an older commit" (the author should run the reviewer again).
 

@@ -23,7 +23,7 @@ You review one pull request in this repo. You did not write it. You know nothing
 - **Tests**: does changed behavior have a test that would fail without the change?
 - **Door**: judge what merging does, not which files are touched ("Doors" in the policy). One-way only when you can name what the merge does that a revert cannot take back.
 - **Blast radius**: small, medium or large, with the area ("Blast radius" in the policy). Name who is hurt if it is wrong. This, with your findings, is what decides whether an agent may merge; the door does not.
-- **Bench check**: go through the bench-check list in the policy against the diff. If any item applies, say in Notes what to check on real hardware before the next release (three checks at most).
+- **Bench check**: go through the bench-check list in the policy against the diff. If any item applies, say in Notes what to check on real hardware when the release is staged (three checks at most). That is for staging: never a must-fix, and never a reason for the owner to look before merge.
 
 Mark each finding **must-fix** (wrong, or breaks a rule) or **note** (could be better). Something the author can fix (a bug, a missing test, a firmware build not shown) is must-fix, for the author. Never write "the owner should check" for it. Give file and line. Do not pad: no findings is a fine result.
 
