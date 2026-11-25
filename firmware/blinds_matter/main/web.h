@@ -1,5 +1,5 @@
 // The JSON interface the Tilt app talks to, on ESP-IDF's HTTP server: the pages, the routes, and webTick.
-// Schedules, firmware upload and the people handlers live in their own files, included here at the top.
+// Schedules, Scenes, firmware upload and the people handlers live in their own files, included here at the top.
 #pragma once
 #include <esp_http_server.h>
 #include <esp_ota_ops.h>
@@ -14,10 +14,11 @@
 #include "wire.h"                                // the wire contract for /api/cfg and Schedule slots
 #include "api.h"                                 // the reply helpers and Lock
 #include "schedules.h"
+#include "scenes.h"
 #include "update.h"
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev28"
+#define FW_VERSION "2.3.0-dev30"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 
@@ -302,7 +303,7 @@ esp_err_t hBackup(httpd_req_t *r);
 esp_err_t hRestore(httpd_req_t *r);
 const Route routes[] = {
   {"/", HTTP_GET, hRoot}, {"/api/s", HTTP_GET, hState}, {"/api/dev", HTTP_GET, hDev}, {"/api/cfg", HTTP_GET, hCfg}, {"/api/log", HTTP_GET, hLog},
-  {"/api/hist", HTTP_GET, hHist}, {"/api/set", HTTP_GET, hSet}, {"/api/sched", HTTP_GET, hSched}, {"/api/go", HTTP_GET, hGo}, {"/api/stop", HTTP_GET, hStop},
+  {"/api/hist", HTTP_GET, hHist}, {"/api/set", HTTP_GET, hSet}, {"/api/sched", HTTP_GET, hSched}, {"/api/scenes", HTTP_GET, hScenes}, {"/api/scene", HTTP_GET, hScene}, {"/api/go", HTTP_GET, hGo}, {"/api/stop", HTTP_GET, hStop},
   {"/api/jog", HTTP_GET, hJog}, {"/api/angle", HTTP_GET, hAngle}, {"/api/mark", HTTP_GET, hMark}, {"/api/reset", HTTP_GET, hReset}, {"/api/reboot", HTTP_GET, hReboot},
   {"/api/awake", HTTP_GET, hAwake},
   {"/api/keep", HTTP_GET, hKeep}, {"/api/watch", HTTP_GET, hWatch}, {"/api/trace", HTTP_GET, hTrace},

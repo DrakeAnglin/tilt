@@ -191,6 +191,7 @@ extern "C" void app_main()
     motionBegin();                               // 5. motors braked, drivers asleep; which sensors send PWM
     powerBegin();                                // 6. the first battery and input readings
     schedBegin();                                // 7. the Schedules' extra facts and place, the time zone
+    scenesBegin();                               //    the Scenes
     updateBegin();                               // 8. is this firmware on trial?
     secBegin();                                  // 9. the phones' keys, this start's boot id, the plain-API switch
 
