@@ -158,11 +158,20 @@ class OnlyAddsTests(unittest.TestCase):
         for line in ['"$OUT/link_test" || true', '"$OUT/link_test" ||:', 'set +e', 'exit 0',
                      'if x; then exit; fi', 'exec true', 'a && exit 0; b',
                      '"$X" || echo skipped', '"$X" || return 0', 'set +o errexit', 'trap "exit 0" EXIT',
-                     '"$X" &', '[ -f x ] || { echo no; exit 1; }']:
+                     '"$X" &', '[ -f x ] || { echo no; exit 1; }',
+                     '"$X" | tee log', '"$X" && echo ok', '! "$X"', 'if "$X"; then :; fi', 'set -n',
+                     'exit 256', 'if false; then', ": <<'EOF'", 'c++() { :; }', 'cd /', 'echo hi']:
             self.assertFalse(self.ok('@@ -1,1 +1,2 @@\n set -e\n+' + line + '\n'), line)
 
     def test_a_cleanup_trap_is_fine(self):
         self.assertTrue(self.ok('@@ -1,1 +1,2 @@\n set -e\n+trap \'rm -rf "$OUT"\' EXIT\n'))
+
+    def test_a_minus_minus_line_is_still_read(self):
+        # A removed line starting with "--" looks like a file header; inside a hunk it is a removed line.
+        self.assertFalse(self.ok('--- a/x\n+++ b/x\n@@ -1,2 +1,1 @@\n set -e\n---verbose "$OUT/t"\n'))
+
+    def test_generator_and_run_with_args_are_fine(self):
+        self.assertTrue(self.ok('@@ -1,1 +1,3 @@\n set -e\n+python3 make_ota_files.py "$OUT"\n+"$OUT/ota_test" "$OUT"\n'))
 
     def test_an_empty_patch_is_not(self):
         self.assertFalse(self.ok(''))

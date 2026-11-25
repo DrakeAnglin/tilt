@@ -66,7 +66,7 @@ Tests cannot vouch for these, or they are the rules themselves:
 
 - `hardware/`, `tools/fusion_*.py`, `tools/bambu*.py`, `tools/orient.py`: printed parts and the PCB. Someone has to look at the part.
 - `tools/release_firmware.py`, `tools/flash*.sh`, `partitions.csv`, `sdkconfig*`: release and flashing.
-- `tools/firmware_tests.sh`, `tools/app_tests.sh`: how the tests run. Adding a test to the run is fine and an agent may merge it: every removed line is a comment, and no added line can hide a failure (any `||`, `set +` anything, `exit 0` or a bare `exit`, `return`, `exec`, a test run in the background with `&`, a `trap` that exits). `tools/agent/only_adds_tests.awk` decides. Anything else is a human's.
+- `tools/firmware_tests.sh`, `tools/app_tests.sh`: how the tests run. Adding a test to the run is fine and an agent may merge it: every removed line is a comment, and every added line is a comment, a compile (`c++`, `cc`), a test run (`"$OUT/<name>"`), a `python3 <file>.py` generator or the `$OUT` cleanup trap, with no `; & | $( ) { } < > !`. `tools/agent/only_adds_tests.awk` decides. Anything else is a human's. The reviewer still reads the diff: the check narrows what can change, it does not prove a test is good.
 - `fwkey.h`, `sec.h`, `tilt_crypto.h`, `lock.h`, `update.h` (it holds the firmware signature check), `Secure.swift`: keys, pairing, signatures and who may do what. A hole here lets someone in, and a bench check does not show a hole.
 - `*.entitlements`, `Info.plist`, `PrivacyInfo.xcprivacy`: what Apple reviews.
 - `docs/adr/`, `docs/requirements.md`: decisions are the owner's.
