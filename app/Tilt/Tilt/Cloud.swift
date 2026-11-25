@@ -2,6 +2,9 @@
 // only talks on its own Wi-Fi, so the phones tell each other two things this way:
 //   Join   a phone asked to join a controller: its owners get a push notification, wherever they are.
 //   Gone   an owner removed a phone: that phone drops the blinds the next time it opens, even away from home.
+// And the Tilt Hub tells owners when something is wrong (Alert records, written by the hub: firmware/tilt_hub/main/cloud.h):
+//   Alert  one per topic, kind and blind, replaced each time; an owner's subscription turns each save into a push, and
+//          the alerts extension (TiltAlerts) words it with AlertWords.
 // What is stored: a random name for the controller ("topic", known only to phones that have talked to it), the name the
 // asking person typed, the room's name, and a proof only the removed phone can check. No keys, no addresses.
 import CloudKit
@@ -29,6 +32,7 @@ enum Cloud {
 
     /// An owner's phone: get a push when someone asks to join this controller. Done once per controller.
     @MainActor static func watch(topic: String) async {
+        await watchAlerts(topic: topic)
         let key = "cloud.watch.\(topic)"
         guard !topic.isEmpty, !UserDefaults.standard.bool(forKey: key) else { return }
         if let t = lastTry[topic], Date().timeIntervalSince(t) < 300 { return }      // it failed a moment ago (no iCloud account, no internet): try again in 5 minutes
@@ -53,10 +57,34 @@ enum Cloud {
     }
     /// No longer an owner (or the controller was removed from this phone).
     static func unwatch(topic: String) async {
-        let key = "cloud.watch.\(topic)"
+        let key = "cloud.watch.\(topic)", akey = "cloud.alerts.\(topic)"
+        if UserDefaults.standard.bool(forKey: akey) {
+            _ = try? await db.deleteSubscription(withID: "alert-\(topic)")
+            UserDefaults.standard.removeObject(forKey: akey)
+        }
         guard UserDefaults.standard.bool(forKey: key) else { return }
         _ = try? await db.deleteSubscription(withID: "join-\(topic)")
         UserDefaults.standard.removeObject(forKey: key)
+    }
+
+    /// An owner's phone: the hub's alerts for this controller (or for the hub itself) come as a push. Done once per topic.
+    @MainActor static func watchAlerts(topic: String) async {
+        let key = "cloud.alerts.\(topic)"
+        guard !topic.isEmpty, !UserDefaults.standard.bool(forKey: key) else { return }
+        if let t = lastTry["a" + topic], Date().timeIntervalSince(t) < 300 { return }
+        lastTry["a" + topic] = Date()
+        // Each record is replaced by the next alert of its kind, so a save fires both ways.
+        let sub = CKQuerySubscription(recordType: "Alert", predicate: NSPredicate(format: "topic == %@", topic), subscriptionID: "alert-\(topic)",
+                                      options: [.firesOnRecordCreation, .firesOnRecordUpdate])
+        let info = CKSubscription.NotificationInfo()
+        info.titleLocalizationKey = "ALERT_TITLE"; info.titleLocalizationArgs = ["name"]   // if the extension can't run
+        info.alertLocalizationKey = "ALERT_BODY"
+        info.desiredKeys = ["kind", "name", "detail", "port"]
+        info.shouldSendMutableContent = true                                                 // TiltAlerts words it
+        info.soundName = "default"
+        sub.notificationInfo = info
+        do { _ = try await db.save(sub); UserDefaults.standard.set(true, forKey: key) }
+        catch { log.error("alerts not watched: \(error.localizedDescription)") }
     }
 
     /// An owner removed the phone `cid`. `proof` came from the controller, made with that phone's own key.

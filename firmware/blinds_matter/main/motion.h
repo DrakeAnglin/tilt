@@ -203,6 +203,7 @@ struct EspTilter : Tilter {
     if (m.kind != MV_JOG) {
       stats.moves[p]++;
       if (m.stalled) stats.stalls[p]++;
+      if (m.stalled && m.kind == MV_TILT) movesStalled[p]++;
       float trav = fabsf(angDiff(bs[p].ang, m.startAng)), avg = m.runMs ? trav * 1000.0f / m.runMs : 0;
       char sp[40];
       snprintf(sp, sizeof sp, "%.1f deg/s, %d nudge%s, %d turn-back%s", avg, m.nudges - m.turnBacks, m.nudges - m.turnBacks == 1 ? "" : "s", m.turnBacks, m.turnBacks == 1 ? "" : "s");
