@@ -1,47 +1,129 @@
-// Schedules (run by the controllers, so they work with the phone away) and scenes (one tap from the phone).
+// Schedules (run by the controllers, so they work with the phone away) and Scenes (kept on the controllers, run
+// with one tap from any phone in the home).
 import CoreLocation
 import SwiftUI
 
 // Schedule and BlindTarget live in Shared/SchedulePlan.swift.
 
-struct BlindScene: Identifiable, Codable, Equatable {
-    var id = UUID()
-    var name = "New Scene"
-    var symbol = "sun.max"
-    var tilts: [BlindTarget: Int] = [:]
-}
+// BlindScene and ScenePlan (kept on the controllers) live in Shared/ScenePlan.swift; running, keeping a copy on the
+// phone and pruning in Shared/Scenes.swift.
 
-/// The scenes, kept on this phone. One copy for every page that shows them.
+/// The Scenes, kept on the controllers and shared by every phone with a key. The phone keeps a copy (for Siri,
+/// Shortcuts, and controllers it cannot reach right now). One store for every page that shows them.
 @MainActor @Observable
 final class SceneStore {
     static let shared = SceneStore()
-    var scenes: [BlindScene] = (UserDefaults.standard.data(forKey: Prefs.scenes)).flatMap { try? JSONDecoder().decode([BlindScene].self, from: $0) } ?? []
-    func save() { UserDefaults.standard.set(try? JSONEncoder().encode(scenes), forKey: Prefs.scenes) }
+    var scenes: [BlindScene] = Scenes.load()
+    private var read: [String: [SceneSlot]] = [:]       // per controller, as last read
+    private var localOnly: Set<String> = []             // controllers whose firmware does not keep Scenes: their part stays on this phone
+    private var lastLoad = Date.distantPast
+    private var edits = 0                               // saves so far: a read that started before one is out of date
+
+    /// Keep the copy on this phone.
+    func save() { Scenes.save(scenes) }
     func run(_ scene: BlindScene, controllers: [Controller]) {
-        for (t, tilt) in scene.tilts { controllers.first { $0.id == t.controller }?.go(blind: t.blind, tilt: tilt) }
+        let clients = Dictionary(controllers.map { ($0.id, $0.client) }, uniquingKeysWith: { a, _ in a })
+        Task {
+            let r = await Scenes.run(scene, clients: clients)
+            for (id, why) in r.failed { controllers.first { $0.id == id }?.lastError = why }
+        }
+    }
+    /// A controller was removed: the scenes that only moved its blinds go with it.
+    func prune(controller id: String) {
+        let left = Scenes.prune(scenes, controller: id)
+        if left.count != scenes.count { scenes = left; save() }
+    }
+
+    /// Read the Scenes from the controllers. `soon`: skip it if they were read a moment ago.
+    func load(_ controllers: [Controller], soon: Bool = false) async {
+        if soon, Date().timeIntervalSince(lastLoad) < 15 { return }
+        let got = await refresh(controllers)
+        // Scenes never on a controller yet (made before the controllers kept them, or while one could not): put them
+        // there now, once every controller they cover answers, so the other phones see them.
+        for s in scenes where !s.seen && !s.tilts.isEmpty && s.tilts.keys.allSatisfy({ got[$0.controller] != nil }) {
+            try? await save(s, controllers: controllers)
+        }
+    }
+    /// Read every controller's Scenes and put them together with this phone's copy. Returns what each one answered.
+    private func refresh(_ controllers: [Controller]) async -> [String: [SceneSlot]] {
+        lastLoad = Date()
+        let startEdits = edits
+        var got: [String: [SceneSlot]] = [:], old: Set<String> = []
+        await withTaskGroup(of: (String, [SceneSlot]?, Bool).self) { g in
+            for c in controllers {
+                let client = c.client, id = c.id
+                g.addTask {
+                    do { let l = try await client.scenes(); return (id, l, l == nil) } catch { return (id, nil, false) }
+                }
+            }
+            for await (id, l, isOld) in g { if let l { got[id] = l } else if isOld { old.insert(id) } }
+        }
+        if edits != startEdits { return got }            // a save landed meanwhile: this read is older than it, keep what the save left
+        read = got; localOnly = old
+        let known = Set(controllers.map(\.id))           // a controller taken off this phone takes its blinds out of the Scenes here
+        scenes = ScenePlan.scenes(read: got, kept: scenes.map { var s = $0; s.tilts = s.tilts.filter { known.contains($0.key.controller) }; return s })
+        save()
+        return got
+    }
+
+    /// Save (or delete) a Scene on every controller it covers, and keep the copy here.
+    func save(_ scene: BlindScene, delete: Bool = false, controllers: [Controller]) async throws {
+        var s = scene
+        s.name = ScenePlan.fitName(s.name)                  // what the controller keeps, so every phone reads back the same
+        if s.name.isEmpty { s.name = "Scene" }
+        s.tilts = s.tilts.filter { t in controllers.contains { $0.id == t.key.controller } }
+        if s.gid == 0 { s.gid = UInt32.random(in: 1...UInt32.max) }
+        s.ver = UInt32(Date().timeIntervalSince1970)
+        let name = { (id: String) in controllers.first { $0.id == id }?.state?.name ?? "A controller" }
+        let ports = Dictionary(uniqueKeysWithValues: controllers.compactMap { c in c.state.map { (c.id, $0.b.count) } })
+        // A controller that did not answer last time, or had firmware without Scenes, may have since: ask again first.
+        if s.tilts.keys.contains(where: { read[$0.controller] == nil }) { _ = await refresh(controllers) }
+        let writes: [SceneWrite]
+        do { writes = try ScenePlan.writes(s, delete: delete, read: read, localOnly: localOnly, ports: ports) }
+        catch .full(let c) { throw TiltError("\(name(c)) already has \(ScenePlan.perController) scenes.") }
+        catch .notRead(let c) { throw TiltError("\(name(c)) did not answer. Try again when it is reachable.") }
+        edits += 1
+        do {
+            for w in writes {
+                try await controllers.first { $0.id == w.controller }?.client.setScene(w.value)
+                if let i = read[w.controller]?.firstIndex(where: { $0.gid == s.gid }) { read[w.controller]!.remove(at: i) }
+                if w.value.mask != 0 { read[w.controller]!.append(w.value) }
+            }
+        } catch {
+            _ = await refresh(controllers)                  // some were written: show what the controllers have now (only read: no retry loop)
+            throw error
+        }
+        s.seen = !s.tilts.keys.contains { localOnly.contains($0.controller) }     // all of it is on the controllers
+        if delete { scenes.removeAll { $0.id == s.id } }
+        else if let i = scenes.firstIndex(where: { $0.id == s.id }) { scenes[i] = s } else { scenes.append(s) }
+        save()
     }
 }
 
 /// The scenes as a row of tiles: tap to run, hold to edit or delete, and a tile to make a new one.
 struct ScenesRow: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var phase
     @State private var editing: BlindScene?
     @State private var ran: UUID?
+    @State private var problem: String?
     var body: some View {
         let store = SceneStore.shared
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(store.scenes) { sc in
-                    Button { ran = sc.id; store.run(sc, controllers: model.controllers) } label: {
+                    // A Menu per tile, not .contextMenu: inside a List row (the Automations tab) every tile's context menu
+                    // opened the row's first tile, so Edit or Delete acted on the wrong Scene.
+                    Menu {
+                        Button("Edit", systemImage: "pencil") { editing = sc }
+                        Button("Delete", systemImage: "trash", role: .destructive) { change(sc, delete: true) }
+                    } label: {
                         VStack(spacing: 8) { Image(systemName: sc.symbol).font(.title2); Text(sc.name).font(.footnote.weight(.semibold)).lineLimit(1) }
                             .frame(width: 104, height: 84)
                             .card(radius: 20)
-                    }
+                    } primaryAction: { ran = sc.id; store.run(sc, controllers: model.controllers) }
                     .buttonStyle(.plain)
-                    .contextMenu {
-                        Button("Edit", systemImage: "pencil") { editing = sc }
-                        Button("Delete", systemImage: "trash", role: .destructive) { store.scenes.removeAll { $0.id == sc.id }; store.save() }
-                    }
+                    .accessibilityHint("Runs the scene. Hold to edit or delete.")
                 }
                 Button { editing = BlindScene() } label: {
                     VStack(spacing: 8) { Image(systemName: "plus").font(.title2); Text("New Scene").font(.footnote.weight(.semibold)) }
@@ -54,11 +136,19 @@ struct ScenesRow: View {
             .padding(.vertical, 2)
         }
         .sensoryFeedback(.impact, trigger: ran)
+        .task(id: model.controllers.map(\.id)) { await store.load(model.controllers, soon: true) }
+        .onChange(of: phase) { if phase == .active { Task { await store.load(model.controllers, soon: true) } } }   // another phone may have changed them
         .sheet(item: $editing) { sc in
-            SceneEditor(scene: sc) { new in
-                if let i = store.scenes.firstIndex(where: { $0.id == new.id }) { store.scenes[i] = new } else { store.scenes.append(new) }
-                store.save()
-            }
+            SceneEditor(scene: sc) { new in change(new) }
+        }
+        .alert("Scene not saved", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(problem ?? "") }
+    }
+    private func change(_ sc: BlindScene, delete: Bool = false) {
+        Task {
+            do { try await SceneStore.shared.save(sc, delete: delete, controllers: model.controllers) }
+            catch { problem = error.localizedDescription }
         }
     }
 }
@@ -285,7 +375,10 @@ struct SceneEditor: View {
         NavigationStack {
             Form {
             Group {
-                Section("Name") { TextField("Name", text: $scene.name) }
+                Section("Name") {
+                    TextField("Name", text: $scene.name)
+                        .onChange(of: scene.name) { if ScenePlan.limitName(scene.name) != scene.name { scene.name = ScenePlan.limitName(scene.name) } }
+                }
                 Section("Icon") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -323,7 +416,7 @@ struct SceneEditor: View {
             .navigationTitle("Scene").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { done(scene); dismiss() }.disabled(scene.tilts.isEmpty || scene.name.isEmpty) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { done(scene); dismiss() }.disabled(scene.tilts.isEmpty || ScenePlan.fitName(scene.name).isEmpty) }
             }
         }
     }

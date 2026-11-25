@@ -14,9 +14,8 @@ given in App Store Connect, and how firmware is published, for the next release.
    - Support URL: https://drakeanglin.github.io/tilt-site/support/
    - Questions and problems: issues on `DrakeAnglin/tilt-site`
 4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt-site/releases/latest/download/firmware.json`
-   (the public site repo, so this code repo can stay private). For each firmware release:
-   `python3 tools/release_firmware.py stable --notes "..."` (builds without secrets, signs), then
-   `gh release create firmware-<version> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/tilt-<version>.bin`.
+   (the public site repo, so this code repo can stay private). A release is a version tag on `main` (`fw-v2.3.0`,
+   `hub-v0.3.4`): a GitHub Action builds, signs and publishes it. See `docs/firmware-release.md`.
    Use releases on tilt-site for firmware only, so "latest" is always the newest firmware.
 5. **Release-day clean-up on the controller:** remove the "Duo Test" user, and the "Mac owner" key once the app can do
    every update (the Mac tools need that key today).

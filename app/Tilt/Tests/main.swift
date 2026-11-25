@@ -49,6 +49,34 @@ check(low.isLow && !ok.isLow, "under 20% on battery is low")
 check(!chargingLow.isLow, "charging is not low")
 check(empty.isLow && empty.tooLowToMove, "too low to move is low even while charging")
 
+// ---- battery notices (Shared/BatteryNotice.swift): one rule for the controller's own reading and the hub's
+for b in [low, ok, chargingLow, empty, ControllerState.Battery(v: 4.2, pct: 100, st: "full", low: 0)] {
+    let hub = BatteryReading.fromHub(pct: b.pct, low: b.low, chg: b.charging ? 1 : 0)
+    check(hub == b.reading && hub?.isLow == b.isLow, "the hub's report and the controller's own reading agree (\(b.pct)% \(b.st))")
+}
+check(BatteryReading.fromHub(pct: 15, low: 0, chg: 1)?.isLow == false, "charging on a hub is never low")
+check(BatteryReading.fromHub(pct: 15, low: 0, chg: nil)?.isLow == true, "an older hub that does not say: low, as before")
+check(BatteryReading.fromHub(pct: 19, low: 0, chg: 0)?.isLow == true && BatteryReading.fromHub(pct: 20, low: 0, chg: 0)?.isLow == false, "the hub path uses lowPercent (20)")
+check(BatteryReading.fromHub(pct: -1, low: 0, chg: 0) == nil, "no reading yet from the hub: nothing to judge")
+let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+check(BatteryNotice.decide(low.reading, lastSent: nil, now: t0) == .low(pct: 15), "low and never sent: send")
+check(BatteryNotice.decide(chargingLow.reading, lastSent: nil, now: t0) == nil, "charging: no notice")
+check(BatteryNotice.decide(empty.reading, lastSent: nil, now: t0) == nil, "too low to move but on the cable: no notice (it is charging)")
+check(BatteryNotice.decide(BatteryReading(pct: 2, charging: false, tooLowToMove: true), lastSent: nil, now: t0) == .tooLowToMove, "too low to move on battery: send")
+check(BatteryNotice.decide(low.reading, lastSent: t0, now: t0.addingTimeInterval(86400)) == nil, "within a day of the last one: wait")
+check(BatteryNotice.decide(low.reading, lastSent: t0, now: t0.addingTimeInterval(86401)) != nil, "a day later: again")
+check(BatteryNotice.low(pct: 15).title(name: "Den") == "Den: battery low" && BatteryNotice.low(pct: 15).body.contains("15%"), "the notice wording")
+final class FakeNotifier: Notifier {
+    var sent: [(key: String, title: String, at: Date)] = []
+    func lastSent(_ key: String) -> Date? { sent.last { $0.key == key }?.at }
+    func send(_ key: String, title: String, body: String, at: Date) { sent.append((key, title, at)) }
+}
+let fn = FakeNotifier()
+BatteryNotices.check(id: "aa", name: "Den", reading: low.reading, via: fn, now: t0)
+BatteryNotices.check(id: "aa", name: "Den", reading: BatteryReading.fromHub(pct: 12, low: 0, chg: 0)!, via: fn, now: t0.addingTimeInterval(3600))
+BatteryNotices.check(id: "bb", name: "Office", reading: low.reading, via: fn, now: t0.addingTimeInterval(3600))
+check(fn.sent.map(\.key) == ["lowbatt.aa", "lowbatt.bb"], "once a day per controller, whichever path the reading came by")
+
 // ---- asleep / not reachable wording
 let seenAt = Date(timeIntervalSince1970: 1_800_000_000)
 check(TiltWords.away(lastSeen: seenAt.addingTimeInterval(-30), now: seenAt) == "Unreachable · last seen just now", "unreachable, seen moments ago")
@@ -170,6 +198,71 @@ check((try? SchedulePlan.writes(wake, slots: full))?.first { $0.controller == "h
 let twoPorts = try SchedulePlan.writes(wake, slots: ["den": emptySlots(), "hall": emptySlots()], ports: ["den": 2])
 check(twoPorts.first { $0.controller == "den" }?.value.mask == 0b001, "the mask follows the controller's Ports")
 
+// ---- Scenes on the controllers (Shared/ScenePlan.swift), and their shared wire fixture
+let scData = try Data(contentsOf: wireDir.appendingPathComponent("scenes.json"))
+let scList = try JSONDecoder().decode(SceneList.self, from: scData)
+check(scList.max == 16 && scList.sc.count == 2 && scList.sc[0].gid == 4_000_000_000 && scList.sc[0].name == "Movie \"night\"" && scList.sc[0].t == [-100, 0, -100], "the Scenes decode")
+let sceneWrite = try String(contentsOf: wireDir.appendingPathComponent("scene_write.txt"), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+check(ControllerClient.sceneCommand(scList.sc[0]) == sceneWrite, "writing the first Scene back is the fixture's command")
+try await fc.setScene(scList.sc[0])
+check(await fake.sent.last == sceneWrite, "the client sends that command")
+struct OldFirmware: ControllerTransport {
+    var host: String { "old" }
+    func move(to host: String) async {}
+    func call(_ command: String) async throws -> Data { Data(#"{"ok":0,"err":"unknown command"}"#.utf8) }
+}
+check(try await ControllerClient(transport: OldFirmware()).scenes() == nil, "firmware without Scenes: nil, not an error")
+let demoScenes = try await demo.scenes() ?? []
+check(demoScenes.map(\.name) == ["Morning", "Movie"], "the demo room keeps two sample Scenes")
+
+let atDen = { (b: Int) in BlindTarget(controller: "den", blind: b) }, atHall = { (b: Int) in BlindTarget(controller: "hall", blind: b) }
+var homeScenes: [String: [SceneSlot]] = ["den": [], "hall": []]
+func applyScenes(_ ws: [SceneWrite], to r: inout [String: [SceneSlot]]) {
+    for w in ws { r[w.controller]!.removeAll { $0.gid == w.value.gid }; if w.value.mask != 0 { r[w.controller]!.append(w.value) } }
+}
+let movie = BlindScene(name: "Movie", symbol: "film", tilts: [atDen(0): -100, atDen(2): -50, atHall(1): 0], gid: 9, ver: 100)
+applyScenes(try ScenePlan.writes(movie, read: homeScenes), to: &homeScenes)
+check(homeScenes["den"]![0].mask == 0b101 && homeScenes["den"]![0].t == [-100, 0, -50] && homeScenes["hall"]![0].mask == 0b010, "a Scene is split by controller")
+// A second phone (another Apple account, a Guest) has no copy: it sees the same Scene from the controllers alone.
+let guestSees = ScenePlan.scenes(read: homeScenes, kept: [])
+check(guestSees.count == 1 && guestSees[0].tilts == movie.tilts && guestSees[0].name == "Movie" && guestSees[0].gid == 9, "another phone puts the whole Scene back together")
+check(guestSees[0].id == BlindScene.id(for: 9) && ScenePlan.scenes(read: homeScenes, kept: [])[0].id == guestSees[0].id, "the same id on every load (Shortcuts keep working)")
+check(ScenePlan.scenes(read: homeScenes, kept: [movie])[0].id == movie.id, "the phone that made it keeps its own id")
+// The second phone edits it: the newest name wins, and the first phone sees the change.
+var renamed = guestSees[0]; renamed.name = "Film"; renamed.ver = 200; renamed.tilts[atHall(1)] = nil
+applyScenes(try ScenePlan.writes(renamed, read: homeScenes), to: &homeScenes)
+check(homeScenes["hall"]!.isEmpty, "a controller with no blinds left in the Scene loses its part")
+let mine = ScenePlan.scenes(read: homeScenes, kept: [movie])
+check(mine.count == 1 && mine[0].name == "Film" && mine[0].tilts == [atDen(0): -100, atDen(2): -50], "the first phone sees the other phone's edit")
+// Mixed versions (a save that reached only one controller): the newest name, each controller's own tilts.
+var split = homeScenes; split["hall"] = [SceneSlot(gid: 9, ver: 150, name: "Old", sym: "moon", mask: 1, t: [30, 0, 0])]
+let mixed = ScenePlan.scenes(read: split, kept: [])
+check(mixed[0].name == "Film" && mixed[0].tilts[atHall(0)] == 30, "mixed versions: the newest name, every controller's tilts")
+// A controller that did not answer: the phone's copy fills in its part; saving needs it.
+let away = ScenePlan.scenes(read: ["den": homeScenes["den"]!], kept: [movie])
+check(away[0].tilts[atHall(1)] == 0 && away[0].tilts[atDen(2)] == -50, "a controller that did not answer: its part comes from the phone's copy")
+check((try? ScenePlan.writes(movie, read: ["den": []])) == nil, "saving a Scene with blinds on a controller that did not answer is refused")
+check((try? ScenePlan.writes(movie, read: ["den": []], localOnly: ["hall"]))?.count == 1, "old firmware: its part stays on the phone, the rest is saved")
+// Names: kept as typed (quotes, curly apostrophe, accents, emoji), cut like the controller cuts them (wire.h sceneName).
+check(ScenePlan.fitName("Mom\u{2019}s caf\u{E9} \u{1F3AC}") == "Mom\u{2019}s caf\u{E9} \u{1F3AC}" && ScenePlan.fitName("Movie \"night\"") == "Movie \"night\"", "a Scene name is kept as typed")
+check(ScenePlan.fitName(String(repeating: "x", count: 46) + "\u{1F3AC}") == String(repeating: "x", count: 46), "a name that does not fit is cut before the character, at 47 bytes")
+check(ScenePlan.fitName("a\nb ") == "ab" && ScenePlan.limitName("ab ") == "ab ", "control characters dropped; trailing spaces only trimmed on save")
+// Made while its controller could not keep Scenes yet (old firmware): after the update it is kept, not taken for deleted.
+let onPhone = BlindScene(name: "Read", symbol: "book", tilts: [atHall(0): 40], gid: 77, ver: 300)
+let afterUpdate = ScenePlan.scenes(read: ["den": [], "hall": []], kept: [onPhone])
+check(afterUpdate == [onPhone], "a Scene never on a controller survives the controller's update (to be put there)")
+check(ScenePlan.scenes(read: homeScenes, kept: [])[0].seen, "a Scene read from a controller counts as seen")
+// Deleted on another phone: gone here too.
+applyScenes(try ScenePlan.writes(mine[0], delete: true, read: homeScenes), to: &homeScenes)
+check(homeScenes["den"]!.isEmpty && ScenePlan.scenes(read: homeScenes, kept: mine).isEmpty, "a Scene deleted on another phone is gone here too")
+// A Scene from before the controllers kept them (an older app's copy, no gid): kept, to be put on the controllers.
+let oldCopy = Data(#"[{"id":"7A1C2B3D-0000-4000-8000-000000000001","name":"Morning","symbol":"sunrise","tilts":[{"controller":"den","blind":0},0]}]"#.utf8)
+if let olds = try? JSONDecoder().decode([BlindScene].self, from: oldCopy) {
+    check(olds[0].gid == 0 && ScenePlan.scenes(read: homeScenes, kept: olds) == olds, "an older app's Scenes load, not yet on the controllers")
+} else { check(false, "an older app's Scenes decode") }
+let fullScenes = Array(repeating: SceneSlot(gid: 1, ver: 1, name: "x", sym: "", mask: 1, t: [0, 0, 0]), count: 16)
+check((try? ScenePlan.writes(movie, read: ["den": fullScenes, "hall": []])) == nil, "a controller with 16 Scenes takes no new one")
+
 // ---- Bluetooth setup (Shared/Bluetooth.swift): the same frames as Frame
 final class FakeRadio: @unchecked Sendable {      // a controller in setup mode, answering over Bluetooth
     var written: [Data] = []
@@ -243,6 +336,78 @@ check(AlertWords.body(kind: "batt-low", room: "Den", detail: "15").hasPrefix("Th
 let rules = (try? String(contentsOfFile: "../../firmware/tilt_hub/main/alert_rules.h", encoding: .utf8)) ?? ""
 check(rules.contains("ALERT_LOW_PCT = \(ControllerState.Battery.lowPercent),") && rules.contains("ALERT_CRIT_PCT = \(ControllerState.Battery.criticalPercent),"), "the hub's battery lines are the app's (alert_rules.h)")
 for k in hubKinds where k != "test" { check(rules.contains(k) || (try? String(contentsOfFile: "../../firmware/tilt_hub/main/hub.cpp", encoding: .utf8))?.contains("\"\(k)\"") == true, "the hub knows alert \(k)") }
+
+// ---- blind setup (Shared/BlindSetup.swift)
+func blind(hid: Int = 0, pres: Int = 1, seen: Int = 1, cal: Int = 1, mov: Int = 0, q: Int = 0, last: String = "") -> BlindState {
+    BlindState(name: "B", hid: hid, pres: pres, seen: seen, cal: cal, tilt: 0, tgt: nil, mov: mov, q: q, fav: 0, ang: nil, last: last)
+}
+let ts = Date(timeIntervalSince1970: 1_800_000_000)
+var su = BlindSetup()
+check(!su.steady(at: ts), "no reading yet: not steady")
+su.reading(angle: 359.8, at: ts); su.reading(angle: 0.1, at: ts.addingTimeInterval(0.2))
+check(su.steady(at: ts.addingTimeInterval(1.5)), "359.8 to 0.1 is noise across 0/360, not a turn")
+su.reading(angle: 359.0, at: ts.addingTimeInterval(1.6)); su.reading(angle: 1.0, at: ts.addingTimeInterval(1.7))
+check(!su.steady(at: ts.addingTimeInterval(2.5)) && su.steady(at: ts.addingTimeInterval(3.0)), "359 to 1 is a 2 degree turn: wait 1.2 s after it")
+su.reading(angle: 10, at: ts.addingTimeInterval(4)); su.reading(angle: 200, at: ts.addingTimeInterval(4.1))
+check(!su.steady(at: ts.addingTimeInterval(4.5)), "a big turn is a turn")
+su.reading(angle: nil, at: ts.addingTimeInterval(9))
+check(!su.steady(at: ts.addingTimeInterval(20)), "the sensor gave nothing: not steady")
+let okA = CommandAnswer(ok: 1, err: nil, proof: nil, prob: nil)
+check(su.mark == .up && su.marked(okA) == .next(step: 1) && su.mark == .open, "a saved mark: on to the next")
+check(su.marked(CommandAnswer(ok: 0, err: "no reading", proof: nil, prob: nil)) == .failed(reason: "No reading") && su.step == 1, "a refused mark: stay, with the reason")
+_ = su.marked(okA)
+check(su.mark == .down && su.marked(CommandAnswer(ok: 1, err: nil, proof: nil, prob: "up and down are too close")) == .restart(reason: "Up and down are too close. Start again from step 1.") && su.step == 0, "bad marks: start again from step 1")
+_ = su.marked(okA); _ = su.marked(okA)
+check(su.marked(okA) == .next(step: 3) && su.done && su.mark == nil, "three good marks: done")
+su.back(); check(su.step == 2, "back one step")
+var wc = BlindSetup.WiringCheck()
+check(wc.poll(nil, elapsed: 1) == .wait && wc.poll(blind(last: "reached 0"), elapsed: 1) == .wait, "before the move starts: wait")
+check(wc.poll(blind(mov: 1), elapsed: 2) == .wait && wc.poll(blind(last: "reached open"), elapsed: 3) == .reached, "moved, then reached")
+var wc2 = BlindSetup.WiringCheck()
+check(wc2.poll(blind(last: "already there"), elapsed: 5) == .reached, "already at Open: reached")
+check(wc2.poll(blind(last: "blocked: no turn"), elapsed: 6) == .failed(reason: "The blind did not reach Open (blocked: no turn). Check it turns freely, then tap Open."), "did not get there: says why")
+check(BlindSetup.WiringCheck.words(sign: -1).contains("other way round") && BlindSetup.WiringCheck.words(sign: 1).contains("right way") && BlindSetup.WiringCheck.words(sign: nil).contains("right way"), "the wiring words")
+check(blind(cal: 0).needsSetup && !blind(cal: 1).needsSetup, "not marked: needs setup")
+check(!blind(hid: 1, cal: 0).needsSetup && !blind(pres: 0, seen: 1, cal: 0).needsSetup, "hidden or an empty port: no setup asked for")
+check(blind(pres: 0, seen: 0, cal: 0).needsSetup, "a port not checked yet still asks for setup")
+
+// ---- scenes (Shared/Scenes.swift) and the motor sign, against scripted controllers
+actor Scripted: ControllerTransport {
+    let answers: [String: String]
+    var sent: [String] = []
+    init(_ answers: [String: String]) { self.answers = answers }
+    var host: String { "fake" }
+    func move(to host: String) {}
+    func call(_ command: String) async throws -> Data {
+        sent.append(command)
+        if let a = answers.first(where: { command.hasPrefix($0.key) })?.value { return Data(a.utf8) }
+        throw URLError(.timedOut)
+    }
+}
+let den = Scripted(["/api/go": #"{"ok":1}"#, "/api/dev": #"{"fw":"x","p":[{"ang":1,"sign":1},{"ang":2,"sign":-1}]}"#])
+let office = Scripted(["/api/go": #"{"ok":0,"err":"too low to move"}"#])
+let scene = BlindScene(name: "Movie", tilts: [BlindTarget(controller: "den", blind: 0): -100, BlindTarget(controller: "den", blind: 1): -100,
+                                              BlindTarget(controller: "office", blind: 0): 50, BlindTarget(controller: "gone", blind: 0): 0])
+let run = await Scenes.run(scene, clients: ["den": ControllerClient(transport: den), "office": ControllerClient(transport: office)])
+check(run.reached == 2 && run.failed == ["office": "Too low to move"], "a scene moves what it can, says why not, and skips a missing controller")
+check(Set(await den.sent) == ["/api/go?b=0&t=-100", "/api/go?b=1&t=-100"], "a scene sends each blind its tilt")
+let signs = [await ControllerClient(transport: den).motorSign(blind: 0), await ControllerClient(transport: den).motorSign(blind: 1),
+             await ControllerClient(transport: den).motorSign(blind: 2), await ControllerClient(transport: office).motorSign(blind: 0)]
+check(signs == [1, -1, nil, nil], "the motor sign, typed; nil when there is no such port or no answer")
+let onlyDen = BlindScene(name: "Den", tilts: [BlindTarget(controller: "den", blind: 0): 0]), empty0 = BlindScene(name: "Empty")
+let pruned = Scenes.prune([scene, onlyDen, empty0], controller: "den")
+check(pruned.map(\.name) == ["Movie", "Empty"], "removing a controller removes the scenes that only moved its blinds")
+let sd = UserDefaults(suiteName: "tilt-tests-\(UUID())")!
+Scenes.save([scene, onlyDen], sd)
+check(Scenes.load(sd) == [scene, onlyDen] && Scenes.load(UserDefaults(suiteName: "tilt-tests-empty-\(UUID())")!) == [], "scenes are kept and read back")
+check(TiltMath.tilt(percentOpen: 100, closeUp: true) == 0 && TiltMath.tilt(percentOpen: 0, closeUp: true) == 100 && TiltMath.tilt(percentOpen: 0, closeUp: false) == -100, "percent open: 100 is level, 0 is closed on the Close side")
+check(TiltMath.tilt(percentOpen: 30, closeUp: false) == -70 && TiltMath.tilt(percentOpen: 130, closeUp: true) == 0, "in between, and out of range is held to 0…100")
+
+// ---- people as shown (Shared/Client.swift People)
+let pk = { (cid: String, me: Int, wait: Int?) in PhoneKey(cid: cid, name: cid, owner: 0, me: me, wait: wait, code: nil) }
+let shown = People.shown([pk("x", 0, 0), pk("hub", 0, 1), pk("w", 0, 1), pk("me", 1, 0)], hubCid: "hub")
+check(shown.map(\.cid) == ["me", "w", "x"], "the hub's own key is left out; this phone first, then requests")
+check(People.shown([pk("hub", 0, 1)], hubCid: nil).count == 1, "not on a hub: nobody is left out")
 
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

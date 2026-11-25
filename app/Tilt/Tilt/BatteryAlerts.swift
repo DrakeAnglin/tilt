@@ -22,31 +22,39 @@ final class NoticePresenter: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
+/// The phone's notifications, and when each was last sent (UserDefaults).
+struct PhoneNotifier: Notifier {
+    func lastSent(_ key: String) -> Date? {
+        let t = UserDefaults.standard.double(forKey: key)
+        return t > 0 ? Date(timeIntervalSince1970: t) : nil
+    }
+    func send(_ key: String, title: String, body: String, at: Date) {
+        UserDefaults.standard.set(at.timeIntervalSince1970, forKey: key)
+        let c = UNMutableNotificationContent()
+        c.title = title
+        c.body = body
+        c.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+    }
+}
+
 enum BatteryAlerts {
     static let refreshId = "app.tilt.blinds.refresh"
 
     /// A removed controller starts fresh if it is added again.
-    static func forget(id: String) { UserDefaults.standard.removeObject(forKey: "lowbatt.\(id)") }
+    static func forget(id: String) { UserDefaults.standard.removeObject(forKey: BatteryNotices.key(id: id)) }
     static func askPermission() { UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in } }
 
     static func check(id: String, name: String, battery: ControllerState.Battery) {
-        guard !battery.charging, battery.isLow else { return }
-        let key = "lowbatt.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
-        guard now - last > 86400 else { return }
-        UserDefaults.standard.set(now, forKey: key)
-        let c = UNMutableNotificationContent()
-        c.title = "\(name): battery low"
-        c.body = battery.tooLowToMove ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(battery.pct)%. Plug in the charging cable soon."
-        c.sound = .default
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+        BatteryNotices.check(id: id, name: name, reading: battery.reading, via: PhoneNotifier())
     }
 
     /// For trying it out: the same notice, 5 seconds from now (leave the app to see it).
     static func test(name: String) {
         askPermission()
-        let c = UNMutableNotificationContent()
-        c.title = "\(name): battery low"
-        c.body = "The battery is at 15%. Plug in the charging cable soon. (This is a test.)"
+        let c = UNMutableNotificationContent(), n = BatteryNotice.low(pct: 15)
+        c.title = n.title(name: name)
+        c.body = n.body + " (This is a test.)"
         c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "lowbatt.test", content: c, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)))
     }

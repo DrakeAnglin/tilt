@@ -12,8 +12,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '../hardware/pcb'))
 import bambu  # noqa: E402
+import bambu_project  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
+import release_ci  # noqa: E402
 import release_firmware  # noqa: E402
 
 try:
@@ -31,6 +33,76 @@ class ReleaseFirmware(unittest.TestCase):
             return b'\x02' + bytes([len(v)]) + v
         body = integer(r) + integer(s)
         self.assertEqual(release_firmware.der_to_raw(b'\x30' + bytes([len(body)]) + body), r + s)
+
+
+    def test_stable_also_goes_to_beta_unless_beta_is_newer(self):
+        e = lambda v: {'version': v, 'file': 'tilt-%s.bin' % v}
+        self.assertEqual(release_firmware.add_to_listing({}, 'stable', e('2.3.0'))['beta']['version'], '2.3.0')
+        l = release_firmware.add_to_listing({'beta': e('2.3.0-beta2')}, 'stable', e('2.3.0'))
+        self.assertEqual(l['beta']['version'], '2.3.0')          # the beta it came from is not newer
+        l = release_firmware.add_to_listing({'beta': e('2.4.0-beta1')}, 'stable', e('2.3.1'))
+        self.assertEqual(l['beta']['version'], '2.4.0-beta1')    # a newer beta stays
+        l = release_firmware.add_to_listing({'stable': e('2.3.0')}, 'beta', e('2.4.0-beta1'))
+        self.assertEqual(l['stable']['version'], '2.3.0')        # a beta never touches stable
+
+
+class ReleaseCI(unittest.TestCase):
+    def test_parse_tag(self):
+        self.assertEqual(release_ci.parse_tag('fw-v2.3.0'), ('controller', '2.3.0', 'stable'))
+        self.assertEqual(release_ci.parse_tag('fw-v2.3.0-beta1'), ('controller', '2.3.0-beta1', 'beta'))
+        self.assertEqual(release_ci.parse_tag('hub-v0.3.4'), ('hub', '0.3.4', 'hub'))
+        for bad in ['v2.3.0', 'fw-2.3.0', 'fw-v2.3', 'fw-v2.3.0 ', 'firmware-2.3.0']:
+            with self.assertRaises(ValueError): release_ci.parse_tag(bad)
+
+    def test_code_versions_parse(self):
+        self.assertRegex(release_ci.code_version('controller'), r'^\d+\.\d+\.\d+')
+        self.assertRegex(release_ci.code_version('hub'), r'^\d+\.\d+\.\d+')
+
+    def test_raw_to_der_undoes_der_to_raw(self):
+        for raw in [b'\x80' + b'\x11' * 31 + b'\x00\x22' + b'\x33' * 30, b'\x01' * 64, b'\x00' * 31 + b'\x05' + b'\xff' * 32]:
+            self.assertEqual(release_firmware.der_to_raw(release_ci.raw_to_der(raw)), raw)
+
+    def test_signed_part(self):
+        self.assertEqual(release_ci.signed_part(b'IMG' + b's' * 64 + b'TILTSIG1'), (b'IMG', b's' * 64))
+        self.assertEqual(release_ci.signed_part(b'P' + b's' * 64 + b'TILTDLT1'), (b'P', b's' * 64))
+        with self.assertRaises(ValueError): release_ci.signed_part(b'x' * 80)
+
+    def test_fetch_and_verify_check_only_what_was_built(self):
+        """fetch() downloads every file firmware.json names plus older images; verify() then checks only new files."""
+        import json, subprocess
+        site = {'firmware.json': json.dumps({'stable': {'version': '2.2.0', 'file': 'tilt-2.2.0.bin', 'patches': [{'file': 'tilt-2.2.0-from-2.1.0.patch'}]},
+                                             'hub': {'version': '0.3.3', 'file': 'tilt-hub-0.3.3.bin'}}).encode(),
+                'tilt-2.1.0.bin': b'old', 'tilt-2.2.0.bin': b'new', 'tilt-2.2.0-from-2.1.0.patch': b'p', 'tilt-hub-0.3.3.bin': b'h'}
+        releases = [{'draft': False, 'prerelease': False, 'published_at': '2026-11-0%d' % i,
+                     'assets': [{'name': n, 'browser_download_url': 'u:' + n} for n in names]}
+                    for i, names in [(1, ['tilt-2.1.0.bin']), (2, list(site))]]
+        get = release_ci._get
+        release_ci._get = lambda url: json.dumps(releases).encode() if url.startswith('https://api') else site[url[2:]]
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                release_ci.fetch(d)
+                self.assertEqual(sorted(release_ci.fetched_names(d)), sorted(n for n in site if n != 'firmware.json'))
+                self.assertLess(os.path.getmtime(os.path.join(d, 'tilt-2.1.0.bin')), os.path.getmtime(os.path.join(d, 'tilt-2.2.0.bin')))
+                key, pub = os.path.join(d, 'k.pem'), os.path.join(d, 'p.pem')
+                subprocess.run(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', key], check=True)
+                subprocess.run(['openssl', 'ec', '-in', key, '-pubout', '-out', pub], check=True, capture_output=True)
+                old_key, release_firmware.KEY = release_firmware.KEY, key
+                try:
+                    img = b'image' * 50
+                    open(os.path.join(d, 'tilt-2.3.0.bin'), 'wb').write(img + release_firmware.sign(img) + b'TILTSIG1')
+                finally:
+                    release_firmware.KEY = old_key
+                release_ci.verify(pub, d)                   # the fetched files are not signed with this key: skipped
+                open(os.path.join(d, 'tilt-2.3.0.bin'), 'r+b').write(b'X')
+                with self.assertRaises(SystemExit): release_ci.verify(pub, d)
+        finally:
+            release_ci._get = get
+
+    def test_listed_files_names_every_image_and_patch_once(self):
+        listing = {'stable': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                   'beta': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                   'hub': {'file': 'tilt-hub-0.3.4.bin'}}
+        self.assertEqual(release_ci.listed_files(listing), ['tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin'])
 
 
 class Orient(unittest.TestCase):
@@ -73,6 +145,48 @@ class BambuPacking(unittest.TestCase):
                 for b in boxes[i + 1:]:
                     apart = a[3] <= b[1] or b[3] <= a[1] or a[4] <= b[2] or b[4] <= a[2]
                     self.assertTrue(apart, (m, a[0], b[0]))
+
+
+class BambuProject(unittest.TestCase):
+    """tools/bambu_project.py: one plate per part, whole-set plates, per-part brims and supports."""
+
+    def test_every_part_has_its_own_plate(self):
+        single = [p for p in bambu_project.PLATES[3:]]
+        printed = sorted(n for _, rows in single for r in rows for n in r)
+        every = sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX))
+        self.assertEqual(printed, every)
+
+    def test_whole_set_plates_hold_one_tilter_and_the_box(self):
+        sets = sorted(n for _, rows in bambu_project.PLATES[:3] for r in rows for n in r)
+        self.assertEqual(sets, sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX)))
+
+    def test_plate_names_are_allowed_in_bambu_studio(self):
+        for title, _ in bambu_project.PLATES:
+            self.assertFalse(set(title) & set('<>:/\\|?*"'), title)
+
+    def test_plates_fit_without_overlap(self):
+        for title, rows in bambu_project.PLATES:
+            boxes = []
+            for n, (x, y) in bambu_project.pack(rows).items():
+                w, d = bambu_project.size(n)
+                boxes.append((n, x - w / 2, y - d / 2, x + w / 2, y + d / 2))     # size() includes the brim
+            for n, x0, y0, x1, y1 in boxes:
+                self.assertTrue(0 <= x0 and x1 <= bambu_project.H2D[0] and 0 <= y0 and y1 <= bambu_project.H2D[1],
+                                (title, n))
+            for i, a in enumerate(boxes):
+                for b in boxes[i + 1:]:
+                    apart = a[3] <= b[1] or b[3] <= a[1] or a[4] <= b[2] or b[4] <= a[2]
+                    self.assertTrue(apart, (title, a[0], b[0]))
+
+    def test_supports_only_where_the_owner_said(self):
+        on = {n for _, rows in bambu_project.PLATES for r in rows for n in r
+              if bambu_project.object_settings(n).get('enable_support') == '1'}
+        self.assertEqual(on, {'tray_lid', 'worm', 'worm_wheel'})
+        self.assertEqual(bambu_project.TWEAKS['enable_support'], '0')
+
+    def test_worm_has_a_brim(self):
+        self.assertEqual(bambu_project.object_settings('worm')['brim_type'], 'outer_only')
+        self.assertEqual(bambu_project.TWEAKS['brim_type'], 'no_brim')
 
 
 class Netlist(unittest.TestCase):

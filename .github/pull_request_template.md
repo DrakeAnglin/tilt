@@ -11,9 +11,9 @@ Closes #
 
 ## Merge Danger
 
-**Door:** <!-- two-way (a revert undoes it) or one-way (no going back once shipped) -->
+**Door:** <!-- one of: two-way (a revert undoes it) or one-way (a revert does not undo the merge) -->
 
-**Blast Radius:** <!-- one word: docs, tools, app, firmware, hardware, release -->
+**Blast Radius:** <!-- small, medium or large, and the area (docs, tools, app, firmware, hardware, site, release): who is hurt if it is wrong -->
 
 **What could go wrong:** <!-- what breaks, and for whom, if this is wrong after merge -->
 

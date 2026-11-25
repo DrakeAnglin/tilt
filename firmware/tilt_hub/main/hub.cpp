@@ -66,7 +66,12 @@
 #include "logic.h"                               // battLevel (the controller's own rules)
 #include "home_view.h"                          // what Home sees, the same rules as a controller on Wi-Fi
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm: the same as the controller's
+#if defined(TILT_RELEASE)                         // an update file carries no Wi-Fi of anyone's
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
+#else
 #include "secrets.h"                             // WIFI_SSID, WIFI_PASSWORD (bench: until Apple Home gives the network)
+#endif
 // HUB_SETUP_PIN: on the hub's label; made by build.sh, never in the repo. It is copied to flash at the first start, so
 // update files (built with TILT_RELEASE) carry no code at all.
 #if __has_include("setup_pin.h") && !defined(TILT_RELEASE)
@@ -110,6 +115,7 @@ struct Ctrl {
   bool bootOk;
   uint64_t ctr;
   int closeUp, pct, low;
+  int chg;                                       // on the charging cable: 1 yes, 0 no, -1 not said (older controller)
   struct B { char name[33]; int hid, ok, tilt, tgt, mov; } b[PORTS];
   int sep;                                       // what the controller says now (-1 = not heard yet)
   int tileLift[PORTS], tileOp[PORTS];            // what each tile last showed Home (-1 = nothing yet)
@@ -709,7 +715,7 @@ static void udpTask(void *) {
         SemaphoreHandle_t m = ctrls[c].mx;
         ctrls[c] = Ctrl{};
         Ctrl &f = ctrls[c];
-        f.mx = m; f.pct = -1; f.sep = -1; f.own = -1;
+        f.mx = m; f.pct = -1; f.chg = -1; f.sep = -1; f.own = -1;
         for (auto &b : f.b) b.tilt = b.tgt = INT32_MIN;
         for (int t = 0; t < PORTS; t++) f.tileLift[t] = f.tileOp[t] = -1;
         strlcpy(f.s.id, id, 13); f.used = true;
@@ -734,6 +740,8 @@ static void udpTask(void *) {
     if (nm && strcmp(clean, k.name)) { strlcpy(k.name, clean, sizeof k.name); k.announced = false; }
     k.pct = cJSON_GetNumberValue(cJSON_GetObjectItem(j, "pct"));
     k.low = cJSON_GetNumberValue(cJSON_GetObjectItem(j, "low"));
+    cJSON *chgj = cJSON_GetObjectItem(j, "chg");
+    k.chg = cJSON_IsNumber(chgj) ? chgj->valueint : -1;
     cJSON *ownj = cJSON_GetObjectItem(j, "own");
     if (cJSON_IsNumber(ownj) && ownj->valueint != k.own) { k.own = ownj->valueint; k.announced = false; k.hello.clear(); }   // its hello says "owned": ask it again
     cJSON *cvj = cJSON_GetObjectItem(j, "cv");
@@ -1245,6 +1253,7 @@ static std::string infoJson() {
              k.pct, k.low, rssi, lqi, k.otaSt, k.otaPct, k.s.ep[0], k.s.ep[1], k.s.ep[2]);
     std::string tailj = std::string(nums) + (k.otaErr[0] ? ",\"otaErr\":\"" + std::string(k.otaErr) + "\"" : std::string()) +
                         (k.s.keyState ? ",\"hubCid\":\"" + hexOf(k.s.cid, 8) + "\"" : std::string()) +   // the hub's own key on it (its join request)
+                        (k.chg >= 0 ? ",\"chg\":" + std::to_string(k.chg) : std::string()) +   // on the charging cable (not said by an older controller)
                         ",\"own\":" + std::to_string(k.own) + "}";                                            // it has an owner (-1 not known)
     j += std::string(first ? "" : ",") + "{\"id\":\"" + std::string(k.s.id, strnlen(k.s.id, 12)) + "\",\"name\":\"" + std::string(k.name, strnlen(k.name, 32)) +
          "\",\"fw\":\"" + std::string(k.fw, strnlen(k.fw, 23)) + "\"" + tailj;
@@ -1961,7 +1970,7 @@ extern "C" void app_main() {
   pendMx = xSemaphoreCreateMutex();
   for (auto &p : pend) p.sem = xSemaphoreCreateBinary();
   for (auto &k : ctrls) {
-    k.mx = xSemaphoreCreateMutex(); k.pct = -1; k.sep = -1; k.own = -1;
+    k.mx = xSemaphoreCreateMutex(); k.pct = -1; k.chg = -1; k.sep = -1; k.own = -1;
     for (auto &b : k.b) b.tilt = b.tgt = INT32_MIN;
     for (int t = 0; t < PORTS; t++) { k.tileLift[t] = k.tileOp[t] = -1; k.tileLabel[t][0] = 0; }
   }

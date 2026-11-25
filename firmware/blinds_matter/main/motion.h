@@ -6,6 +6,7 @@
 #include "power.h"
 #include "pwmin.h"
 #include "request.h"
+#include "handwatch.h"
 
 struct BlindState {
   bool present = false, seen = false;
@@ -159,14 +160,12 @@ void motionBegin() {
   pwmSaved = nvs.getUChar("pwm", 0);
 }
 
-// (setup's live reading, see watchTick)
-void watchTick(uint32_t now);
-int watchPort = -1;
-bool watchOn = false;
-uint32_t watchUntil = 0;
-bool handBusy = false;                         // the watch is on a blind that is being turned by hand (see handTick)
-void handCheck(int p, uint32_t now);
-uint32_t setupSeen = 0;                        // millis of the app's last "setup is open" call: no following by hand then
+// ---- the watch and Follow: handwatch.h decides, the watch code below is its adapter
+HandWatch hand;
+int sensorPort = -1;                           // the blind whose sensor the watch has switched on; -1 = none
+void watchTick(uint32_t now, int p);
+void watchSync(int p);
+void followHand(int p, float t);
 // ---- moves
 // A recording of the last move, for the developer page: the angle every 40 ms from the start until 1.5 s after the stop.
 struct TracePt { uint16_t t, a; uint8_t st; };          // t: 10 ms units; a: tenths of a degree; st: state, +16 = motor on
@@ -181,7 +180,6 @@ void tr(const Move &m, uint32_t now, float a) {
   traceLast = now;
   trace[traceN++] = {(uint16_t)((now - traceT0) / 10), (uint16_t)lroundf(a * 10.0f), (uint8_t)(m.st | (motOn[m.port] ? 16 : 0))};
 }
-float handRef[PORTS] = {NAN, NAN, NAN};        // each blind's tilt as the controller last left it (see "turned by hand")
 // The Tilter seam's controller adapter: today's sensor, motor, clock, settings and log calls for one port.
 struct EspTilter : Tilter {
   int p;
@@ -216,7 +214,7 @@ struct EspTilter : Tilter {
     if (!powered) stats.battMotorMs += m.runMs;
     strlcpy(bs[p].last, msg, sizeof bs[p].last);
     bs[p].target = NAN;
-    handRef[p] = bs[p].tilt;                     // the motor put it here: not a turn by hand
+    hand.motorLeft(p, bs[p].tilt);               // the motor put it here: not a turn by hand
   }
 };
 EspTilter tilters[PORTS] = {EspTilter(0), EspTilter(1), EspTilter(2)};
@@ -225,8 +223,9 @@ bool beginMove(int kind, int p) {             // leaves cur on port p
   if (MVX.kind != MV_NONE) { motorRaw(p, 0, 0); sensorOff(p); bs[p].target = NAN; }
   bool others = false;
   for (int i = 0; i < PORTS; i++) if (i != p && mvs[i].kind != MV_NONE) others = true;
-  if (watchOn) { if (watchPort != p) sensorOff(watchPort); watchOn = false; }
-  watchPort = -1; handBusy = false;
+  if (sensorPort >= 0 && sensorPort != p) sensorOff(sensorPort);   // the move reads its own sensor: the watch ends
+  sensorPort = -1;
+  hand.motorStarted();
   moveFresh(MVX, kind, p, millis());
   if (!others) { tracePort = p; traceN = 0; traceT0 = MVX.t0; traceLast = 0; traceTgt = NAN; }
   digitalWrite(P_EN[p], HIGH);
@@ -312,7 +311,10 @@ void motionTick() {
   if (!moving()) {
     for (int i = 0; i < PORTS; i++)
       if (bs[i].queued) { bs[i].queued = false; const char *e = startTilt(i, bs[i].qTilt); if (e) { strlcpy(bs[i].last, e, sizeof bs[i].last); bs[i].target = NAN; } return; }
-    if (watchPort >= 0) { watchTick(now); return; }
+    HandWatchNow w = hand.tick(now);
+    if (w.followFrom >= 0) { watchSync(-1); followHand(w.followFrom, w.followTilt); return; }
+    if (w.watchPort >= 0) { watchTick(now, w.watchPort); return; }
+    watchSync(-1);
     // Keep the positions fresh: the wand may have been turned by hand. One port at a time. With "blinds follow each
     // other" on and two or more blinds, always (quicker while someone looks); otherwise only while someone looks.
     int n = 0;
@@ -322,7 +324,7 @@ void motionTick() {
     if (now - lastIdle >= step && (follow || uiActive() || !bs[idlePort].seen)) {
       lastIdle = now;
       pulseRead(idlePort);
-      if (follow) handCheck(idlePort, now);
+      if (follow) hand.reading(idlePort, movable(idlePort) ? bs[idlePort].tilt : NAN, bs[idlePort].ang, bs[idlePort].blind, now);
       idlePort = (idlePort + 1) % PORTS;
     }
     return;
@@ -331,45 +333,30 @@ void motionTick() {
   lastT = now;
   for (int i = 0; i < PORTS; i++) if (mvs[i].kind != MV_NONE) { Use u(i); moveTick(mvs[i], tilters[i], now); }
 }
-// ---- setup: keep one blind's sensor on and its reading live (the app asks again every second while a setup is open)
-void watchStop() { if (watchOn && watchPort >= 0 && !movingPort(watchPort)) sensorOff(watchPort); watchOn = false; watchPort = -1; handBusy = false; }
-// ---- turned by hand: with "blinds follow each other" on, a blind that is turned with its wand takes the others along.
-// The idle look-round (motionTick) sees a blind away from where the controller left it; its sensor then stays on
-// until it has held still for HAND_STILL_MS, and the other blinds are sent to the same tilt. Long enough that a pause
-// while turning the wand does not start the others half way (they would run while the hand is still at work).
-const float HAND_TILT = 6.0f;                  // a change of this much (tilt units) starts it
-const uint32_t HAND_STILL_MS = 1500;
-float handLast = 0;
-uint32_t handStill = 0, handSince = 0;
-void handCheck(int p, uint32_t now) {          // p has just been read (motor stopped)
-  if (!movable(p) || bs[p].blind || isnan(bs[p].tilt)) return;
-  if (setupSeen && now - setupSeen < 15000) { handRef[p] = bs[p].tilt; return; }     // a setup screen is open: hands are expected
-  if (isnan(handRef[p])) { handRef[p] = bs[p].tilt; return; }
-  if (fabsf(bs[p].tilt - handRef[p]) < HAND_TILT) return;
-  watchPort = p; watchUntil = now + 3000; handBusy = true;
-  handLast = bs[p].ang; handStill = handSince = now;
+// ---- the watch: one blind's sensor kept on and read every 100 ms (setup, a recovery, or a wand being turned)
+void watchSync(int p) {                        // the watch's sensor on for blind p only (-1: none)
+  if (sensorPort == p) return;
+  if (sensorPort >= 0 && !movingPort(sensorPort)) sensorOff(sensorPort);
+  sensorPort = -1;
+  if (p < 0) return;
+  digitalWrite(P_EN[p], HIGH);
+  delay(20);
+  senseWake(p);
+  sensorPort = p;
 }
-void handTick(uint32_t now) {                  // from watchTick, every 100 ms, with a fresh reading
-  int p = watchPort;
-  watchUntil = now + 3000;
-  if (bs[p].blind) { handStill = now; return; }
-  if (fabsf(angDiff(bs[p].ang, handLast)) > 0.7f) { handLast = bs[p].ang; handStill = now; }
-  bool timeout = now - handSince > 60000;
-  if (now - handStill < HAND_STILL_MS && !timeout) return;
-  float t = constrain(bs[p].tilt, -100.0f, 100.0f);
-  bool moved = !timeout && !isnan(t) && fabsf(t - handRef[p]) >= HAND_TILT * 0.6f;
-  handRef[p] = bs[p].tilt;
-  watchStop();
-  if (!moved) return;
+void watchTick(uint32_t now, int p) {          // from motionTick, only while nothing moves
+  static uint32_t last = 0;
+  watchSync(p);
+  if (now - last < 100) return;
+  last = now;
+  noteAngle(p, readAngle(p));
+  hand.reading(p, movable(p) ? bs[p].tilt : NAN, bs[p].ang, bs[p].blind, now);
+}
+// ---- turned by hand: with "blinds follow each other" on, a blind turned with its wand takes the others along
+// (ADR 0004). The idle look-round (motionTick) gives HandWatch each reading; it says when the hand is done.
+void followHand(int p, float t) {
   int n = moveBlinds(moveAsk(FROM_HAND, p, t)).started;
   event("%s turned by hand to tilt %.0f: %d other blind%s follow%s", cfg.b[p].name, t, n, n == 1 ? "" : "s", n == 1 ? "s" : "");
-}
-void watchTick(uint32_t now) {                 // from motionTick, only while nothing moves
-  static uint32_t last = 0;
-  if (watchPort < 0) return;
-  if ((int32_t)(watchUntil - now) <= 0) { watchStop(); return; }
-  if (!watchOn) { digitalWrite(P_EN[watchPort], HIGH); delay(20); senseWake(watchPort); watchOn = true; }
-  if (now - last >= 100) { last = now; noteAngle(watchPort, readAngle(watchPort)); if (handBusy) handTick(now); }
 }
 // A reading for a mark: the sensor has to hold still for 0.6 s. A still PWM reading wanders about +-1.5 degrees (brush
 // noise on the shared wires), so "still" is within STEADY_DEG; a wand being turned moves far more. Returns NAN if not.
@@ -390,8 +377,8 @@ const char *setMark(int p, const String &w) {
   if (moving()) return "wait until it stops";
   BlindCfg &c = cfg.b[p];
   if (w == "clear") { c.up = c.open = c.down = NAN; cfgSave(); noteAngle(p, bs[p].ang); event("%s: marks cleared", c.name); return nullptr; }
-  if (!(watchOn && watchPort == p)) { watchStop(); digitalWrite(P_EN[p], HIGH); delay(20); senseWake(p); watchPort = p; watchOn = true; watchUntil = millis() + 3000; }
-  handBusy = false;
+  hand.setupOpen(p, millis());                 // keep its sensor on: steadyAngle reads it
+  watchSync(p);
   if (!bs[p].present) return "no tilter plugged in";
   float st = steadyAngle(p);
   if (isnan(st)) return "the slats are still moving: let them settle, then tap again";
@@ -404,7 +391,7 @@ const char *setMark(int p, const String &w) {
   else return "unknown mark";
   cfgSave();
   noteAngle(p, bs[p].ang);
-  handRef[p] = NAN; setupSeen = millis() ? millis() : 1;
+  hand.marked(p, millis());
   event("%s: marked %s at %.1f deg", c.name, w.c_str(), bs[p].ang);
   return nullptr;
 }
