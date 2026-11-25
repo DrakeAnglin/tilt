@@ -4,6 +4,9 @@
 cd "$(dirname "$0")"
 . ~/esp/esp-idf/export.sh > /dev/null 2>&1
 . ~/esp/esp-matter/export.sh > /dev/null 2>&1
+# sdkconfig (not in Git) is made from sdkconfig.defaults: made again whenever the defaults change, so every checkout
+# builds with the same settings (the memory and TLS trims for push alerts live there).
+if [ -f sdkconfig ] && [ sdkconfig.defaults -nt sdkconfig ]; then rm -f sdkconfig; rm -rf build; fi
 [ -f sdkconfig ] || idf.py set-target esp32c6 > build-setup.log 2>&1
 # The hub's setup code (8 digits): the first owner types it in the app. Made once, kept in main/setup_pin.h (not in
 # Git). Put it on a label on the hub.

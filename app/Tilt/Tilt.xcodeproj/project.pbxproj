@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		71170000000000000000C002 /* TiltAlerts.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 71170000000000000000C001 /* TiltAlerts.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		71170000000000000000B002 /* TiltWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 71170000000000000000B001 /* TiltWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -18,6 +19,13 @@
 			remoteGlobalIDString = 71170000000000000000B010;
 			remoteInfo = TiltWidget;
 		};
+		71170000000000000000C003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 71170000000000000000A009 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 71170000000000000000C010;
+			remoteInfo = TiltAlerts;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -28,6 +36,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				71170000000000000000B002 /* TiltWidget.appex in Embed Foundation Extensions */,
+				71170000000000000000C002 /* TiltAlerts.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -37,6 +46,7 @@
 /* Begin PBXFileReference section */
 		71170000000000000000A001 /* Tilt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tilt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		71170000000000000000B001 /* TiltWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TiltWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		71170000000000000000C001 /* TiltAlerts.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TiltAlerts.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -53,6 +63,11 @@
 		71170000000000000000B006 /* TiltWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = TiltWidget;
+			sourceTree = "<group>";
+		};
+		71170000000000000000C006 /* TiltAlerts */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TiltAlerts;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -72,6 +87,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		71170000000000000000C012 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -81,6 +103,7 @@
 				71170000000000000000A002 /* Tilt */,
 				71170000000000000000B005 /* Shared */,
 				71170000000000000000B006 /* TiltWidget */,
+				71170000000000000000C006 /* TiltAlerts */,
 				71170000000000000000A004 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +113,7 @@
 			children = (
 				71170000000000000000A001 /* Tilt.app */,
 				71170000000000000000B001 /* TiltWidget.appex */,
+				71170000000000000000C001 /* TiltAlerts.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -110,6 +134,7 @@
 			);
 			dependencies = (
 				71170000000000000000B017 /* PBXTargetDependency */,
+				71170000000000000000C017 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				71170000000000000000A002 /* Tilt */,
@@ -141,6 +166,27 @@
 			productReference = 71170000000000000000B001 /* TiltWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		71170000000000000000C010 /* TiltAlerts */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 71170000000000000000C014 /* Build configuration list for PBXNativeTarget "TiltAlerts" */;
+			buildPhases = (
+				71170000000000000000C011 /* Sources */,
+				71170000000000000000C012 /* Frameworks */,
+				71170000000000000000C013 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				71170000000000000000B005 /* Shared */,
+				71170000000000000000C006 /* TiltAlerts */,
+			);
+			name = TiltAlerts;
+			productName = TiltAlerts;
+			productReference = 71170000000000000000C001 /* TiltAlerts.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -155,6 +201,9 @@
 						CreatedOnToolsVersion = 27.2;
 					};
 					71170000000000000000B010 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+					71170000000000000000C010 = {
 						CreatedOnToolsVersion = 27.2;
 					};
 				};
@@ -175,11 +224,19 @@
 			targets = (
 				71170000000000000000A008 /* Tilt */,
 				71170000000000000000B010 /* TiltWidget */,
+				71170000000000000000C010 /* TiltAlerts */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		71170000000000000000C013 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		71170000000000000000A007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -197,6 +254,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		71170000000000000000C011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		71170000000000000000A005 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -214,6 +278,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		71170000000000000000C017 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 71170000000000000000C010 /* TiltAlerts */;
+			targetProxy = 71170000000000000000C003 /* PBXContainerItemProxy */;
+		};
 		71170000000000000000B017 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 71170000000000000000B010 /* TiltWidget */;
@@ -222,6 +291,54 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		71170000000000000000C015 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = P6F5JH9942;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TiltAlerts-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Tilt;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.tilt.blinds.alerts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		71170000000000000000C016 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = P6F5JH9942;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TiltAlerts-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Tilt;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.tilt.blinds.alerts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		71170000000000000000A00C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -368,6 +485,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		71170000000000000000C014 /* Build configuration list for PBXNativeTarget "TiltAlerts" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				71170000000000000000C015 /* Debug */,
+				71170000000000000000C016 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		71170000000000000000A00A /* Build configuration list for PBXProject "Tilt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

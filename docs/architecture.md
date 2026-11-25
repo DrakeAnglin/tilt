@@ -31,7 +31,8 @@ Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md]
 
 ## Why it is built this way
 - **No cloud.** The app talks to controllers directly, and Apple Home covers voice and away-from-home control
-  ([ADR 0001](adr/0001-no-cloud-local-first.md)).
+  ([ADR 0001](adr/0001-no-cloud-local-first.md)). The one use of iCloud is for notices: join requests between phones
+  and the hub's push alerts (no server of our own).
 - **Thread only, through a Tilt Hub** ([ADR 0003](adr/0003-thread-only-tilt-hub.md)). A sleeping Thread device uses
   about a tenth of the battery of Wi-Fi power save, and a tap reacts in about half a second. The hub is Apple Home's
   Matter device for every blind, so no Apple Thread border router is needed.
@@ -122,6 +123,13 @@ A reversed cord would put battery + on IN2, so the continuity check matters.
   a new controller over Bluetooth and hands it the hub's Thread network (sealed, to the controller only), then talks to
   it through the hub over a secured channel with a key per phone (Owner and Guests); the hub cannot read it. Apple
   Home sees the blinds through the hub (added once, with the hub's own setup code).
+- **Push alerts** (owners only, at home or away): the hub watches for problems (a blind stalled, a controller not
+  responding, battery low / almost empty / empty, an update failed) and writes an Alert record to the app's iCloud
+  (CloudKit public database) with a server-to-server key. Each owner's iPhone has a subscription on that controller's
+  random topic, so iCloud pushes it; the app's alerts extension (TiltAlerts) words it. Each alert is sent once; alerts
+  wait on the hub while the internet is down. The only alert made on the phone is "Tilt Hub is offline" (on the home
+  Wi-Fi), since the hub can't send that one. Records hold no keys or addresses. Details:
+  [firmware/tilt_hub/README.md](../firmware/tilt_hub/README.md#push-alerts).
 - **Firmware updates**: signed release files on this repo's GitHub releases; the app hands them to the hub,
   which feeds them to the controller over Thread
   ([app-store.md](app-store.md)).

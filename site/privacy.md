@@ -22,6 +22,11 @@ stays with you.
   display name and the room's name, so the owners' phones can be told; and when an owner removes a phone, a note that
   only the removed phone can read. These notes contain no keys, addresses or locations, and are deleted when the request
   is answered.
+- **Alerts, also in Tilt's iCloud container:** when something needs an owner (a blind stalled, a battery is low, a
+  controller stopped answering, an update failed), your Tilt Hub writes a short alert so iCloud can notify the owners'
+  iPhones. An alert holds a random name that only your phones know, the kind of alert, the room's and blind's names, a
+  short detail (such as the battery percent) and a time; no keys, addresses or locations. Each new alert of the same
+  kind replaces the last one.
 
 ## What Tilt does not do
 
