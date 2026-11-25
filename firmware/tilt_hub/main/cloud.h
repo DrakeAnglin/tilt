@@ -152,9 +152,10 @@ static int ckPost(const char *env, const char *op, const std::string &body, std:
       if (w > 0) off += w;
     }
     char buf[512];
+    uint32_t until = ms() + 20000;                 // a quiet or half-open connection: give up (no answer: looked up before sending again)
     for (;;) {
       ssize_t n = esp_tls_conn_read(tls, buf, sizeof buf);
-      if (n == ESP_TLS_ERR_SSL_WANT_READ) continue;
+      if (n == ESP_TLS_ERR_SSL_WANT_READ) { if ((int32_t)(ms() - until) > 0) { all.clear(); break; } continue; }
       if (n <= 0 || all.size() > 6000) break;
       all.append(buf, n);
     }

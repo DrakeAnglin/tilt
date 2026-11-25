@@ -85,16 +85,24 @@ enum BatteryAlerts {
 /// the home Wi-Fi (away from home a hub out of reach is normal). Home = the same Wi-Fi router as when the hub last
 /// answered. Not for a moment's restart (an update): only after it has been out of reach for a few minutes.
 enum HubOffline {
-    private static let sentKey = "huboff.sent", routerKey = "huboff.router"
+    private static let sentKey = "huboff.sent", routerKey = "huboff.router", firstKey = "huboff.first"
     static let after: TimeInterval = 180
 
     static func answered() async {
         UserDefaults.standard.removeObject(forKey: sentKey)
+        UserDefaults.standard.removeObject(forKey: firstKey)
         if let r = await wifiRouter() { UserDefaults.standard.set(r, forKey: routerKey) }
     }
-    /// since: when it was first missed in a row (nil: checked twice just now, in the background).
+    /// since: when the app first missed it in a row (nil: from the background check, which keeps its own first miss,
+    /// so it too tells only once the hub has been out of reach for `after`).
     static func missed(since: Date?) async {
-        if let since, Date().timeIntervalSince(since) < after { return }
+        let d = UserDefaults.standard
+        var first = since
+        if first == nil {
+            let t = d.double(forKey: firstKey)
+            if t > 0 { first = Date(timeIntervalSince1970: t) } else { d.set(Date().timeIntervalSince1970, forKey: firstKey); return }
+        }
+        if let first, Date().timeIntervalSince(first) < after { return }
         guard !UserDefaults.standard.bool(forKey: sentKey), let home = UserDefaults.standard.string(forKey: routerKey),
               let now = await wifiRouter(), now == home else { return }
         UserDefaults.standard.set(true, forKey: sentKey)

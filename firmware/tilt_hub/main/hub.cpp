@@ -389,9 +389,14 @@ static void alertsCare() {
     if (j) cJSON_Delete(j);
   }
 }
-static void alertUpdateFailed(int c, const char *why) {
-  Memo &m = memoOf(c);
-  alertRaise(m.topic, "update", 9, ctrls[c].name, why);
+static void alertUpdateFailed(int c, const char *why) {     // from the update task (stateMx not held)
+  uint8_t t[16];
+  char name[33];
+  xSemaphoreTake(stateMx, portMAX_DELAY);
+  memcpy(t, memoOf(c).topic, 16);
+  strlcpy(name, ctrls[c].name, sizeof name);
+  xSemaphoreGive(stateMx);
+  alertRaise(t, "update", 9, name, why);
 }
 // The hub's own new firmware went back to the old one (it did not work): tell its owners once per version.
 static uint8_t htopic[16];

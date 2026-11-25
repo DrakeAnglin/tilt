@@ -335,7 +335,8 @@ check(AlertWords.title(kind: "stall", room: "Den", detail: "Left") == "Den: Left
 check(AlertWords.body(kind: "batt-low", room: "Den", detail: "15").hasPrefix("The battery is at 15%."), "the battery alert gives the percent")
 let rules = (try? String(contentsOfFile: "../../firmware/tilt_hub/main/alert_rules.h", encoding: .utf8)) ?? ""
 check(rules.contains("ALERT_LOW_PCT = \(ControllerState.Battery.lowPercent),") && rules.contains("ALERT_CRIT_PCT = \(ControllerState.Battery.criticalPercent),"), "the hub's battery lines are the app's (alert_rules.h)")
-for k in hubKinds where k != "test" { check(rules.contains(k) || (try? String(contentsOfFile: "../../firmware/tilt_hub/main/hub.cpp", encoding: .utf8))?.contains("\"\(k)\"") == true, "the hub knows alert \(k)") }
+let hubSrc = rules + ((try? String(contentsOfFile: "../../firmware/tilt_hub/main/hub.cpp", encoding: .utf8)) ?? "")
+for k in hubKinds { check(hubSrc.contains("\"\(k)\""), "the hub sends alert \(k) (as \"\(k)\" in alert_rules.h or hub.cpp)") }
 
 // ---- blind setup (Shared/BlindSetup.swift)
 func blind(hid: Int = 0, pres: Int = 1, seen: Int = 1, cal: Int = 1, mov: Int = 0, q: Int = 0, last: String = "") -> BlindState {
