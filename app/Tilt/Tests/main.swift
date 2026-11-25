@@ -49,6 +49,34 @@ check(low.isLow && !ok.isLow, "under 20% on battery is low")
 check(!chargingLow.isLow, "charging is not low")
 check(empty.isLow && empty.tooLowToMove, "too low to move is low even while charging")
 
+// ---- battery notices (Shared/BatteryNotice.swift): one rule for the controller's own reading and the hub's
+for b in [low, ok, chargingLow, empty, ControllerState.Battery(v: 4.2, pct: 100, st: "full", low: 0)] {
+    let hub = BatteryReading.fromHub(pct: b.pct, low: b.low, chg: b.charging ? 1 : 0)
+    check(hub == b.reading && hub?.isLow == b.isLow, "the hub's report and the controller's own reading agree (\(b.pct)% \(b.st))")
+}
+check(BatteryReading.fromHub(pct: 15, low: 0, chg: 1)?.isLow == false, "charging on a hub is never low")
+check(BatteryReading.fromHub(pct: 15, low: 0, chg: nil)?.isLow == true, "an older hub that does not say: low, as before")
+check(BatteryReading.fromHub(pct: 19, low: 0, chg: 0)?.isLow == true && BatteryReading.fromHub(pct: 20, low: 0, chg: 0)?.isLow == false, "the hub path uses lowPercent (20)")
+check(BatteryReading.fromHub(pct: -1, low: 0, chg: 0) == nil, "no reading yet from the hub: nothing to judge")
+let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+check(BatteryNotice.decide(low.reading, lastSent: nil, now: t0) == .low(pct: 15), "low and never sent: send")
+check(BatteryNotice.decide(chargingLow.reading, lastSent: nil, now: t0) == nil, "charging: no notice")
+check(BatteryNotice.decide(empty.reading, lastSent: nil, now: t0) == nil, "too low to move but on the cable: no notice (it is charging)")
+check(BatteryNotice.decide(BatteryReading(pct: 2, charging: false, tooLowToMove: true), lastSent: nil, now: t0) == .tooLowToMove, "too low to move on battery: send")
+check(BatteryNotice.decide(low.reading, lastSent: t0, now: t0.addingTimeInterval(86400)) == nil, "within a day of the last one: wait")
+check(BatteryNotice.decide(low.reading, lastSent: t0, now: t0.addingTimeInterval(86401)) != nil, "a day later: again")
+check(BatteryNotice.low(pct: 15).title(name: "Den") == "Den: battery low" && BatteryNotice.low(pct: 15).body.contains("15%"), "the notice wording")
+final class FakeNotifier: Notifier {
+    var sent: [(key: String, title: String, at: Date)] = []
+    func lastSent(_ key: String) -> Date? { sent.last { $0.key == key }?.at }
+    func send(_ key: String, title: String, body: String, at: Date) { sent.append((key, title, at)) }
+}
+let fn = FakeNotifier()
+BatteryNotices.check(id: "aa", name: "Den", reading: low.reading, via: fn, now: t0)
+BatteryNotices.check(id: "aa", name: "Den", reading: BatteryReading.fromHub(pct: 12, low: 0, chg: 0)!, via: fn, now: t0.addingTimeInterval(3600))
+BatteryNotices.check(id: "bb", name: "Office", reading: low.reading, via: fn, now: t0.addingTimeInterval(3600))
+check(fn.sent.map(\.key) == ["lowbatt.aa", "lowbatt.bb"], "once a day per controller, whichever path the reading came by")
+
 // ---- asleep / not reachable wording
 let seenAt = Date(timeIntervalSince1970: 1_800_000_000)
 check(TiltWords.away(lastSeen: seenAt.addingTimeInterval(-30), now: seenAt) == "Unreachable · last seen just now", "unreachable, seen moments ago")
@@ -267,6 +295,7 @@ let hubInfoData = try Data(contentsOf: wireDir.appendingPathComponent("hub_info.
 let hi = try? JSONDecoder().decode(HubInfo.self, from: hubInfoData)
 check(hi?.fw == "0.3.5" && hi?.ip == "192.168.1.40" && hi?.ch == 15 && hi?.home == 1 && hi?.homes?.first?.vendor == 4937, "hub_info.json: the hub's own fields")
 check(hi?.c.count == 2 && hi?.c[0].hubCid == "0011223344556677" && hi?.c[0].own == 1 && hi?.c[0].signal == -61, "hub_info.json: a controller on the hub")
+check(hi?.c[0].chg == 0 && hi?.c[1].chg == nil, "hub_info.json: on the cable or not, and nothing said by an older controller")
 check(hi?.c[1].notResponding == true && hi?.c[1].signal == nil && hi?.c[1].ota == 4 && hi?.c[1].otaErr == "the controller stopped answering", "hub_info.json: a silent controller whose update failed")
 check(hi?.new.first?.ble == "aa:bb:cc:dd:ee:ff", "hub_info.json: a new controller nearby")
 let renamed = Data(String(decoding: hubInfoData, as: UTF8.self).replacingOccurrences(of: "\"seenS\"", with: "\"seen\"").utf8)

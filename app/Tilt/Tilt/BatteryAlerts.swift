@@ -20,31 +20,39 @@ final class NoticePresenter: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
+/// The phone's notifications, and when each was last sent (UserDefaults).
+struct PhoneNotifier: Notifier {
+    func lastSent(_ key: String) -> Date? {
+        let t = UserDefaults.standard.double(forKey: key)
+        return t > 0 ? Date(timeIntervalSince1970: t) : nil
+    }
+    func send(_ key: String, title: String, body: String, at: Date) {
+        UserDefaults.standard.set(at.timeIntervalSince1970, forKey: key)
+        let c = UNMutableNotificationContent()
+        c.title = title
+        c.body = body
+        c.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+    }
+}
+
 enum BatteryAlerts {
     static let refreshId = "app.tilt.blinds.refresh"
 
     /// A removed controller starts fresh if it is added again.
-    static func forget(id: String) { UserDefaults.standard.removeObject(forKey: "lowbatt.\(id)") }
+    static func forget(id: String) { UserDefaults.standard.removeObject(forKey: BatteryNotices.key(id: id)) }
     static func askPermission() { UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in } }
 
     static func check(id: String, name: String, battery: ControllerState.Battery) {
-        guard !battery.charging, battery.isLow else { return }
-        let key = "lowbatt.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
-        guard now - last > 86400 else { return }
-        UserDefaults.standard.set(now, forKey: key)
-        let c = UNMutableNotificationContent()
-        c.title = "\(name): battery low"
-        c.body = battery.tooLowToMove ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(battery.pct)%. Plug in the charging cable soon."
-        c.sound = .default
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+        BatteryNotices.check(id: id, name: name, reading: battery.reading, via: PhoneNotifier())
     }
 
     /// For trying it out: the same notice, 5 seconds from now (leave the app to see it).
     static func test(name: String) {
         askPermission()
-        let c = UNMutableNotificationContent()
-        c.title = "\(name): battery low"
-        c.body = "The battery is at 15%. Plug in the charging cable soon. (This is a test.)"
+        let c = UNMutableNotificationContent(), n = BatteryNotice.low(pct: 15)
+        c.title = n.title(name: name)
+        c.body = n.body + " (This is a test.)"
         c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "lowbatt.test", content: c, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)))
     }
@@ -54,28 +62,16 @@ enum BatteryAlerts {
         r.earliestBeginDate = Date(timeIntervalSinceNow: 4 * 3600)
         try? BGTaskScheduler.shared.submit(r)
     }
-    /// From what a Tilt Hub reports (no controller is woken for it).
-    static func checkPercent(id: String, name: String, pct: Int, tooLow: Bool) {
-        guard pct < 20 || tooLow else { return }
-        let key = "lowbatt.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
-        guard now - last > 86400 else { return }
-        UserDefaults.standard.set(now, forKey: key)
-        let c = UNMutableNotificationContent()
-        c.title = "\(name): battery low"
-        c.body = tooLow ? "The battery is too low to move the blinds. Plug in the charging cable." : "The battery is at \(pct)%. Plug in the charging cable soon."
-        c.sound = .default
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+    /// From what a Tilt Hub reports (no controller is woken for it): the same rule as a reading from the controller.
+    static func check(member m: HubInfo.Member) {
+        guard let r = BatteryReading.fromHub(pct: m.pct, low: m.low, chg: m.chg) else { return }
+        BatteryNotices.check(id: m.id, name: m.name, reading: r, via: PhoneNotifier())
     }
     /// The hub has not heard from a controller for 25 minutes (unplugged, flat, or out of range of the hub).
-    static func notResponding(id: String, name: String) {
-        let key = "noresp.\(id)", last = UserDefaults.standard.double(forKey: key), now = Date().timeIntervalSince1970
-        guard now - last > 43200 else { return }
-        UserDefaults.standard.set(now, forKey: key)
-        let c = UNMutableNotificationContent()
-        c.title = "\(name) is not responding"
-        c.body = "Your Tilt Hub has not heard from it for a while. Check that its battery is charged and that it is within reach of the hub."
-        c.sound = .default
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: c, trigger: nil))
+    static func notResponding(id: String, name: String, now: Date = .now) {
+        let key = "noresp.\(id)", n = PhoneNotifier()
+        if let last = n.lastSent(key), now.timeIntervalSince(last) <= 43200 { return }
+        n.send(key, title: "\(name) is not responding", body: "Your Tilt Hub has not heard from it for a while. Check that its battery is charged and that it is within reach of the hub.", at: now)
     }
 
     /// Run by iOS now and then while the app is closed. Controllers on a Tilt Hub are checked through the hub (it
@@ -86,7 +82,7 @@ enum BatteryAlerts {
         if let info = await HubWatch.fetchInfo() {
             for m in info.c {
                 onHub.insert(m.id)
-                if m.pct >= 0 { checkPercent(id: m.id, name: m.name, pct: m.pct, tooLow: m.low == 1) }
+                check(member: m)
                 if m.seenS > HubInfo.Member.silentAfter { notResponding(id: m.id, name: m.name) }
             }
         }
