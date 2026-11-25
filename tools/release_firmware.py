@@ -11,8 +11,9 @@ firmware/blinds_matter/build-release), checks none of secrets.h's values ended u
                        the new image's signature | the patch file's signature | "TILTDLT1". A controller running
                        exactly <old> takes it in about a minute over Thread instead of seven.
   firmware.json        {"stable": {...}, "beta": {...}}  the newest version on each channel; the file name is relative
-Publish both on the public site repo (the app reads its latest release):
-  gh release create firmware-<version> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/tilt-<version>.bin firmware/releases/tilt-<version>-from-*.patch
+Normally the GitHub Action runs this on a version tag and publishes the result (docs/firmware-release.md). By hand:
+put firmware.json and every file it names on a new release of the public site repo (the app reads its latest release):
+  gh release create <tag> --repo DrakeAnglin/tilt-site firmware/releases/firmware.json firmware/releases/<each file it names>
 """
 import argparse, hashlib, json, os, re, subprocess, sys
 
@@ -51,6 +52,23 @@ def image_of(signed):
     """A file as published (image | signature | "TILTSIG1") back to the image."""
     return signed[:-72] if signed.endswith(b'TILTSIG1') else signed
 
+def check_no_secrets(image):
+    """Never publish a file with a password in it: no value from a secrets.h on this machine may be in the image."""
+    for secrets in [os.path.join(FW, 'main', 'secrets.h'), os.path.join(ROOT, 'firmware', 'tilt_hub', 'main', 'secrets.h')]:
+        if os.path.exists(secrets):
+            for v in re.findall(r'#define \w+ "([^"]{4,})"', open(secrets).read()):
+                if v.encode() in image: sys.exit('a value from %s is inside the release build: not published' % secrets)
+
+def add_to_listing(listing, channel, entry):
+    """Put a release on its channel. A stable release also goes to beta when beta has nothing newer, so a phone that
+    follows beta is offered it too."""
+    def key(v): return [int(x) if x.isdigit() else x for x in re.split(r'[.-]', v)]
+    listing[channel] = entry
+    if channel == 'stable':
+        b = listing.get('beta')
+        if not b or key(b['version'].split('-')[0]) <= key(entry['version']): listing['beta'] = entry
+    return listing
+
 def build_signed(version):
     """Build the public release with no secrets in it, sign it, write it to OUT."""
     log = open(os.path.join(FW, 'build-release.log'), 'w')
@@ -58,10 +76,7 @@ def build_signed(version):
     if subprocess.run([os.path.join(FW, 'build.sh'), '-DTILT_RELEASE=1', 'build'], cwd=FW, stdout=log, stderr=log, env=env).returncode:
         sys.exit('the release build failed: see firmware/blinds_matter/build-release.log')
     image = open(os.path.join(FW, 'build-release', 'blinds_matter.bin'), 'rb').read()
-    for secrets in [os.path.join(FW, 'main', 'secrets.h'), os.path.join(ROOT, 'firmware', 'tilt_hub', 'main', 'secrets.h')]:
-        if os.path.exists(secrets):              # never publish a file with a password in it
-            for v in re.findall(r'#define \w+ "([^"]{4,})"', open(secrets).read()):
-                if v.encode() in image: sys.exit('a value from %s is inside the release build: not published' % secrets)
+    check_no_secrets(image)
     signed = image + sign(image) + b'TILTSIG1'
     name = 'tilt-%s.bin' % version
     open(os.path.join(OUT, name), 'wb').write(signed)
@@ -92,6 +107,7 @@ def main():
         if subprocess.run([os.path.join(hubdir, 'build.sh'), '-B', 'build-release', '-DTILT_RELEASE=1', 'build'], cwd=hubdir, stdout=log, stderr=log, env=env).returncode:
             sys.exit('the hub release build failed: see firmware/tilt_hub/build-release.log')
         image = open(os.path.join(hubdir, 'build-release', 'tilt_hub.bin'), 'rb').read()
+        check_no_secrets(image)
         os.makedirs(OUT, exist_ok=True)
         name = 'tilt-hub-%s.bin' % hv
         signed = image + sign(image) + b'TILTSIG1'
@@ -119,8 +135,7 @@ def main():
         open(os.path.join(OUT, pname), 'wb').write(p)
         entry['patches'].append({'from': base[-32:].hex(), 'file': pname, 'size': len(p), 'sha256': hashlib.sha256(p).hexdigest()})
         print('  patch from %s: %d bytes' % (old, len(p)))
-    listing[a.channel] = entry
-    if a.channel == 'stable' and 'beta' not in listing: listing['beta'] = entry
+    add_to_listing(listing, a.channel, entry)
     json.dump(listing, open(path, 'w'), indent=2)
     print('%s %s: %s (%d bytes)' % (a.channel, version, name, len(signed)))
 
