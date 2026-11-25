@@ -16,7 +16,7 @@ You decide one thing for one pull request: may an agent merge it, or does the ow
 
 ## Decide
 
-Go down the "Who merges" list one line at a time and write yes or no for each. Check the review's claims against the diff yourself: if the review says two-way and you see a one-way item from the policy, it is one-way.
+Go down the "Who merges" list one line at a time and write yes or no for each. Check the review's claims against the diff yourself: if the review says small and you see who a mistake would hurt on merge (a large item from the policy), it is large. The door alone never makes a verdict human.
 
 - Every line yes: **merge**.
 - A line clearly no: **human**.
@@ -37,11 +37,11 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 
 **TL;DR:** <merge: one sentence on why it is safe. human: why a person is needed and what to look at, in one or two sentences.>
 
-**Door:** <two-way|one-way> · **Blast Radius:** <one word>
+**Door:** <two-way|one-way> · **Blast Radius:** <small|medium|large> (<area>)
 **What could go wrong:** <one line, from the review, corrected if you disagree>
 
 ### Notes
-1. Two-way door: yes/no
+1. Blast radius small or medium: yes/no
 2. CI green on the reviewed commit: yes/no
 3. Nothing left to fix: yes/no
 4. Tested, or docs only: yes/no
