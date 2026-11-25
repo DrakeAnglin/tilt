@@ -24,7 +24,7 @@ Go down the "Who merges" list one line at a time and write yes or no for each. C
 
 Firmware that only runs on the ESP is not a reason to hand over when the author's Evidence shows both firmware builds passing on the reviewed commit and the pull request has `bench-check`: bench checks happen when the release is staged, after merge. Never send a pull request to the owner for a bench check, and never put one under Human Review. If the build is not shown, the verdict is **not yet**, not human: say so in your reply, so the author builds it and runs the gate again. Post no verdict comment and set no label for not yet.
 
-A review whose `sha` is not the current head is out of date: **human**, with the reason "review is for an older commit" (the author should run the reviewer again).
+A review whose `sha` is not the current head is out of date: **not yet**, not human. Say so in your reply so the author runs the reviewer again. Post no verdict comment and set no label.
 
 ## Post
 
@@ -46,8 +46,7 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 3. Nothing left to fix: yes/no
 4. Tested, or docs only: yes/no
 5. Does the issue and nothing else: yes/no
-6. Under 600 lines, not counting tests: yes/no
-7. No human-only path: yes/no <name the paths when no>
+6. No human-only path: yes/no <name the paths when no>
 
 ### Human Review
 <merge: "Not needed." human: fill in both lines below>
