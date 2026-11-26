@@ -28,6 +28,10 @@ Firmware that only runs on the ESP is not a reason to hand over when the author'
 
 A review whose `sha` is not the current head is out of date: **not yet**, not human. Say so in your reply so the author runs the reviewer again. Post no verdict comment and set no label.
 
+CI that is red, still running or never started (a GitHub outage, a billing refusal, a runner that did not come) is **not yet**, never human. No person can judge code by a CI run that did not happen. Say what is wrong with CI in your reply.
+
+**Builds after a merge from main.** The ESP builds in Evidence may be for an older commit when every commit since is a merge of `origin/main` and those merges changed nothing under `firmware/`: `git diff --name-only <built sha> <head> -- firmware/` is empty. Then the old builds still count. Otherwise the author builds again (**not yet**): a header main changed can break this change's code, and CI does not build firmware.
+
 ## Post
 
 One comment, `gh pr comment <pr> --body-file <file>`. The decision comes from the review comment's Summary, Evidence and Merge Danger, checked against the diff.
@@ -60,13 +64,15 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 <!-- factory-gate sha=<full head sha> verdict=<merge|human> -->
 ```
 
+For a **human** verdict whose reason a new commit does not take away (a stuck finding, a large blast radius, more than ten rounds, a test-script change beyond adding tests, a fork), end the marker with ` sticky=1`: `<!-- factory-gate sha=... verdict=human sticky=1 -->`. `tools/agent/clear_stale_label.sh` never takes off a label that such a verdict put on.
+
 More than ten `factory-review` comments on the pull request: **human**, "too many rounds of review".
 
 A review with `stuck` above 0: **human**. The **Why** is that two agents read the same code and cannot agree; the **Confirm** lines are the stuck findings, each with both sides in a few words.
 
 A review with must-fix above 0 and stuck 0: **not yet**, not human. The author still has to fix or answer them.
 
-Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge; for human, `--add-label needs-human` and take `auto-merge-ok` off. Never take `needs-human` off: only the owner does. If it is already on, the verdict is **human**, and you say what the owner still has to confirm. Never add `needs-human` without this comment.
+Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge; for human, `--add-label needs-human` and take `auto-merge-ok` off. Never take `needs-human` off yourself. If it is already on, first run `tools/agent/clear_stale_label.sh <pr>`: it takes the label off when no rule on main still needs a person (the reason was an old commit, red CI, an old merge script or a repo move), and keeps it when one does or the owner wrote `/hold`. If it is still on after that, the verdict is **human**, and you say what the owner still has to confirm. Never add `needs-human` without this comment.
 
 Last, put the same thing where the owner looks first, the pull request body: replace what is under its `## Human Review` heading (add the heading at the end if it is missing) with `Not needed.` or your **Why** and **Confirm** lines. `gh pr view <pr> --json body --jq .body`, change only that section, `gh pr edit <pr> --body-file <file>`.
 
