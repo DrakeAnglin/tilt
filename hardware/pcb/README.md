@@ -16,7 +16,7 @@ The board was drawn for an MCP73871 charger module and a separate USB-C board (J
 6092 with its own USB-C instead, with no copper change: the harness and the battery splice in the J5 plug are in
 [the build guide, step 11](../../docs/pcb-build.md#step-11-the-charger-the-battery-and-solar). J3 stays empty.
 
-**Build it:** [docs/pcb-build.md](../../docs/pcb-build.md) (a picture per step). **Parts:** [BOM](../BOM.md#one-controller-3). **Box:** [docs/controller-box.md](../../docs/controller-box.md).
+**Build it:** [docs/pcb-build.md](../../docs/pcb-build.md) (a picture per step). **Parts:** [BOM](../BOM.md#one-controller). **Box:** [docs/controller-box.md](../../docs/controller-box.md).
 
 ![top, 3D](controller/render-top.png)
 

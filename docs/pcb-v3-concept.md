@@ -1,5 +1,7 @@
 # Controller PCB v3: concept (rev 3, hand-solder only)
 
+A design note for the next PCB, on hold. Not needed to build the current version.
+
 > **On hold.** Nothing here is ordered. Two things changed since this was written: the v2 build now uses the
 > **Adafruit 6092** charger instead of the MCP73871 module ([PCB build, step 11](pcb-build.md#step-11-the-charger-the-battery-and-solar)),
 > and the controller runs **Matter over Wi-Fi**, not Thread. Solar gets a DC jack

@@ -13,6 +13,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '../hardware/pcb'))
 import bambu  # noqa: E402
 import bambu_project  # noqa: E402
+import check_docs  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
 import release_ci  # noqa: E402
@@ -271,6 +272,37 @@ class BlindsClient(unittest.TestCase):
                 self.assertEqual(blinds_client.load(), {'x': 1})
             finally:
                 blinds_client.STORE = old
+
+
+class CheckDocs(unittest.TestCase):
+    def pages(self, files):
+        d = tempfile.mkdtemp()
+        for name, text in files.items():
+            path = os.path.join(d, name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w') as f:
+                f.write(text)
+        return d
+
+    def test_docs_broken_link(self):
+        d = self.pages({'a.md': '# A\n\nSee [gone](gone.md).\n'})
+        self.assertEqual(check_docs.problems(d), ['a.md:3: broken link gone.md'])
+
+    def test_docs_bad_anchor(self):
+        d = self.pages({'a.md': '[x](other.md#no-such-heading)\n', 'other.md': '# Other\n'})
+        self.assertEqual(check_docs.problems(d), ['a.md:1: no heading for #no-such-heading in other.md'])
+        d = self.pages({'a.md': '[x](other.md#tilt-hub-one-per-home) [y](#a-b)\n\n## A b\n',
+                        'other.md': '## Tilt Hub (one per home)\n'})
+        self.assertEqual(check_docs.problems(d), [])
+
+    def test_docs_house_words(self):
+        words = 'Buy for 8 blinds on 3 controllers.\n'
+        self.assertEqual(len(check_docs.problems(self.pages({'a.md': words}))), 2)
+        self.assertEqual(check_docs.problems(self.pages({'a.md': 'Example: ' + words})), [])
+        self.assertEqual(check_docs.problems(self.pages({'docs/developer/a.md': words})), [])
+
+    def test_docs_clean(self):
+        self.assertEqual(check_docs.problems(os.path.join(HERE, '..')), [])
 
 
 if __name__ == '__main__':

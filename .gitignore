@@ -40,7 +40,7 @@ DerivedData/
 /result.json
 firmware/blinds-settings-backup.json
 
-# App Store screenshots: made again with the demo room (see docs/app-store.md)
+# App Store screenshots: made again with the demo room (see docs/developer/app-store.md)
 app/Tilt/AppStore/
 
 # Thread build of the controller

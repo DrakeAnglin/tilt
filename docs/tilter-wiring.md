@@ -26,7 +26,7 @@ wakes the driver; **ULT = (FA)ULT**, an error *output* that must stay unconnecte
 
 **Check the sleep jumper.** EEP must be free for the EN wire to control. The jumper is a tiny pair of pads at the top
 edge marked **J1** between the words **"en"** and **"sleep"** (some batches print it **J2**).
-1. Look at J1: **open** (two separate pads) on the owner's boards, which is what we want. If yours is **bridged**,
+1. Look at J1: **open** (two separate pads) on the boards in the reference build, which is what you want. If yours is **bridged**,
    scrape the bridge through or wick the solder off.
 2. Meter on **resistance (Ω)** between **EEP** and **VCC**: **megohms or open** is good. Near 0 = the jumper is still
    closed; a few kΩ = a pull-up resistor on EEP: remove it before wiring.
@@ -90,4 +90,4 @@ learns the motor's direction on its first moves), then fit the boards into the t
 
 ## Next
 Plug it into a controller port with an RJ12 cord and run setup in the Tilt app
-([build guide, step 7](build-guide.md#7-set-up-in-the-tilt-app)).
+([build guide, step 8](build-guide.md#8-set-up-in-the-tilt-app)).

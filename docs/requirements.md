@@ -8,7 +8,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | ID | Pri | Requirement | Verification |
 |---|---|---|---|
 | F-1 | Must | Tilt each blind through its **full mechanical range** (fully closed one way → open → fully closed the other way). No 180° limit | Angle sensor covers the measured full range on every test blind |
-| F-2 | Must | One controller drives **up to 3 motors** independently | Run 3 motors at the same time on the bench |
+| F-2 | Must | One controller drives **up to 3 blinds**, each on its own | Run 3 motors at the same time on the bench |
 | F-3 | Must | Knows blind position from an **absolute angle sensor** (AS5600), so it is correct after power loss and after hand use | Cut power, turn the wand, power up: position is correct |
 | F-4 | Must | **Calibration**: per motor, set direction and both end limits; choose which end "Close" goes to (slats down or up) | Done from the setup app |
 | F-5 | Must | **Stall / jam detection** stops the motor within 250 ms and never strips the gearbox | Hold the rod by hand; motor stops, no damage |
@@ -23,23 +23,23 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 
 | ID | Pri | Requirement |
 |---|---|---|
-| C-1 | Must | **Matter over Wi-Fi** with no hub. Thread through a hub is a later goal |
+| C-1 | Must | Controllers talk **Thread** to a **Tilt Hub** (one per home); the hub is the Matter device on Wi-Fi for every blind ([ADR 0003](adr/0003-thread-only-tilt-hub.md)) |
 | C-2 | Must | Works with **Amazon Alexa** voice commands ("Alexa, open the bedroom blinds", "...set to 50%") |
 | C-3 | Must | Works with **Apple Home / Siri** |
 | C-4 | Should | Works with Google Home and Home Assistant (free with Matter) |
 | C-5 | Must | **Works locally**: no vendor cloud, account or server ([ADR 0001](adr/0001-no-cloud-local-first.md)) |
-| C-6 | Must | **Firmware updates over Wi-Fi**, signed, installed from the app |
-| C-7 | Should | Each of the 3 motors shows up as its **own named blind** in Alexa/Home |
+| C-6 | Must | **Firmware updates through the Tilt Hub**, signed, installed from the app |
+| C-7 | Should | Each blind shows up as its **own named blind** in Apple Home and Alexa |
 
 ## App
 
 | ID | Pri | Requirement |
 |---|---|---|
-| A-1 | Must | Set up a new controller over Bluetooth (Wi-Fi password), then add it to Apple Home with the controller's own setup code |
+| A-1 | Must | Set up a new controller over Bluetooth; it joins the Tilt Hub (no Wi-Fi password), and its blinds show up in Apple Home through the hub |
 | A-2 | Must | Name each motor port / blind, enable/disable ports |
 | A-3 | Must | Calibration wizard (jog, set limits, test) |
 | A-4 | Should | Manual control per blind, status (tilt, Battery level, firmware version) |
-| A-5 | Must | Native iPhone and iPad app (**Tilt**, App Store), finds the controllers on the home Wi-Fi |
+| A-5 | Must | Native iPhone and iPad app (**Tilt**, App Store), finds the controllers through the Tilt Hub |
 | A-6 | Should | Share a controller with the people you live with (Owner invites Guests) |
 | A-7 | Could | Android |
 
@@ -69,7 +69,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 
 | ID | Pri | Requirement |
 |---|---|---|
-| E-1 | Must | **Cordless**: 18650 cell per controller, charged from any USB-C charger. No wall (AC) power on our boards. Target ≥ 2 months per charge with no sun: on Wi-Fi this may not hold; measured in [#6](https://github.com/DrakeAnglin/tilt/issues/6) |
+| E-1 | Must | **Cordless**: 18650 cell per controller, charged from any USB-C charger. No wall (AC) power on the boards. Target ≥ 2 months per charge with no sun; measured in [#6](https://github.com/DrakeAnglin/tilt/issues/6) |
 | E-2 | Should | Optional small solar panel keeps the cell charged (v3: DC jack, [#8](https://github.com/DrakeAnglin/tilt/issues/8)) |
 | E-3 | Must | A stalled motor never browns out the ESP32 (one motor runs at a time; stall stop) |
 | E-4 | Must | Solar input clamped; fuse on each port; protected cells only. Charging stops when the cell is hot: open (the v2 board has no probe on the cell) |

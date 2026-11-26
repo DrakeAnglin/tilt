@@ -10,6 +10,10 @@
 One physical window covering with one tilt rod. It shows up as one tile in Apple Home. Two coverings in one window are two blinds.
 _Avoid_: shade, window, slat set
 
+**Reference blind**:
+The blind model the tilter is drawn for (its headrail and tilt rod sizes are in `hardware/mechanical/README.md`). Other blinds are measured and the CAD adjusted.
+_Avoid_: the owner's blinds (Owner means the first phone paired with a controller)
+
 **Tilter**:
 The motor unit on one blind's tilt rod: gearbox, N20 motor, and sensor module with its RJ12 jack. A blind has exactly one.
 _Avoid_: tilt motor, drive, TiltPod (the sensor module is a part of the tilter, not a separate thing)

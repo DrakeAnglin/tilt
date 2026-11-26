@@ -1,7 +1,7 @@
 name: Firmware release
 
 # Push a version tag on a commit in main and this builds, signs and publishes the release on this repo,
-# where the Tilt app finds it (releases/latest/download/firmware.json). How to cut one: docs/firmware-release.md.
+# where the Tilt app finds it (releases/latest/download/firmware.json). How to cut one: docs/developer/firmware-release.md.
 #   fw-v2.3.0        controller, stable        fw-v2.3.0-beta1   controller, beta        hub-v0.3.4   Tilt Hub
 # The tag's message (git tag -a ... -m "...") becomes the release notes the app shows.
 # A pull request that changes the release path runs the same build and signs with a throwaway key; nothing is published.
@@ -28,7 +28,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     # The signing key is only given to tag runs. Keep the secret in the "release" environment, allowed for
-    # fw-v* and hub-v* tags only (docs/firmware-release.md).
+    # fw-v* and hub-v* tags only (docs/developer/firmware-release.md).
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
     outputs:
       kind: ${{ steps.tag.outputs.kind }}
