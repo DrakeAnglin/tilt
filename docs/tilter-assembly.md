@@ -26,7 +26,7 @@ missing part shows up now and not halfway through.
 | **A. Prep** | bearing shell, tray, carrier, worm case half with the pin hole, tray lid | 6 M3 heat-set inserts, 5 Ø2 × 6 dowel pins |
 | **B. Gearbox** | case right (main half), case left (lid), worm, worm wheel, ring cup, 4 planets, sun 27T | 2 M3 × 25 |
 | **C. Motor end** | motor shell, motor pinion, cluster (20T / 9T), sensor sleeve | N20 motor, 2 M1.6 × 4 |
-| **D. Tray and lid** | magnet gear | the finished sensor module, the Ø4 × 2 magnet, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 felt pads |
+| **D. Tray and lid** | magnet gear (magnet goes in at A4) | the finished sensor module, the Ø4 × 2 magnet, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 felt pads |
 
 The parts in group A go on to B and D once they are prepped. Keep the grease out with all of them.
 
@@ -67,6 +67,16 @@ moving on. Check each one is straight: an M3 screw should start by hand.
 Press them in with flat pliers or a light tap. They must be straight: a tilted pin binds its planet.
 
 ![carrier with 4 pins, worm with its top pin](photos/tilter/a3-dowel-pins.jpg)
+
+### A4. Magnet into the magnet gear
+Press the Ø4 × 2 magnet into the hub of the magnet gear (the small 8-tooth gear).
+- Use a **plastic** tool to push it, not metal: the magnet jumps to steel tweezers or a screwdriver. A spare printed
+  part works well. Set the magnet on the hub's hole, push it in from the top, then seat it.
+- It does not need to be perfectly flush. **Flush or a little below is fine; it must not stick out.** The magnet
+  sits 0.8 mm above the sensor chip, and the sensor reads fine a bit farther away, but a magnet that sticks out can
+  hit the chip.
+
+![magnet pressed into the magnet gear](photos/tilter/a4-magnet-gear.jpg)
 
 ---
 
@@ -152,7 +162,7 @@ jack up. Tuck the leads flat so nothing sits above the tray walls.
 📷 **Photo D3:** looking into the tray from above, all boards seated, leads tucked.
 
 ### D4. Magnet gear and lid
-Press the magnet into the magnet gear's hub. Slide the gear into the lid's gear cage from the rod side until its
+Slide the magnet gear (magnet already in, step A4) into the lid's gear cage from the rod side until its
 hub clicks into its seat.
 **Grease:** the magnet gear's teeth.
 
