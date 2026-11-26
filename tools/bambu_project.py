@@ -169,10 +169,16 @@ def build(out, PLATES):
 
     model = src.read('3D/3dmodel.model').decode()
 
+    # Studio keeps a mesh's own origin as a component offset; the box halves are not centered on theirs. Take the
+    # offset off so the part's middle lands where pack() put it.
+    offset = {o: tuple(map(float, t.split()[9:11])) for o, t in
+              re.findall(r'<object id="(\d+)"[^>]*>\s*<components>\s*<component [^>]*?transform="([^"]+)"', model)}
+
     def move(m):
         _, _, x, y = place[key_of[m.group(2)]]
         z = m.group(3).split()[11]
-        return '%stransform="1 0 0 0 1 0 0 0 1 %.2f %.2f %s"' % (m.group(1), x, y, z)
+        dx, dy = offset.get(m.group(2), (0, 0))
+        return '%stransform="1 0 0 0 1 0 0 0 1 %.2f %.2f %s"' % (m.group(1), x - dx, y - dy, z)
     model = re.sub(r'(<item objectid="(\d+)"[^>]*?)transform="([^"]+)"', move, model)
 
     def obj(m):
