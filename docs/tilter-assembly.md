@@ -101,19 +101,29 @@ Case left on. The worm should still turn by hand, with no tight spot through a f
 📷 **Photo B2:** worm case closed.
 
 ### B3. Ring cup and planets
-Ring cup onto the wheel's hex. The 4 planets onto the carrier's pins, carrier into the cup.
-**Grease:** the planets' teeth, the ring cup's teeth, and the carrier's hub where it runs in the wheel.
+Ring cup onto the wheel's hex. Planets onto the carrier's pins, then the carrier into the cup.
+- **Planets bed side up.** Put each planet on with the face that sat on the print bed facing up, away from the
+  carrier. That face is flatter, and the planet turns more easily on its pin.
+- The planets should float freely on their pins. Nothing here is tight.
 
-📷 **Photo B3:** looking into the ring cup, 4 planets in place.
+**Grease** a thin film on everything that touches: the pins, the planets' teeth, the ring cup's teeth, and the
+carrier's hub where it turns in the wheel.
 
-### B4. Bearing shell and sun
-Bearing shell over the cup (its two pins find the lid). Sun piece (27T) in, its sun into the planets.
-Two **M3 × 25** from the main half's back into the bearing shell. **Snug, not tight.**
+![ring cup with the 4 planets in, bearing shell beside it](photos/tilter/b3-planets.jpg)
+
+### B4. Bearing shell on
+Bearing shell over the cup, cup side down (its two pins find the lid). Two **M3 × 25** from the main half's back into
+the bearing shell's inserts. **Snug, not tight.**
+
+![bearing shell on the gearbox](photos/tilter/b4-bearing-shell-on.jpg)
+
+### B5. Sun piece
+Sun piece (27T) in through the bearing shell's hole, its sun into the planets.
 **Grease:** the sun's teeth and the 27T gear.
 
 Check: turn the sun by hand; the wheel should turn, slowly.
 
-📷 **Photo B4:** bearing shell on, sun showing, two bolts in.
+📷 **Photo B5:** the sun piece in.
 
 ---
 
