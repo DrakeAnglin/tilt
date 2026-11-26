@@ -374,7 +374,7 @@ If TP1 reads 0, check the J5 plug is in and both splice crimps (slots 2 and 4) a
 2. Flash the ESP32-C6 on the bench first (through its own USB-C). In the box there's no room for a cable.
 3. Plug it into J1 / J2: **chip up, its USB toward end B**, its 5V pin in J1's square pad. Push it fully down.
 4. Battery back in. **TP3 should read 3.3 V**, and the ESP boots. With the cell below about 3.8 V, TP3 sags toward
-   3.0 V (D3 and the ESP's regulator each take a little) and the ESP resets whenever Wi-Fi transmits: charge the cell first.
+   3.0 V (D3 and the ESP's regulator each take a little) and the ESP resets whenever the radio transmits: charge the cell first.
    (v3 fixes this with a 3.3 V converter: [v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)
 
 Then it goes into the box: [box assembly](controller-box.md#assembly).
@@ -388,7 +388,7 @@ Then it goes into the box: [box assembly](controller-box.md#assembly).
 | Solar in: TP4 has voltage but the charger's VIN reads 0 V | PWR crimp not making contact | push the crimp in until it clicks, tug-test it |
 | TP1 and TP2 fine, TP3 about 3.0 V, ESP keeps resetting | cell too low (below about 3.8 V) | charge it (bench charging above) |
 | Cell barely rises after hours | charger not charging properly | USB power meter between charger and cable: about **1 A** while charging (6092) |
-| ESP not on Wi-Fi | not powered, or browning out | TP3 = 3.3 V? Unplug power 5 s to restart it |
+| ESP not reaching the Tilt Hub | not powered, or browning out | TP3 = 3.3 V? Unplug power 5 s to restart it |
 
 ## Regenerate this guide
 
