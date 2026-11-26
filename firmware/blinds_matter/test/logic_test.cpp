@@ -1,4 +1,5 @@
-// Tests for main/logic.h, main/handwatch.h, main/home_view.h, main/request.h, main/tilter.h and main/wire.h, run on the Mac:
+// Tests for main/logic.h, main/handwatch.h, main/home_view.h, main/request.h, main/tilter.h, main/wire.h and the Tilt
+// Hub's alert_rules.h, run on the Mac:
 // tools/firmware_tests.sh. No hardware, no ESP-IDF.
 #include "../main/logic.h"
 #include "../main/home_view.h"
@@ -6,6 +7,7 @@
 #include "../main/request.h"
 #include "../main/tilter.h"
 #include "../main/wire.h"
+#include "../../tilt_hub/main/alert_rules.h"
 #include <cstdio>
 #include <ctime>
 #include <fstream>
@@ -601,6 +603,45 @@ int main() {
   bad = hc; bad.iter = 999;
   CHECK(!homeCodeKeep(bad, sizeof bad), "too few iterations: make one");
   CHECK(manualCodeDashed("12345678901") == "1234-567-8901" && manualCodeDashed("123") == "123", "the manual code is dashed 4-3-4");
+
+  // ---- the Tilt Hub's alert rules: each alert once; the battery's three levels each once
+  {
+    AlertMemo m = {};
+    bool ch = false;
+    CHECK(!alertBattery(m, 55, 0, &ch), "a full battery: nothing");
+    CHECK(!strcmp(alertBattery(m, 19, 0, &ch), "batt-low"), "under 20: low");
+    CHECK(!alertBattery(m, 18, 0, &ch) && !alertBattery(m, 20, 0, &ch) && !alertBattery(m, 19, 0, &ch), "low again, or back at the line: no repeat");
+    CHECK(!strcmp(alertBattery(m, 9, 0, &ch), "batt-crit"), "under 10: critical");
+    CHECK(!alertBattery(m, 8, 0, &ch), "critical again: no repeat");
+    CHECK(!strcmp(alertBattery(m, 7, 1, &ch), "batt-dead"), "too low to move: dead");
+    CHECK(!alertBattery(m, 6, 1, &ch) && !alertBattery(m, 15, 0, &ch), "dead again, or charging a little: nothing");
+    CHECK(!alertBattery(m, 25, 0, &ch) && m.batt == 0, "charged to 25: all levels reset");
+    CHECK(!strcmp(alertBattery(m, 19, 0, &ch), "batt-low"), "and low can come again");
+    AlertMemo d = {};
+    CHECK(!strcmp(alertBattery(d, 12, 1, &ch), "batt-dead") && !alertBattery(d, 5, 0, &ch), "straight to too low to move: one alert, not three");
+    CHECK(!alertBattery(d, -1, 0, &ch) && alertBattLevel(-1, 0) == -1, "no reading yet: nothing");
+  }
+  {
+    AlertMemo m = {};
+    bool ch = false;
+    int st[3] = {2, 0, 0};
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 0 && ch, "the first push only learns the counts");
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 0, "the same counts: nothing");
+    st[1] = 1;
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 2, "blind 2 stalled once: one alert, for it");
+    CHECK(alertStalls(m, 7, st, 3, &ch) == 0, "told once only");
+    int again[3] = {1, 0, 0};
+    CHECK(alertStalls(m, 8, again, 3, &ch) == 1, "after a restart the count starts at 0: its first stall is new");
+    int none[3] = {-1, -1, -1};
+    CHECK(alertStalls(m, 8, none, 3, &ch) == 0, "an older controller (no counts): nothing");
+  }
+  {
+    AlertMemo m = {};
+    CHECK(!alertSilent(m, ALERT_SILENT_MS), "quiet for exactly the check-in allowance: fine");
+    CHECK(alertSilent(m, ALERT_SILENT_MS + 1) && !alertSilent(m, ALERT_SILENT_MS * 3), "silent: one alert, not more");
+    CHECK(alertHeard(m) && !alertHeard(m), "heard again: cleared (no alert for that)");
+    CHECK(alertSilent(m, ALERT_SILENT_MS + 1), "silent again later: a new alert");
+  }
 
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;

@@ -8,15 +8,14 @@ given in App Store Connect, and how firmware is published, for the next release.
 2. ~~CloudKit~~ done 2026-11-21 (`Gone` added; schema deployed to Production). Was: in the CloudKit Console, open container `iCloud.app.tilt.blinds`, Development, and use
    "Deploy Schema Changes" to copy the record types `Join` and `Gone` to Production. Add a query index on `Join.topic`
    (queryable) if the console asks.
-3. **Website (public, separate from this private repo):** https://drakeanglin.github.io/tilt-site/ from the
-   `DrakeAnglin/tilt-site` repo. The privacy policy lives only there (`privacy.md`); edit it in that repo.
-   - Privacy policy URL: https://drakeanglin.github.io/tilt-site/privacy/
-   - Support URL: https://drakeanglin.github.io/tilt-site/support/
-   - Questions and problems: issues on `DrakeAnglin/tilt-site`
-4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt-site/releases/latest/download/firmware.json`
-   (the public site repo, so this code repo can stay private). A release is a version tag on `main` (`fw-v2.3.0`,
-   `hub-v0.3.4`): a GitHub Action builds, signs and publishes it. See `docs/firmware-release.md`.
-   Use releases on tilt-site for firmware only, so "latest" is always the newest firmware.
+3. **Website:** https://drakeanglin.github.io/tilt/ from `site/` in this repo (`.github/workflows/site.yml` publishes it on a
+   merge to `main`). The privacy policy is `site/privacy.md`.
+   - Privacy policy URL: https://drakeanglin.github.io/tilt/privacy/
+   - Support URL: https://drakeanglin.github.io/tilt/support/
+   - Questions and problems: issues on `DrakeAnglin/tilt`
+4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt/releases/latest/download/firmware.json`.
+   A release is a version tag on `main` (`fw-v2.3.0`, `hub-v0.3.4`): a GitHub Action builds, signs and publishes it.
+   See `docs/firmware-release.md`. Use releases on this repo for firmware only, so "latest" is always the newest firmware.
 5. **Release-day clean-up on the controller:** remove the "Duo Test" user, and the "Mac owner" key once the app can do
    every update (the Mac tools need that key today).
 

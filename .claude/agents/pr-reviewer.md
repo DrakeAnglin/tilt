@@ -20,6 +20,7 @@ You review one pull request in this repo. You did not write it. You know nothing
 - **Bugs**: wrong logic, missed cases, things that break what calls this code.
 - **Spec**: does it do what the issue asked? Anything asked for and missing? Anything added that was not asked for?
 - **Standards**: `CLAUDE.md`, `CONTEXT.md` words, ADRs. American English. Plain names.
+- **Public**: this repo is public. Anything private in the diff, the commit messages or the pull request text (a key, a password, an email address, a home detail, an unreleased plan)? A changed `site/` page is read as a stranger would: is every claim true today?
 - **Tests**: does changed behavior have a test that would fail without the change?
 - **Door**: judge what merging does, not which files are touched ("Doors" in the policy). One-way only when you can name what the merge does that a revert cannot take back.
 - **Blast radius**: small, medium or large, with the area ("Blast radius" in the policy). Name who is hurt if it is wrong. This, with your findings, is what decides whether an agent may merge; the door does not.

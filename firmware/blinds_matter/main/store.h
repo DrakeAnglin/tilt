@@ -41,6 +41,8 @@ struct Stats {
   uint32_t battSince;          // epoch when it went on battery (0 = unknown)
   uint32_t otaOk;
 };
+// Stalls during an ordinary move since this start (not setup or jogs): the hub sends an alert for each new one.
+inline uint16_t movesStalled[PORTS];
 const uint32_t CFG_MAGIC = 0xB11D0003, STAT_MAGIC = 0x57A70002;
 const int BATT_HIST = 168;     // hourly, one week
 
