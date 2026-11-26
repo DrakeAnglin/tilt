@@ -26,8 +26,8 @@ missing part shows up now and not halfway through.
 | Group | Printed | Bought |
 |---|---|---|
 | **A. Prep** | bearing shell, tray, carrier, worm, tray lid, magnet gear | 6 M3 heat-set inserts, 5 Ø2 × 6 dowel pins, the Ø4 × 2 magnet |
-| **B. Gearbox** | case right (main half), case left (lid), worm, worm wheel, ring cup, 4 planets, sun 27T | 2 M3 × 20 |
-| **C. Motor end** | motor shell, motor pinion, cluster (20T / 9T), sensor sleeve | N20 motor, 2 M1.6 × 4 |
+| **B. Gearbox** | case right (main half), case left (lid), worm, worm wheel, ring cup, 4 planets | 2 M3 × 20 |
+| **C. Motor end** | motor shell, sun piece (27T), motor pinion, cluster (20T / 9T), sensor sleeve | N20 motor, 2 M1.6 × 4 |
 | **D. Tray and lid** | (tray, lid and magnet gear from A) | the finished sensor module, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 felt pads |
 
 The parts in group A go on to B and D once they are prepped. Keep the grease out with all of them.
@@ -117,37 +117,42 @@ the bearing shell's inserts. **Snug, not tight.**
 
 ![bearing shell on the gearbox](photos/tilter/b4-bearing-shell-on.jpg)
 
-### B5. Sun piece
-Sun piece (27T) in through the bearing shell's hole, its sun into the planets.
-**Grease:** the sun's teeth and the 27T gear.
-
-Check: turn the sun by hand; the wheel should turn, slowly.
-
-📷 **Photo B5:** the sun piece in.
-
 ---
 
 ## Part C: the motor end
+The motor shell holds the motor and three gears. Build it on the bench, gear side up, then it goes onto the gearbox.
 
 ### C1. Motor into the motor shell
-N20 onto its plate with the 2 **M1.6 × 4** (heads down in their wells). Motor pinion onto the motor shaft (D-shaft
-lines up with the flat).
+N20 onto its plate with the 2 **M1.6 × 4** screws (heads down in their wells).
+**Snug only.** These are tiny screws in plastic: tighten until they stop, then no more, or they strip the plastic.
 
-📷 **Photo C1:** motor shell with the N20 and pinion.
+![motor screwed into the motor shell](photos/tilter/c1-motor-screws.jpg)
 
-### C2. Cluster gear
-Drop the cluster (20T / 9T) in. Set the motor shell on the bearing shell: its two pins find their holes. It has no
-bolts of its own yet. Hold it there; the cluster's axle comes in step D2.
-**Grease:** pinion, both cluster gears.
+### C2. The three gears
+Turn the motor shell gear side up. **Grease** each gear before it goes in: a thin film on the teeth and on the
+flat faces that rub on the shell.
+1. **Sun piece** (the big 27T gear, sun up) into the big round room.
+2. **Motor pinion** onto the motor shaft. Its hole has a flat to match the flat on the shaft: line them up and push
+   it on.
+3. **Cluster** (20T / 9T) into the last room, meshing with the pinion and the sun piece's 27T. It has no axle yet:
+   the tray bolt goes through it in step D2 and becomes its axle.
 
-📷 **Photo C2:** motor shell sitting on the bearing shell, cluster in.
+![motor shell with sun piece, pinion and cluster](photos/tilter/c2-motor-end-gears.jpg)
 
-### C3. Sensor sleeve
+### C3. Onto the gearbox
+Set the motor shell on the bearing shell: its two pins find their holes, and the sun goes into the planets. Turn the
+pinion a little if it does not drop in. It has no bolts of its own yet; hold it there until step D2.
+
+Check: turn the cluster by hand; the whole train should turn, slowly.
+
+📷 **Photo C3:** motor shell sitting on the gearbox.
+
+### C4. Sensor sleeve
 Push the sleeve's nose through the motor plate from the back. Turn it until the lugs drop into the carrier (the
 last 2.4 mm). Its gear now sticks out of the plate.
 **Grease:** the sleeve's nose.
 
-📷 **Photo C3:** sleeve in, its gear sticking out.
+📷 **Photo C4:** sleeve in, its gear sticking out.
 
 ---
 
