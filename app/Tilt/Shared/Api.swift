@@ -93,6 +93,10 @@ enum Prefs {
     static func lastSeen(_ id: String) -> String { "seen.\(id)" }
 }
 
+/// First launch: ask for the person's name only while none is saved and they have not tapped Not Now. Sign in with
+/// Apple stays optional (App Review 5.1.1): the demo and everything else work without a name.
+func asksForName(saved: String?, skipped: Bool) -> Bool { saved == nil && !skipped }
+
 /// Developer Mode exists only in builds made from Xcode, never in an App Store build.
 let developerBuild: Bool = {
     #if DEBUG

@@ -55,7 +55,7 @@ struct RootView: View {
     /// Developer builds, for screenshots: "-tab 1" starts on Automations, "-demo" adds the demo room.
     @State private var tab = developerBuild ? UserDefaults.standard.integer(forKey: "tab") : 0
     @State private var join: JoinAsk?
-    @State private var needName = AppModel.savedName == nil && !UserDefaults.standard.bool(forKey: Prefs.nameSkipped)
+    @State private var needName = asksForName(saved: AppModel.savedName, skipped: UserDefaults.standard.bool(forKey: Prefs.nameSkipped))
     /// Requests to join the controllers this phone owns.
     private var pending: [JoinAsk] { model.controllers.flatMap { c in c.requests.map { JoinAsk(controller: c, phone: $0) } } }
     /// Show the next request that has not been answered or swiped away.
