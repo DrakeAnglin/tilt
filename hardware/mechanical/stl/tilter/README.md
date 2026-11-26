@@ -52,12 +52,14 @@ PETG is for the parts that rub or mesh against PLA all the time.
 Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter).
 
 ## Before you start
-1. **Wire the sensor module on the bench:** [tilter wiring](../../../../docs/tilter-wiring.md). The AS5600 is already
+1. **Wire the sensor module on the bench:** [sensor module](../../../../docs/tilter-wiring.md). The AS5600 is already
    switched to PWM. Leave the two motor leads loose.
 2. **Press the inserts** with a soldering iron: 4 in the bearing shell, 2 in the tray.
 3. **Press the dowels:** 4 into the carrier, 1 into the worm case for the worm's top end.
 
 ## Assembly
+Step by step with photos: [tilter assembly](../../../../docs/tilter-assembly.md). Short version:
+
 Grease every gear as it goes in.
 
 1. **Worm case:** wheel and worm into the main half, lid on. Ring cup onto the wheel's hex. Planets onto the carrier's

@@ -18,7 +18,7 @@ controller. Each step links to the detailed page.
 | 1 | Measure your blind (if it is not like the reference blinds) | [measure-your-blinds.md](measure-your-blinds.md) |
 | 2 | Order the parts | [BOM](../hardware/BOM.md) |
 | 3 | Print the tilter, the box and the hub box | [tilter](../hardware/mechanical/stl/tilter/README.md#printed-parts), [box](controller-box.md), [hub box](hub-box.md) |
-| 4 | Build the tilter | [tilter wiring](tilter-wiring.md), [tilter assembly](../hardware/mechanical/stl/tilter/README.md#assembly) |
+| 4 | Build the tilter: sensor module, then mechanical build | [sensor module](tilter-wiring.md), [mechanical build](tilter-assembly.md) |
 | 5 | Flash the ESP32-C6 | [firmware](../firmware/README.md#first-flash-over-usb-on-the-bench) |
 | 6 | Build the controller: PCB, then box | [PCB build](pcb-build.md), [box assembly](controller-box.md#assembly) |
 | 7 | Build the Tilt Hub | below |
@@ -48,14 +48,14 @@ output with the bench tool ([as5600_setup](../firmware/README.md#as5600_setup-se
 - **Hub box:** printed round the hub's ESP and its plug, so flash the hub first ([hub box](hub-box.md)).
 
 ### 4. Build the tilter
-1. Wire the sensor module on the bench: RJ12 breakout, DRV8833, AS5600, motor leads
-   ([tilter wiring](tilter-wiring.md)).
+The tilter is two subassemblies, built in this order:
+1. **Sensor module** (electronics): RJ12 breakout, DRV8833 motor driver and AS5600 angle sensor, wired together on
+   the bench, then the meter checks ([sensor module](tilter-wiring.md)).
 
    ![tilter wiring](renders/tilter-wiring.png)
 
-2. Do the meter checks at the end of the wiring page.
-3. Assemble the gearbox and fit the boards ([tilter assembly](../hardware/mechanical/stl/tilter/README.md#assembly)).
-   Leave it out of the blind until it is set up in the app.
+2. **Mechanical build** (printed parts): inserts, gearbox, motor, then the sensor module goes into the tray and the
+   lid goes on ([mechanical build](tilter-assembly.md)). Leave it out of the blind until it is set up in the app.
 
 ### 5. Flash the ESP32-C6
 Over its own USB-C, on the bench, before it goes on the PCB

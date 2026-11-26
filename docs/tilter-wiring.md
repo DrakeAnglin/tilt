@@ -1,9 +1,12 @@
-# Wiring a tilter (the motor side)
+# Tilter sensor module (the electronics)
+
+The first of the tilter's two subassemblies. Build it on the bench; the second is the
+[mechanical build](tilter-assembly.md), where this module goes in. Each step ends with a photo of how it looks done.
 
 Each tilter's **sensor module** holds three small boards: the **RJ12 breakout** (where the phone cord plugs in), the
 **DRV8833** motor driver and the **AS5600** angle sensor, plus two leads to the **N20 motor**. The controller only sends
 battery power and logic down the cord; the driver right here turns that into motor current. Do this on the bench,
-before the [tilter assembly](../hardware/mechanical/stl/tilter/README.md#assembly).
+before the [mechanical build](tilter-assembly.md).
 
 ![tilter wiring](renders/tilter-wiring.png)
 
@@ -31,6 +34,8 @@ edge marked **J1** between the words **"en"** and **"sleep"** (some batches prin
 2. Meter on **resistance (Ω)** between **EEP** and **VCC**: **megohms or open** is good. Near 0 = the jumper is still
    closed; a few kΩ = a pull-up resistor on EEP: remove it before wiring.
 
+📷 **Photo S1:** close-up of the DRV8833's J1 pads, open.
+
 **AS5600: switch it to PWM first.** Do this once per sensor, before any wiring, with the bench tool
 ([firmware/README.md](../firmware/README.md#as5600_setup-sensor-bench-tool)): it needs the SDA and SCL pads, which
 are left empty in the tilter. The controller reads the angle as PWM.
@@ -49,6 +54,8 @@ left (VCC = square pad), **DIR, SCL, SDA, GPO** on the right (DIR = square pad).
 4. **R4** (bottom right, next to GPO) is a pull-up on the output on some versions. Leave it; if the angle later
    reads stuck, remove it.
 5. Mechanical: if the board does not drop onto its studs in the tray, file a little off the edge nearest the rod.
+
+📷 **Photo S2:** the back of the AS5600 with both links.
 
 **Check the cord** before you trust it: meter beep mode, plug end to plug end. **Pin 1 must beep to pin 1** (not
 pin 6) on every cord: "straight-wired" is used loosely in listings, and a reversed cord puts battery + on IN2.
@@ -75,6 +82,10 @@ Why two wires from pins 3 and 5: GND is split so the motor's current returns on 
 sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Leave **IN3, IN4, OUT3, OUT4, ULT** on
 the driver and **SCL, SDA** on the sensor empty.
 
+📷 **Photo S3:** the RJ12 breakout with its eight leads, pins readable.
+
+📷 **Photo S4:** the finished module laid flat: breakout, driver, sensor, white pair loose.
+
 ## 3. Check before plugging in
 Meter in beep mode, nothing connected:
 - RJ12 **pin 1 to pin 3** (battery + to GND): **no beep**.
@@ -84,10 +95,13 @@ Meter in beep mode, nothing connected:
 - DRV8833 EEP to VCC: megohms or open (no jumper, no pull-up). Nothing on ULT.
 
 ## 4. Final assembly
-At final assembly, solder the white pair's free ends to the N20's two tabs (either way round: the controller
-learns the motor's direction on its first moves), then fit the boards into the tray as the
-[tilter build](../hardware/mechanical/stl/tilter/README.md#assembly) describes.
+In the [mechanical build](tilter-assembly.md), steps D1 and D3: solder the white pair's free ends to the N20's two
+tabs (either way round: the controller learns the motor's direction on its first moves), then fit the boards into
+the tray.
 
 ## Next
 Plug it into a controller port with an RJ12 cord and run setup in the Tilt app
 ([build guide, step 8](build-guide.md#8-set-up-in-the-tilt-app)).
+
+## Photos
+In `docs/photos/tilter/`, named `s1-drv-jumper.jpg`, `s2-as5600-links.jpg`, `s3-rj12-leads.jpg`, `s4-module.jpg`.
