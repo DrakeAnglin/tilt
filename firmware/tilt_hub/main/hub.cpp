@@ -238,7 +238,7 @@ extern "C" void app_main() {
   pendMx = xSemaphoreCreateMutex();
   for (auto &p : pend) p.sem = xSemaphoreCreateBinary();
   for (auto &k : ctrls) {
-    k.mx = xSemaphoreCreateMutex(); k.pct = -1; k.chg = -1; k.sep = -1; k.own = -1;
+    k.mx = xSemaphoreCreateMutex(); k.pct = -1; k.chg = -1; k.src = -1; k.sep = -1; k.own = -1;
     for (auto &b : k.b) b.tilt = b.tgt = INT32_MIN;
     for (int t = 0; t < PORTS; t++) { k.tileLift[t] = k.tileOp[t] = -1; k.tileLabel[t][0] = 0; }
   }

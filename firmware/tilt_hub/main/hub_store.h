@@ -24,6 +24,7 @@ struct Ctrl {
   uint32_t seen;                                 // ms of the last message from it
   int closeUp, pct, low;
   int chg;                                       // on the charging cable: 1 yes, 0 no, -1 not said (older controller)
+  int src;                                       // Power source, passed on as sent (0 battery, 1 solar, 2 USB, 3 unknown); -1 not said
   struct B { char name[33]; int hid, ok, tilt, tgt, mov; } b[PORTS];
   int sep;                                       // what the controller says now (-1 = not heard yet)
   int tileLift[PORTS], tileOp[PORTS];            // what each tile last showed Home (-1 = nothing yet)
