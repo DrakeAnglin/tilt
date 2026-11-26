@@ -305,7 +305,7 @@ class CheckDocs(unittest.TestCase):
         self.assertEqual(check_docs.problems(os.path.join(HERE, '..')), [])
 
 class FirmwareBuildCI(unittest.TestCase):
-    """CI's Tilt Hub build (.github/workflows/ci.yml, tools/firmware_build_ci.sh)."""
+    """CI's Tilt Hub build and controller build (.github/workflows/ci.yml, tools/firmware_build_ci.sh)."""
 
     def test_unknown_firmware_name_is_a_usage_error(self):
         import subprocess
@@ -328,6 +328,36 @@ class FirmwareBuildCI(unittest.TestCase):
         job = re.search(r'^  ci:\n(.*?)(?=^  \S|\Z)', self.workflow('ci.yml'), re.M | re.S).group(1)
         needs = re.search(r'^    needs: \[([^\]]*)\]', job, re.M).group(1)
         self.assertIn('hub-build', [n.strip() for n in needs.split(',')])
+
+    def test_ci_check_waits_for_the_controller_build(self):
+        import re
+        job = re.search(r'^  ci:\n(.*?)(?=^  \S|\Z)', self.workflow('ci.yml'), re.M | re.S).group(1)
+        needs = re.search(r'^    needs: \[([^\]]*)\]', job, re.M).group(1)
+        self.assertIn('controller-build', [n.strip() for n in needs.split(',')])
+
+    def test_ci_builds_the_controller_like_a_release(self):
+        script = open(os.path.join(HERE, 'firmware_build_ci.sh')).read()
+        release = open(os.path.join(HERE, 'release_firmware.py')).read()
+        for text in ('-DTILT_RELEASE=1', 'build-release', 'sdkconfig.release'):
+            self.assertIn(text, script)
+            self.assertIn(text, release)
+        self.assertIn('controller)', script)
+
+    def controller_filter(self):
+        """The changes job's controller test, as a function of one path: (paths it drops, paths it keeps)."""
+        import re
+        line = next(l for l in self.workflow('ci.yml').splitlines() if 'grep -vE' in l and 'blinds_matter/test/' in l)
+        drop, keep = re.findall(r"grep -[vq]E '([^']+)'", line)
+        return lambda path: not re.search(drop, path) and bool(re.search(keep, path))
+
+    def test_controller_build_runs_only_for_its_inputs(self):
+        builds = self.controller_filter()
+        for path in ('firmware/blinds_matter/main/hub_link.h', 'firmware/blinds_matter/CMakeLists.txt',
+                     'firmware/blinds_matter/sdkconfig.defaults', 'tools/firmware_build_ci.sh', '.github/workflows/ci.yml'):
+            self.assertTrue(builds(path), path)
+        for path in ('firmware/blinds_matter/test/logic_test.cpp', 'app/x.swift', 'docs/x.md',
+                     'firmware/tilt_hub/main/app_main.cpp'):
+            self.assertFalse(builds(path), path)
 
 
 if __name__ == '__main__':
