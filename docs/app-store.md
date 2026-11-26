@@ -5,6 +5,10 @@ Tilt 1.0 (build 3) was submitted to the App Store on 2026-11-21. Apple answered 
 notes (issue #126). Build 4 goes back with both. This page keeps the account steps, the answers given in App Store
 Connect, and how firmware is published, for the next release.
 
+**Status (2026-11-25):** build 4 resubmitted with the notes below, the recording attached (in App Review Information and
+in the Resolution Center reply), and a reply to Apple. Waiting for review. The version is set to release automatically
+once approved.
+
 ## Account steps (owner only)
 1. ~~App Store Connect record~~ done 2026-11-21: "Tilt: Smart Blinds" (the name Tilt was taken), bundle ID `app.tilt.blinds`, SKU TILT001. The home-screen name stays Tilt.
 2. ~~CloudKit~~ done 2026-11-21 (`Gone` added; schema deployed to Production). Was: in the CloudKit Console, open container `iCloud.app.tilt.blinds`, Development, and use
@@ -23,7 +27,7 @@ Connect, and how firmware is published, for the next release.
 
 ## Listing status (filled in App Store Connect, 2026-11-21)
 - Version page: promotional text, description, keywords, support and marketing URLs, copyright, App Review notes,
-  sign-in not required, manual release, App Review contact, screenshots, build 3 (build 4 for the resubmission).
+  sign-in not required, automatic release, App Review contact, screenshots, build 3 (build 4 for the resubmission).
 - App Information: subtitle "Smart tilt for your blinds", Lifestyle / Utilities, no third-party content, rated 4+.
 - Pricing: free. Availability: 174 countries or regions, all except China mainland (it needs a security assessment
   and an AI-content filing).
@@ -54,8 +58,10 @@ schedule), Settings, then Add a New Device and set up a real controller over Blu
 blinds with the phone. Film the real blinds with a second phone if possible; otherwise the app alone is fine. Under
 about 3 minutes; trim in Photos.
 
-> 1. RECORDING: attached (iPhone, latest iOS). It starts at launch, shows the demo, then sets up and moves a real
-> Tilt controller. Tilt has no accounts, no user-generated content and nothing paid.
+> 1. RECORDING: attached, filmed with a second camera so the real blinds show. It starts on the home screen of a real device,
+> opens Tilt, and opens and closes real blinds with a Tilt controller: all three at once, then one blind with its
+> slider. The demo (point 3) shows the rest without hardware. Tilt has no accounts, no user-generated content and
+> nothing paid.
 >
 > 2. PURPOSE AND AUDIENCE: Tilt is the companion app for Tilt, a small open-source battery motor that clips onto the
 > tilt rod of ordinary horizontal blinds. It is for people who want their existing blinds to open and close on a
