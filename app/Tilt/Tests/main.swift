@@ -156,6 +156,23 @@ check((try? JSONDecoder().decode(ControllerConfig.self, from: oldCfg))?.limits =
       "older firmware without limits: 3 Ports and 8 slots")
 check(Schedule.everyPort([("den", 2), ("hall", 3)]).count == 5, "every Port follows each controller's limits")
 
+// ---- the hub link's vectors (firmware/blinds_matter/test/wire/link.json, made by tools/link_vectors.py and checked by
+// the firmware's link_test.cpp): this app seals, opens and derives keys the same way
+let lv = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: wireDir.appendingPathComponent("link.json")))
+func lvData(_ k: String) -> Data { Data(hex: lv[k] ?? "") ?? Data() }
+let lvInfo = Data("blinds-v1".utf8) + lvData("cpub") + lvData("dpub")
+let lvKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: lvData("shared")), info: lvInfo, outputByteCount: 32)
+let lvSalted = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: lvData("shared")), salt: Data((lv["salt"] ?? "").utf8), info: lvInfo, outputByteCount: 32)
+check(lvKey.withUnsafeBytes { Data($0) } == lvData("key") && lvSalted.withUnsafeBytes { Data($0) } == lvData("keySalted"), "link vectors: the pairing key, with and without the setup code")
+let lvFrame = try Frame.seal(lv["cmd"] ?? "", key: lvKey, cid: lvData("cid"), boot: lvData("boot"), counter: UInt64(lv["ctr"] ?? "") ?? 0)
+let lvSaltedFrame = try Frame.seal(lv["cmd"] ?? "", key: lvSalted, cid: lvData("cid"), boot: lvData("boot"), counter: UInt64(lv["ctr"] ?? "") ?? 0)
+check(lvFrame.packet == lvData("frame") && lvSaltedFrame.packet == lvData("frameSalted"), "link vectors: a sealed command")
+check((try? Frame.open(lvData("reply"), key: lvKey, cid: lvData("cid"), nonce: lvFrame.nonce)).map { String(decoding: $0, as: UTF8.self) } == lv["replyOut"], "link vectors: the reply opens")
+let lvLink = Data(HMAC<SHA256>.authenticationCode(for: Data("tilt-hub-link".utf8), using: SymmetricKey(data: lvData("hubKey"))))
+check(lvLink == lvData("linkKey"), "link vectors: the hub's link key")
+let lvTime = Data(HMAC<SHA256>.authenticationCode(for: Data("hub-time".utf8) + lvData("boot") + Data((lv["timeMsg"] ?? "").utf8), using: SymmetricKey(data: lvLink))).prefix(16).hex
+check(lvTime == lv["proofTime"], "link vectors: a proof")
+
 // ---- Schedules on the controllers' slots (Shared/SchedulePlan.swift)
 func emptySlots() -> [SchedSlot] { Array(repeating: .empty, count: 8) }
 func apply(_ ws: [SlotWrite], to slots: inout [String: [SchedSlot]]) { for w in ws { slots[w.controller]![w.slot] = w.value } }

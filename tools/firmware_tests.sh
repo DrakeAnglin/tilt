@@ -4,6 +4,9 @@
 #   firmware/blinds_matter/test/ota_test.cpp     a firmware file through the hub, with files signed by
 #                                                tools/release_firmware.py with a throwaway key (needs python3, openssl)
 #   firmware/tilt_hub/test/hub_test.cpp          the Tilt Hub's people rules and update-file checks (needs mbedtls: see below)
+#   firmware/blinds_matter/test/link_test.cpp    the hub link both firmwares share
+#   firmware/tilt_hub/test/ctrl_link_test.cpp    the hub's link to one controller
+#   (the two link tests use firmware/blinds_matter/test/host_mbedtls, a stand-in for mbedtls)
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=$(mktemp -d)
@@ -14,6 +17,10 @@ c++ -std=c++17 -Wall -Wextra -O1 -o "$OUT/logic_test" logic_test.cpp
 python3 make_ota_files.py "$OUT"
 c++ -std=c++17 -Wall -Wextra -O1 -o "$OUT/ota_test" ota_test.cpp
 "$OUT/ota_test" "$OUT"
+c++ -std=c++17 -Wall -Wextra -O1 -I host_mbedtls -o "$OUT/link_test" link_test.cpp
+"$OUT/link_test"
+c++ -std=c++17 -Wall -Wextra -O1 -pthread -I host_mbedtls -I ../main -o "$OUT/ctrl_link_test" ../../tilt_hub/test/ctrl_link_test.cpp
+"$OUT/ctrl_link_test"
 
 # The hub test checks real signatures, with mbedtls (the library the firmware uses): the system's if it has one
 # (CI: apt-get install libmbedtls-dev; a Mac: brew install mbedtls), else built here from ESP-IDF's copy.

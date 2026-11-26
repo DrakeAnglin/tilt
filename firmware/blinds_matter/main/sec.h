@@ -32,6 +32,7 @@
 #include "store.h"                               // nvs, event, cleanText
 #include "lock.h"                                // mx
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm (shared with the Tilt Hub)
+#include "tilt_link.h"                           // linkKey, proofs, the hub link's layouts (shared with the Tilt Hub)
 
 const int MAX_KEYS = 8;
 struct ClientKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // used 1 = paired, 2 = asked to join, waiting for an owner; role 1 = owner
@@ -102,7 +103,7 @@ static uint8_t hubLink[32];
 static volatile bool hubLinkOk = false;
 void hubLinkRefresh() {
   int s = hubSlot();
-  if (s >= 0) hmac256(keys[s].key, 32, (const uint8_t *)"tilt-hub-link", 13, hubLink);
+  if (s >= 0) linkKey(keys[s].key, hubLink);
   hubLinkOk = s >= 0;
 }
 std::string hubMac(const std::string &what) {

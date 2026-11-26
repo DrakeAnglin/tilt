@@ -280,8 +280,8 @@ std::string helloJson() {                       // from the hub task and Bluetoo
   bool own;
   uint8_t open;
   { QuietLock l; name = jq(cfg.name); own = owned(); open = openApi; }
-  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d}", ctrlId().c_str(),
-     name.c_str(), img.c_str(), hexOf(bootId, 4).c_str(), own ? 1 : 0, open, homesPaired() ? 1 : 0, hubOk() ? 1 : 0);
+  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d,\"proto\":%d}", ctrlId().c_str(),
+     name.c_str(), img.c_str(), hexOf(bootId, 4).c_str(), own ? 1 : 0, open, homesPaired() ? 1 : 0, hubOk() ? 1 : 0, LINK_PROTO);
   return j;
 }
 void openHomeWindow();                           // app_main.cpp
