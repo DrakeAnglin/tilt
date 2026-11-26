@@ -14,6 +14,16 @@ enum TiltWords {
         if a > closedAbove { return t > 0 ? "Closed, slats up" : "Closed, slats down" }
         return "\(Int(a.rounded()))% toward \(t > 0 ? "up" : "down")"
     }
+    /// The Power source next to the Battery level: "Solar", "Plugged in", "Charging" (on input power, source not sure),
+    /// or nil on battery. Never a named source the charging flag does not back up, or a value it does not know.
+    static func powerSource(charging: Bool, src: Int?) -> String? {
+        guard charging else { return nil }
+        switch src {
+        case 1: return "Solar"
+        case 2: return "Plugged in"
+        default: return "Charging"
+        }
+    }
     /// What a schedule or button does: "Open", "Close up", "Close down", or a position.
     static func action(_ tilt: Int) -> String {
         tilt == 0 ? "Open" : tilt == 100 ? "Close up" : tilt == -100 ? "Close down" : long(Double(tilt))

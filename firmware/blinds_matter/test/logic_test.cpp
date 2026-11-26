@@ -603,6 +603,34 @@ int main() {
   CHECK(sunEventAt(timegm(&dec), 80, 15, true) == 0, "no sunrise in the polar night");
   CHECK(sunEventAt(n, NAN, NAN, true) == 0, "no place set");
 
+  // ---- Power source (v2.2 board): USB only when input power is there while the sun is well down; never Solar
+  {
+    const uint32_t H = 3600, M = 60;
+    time_t mid = n - 18 * H + 6 * H;                     // local midnight in Chicago (CST = UTC-6), Nov 21 2026
+    CHECK(powerSourceOf(false, true, n, rise, set) == SRC_BATTERY, "no input power at noon: battery");
+    CHECK(powerSourceOf(false, true, mid, rise, set) == SRC_BATTERY, "no input power at midnight: battery");
+    CHECK(powerSourceOf(true, true, mid, rise, set) == SRC_USB, "input power at midnight: USB");
+    CHECK(powerSourceOf(true, true, set + 61 * M, rise, set) == SRC_USB, "61 minutes after sunset: USB");
+    CHECK(powerSourceOf(true, true, rise - 61 * M, rise, set) == SRC_USB, "61 minutes before sunrise: USB");
+    CHECK(powerSourceOf(true, true, n, rise, set) == SRC_UNKNOWN, "input power at noon: unknown");
+    CHECK(powerSourceOf(true, true, set + 59 * M, rise, set) == SRC_UNKNOWN, "59 minutes after sunset: unknown (twilight)");
+    CHECK(powerSourceOf(true, true, rise - 59 * M, rise, set) == SRC_UNKNOWN, "59 minutes before sunrise: unknown");
+    CHECK(powerSourceOf(true, false, mid, rise, set) == SRC_UNKNOWN, "clock not set: unknown");
+    CHECK(powerSourceOf(true, true, mid, 0, 0) == SRC_UNKNOWN, "no place set: unknown");
+    time_t dn = timegm(&dec);
+    uint32_t pr = sunEventAt(dn, 80, 15, true), ps = sunEventAt(dn, 80, 15, false);
+    CHECK(powerSourceOf(true, true, dn - 12 * H, pr, ps) == SRC_UNKNOWN, "the sun does not set or rise there: unknown");
+    bool only = true, darkOnly = true;
+    for (int h = 0; h < 24; h++) {
+      uint32_t t = mid + h * H;
+      int s = powerSourceOf(true, true, t, rise, set);
+      if (s != SRC_USB && s != SRC_UNKNOWN) only = false;
+      if (s == SRC_USB && t + SRC_NIGHT_MARGIN_S >= rise && t <= set + SRC_NIGHT_MARGIN_S) darkOnly = false;
+    }
+    CHECK(only, "every hour of a day: only USB or unknown, never Solar");
+    CHECK(darkOnly, "USB only in the dark hours");
+  }
+
   // ---- stall
   CHECK(stallCheck(100, 300, 999, 500, 10, 10, 2) == STALL_WAIT, "no check while the gear play is taken up");
   CHECK(stallCheck(900, 300, 200, 500, 10, 10, 2) == STALL_WAIT, "not time to check yet");

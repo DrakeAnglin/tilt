@@ -193,13 +193,23 @@ struct BatteryPill: View {
     let battery: ControllerState.Battery
     var body: some View {
         let charging = battery.charging
+        let source = TiltWords.powerSource(charging: charging, src: battery.src)
         HStack(spacing: 5) {
-            Image(systemName: charging ? "bolt.fill" : battery.pct < ControllerState.Battery.lowPercent ? "battery.25percent" : "battery.75percent").font(.caption2)
-            Text("\(battery.pct)%").font(.caption.weight(.semibold)).monospacedDigit()
+            Image(systemName: icon(source)).font(.caption2)
+            Text(source.map { "\(battery.pct)% · \($0)" } ?? "\(battery.pct)%").font(.caption.weight(.semibold)).monospacedDigit()
         }
         .foregroundStyle(battery.isLow ? Palette.danger : charging ? Palette.good : Color.secondary)
         .padding(.horizontal, 9).padding(.vertical, 5)
         .background(Palette.surface, in: Capsule())
-        .accessibilityLabel("Battery \(battery.pct) percent\(charging ? ", charging" : "")")
+        .accessibilityLabel("Battery \(battery.pct) percent\(source.map { ", " + $0.lowercased() } ?? "")")
+    }
+    /// The icon for the word TiltWords.powerSource gave (nil: on battery).
+    private func icon(_ source: String?) -> String {
+        guard source != nil else { return battery.pct < ControllerState.Battery.lowPercent ? "battery.25percent" : "battery.75percent" }
+        switch battery.src {
+        case 1: return "sun.max.fill"
+        case 2: return "powerplug.fill"
+        default: return "bolt.fill"
+        }
     }
 }

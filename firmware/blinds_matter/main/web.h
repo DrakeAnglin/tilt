@@ -46,7 +46,7 @@ float tiltWord(int p, const std::string &to) {
 std::string hubThreadJson();                     // hub_link.h
 bool hubJoined();
 // The status the app polls (/api/s). Short keys, kept short on purpose (it goes over Thread often):
-//   t epoch, tok clock set, up seconds running, batt {v rest volts, pct, st charge state, vin, low}, closeUp, sync
+//   t epoch, tok clock set, up seconds running, batt {v rest volts, pct, st charge state, vin, low, src Power source}, closeUp, sync
 //   follow mode, par move at the same time, mv the blind moving (-1 none), log event count, hk in a Matter home,
 //   asks join requests waiting, hkey knows the Tilt Hub's key, me caller is an owner, gentle a slow move running,
 //   topic iCloud notice topic; b[] per blind: hid hidden, pres plugged in, seen checked, cal marks set, tilt, tgt
@@ -56,7 +56,7 @@ esp_err_t hState(httpd_req_t *r) {
   std::string j;
   j.reserve(1200);
   ap(j, "{\"v\":\"" FW_VERSION "\",\"name\":%s,\"t\":%lu,\"tok\":%d,\"up\":%lu", jq(cfg.name).c_str(), (unsigned long)time(nullptr), timeValid() ? 1 : 0, (unsigned long)(millis() / 1000));
-  ap(j, ",\"batt\":{\"v\":%.2f,\"pct\":%d,\"st\":\"%s\",\"vin\":%.2f,\"low\":%d}", vbatRest, battPercent(vbatRest), chargeState(), vin, battOkToMove() ? 0 : 1);   // low: 1 = below the motor cut-off, no moves
+  ap(j, ",\"batt\":{\"v\":%.2f,\"pct\":%d,\"st\":\"%s\",\"vin\":%.2f,\"low\":%d,\"src\":%d}", vbatRest, battPercent(vbatRest), chargeState(), vin, battOkToMove() ? 0 : 1, powerSource());   // low: 1 = below the motor cut-off, no moves; src: Power source (logic.h)
   ap(j, ",\"pw\":{\"mode\":1,\"sleepIn\":-1,\"checkin\":0},\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"ap\":0,\"mv\":%d,\"log\":%lu,\"hk\":%d,\"asks\":%d,\"hkey\":%d,\"me\":%d,\"gentle\":%d,\"topic\":\"%s\",\"b\":[", cfg.closeUp, syncMode, parMode, firstMoving(), (unsigned long)logSeq, homesPaired(), asksWaiting(), hubSlot() >= 0 ? 1 : 0, secClient >= 0 ? keys[secClient].role : 1, rampAny() ? 1 : 0, secClient >= 0 ? hexOf(cloudTopic, 16).c_str() : "");
   for (int i = 0; i < PORTS; i++) {
     BlindCfg &c = cfg.b[i];

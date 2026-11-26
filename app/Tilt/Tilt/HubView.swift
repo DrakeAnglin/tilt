@@ -205,7 +205,10 @@ private struct MemberRow: View {
     }
     private var line: String {
         var parts: [String] = []
-        if m.pct >= 0 { parts.append("Battery \(m.pct)%") }
+        if m.pct >= 0 {
+            parts.append("Battery \(m.pct)%")
+            if let s = TiltWords.powerSource(charging: m.chg == 1, src: m.src) { parts.append(s) }
+        }
         if m.seenS >= 0 { parts.append(m.seenS < 90 ? "checked in just now" : "checked in \(HubView.span(m.seenS)) ago") }
         if m.signal == nil { parts.append("not on the hub's network") }
         return parts.joined(separator: " · ")
