@@ -286,7 +286,7 @@ G = dict(
     hex_R=7.2, hex_clear=0.15, lid_bore_clear=0.15,
     hub_r=4.2, hub_end_x=7.8,          # the hub runs the whole wheel (a short rod is still fully gripped)
     wheel_bore_hub=4.4,
-    pin_d=2.0, pin_len=5.9, pin_press=0.025, pin_pocket=3.0, planet_bore_clear=0.1,
+    pin_d=2.0, pin_len=5.9, pin_hole_clear=0.1, pin_pocket=3.0, planet_bore_clear=0.1,   # dowel pockets Ø2.2, as the worm's top-pin hole (#183)
     sun_bore=4.1, journal_clear=0.15,                    # the sensor sleeve's nose (r 3.9) runs through it
     wall_t=0.8, face_a=3.5, face_d=3.2, plate_t=1.2,      # wall and plate are just skins that keep gears from rubbing
     nose_r=3.9, nose_clear=0.15,                           # sensor sleeve's nose; the motor plate's bore is its front bearing
