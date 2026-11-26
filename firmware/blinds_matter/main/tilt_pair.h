@@ -61,8 +61,18 @@ inline std::string pairAnswer(const PairKeys &k, const uint8_t cid[8], bool owne
   uint8_t pb[100];
   size_t pn = 0;
   mbedtls_base64_encode(pb, sizeof pb, &pn, k.dpub, 65);
-  std::string out = std::string("{\"pub\":\"") + std::string((char *)pb, pn) + "\",\"cid\":\"" + hexOf(cid, 8) + "\",\"check\":\"" + hexOf(k.check, 8) +
-                    "\",\"owner\":" + (owner ? "1" : "0") + ",\"wait\":" + (wait ? "1" : "0") + ",\"topic\":\"" + hexOf(topic, 16) + "\"";
-  if (code) out += std::string(",\"code\":\"") + code + "\"";
-  return out + "}";
+  std::string out = "{\"pub\":\"";               // one string, appended to: the smallest code (the hub has little room)
+  out.append((char *)pb, pn);
+  out += "\",\"cid\":\"";
+  out += hexOf(cid, 8);
+  out += "\",\"check\":\"";
+  out += hexOf(k.check, 8);
+  out += owner ? "\",\"owner\":1" : "\",\"owner\":0";
+  out += wait ? ",\"wait\":1" : ",\"wait\":0";
+  out += ",\"topic\":\"";
+  out += hexOf(topic, 16);
+  out += '"';
+  if (code) { out += ",\"code\":\""; out += code; out += '"'; }
+  out += '}';
+  return out;
 }
