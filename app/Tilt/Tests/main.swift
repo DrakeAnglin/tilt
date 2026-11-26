@@ -675,5 +675,18 @@ do {
     check(poll.missed(), "three in a row: give up")
 }
 
+// ---- a request to join a controller (Shared/JoinProgress.swift)
+do {
+    let rec = { (id: String, code: String?) in ControllerRecord(id: id, name: id, host: "h", cid: "c", owner: false, waiting: code == nil ? nil : true, code: code) }
+    let asked = rec("a", "3829")
+    check(JoinProgress.of(id: "a", joined: [], waiting: [asked], denied: []) == .waiting(code: "3829"), "asked and not answered: waiting, with the code")
+    check(JoinProgress.of(id: "a", joined: [rec("a", nil)], waiting: [], denied: []) == .approved, "an owner approved: in")
+    check(JoinProgress.of(id: "a", joined: [], waiting: [asked], denied: ["a"]) == .declined, "an owner declined")
+    check(JoinProgress.of(id: "a", joined: [], waiting: [], denied: []) == .gone, "the request was taken back")
+    check(JoinProgress.of(id: "a", joined: [rec("b", nil)], waiting: [asked], denied: []) == .waiting(code: "3829"), "another room being in does not hide this request")
+    let noCode = ControllerRecord(id: "a", name: "a", host: "h", cid: "c", owner: false, waiting: true, code: nil)
+    check(JoinProgress.of(id: "a", joined: [], waiting: [noCode], denied: []) == .waiting(code: ""), "no code saved: waiting with an empty code")
+}
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)
