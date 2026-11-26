@@ -66,9 +66,8 @@ esp_err_t hState(httpd_req_t *r) {
   ap(j, ",\"pw\":{\"mode\":1,\"sleepIn\":-1,\"checkin\":0},\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"ap\":0,\"mv\":%d,\"log\":%lu,\"hk\":%d,\"asks\":%d,\"hkey\":%d,\"me\":%d,\"gentle\":%d,\"topic\":\"%s\",\"b\":[", cfg.closeUp, syncMode, parMode, firstMoving(), (unsigned long)logSeq, homesPaired(), asksWaiting(), hubSlot() >= 0 ? 1 : 0, secClient >= 0 ? keys[secClient].role : 1, rampAny() ? 1 : 0, secClient >= 0 ? hexOf(cloudTopic, 16).c_str() : "");
   for (int i = 0; i < PORTS; i++) {
     BlindCfg &c = cfg.b[i];
-    bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
     ap(j, "%s{\"name\":%s,\"hid\":%d,\"pres\":%d,\"seen\":%d,\"cal\":%d,\"tilt\":%s,\"tgt\":%s,\"mov\":%d,\"q\":%d,\"fav\":%d,\"ang\":%s,\"last\":%s}", i ? "," : "",
-       jq(c.name).c_str(), c.hidden, bs[i].present ? 1 : 0, bs[i].seen ? 1 : 0, calibrated(i) ? 1 : 0, jn(live ? tiltOf(i, mvs[i].live) : bs[i].tilt, 1).c_str(),
+       jq(c.name).c_str(), c.hidden, bs[i].present ? 1 : 0, bs[i].seen ? 1 : 0, calibrated(i) ? 1 : 0, jn(blindNow(i).tilt, 1).c_str(),
        jn(bs[i].target, 0).c_str(), movingPort(i) ? 1 : 0, bs[i].queued ? 1 : 0, c.fav, jn(bs[i].ang, 1).c_str(), jq(bs[i].last).c_str());
   }
   j += "]}";
@@ -155,8 +154,9 @@ esp_err_t hSet(httpd_req_t *r) {
   Lock l;
   std::string k = arg(r, "k"), v = arg(r, "v");
   int n = atoi(v.c_str());
-  if (k == "name") cleanText(cfg.name, sizeof cfg.name, v);
-  else if (k == "closeUp") cfg.closeUp = n ? 1 : 0;
+  Settings c = cfg;                              // changed here, then put in place by cfgApply (motion.h)
+  if (k == "name") cleanText(c.name, sizeof c.name, v);
+  else if (k == "closeUp") c.closeUp = n ? 1 : 0;
   else if (k == "loc") { float la = NAN, lo = NAN; if (sscanf(v.c_str(), "%f,%f", &la, &lo) != 2 || fabsf(la) > 90 || fabsf(lo) > 180) return fail(r, "bad place"); sx.lat = la; sx.lon = lo; sxSave(); }
   else if (k == "sync") { syncMode = n ? 1 : 0; syncSave(); hand.reset(); }   // start fresh: no following of old turns
   else if (k == "par") { parMode = n ? 1 : 0; syncSave(); }
@@ -167,24 +167,24 @@ esp_err_t hSet(httpd_req_t *r) {
   else if (k == "tune.max") { tune.moveMaxS = constrain(n, 5, 600); tuneSave(); }
   else if (k == "battMode" || k == "checkin" || k == "tx") return fail(r, "not in this version");
   else if (k == "tz") {
-    if (v.length() < 3 || v.length() >= sizeof cfg.tz) return fail(r, "bad time zone");
-    strlcpy(cfg.tz, v.c_str(), sizeof cfg.tz);
-    cleanText(cfg.tzName, sizeof cfg.tzName, arg(r, "n"));
-    setenv("TZ", cfg.tz, 1);
+    if (v.length() < 3 || v.length() >= sizeof c.tz) return fail(r, "bad time zone");
+    strlcpy(c.tz, v.c_str(), sizeof c.tz);
+    cleanText(c.tzName, sizeof c.tzName, arg(r, "n"));
+    setenv("TZ", c.tz, 1);
     tzset();
   } else if (k.length() >= 4 && k[0] == 'b' && k[2] == '.') {
     int p = k[1] - '0';
     if (p < 0 || p >= PORTS) return fail(r, "no such blind");
     std::string f = k.substr(3);
-    BlindCfg &c = cfg.b[p];
-    if (f == "name") { cleanText(c.name, sizeof c.name, v); if (!c.name[0]) snprintf(c.name, sizeof c.name, "Blind %d", p + 1); }
-    else if (f == "speed") c.speed = constrain(n, 50, 100);
-    else if (f == "fav") c.fav = constrain(n, -100, 100);
-    else if (f == "hid") c.hidden = n ? 1 : 0;
-    else if (f == "sign") c.motSign = n < 0 ? -1 : 1;
+    BlindCfg &b = c.b[p];
+    if (f == "name") { cleanText(b.name, sizeof b.name, v); if (!b.name[0]) snprintf(b.name, sizeof b.name, "Blind %d", p + 1); }
+    else if (f == "speed") b.speed = constrain(n, 50, 100);
+    else if (f == "fav") b.fav = constrain(n, -100, 100);
+    else if (f == "hid") b.hidden = n ? 1 : 0;
+    else if (f == "sign") b.motSign = n < 0 ? -1 : 1;   // a move on this blind is stopped first (cfgApply)
     else return fail(r, "unknown setting");
   } else return fail(r, "unknown setting");
-  cfgSave();
+  cfgApply(c);
   return ok(r);
 }
 esp_err_t hSched(httpd_req_t *r) {
@@ -192,11 +192,12 @@ esp_err_t hSched(httpd_req_t *r) {
   int i = argi(r, "i");
   if (i < 0 || i >= SCHEDS) return fail(r, "no such schedule");
   WireSlot w = slotOfArgs([&](const char *k) { return arg(r, k); }, PORTS);
-  Sched &s = cfg.sched[i];
+  Settings c = cfg;
+  Sched &s = c.sched[i];
   s.on = w.on; s.days = w.days; s.mask = w.mask; s.minute = w.min; s.tilt = w.tilt;
   sx.x[i] = {(uint8_t)w.kind, (uint8_t)w.ramp, (int16_t)w.off, w.gid};
   sxSave();
-  cfgSave();
+  cfgApply(c);
   lastSched = time(nullptr);
   return ok(r);
 }
@@ -228,7 +229,7 @@ esp_err_t hReset(httpd_req_t *r) {
   std::string w = arg(r, "what");
   if (w == "stats") { uint32_t m = stats.magic; memset(&stats, 0, sizeof stats); stats.magic = m; statsSave(); }
   else if (w == "hist") { memset(battHist, 0, sizeof battHist); histSave(); }
-  else if (w == "all") { cfgDefaults(); cfgSave(); }
+  else if (w == "all") { Settings c; cfgDefaultsOf(c); cfgApply(c); }   // a move on a blind whose Marks go is stopped first
   else return fail(r, "unknown");
   event("reset: %s", w.c_str());
   return ok(r);
@@ -276,13 +277,17 @@ esp_err_t hKeep(httpd_req_t *r) {
 std::string ctrlId() { uint8_t m[6] = {0}; esp_read_mac(m, ESP_MAC_WIFI_STA); return hexOf(m, 6); }
 bool hubOk();                                    // hub_link.h
 void hubTick();
-std::string helloJson() {
+std::string helloJson() {                       // from the hub task and Bluetooth, which do not hold mx: it is taken here
   std::string j;
   // img: the running firmware's SHA-256 (as esptool shows it), so an update can be a patch made from exactly it.
   static std::string img;
   if (img.empty()) { uint8_t h[32]; if (esp_partition_get_sha256(esp_ota_get_running_partition(), h) == ESP_OK) img = hexOf(h, 32); }
+  std::string name;
+  bool own;
+  uint8_t open;
+  { QuietLock l; name = jq(cfg.name); own = owned(); open = openApi; }
   ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d}", ctrlId().c_str(),
-     jq(cfg.name).c_str(), img.c_str(), hexOf(bootId, 4).c_str(), owned() ? 1 : 0, openApi, homesPaired() ? 1 : 0, hubOk() ? 1 : 0);
+     name.c_str(), img.c_str(), hexOf(bootId, 4).c_str(), own ? 1 : 0, open, homesPaired() ? 1 : 0, hubOk() ? 1 : 0);
   return j;
 }
 esp_err_t hHello(httpd_req_t *r) { return plain(r, "200 OK", helloJson()); }
@@ -336,6 +341,26 @@ void webBegin() {
 }
 
 extern volatile uint32_t hubLinkSeen;            // hub_link.h
+// Restart (or go back to the firmware before, rollback) once the last answers have gone out. From the blinds task,
+// which holds mx: mx is let go for the wait, so no other task waits behind it. A restart stops and holds the motors
+// first (no handler may start one meanwhile). A rollback leaves the moves alone, as before: if going back is refused,
+// the controller carries on as it was, moves included.
+void restartNow(bool rollback, uint32_t waitMs) {
+  if (!rollback) {
+    motorsHeld = true;
+    rampCancel();
+    for (int i = 0; i < PORTS; i++) {
+      bs[i].queued = false;
+      if (movingPort(i)) { Use u(i); stopNow(MVX, tilters[i], "stopped: restarting"); }
+      motorRaw(i, 0, 0); digitalWrite(P_EN[i], LOW);
+    }
+  }
+  xSemaphoreGive(mx);
+  vTaskDelay(pdMS_TO_TICKS(waitMs));
+  if (!rollback) esp_restart();
+  esp_ota_mark_app_invalid_rollback_and_reboot();  // returns only if refused
+  xSemaphoreTake(mx, portMAX_DELAY);
+}
 // A new firmware is on trial until Thread to the Tilt Hub has worked for a minute (ota.h trialVerdict).
 static void trialTick(uint32_t now) {
   static uint32_t hubSince = 0;
@@ -345,8 +370,7 @@ static void trialTick(uint32_t now) {
   if (v == TRIAL_KEEP) trialKeep();
   else if (v == TRIAL_ROLLBACK) {
     event("new firmware could not reach the Tilt Hub: going back");
-    vTaskDelay(pdMS_TO_TICKS(200));
-    esp_ota_mark_app_invalid_rollback_and_reboot();
+    restartNow(true, 200);
   }
 }
 // Once an hour: the battery history (and, on a developer build, the power log's temperature).
@@ -377,8 +401,8 @@ static void powerTick() {                        // input power connected or gon
   static bool wasPowered = powered;
   if (wasPowered != powered) { wasPowered = powered; event(powered ? "input power connected (%.2f V)" : "on battery (%.2f V)", powered ? vin : vbatRest); }
 }
-static void restartTick() {                      // asked for (an update, a setting): motors off first
-  if (restartSoon) { vTaskDelay(pdMS_TO_TICKS(600)); for (int i = 0; i < PORTS; i++) { motorRaw(i, 0, 0); digitalWrite(P_EN[i], LOW); } esp_restart(); }
+static void restartTick() {                      // asked for (an update, a setting): motors off and held first
+  if (restartSoon) restartNow(false, 600);
 }
 // Once a second, from the blinds task (the lock is held).
 void webTick() {
