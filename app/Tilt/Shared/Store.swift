@@ -51,6 +51,35 @@ struct ControllerRecord: Codable, Identifiable, Equatable {
     var topic: String?
 }
 
+/// This iPhone's link to the Tilt Hub (saved; its key is in the Keychain as "hub-<id>"). `request` nil: this iPhone is in.
+struct HubRecord: Equatable {
+    var id: String, host: String, cid: String, owner: Bool
+    var request: JoinRequest? = nil, topic: String? = nil
+}
+
+/// Saved in the shape every build has used, flat `waiting` and `code`: a record saved by an older build opens as it is,
+/// and an older build still opens one saved by this one (it needs `waiting`, so that is always written).
+/// In an extension, so the struct keeps its memberwise init.
+extension HubRecord: Codable {
+    private enum Keys: String, CodingKey { case id, host, cid, owner, waiting, code, topic }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        id = try c.decode(String.self, forKey: .id); host = try c.decode(String.self, forKey: .host)
+        cid = try c.decode(String.self, forKey: .cid); owner = try c.decode(Bool.self, forKey: .owner)
+        // No `waiting`: in. A record that does not open makes the app forget its hub.
+        let waiting = try c.decodeIfPresent(Bool.self, forKey: .waiting) ?? false
+        request = waiting ? JoinRequest(code: try c.decodeIfPresent(String.self, forKey: .code) ?? "") : nil
+        topic = try c.decodeIfPresent(String.self, forKey: .topic)
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        try c.encode(id, forKey: .id); try c.encode(host, forKey: .host); try c.encode(cid, forKey: .cid); try c.encode(owner, forKey: .owner)
+        try c.encode(request != nil, forKey: .waiting)
+        if let code = request?.code, !code.isEmpty { try c.encode(code, forKey: .code) }
+        try c.encodeIfPresent(topic, forKey: .topic)
+    }
+}
+
 enum Keychain {
     private static let service = "app.tilt.blinds.keys"
     static func save(_ account: String, _ data: Data) {

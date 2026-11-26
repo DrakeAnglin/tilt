@@ -85,6 +85,10 @@ Adding a controller to a Matter fabric (Apple Home, Alexa).
 **Pairing**:
 A phone gaining its own secret key for one controller or for the Tilt Hub, over the app's secured channel.
 
+**Join request**:
+A phone's ask to be let in to a controller or the Tilt Hub that an Owner has not answered yet; both phones show the same 4-digit code.
+_Avoid_: pending pairing, invite
+
 **Calibration**:
 Setting a blind's Marks. In the app this is **Setup**, always one word ("Setup required", "Start Setup", "Redo Setup"); never "set up" or "Marks".
 

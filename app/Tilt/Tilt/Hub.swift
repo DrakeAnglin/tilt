@@ -3,16 +3,11 @@
 // becomes its owner; later phones ask to join and an owner lets them in. Until this iPhone is connected, the hub is only
 // "found" (the Blinds page offers Connect or Ask to Join); Settings shows it once connected.
 // HubWatch keeps what the app knows about the hub (found, record, status); the commands are HubClient's (Shared/HubClient.swift).
+// The saved record, HubRecord, is in Shared/Store.swift, where the Mac tests read it.
 import CryptoKit
 import Foundation
 import Network
 import Observation
-
-/// This iPhone's link to a hub (saved; its key is in the Keychain as "hub-<id>").
-struct HubRecord: Codable, Equatable {
-    var id: String, host: String, cid: String, owner: Bool
-    var waiting: Bool = false, code: String? = nil, topic: String? = nil
-}
 
 @MainActor @Observable
 final class HubWatch {
@@ -25,11 +20,11 @@ final class HubWatch {
     /// This iPhone's connection to a hub.
     private(set) var record: HubRecord? = HubWatch.loadRecord()
     var status: Status {
-        if let r = record { return r.waiting ? .waiting : .connected }
+        if let r = record { return r.request != nil ? .waiting : .connected }
         guard let f = found else { return .none }
         return f.owned ? .someoneElses : .newHub
     }
-    var isOwner: Bool { record?.owner == true && record?.waiting == false }
+    var isOwner: Bool { record?.owner == true && record?.request == nil }
     /// Where the hub is: the connected one's address, else the one found.
     var host: String? { record?.host ?? found?.host }
     /// In Apple Home: checked against Apple Home's own accessories once the Tilt Hub page has opened (HomeSetup.inHome).
@@ -38,7 +33,7 @@ final class HubWatch {
     var answering: Bool?
     var statusWord: String {
         guard let r = record else { return "Not connected" }
-        if r.waiting { return "Waiting for its owner" }
+        if r.request != nil { return "Waiting for its owner" }
         return answering == nil ? "Checking…" : answering! ? "Connected" : "Unreachable"
     }
     /// New controllers advertising near the hub (shown to an owner).
@@ -114,7 +109,7 @@ final class HubWatch {
             inHome = HomeSetup.inHome(hubSays: (i.home ?? 0) == 1, hubHomes: (i.homes ?? []).map { .init(node: $0.node, vendor: $0.vendor) },
                                       appleNodes: AppleHomes.shared.nodeIDs)
             newNearby = i.new.count
-            if var r = record, r.waiting { r.waiting = false; r.code = nil; save(r) }     // the owner let this iPhone in
+            if var r = record, r.request != nil { r.request = nil; save(r) }                  // the owner let this iPhone in
             if isOwner, var r = record {                                                     // the hub's push alerts: watched on every check, so a
                 if let t = i.topic, !t.isEmpty, t != r.topic { r.topic = t; save(r) }      // phone that joined before them gets them too
                 if let t = r.topic { Task { await Cloud.watch(topic: t) } }
@@ -133,7 +128,7 @@ final class HubWatch {
         } catch LinkProblem.notPaired {
             guard current() else { return }
             // A request that no longer exists (the hub was reset) just goes; the Blinds page offers Connect or Ask again.
-            if record?.waiting != true { notice = "The Tilt Hub does not know this iPhone anymore: it was reset, or an owner removed you. Connect to it again from the Blinds page." }
+            if record?.request == nil { notice = "The Tilt Hub does not know this iPhone anymore: it was reset, or an owner removed you. Connect to it again from the Blinds page." }
             forgetLocally()
         } catch {
             guard current() else { return }
@@ -166,14 +161,14 @@ final class HubWatch {
     }
     private func keep(_ f: FoundHub, _ p: Paired) {
         Keychain.save("hub-" + f.id, p.key.withUnsafeBytes { Data($0) })
-        save(HubRecord(id: f.id, host: f.host, cid: p.cid.hex, owner: p.owner, waiting: p.waiting, code: p.waiting ? p.code : nil, topic: p.topic.isEmpty ? nil : p.topic))
+        save(HubRecord(id: f.id, host: f.host, cid: p.cid.hex, owner: p.owner, request: p.request, topic: p.topic.isEmpty ? nil : p.topic))
         conn = nil
         if p.owner, !p.topic.isEmpty { Task { await Cloud.watch(topic: p.topic) } }     // told when someone asks to join
     }
     /// This iPhone leaves the hub: the hub forgets it too (a waiting request is taken back). The hub's only owner cannot
     /// leave while others are in (make someone else an owner, or reset its people).
     func leave() async throws {
-        if record?.waiting == true { await (try? client())?.takeBackRequest() }
+        if record?.request != nil { await (try? client())?.takeBackRequest() }
         else { try await client().leave() }
         forgetLocally()
     }
@@ -228,7 +223,7 @@ final class HubWatch {
     }
     /// For the background check: what the connected hub reports, over the secured channel.
     nonisolated static func fetchInfo() async -> HubInfo? {
-        guard let r = loadRecord(), !r.waiting, let c = client(r) else { return nil }
+        guard let r = loadRecord(), r.request == nil, let c = client(r) else { return nil }
         return try? await c.info()
     }
 }

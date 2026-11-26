@@ -693,5 +693,45 @@ do {
     check(JoinProgress.of(id: "a", joined: [], waiting: [noCode], denied: []) == .waiting(code: ""), "no code saved: waiting with an empty code")
 }
 
+// ---- this iPhone's request to join the Tilt Hub (Shared/Store.swift HubRecord, Shared/Secure.swift JoinRequest)
+/// Today's HubRecord, with Swift's own Codable: what an older build reads.
+struct OldHubRecord: Codable, Equatable {
+    var id: String, host: String, cid: String, owner: Bool
+    var waiting: Bool = false, code: String? = nil, topic: String? = nil
+}
+do {
+    func obj(_ d: Data) -> NSDictionary? { (try? JSONSerialization.jsonObject(with: d)) as? NSDictionary }
+    func decode(_ json: String) -> HubRecord? { try? JSONDecoder().decode(HubRecord.self, from: Data(json.utf8)) }
+    func encoded(_ r: HubRecord) -> NSDictionary? { (try? JSONEncoder().encode(r)).flatMap(obj) }
+    let inJSON = #"{"id":"h1","host":"10.0.0.5","cid":"0101","owner":true,"waiting":false,"topic":"tp"}"#
+    let askJSON = #"{"id":"h1","host":"10.0.0.5","cid":"0101","owner":false,"waiting":true,"code":"3829"}"#
+    let noCodeJSON = #"{"id":"h1","host":"10.0.0.5","cid":"0101","owner":false,"waiting":true}"#
+    let isIn = decode(inJSON)
+    check(isIn?.request == nil && isIn?.id == "h1" && isIn?.host == "10.0.0.5" && isIn?.cid == "0101" && isIn?.owner == true && isIn?.topic == "tp",
+          "a saved record of a phone that is in opens as in, with everything as saved")
+    check(decode(askJSON)?.request == JoinRequest(code: "3829"), "a saved request with its code opens as waiting, with the code")
+    check(decode(noCodeJSON)?.request == JoinRequest(code: ""), "a saved request with no code opens as waiting, with an empty code")
+    for j in [inJSON, askJSON, noCodeJSON] {
+        check(decode(j).flatMap(encoded) == obj(Data(j.utf8)), "a saved record is written again with exactly its keys and values: \(j)")
+    }
+    let stray = decode(#"{"id":"h1","host":"h","cid":"c","owner":false,"waiting":false,"code":"3829"}"#)
+    check(stray != nil && stray?.request == nil, "waiting false with a code: in")
+    check(stray != nil && stray.flatMap(encoded)?["code"] == nil, "and the stray code is not written")
+    let noWaiting = decode(#"{"id":"h1","host":"h","cid":"c","owner":false}"#)
+    check(noWaiting != nil && noWaiting?.request == nil, "no waiting key: in, not an error")
+    let fresh = [HubRecord(id: "h", host: "a", cid: "c", owner: true, topic: "t"),
+                 HubRecord(id: "h", host: "a", cid: "c", owner: false, request: JoinRequest(code: "0042"))]
+    for r in fresh {
+        let what = r.request == nil ? "in" : "waiting"
+        let back = (try? JSONEncoder().encode(r)).flatMap { try? JSONDecoder().decode(HubRecord.self, from: $0) }
+        check(back == r, "a new record goes out and back unchanged (\(what))")
+        let old = (try? JSONEncoder().encode(r)).flatMap { try? JSONDecoder().decode(OldHubRecord.self, from: $0) }
+        check(old != nil && old?.waiting == (r.request != nil) && (old?.code ?? "") == (r.request?.code ?? "") && old?.topic == r.topic,
+              "an older build opens a new record the same (\(what))")
+    }
+    check(paired.request == JoinRequest(code: "1585"), "a phone that asked: its request carries the join code")
+    check(Paired(cid: Data(repeating: 1, count: 8), key: key, owner: true).request == nil, "an owner has no request")
+}
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)
