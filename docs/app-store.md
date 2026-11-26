@@ -1,7 +1,9 @@
 # App Store release
 
-Tilt 1.0 (build 3) was submitted to the App Store on 2026-11-21. This page keeps the account steps, the answers
-given in App Store Connect, and how firmware is published, for the next release.
+Tilt 1.0 (build 3) was submitted to the App Store on 2026-11-21. Apple answered on 2026-11-22 with Guideline 2.1
+"Information Needed": no bug, but they want a screen recording from a real device and written answers in the review
+notes (issue #126). Build 4 goes back with both. This page keeps the account steps, the answers given in App Store
+Connect, and how firmware is published, for the next release.
 
 ## Account steps (owner only)
 1. ~~App Store Connect record~~ done 2026-11-21: "Tilt: Smart Blinds" (the name Tilt was taken), bundle ID `app.tilt.blinds`, SKU TILT001. The home-screen name stays Tilt.
@@ -21,7 +23,7 @@ given in App Store Connect, and how firmware is published, for the next release.
 
 ## Listing status (filled in App Store Connect, 2026-11-21)
 - Version page: promotional text, description, keywords, support and marketing URLs, copyright, App Review notes,
-  sign-in not required, manual release, App Review contact, screenshots, build 3.
+  sign-in not required, manual release, App Review contact, screenshots, build 3 (build 4 for the resubmission).
 - App Information: subtitle "Smart tilt for your blinds", Lifestyle / Utilities, no third-party content, rated 4+.
 - Pricing: free. Availability: 174 countries or regions, all except China mainland (it needs a security assessment
   and an AI-content filing).
@@ -43,10 +45,43 @@ controller) and HTTPS. It implements no encryption of its own and uses no third-
 (The controller's firmware uses its own crypto library, but it is not part of the app.)
 
 ## Notes for App Review
-> Tilt controls a small battery-powered controller for window blinds. You do not need one to review the app: on the
-> first screen tap "No controller yet? Try the Demo" (or Add, Try the Demo). The demo room behaves like a real one:
-> open, close, gentle moves, schedules, scenes and settings all work. Bluetooth setup, Apple Home and sharing need the
-> hardware. Sign in with Apple is used only for the display name shown to people you share blinds with.
+Apple's 2.1 "Information Needed" asks for six things. The Notes field (App Review Information, at most 4000 characters)
+holds the text below, and the screen recording goes in the Attachment field next to it.
+
+**Screen recording (owner, on the iPhone):** turn on Screen Recording in Control Center, record, then open Tilt from the
+home screen. Show: the first screen, Try the Demo, open and close a room and one blind, a scene, Automations (a
+schedule), Settings, then Add a New Device and set up a real controller over Bluetooth, and open and close the real
+blinds with the phone. Film the real blinds with a second phone if possible; otherwise the app alone is fine. Under
+about 3 minutes; trim in Photos.
+
+> 1. RECORDING: attached (iPhone, latest iOS). It starts at launch, shows the demo, then sets up and moves a real
+> Tilt controller. Tilt has no accounts, no user-generated content and nothing paid.
+>
+> 2. PURPOSE AND AUDIENCE: Tilt is the companion app for Tilt, a small open-source battery motor that clips onto the
+> tilt rod of ordinary horizontal blinds. It is for people who want their existing blinds to open and close on a
+> schedule, at sunrise and sunset, from Apple Home and Siri, without replacing them. The app sets up the controller,
+> moves the blinds, and keeps schedules and scenes on the controller itself, so they run when the phone is away.
+>
+> 3. HOW TO REVIEW (no login, no hardware needed): on the first screen tap "No controller yet? Try the Demo" (also under
+> + then Try the Demo). The demo room, "Living Room (Demo)", acts like a real one: tap Open or Close, press and hold
+> them for a gentle move or Set Tilt…, tap the room to move one blind, run the Morning or Movie scene, add a
+> schedule in Automations, and change room and blind settings in Settings. Bluetooth setup, Apple Home, the Tilt Hub and sharing with family need the hardware; they are shown in the
+> recording. Sign in with Apple is optional and only fills in the display name that people you share with see. There is
+> no account and nothing to log in to.
+>
+> 4. EXTERNAL SERVICES: only Apple's own and GitHub. iCloud (CloudKit and key-value storage) passes "ask to join"
+> requests between family members and keeps the display name. Sign in with Apple (optional) for that name. Apple Push
+> Notifications for join requests and low-battery alerts. Apple Home (HomeKit and Matter) to add blinds to the Home app.
+> Firmware update files are downloaded from the project's public GitHub Releases page. Everything else talks only to
+> the user's own controller and hub, over Bluetooth or the home Wi-Fi network. No server of ours, no analytics, no ads,
+> no AI services, no payments. Location is read once on the phone to work out sunrise and sunset and is sent only to the
+> user's own controller.
+>
+> 5. REGIONS: the app works the same in every region where it is offered. It is not offered in China mainland.
+>
+> 6. REGULATION AND THIRD-PARTY MATERIAL: not applicable. Tilt is a home convenience product; it uses no protected
+> third-party content and is not in a regulated industry. The hardware designs and code are our own, published under
+> open licenses at https://github.com/DrakeAnglin/tilt.
 
 ## Metadata draft
 - **Subtitle:** Smart tilt for your blinds

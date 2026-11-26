@@ -55,7 +55,7 @@ struct RootView: View {
     /// Developer builds, for screenshots: "-tab 1" starts on Automations, "-demo" adds the demo room.
     @State private var tab = developerBuild ? UserDefaults.standard.integer(forKey: "tab") : 0
     @State private var join: JoinAsk?
-    @State private var needName = AppModel.savedName == nil
+    @State private var needName = asksForName(saved: AppModel.savedName, skipped: UserDefaults.standard.bool(forKey: Prefs.nameSkipped))
     /// Requests to join the controllers this phone owns.
     private var pending: [JoinAsk] { model.controllers.flatMap { c in c.requests.map { JoinAsk(controller: c, phone: $0) } } }
     /// Show the next request that has not been answered or swiped away.
@@ -81,7 +81,7 @@ struct RootView: View {
         .onAppear { if developerBuild && ProcessInfo.processInfo.arguments.contains("-demo") { model.addDemo() } }
         .preferredColorScheme(appearance == 1 ? .light : appearance == 2 ? .dark : nil)
         // First time: who is this? (So other people see a name, not "iPhone".)
-        .sheet(isPresented: Binding(get: { !splash && needName }, set: { if !$0 { needName = false } })) { WelcomeSheet { needName = false }.presentationDetents([.height(400)]).interactiveDismissDisabled() }
+        .sheet(isPresented: Binding(get: { !splash && needName }, set: { if !$0 { needName = false } })) { WelcomeSheet { needName = false }.presentationDetents([.height(470)]).interactiveDismissDisabled() }
         // A phone asked to join a controller this phone owns: a page to approve or decline it.
         .sheet(item: $join, onDismiss: { showNext() }) { a in JoinSheet(ask: a) { join = nil }.presentationDetents([.height(480)]) }
         .onChange(of: pending.map(\.id), initial: true) { _, _ in showNext() }
@@ -150,13 +150,15 @@ struct WelcomeSheet: View {
                 if n.trimmingCharacters(in: .whitespaces).isEmpty { note = "Apple did not share your name this time. Enter it once here." } else { save(n) }
             }
             .frame(height: 50)
-            if let note {                       // only if Apple gave no name (it shares it the first time only)
-                Text(note).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                HStack {
-                    TextField("First and last name", text: $name).textInputAutocapitalization(.words).autocorrectionDisabled().textFieldStyle(.roundedBorder).onSubmit { save(name) }
-                    Button("Save") { save(name) }.buttonStyle(.bordered).disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
+            // Sign in with Apple is optional (App Review 5.1.1): the name can be typed, or left for later in Settings.
+            Text(note ?? "Or type the name people should see.").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            HStack {
+                TextField("First and last name", text: $name).textInputAutocapitalization(.words).autocorrectionDisabled().textFieldStyle(.roundedBorder).onSubmit { save(name) }
+                Button("Save") { save(name) }.buttonStyle(.bordered).disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+            Button("Not Now") { UserDefaults.standard.set(true, forKey: Prefs.nameSkipped); done() }
+                .font(.subheadline)
+            Text("You can set your name later in Settings.").font(.caption).foregroundStyle(.tertiary)
         }
         .padding(24)
     }

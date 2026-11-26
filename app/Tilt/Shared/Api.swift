@@ -83,6 +83,8 @@ enum Prefs {
     static let scenes = "scenes.v1"
     static let myName = "myName"
     static let devMode = "devMode"
+    /// The person tapped Not Now on the first-launch name sheet: do not ask again (Settings still has Display Name).
+    static let nameSkipped = "nameSkipped"
     static let appearance = "appearance"
     /// Developer builds only: follow the beta firmware channel, and where to look for firmware.
     static let firmwareBeta = "fwBeta"
@@ -90,6 +92,10 @@ enum Prefs {
     /// When a controller last answered, by its id.
     static func lastSeen(_ id: String) -> String { "seen.\(id)" }
 }
+
+/// First launch: ask for the person's name only while none is saved and they have not tapped Not Now. Sign in with
+/// Apple stays optional (App Review 5.1.1): the demo and everything else work without a name.
+func asksForName(saved: String?, skipped: Bool) -> Bool { saved == nil && !skipped }
 
 /// Developer Mode exists only in builds made from Xcode, never in an App Store build.
 let developerBuild: Bool = {
