@@ -1,11 +1,15 @@
 # Print files
 
-**`tilt_project_H2D.3mf`: the print project.** One Bambu Studio project for the H2D with 21 plates: plates 1-3 print a
-whole set (all PLA parts of one tilter, all PETG parts, the controller box), then one plate per part in the order the
-tilter goes together. Brims and supports are already set per part (supports only on the tray lid, worm and worm wheel).
-Built by `python3 tools/bambu_project.py`.
+**Two print projects for the H2D**, both built by `python3 tools/bambu_project.py`, brims and supports set per part
+(supports only on the tray lid, worm and worm wheel), white PLA on filament 1, white PETG on filament 2:
 
-To print plate by plate from the printer: open it in Bambu Studio, Slice all, then Send all. One file goes to the
+- **`tilt_bulk_H2D.3mf`: print everything at once.** 4 plates, one material each: 1 tilter boxes (PLA), 2 tilter
+  gears (PLA), 3 tilter gears (PETG), 4 controller box (PLA).
+- **`tilt_parts_H2D.3mf`: one part per plate**, in the order the tilter goes together, then the controller box's two
+  halves. Use it to reprint a part when something on a bulk plate fails.
+
+
+To print plate by plate from the printer: open a project in Bambu Studio, Slice all, then Send all. One file goes to the
 printer and its screen picks the plate. To see what has been printed and jump to the next plate, use the private
 MakerWorld copy in Bambu Handy (#52).
 

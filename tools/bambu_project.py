@@ -1,13 +1,14 @@
-"""Build the Tilt print project for Bambu Studio / MakerWorld: one plate per part, plus plates that print a whole set.
+"""Build the two Tilt print projects for Bambu Studio / MakerWorld.
 
-  python3 tools/orient.py && python3 tools/bambu_project.py     # writes hardware/mechanical/stl/tilt_project_H2D.3mf
+  python3 tools/orient.py && python3 tools/bambu_project.py     # writes both into hardware/mechanical/stl/
 
-Slice it in the Bambu Studio app (Slice all). Studio 2.9's command line will not slice for the H2D ("No valid nozzle
+  tilt_bulk_H2D.3mf     4 plates, everything at once; one material per plate (the plate list is BULK below):
+                          1 tilter boxes (PLA)  2 tilter gears (PLA)  3 tilter gears (PETG)  4 controller box (PLA)
+  tilt_parts_H2D.3mf    one part per plate, in the order the tilter goes together, then the controller box's two
+                          halves (SINGLE below). Reprint one part from here when a bulk plate goes wrong.
+
+Slice them in the Bambu Studio app (Slice all). Studio 2.9's command line will not slice for the H2D ("No valid nozzle
 found"), not even the older tilter project.
-
-Plates, in order (the plate list is PLATES below):
-  1-3   whole sets: every PLA part of one tilter, every PETG part, the controller box
-  4-    one part per plate, in the order the tilter goes together, then the controller box's two halves
 
 Settings are set per part, so nothing is changed by hand: a brim on the parts that are tall or tiny and could tip or
 lift (BRIM), supports only on the tray lid, the worm and the worm wheel (SUPPORT). Everything else has no brim and no
@@ -28,7 +29,6 @@ from bambu import CLI, PRESETS, flatten  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STL = os.path.join(REPO, 'hardware/mechanical/stl')
-OUT = os.path.join(STL, 'tilt_project_H2D.3mf')
 
 # Where each printed file is. Tilter parts come turned for the bed (tools/orient.py); the box halves already lie flat.
 BOX = ('controller_tray', 'controller_lid')
@@ -72,18 +72,20 @@ def rows(mat):
     return out
 
 
-PLATES = ([('Whole tilter - all PLA parts', rows('PLA')),
-           ('Whole tilter - all PETG parts', rows('PETG')),
-           ('Controller box - tray and lid', [[BOX[0]], [BOX[1]]])] +
-          [('%02d %s' % (k + 4, NAMES[n]), [copies(n)] if n in PARTS else [[n]]) for k, n in enumerate(BUILD)])
+PLA_ROWS = rows('PLA')               # orient.PARTS row 0 is the housing, row 1 the drive
+BULK = [('1 Tilter boxes (PLA)', [PLA_ROWS[0][:3], PLA_ROWS[0][3:]]),
+        ('2 Tilter gears (PLA)', [PLA_ROWS[1]]),
+        ('3 Tilter gears (PETG)', rows('PETG')),
+        ('4 Controller box (PLA)', [[BOX[0]], [BOX[1]]])]
+SINGLE = [('%02d %s' % (k + 1, NAMES[n]), [copies(n)] if n in PARTS else [[n]]) for k, n in enumerate(BUILD)]
+PROJECTS = {'tilt_bulk_H2D.3mf': BULK, 'tilt_parts_H2D.3mf': SINGLE}
 
 H2D = (350.0, 320.0)                # bed
 GAP = 7.0                           # between parts on a plate (owner: keep parts close together)
 
 
-def stride():
-    """Bambu Studio puts plate k at a grid spot: ceil(sqrt(n)) columns, 1.2 bed widths apart, rows going -Y."""
-    n = len(PLATES)
+def stride(n):
+    """Bambu Studio puts plate k of n at a grid spot: ceil(sqrt(n)) columns, 1.2 bed widths apart, rows going -Y."""
     cols = int(n ** 0.5)
     cols += cols * cols < n
     return cols, H2D[0] * 1.2, H2D[1] * 1.2
@@ -132,7 +134,7 @@ def object_settings(name):
     return out
 
 
-def build(out=OUT):
+def build(out, PLATES):
     tmp = tempfile.mkdtemp()
     preset = []
     for n, (kind, name) in enumerate(PRESETS):
@@ -143,7 +145,7 @@ def build(out=OUT):
         json.dump(d, open(p, 'w'), indent=1)
         preset.append(p)
     # One object per part per plate. Each copy is loaded from its own file "<plate>__<part>.stl" so it can be found again.
-    cols, sx, sy = stride()
+    cols, sx, sy = stride(len(PLATES))
     place, stls = {}, []
     for k, (_, prow) in enumerate(PLATES):
         ox, oy = (k % cols) * sx, -(k // cols) * sy
@@ -213,4 +215,5 @@ def build(out=OUT):
 
 
 if __name__ == '__main__':
-    build()
+    for name, plates in PROJECTS.items():
+        build(os.path.join(STL, name), plates)
