@@ -10,6 +10,9 @@ flat on the window.
   compensation on (Bambu's default), or the puzzle tabs bind at the bottom.
 - **Fit:** 0.2 mm in all from top to bottom across the panels, and 0.05 mm front to back under the lips, so the
   panels can't rock. The cap's sockets have 0.15 mm a side.
+- **Bambu Studio:** `hardware/mechanical/stl/solar/solar_housing_H2D.3mf` (or `solar_housing_wires_left_H2D.3mf`):
+  tray and cap on one plate, H2D 0.4 nozzle, 0.20 mm Standard, white PLA, no supports. Rebuilt by
+  `python3 tools/bambu_solar.py` (`--left` for the wires-left set).
 - **Built by:** `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_solar.py --timeout 600`
   (measurements are in the `S` table at the top).
 
