@@ -182,14 +182,24 @@ Tighten both down. Then check: the worm's loop turns the whole train, with no ti
 ![tray going on with its two screws already in, sensor module to the side](photos/tilter/d2-tray-on.jpg)
 
 ### D3. Electronics in
-Push the sensor module's boards into the tray:
-- **AS5600** onto its studs, **chip up**, under the sleeve's gear.
-- **DRV8833** down into its slots.
-- **RJ12 board** last, jack up.
+This step is a little fiddly. Go slowly: the thin wires break if they get pinched.
+1. **AS5600** onto its studs, **chip up**.
 
-Tuck the wires flat so nothing sits above the tray walls.
+   ![AS5600 on its studs](photos/tilter/d3-as5600-in.jpg)
 
-📷 **Photo D3:** looking into the tray from above, all boards seated, wires tucked.
+2. **RJ12 board** into its slot first, jack up.
+3. **DRV8833** last. Nudge it down into place with a small flat screwdriver while you press down on the RJ12 board.
+   Don't force it: if it stops, look for a wire in the way.
+
+   | RJ12 in its slot | All three boards in |
+   |---|---|
+   | ![RJ12 board in its slot](photos/tilter/d3-rj12-in.jpg) | ![all boards seated](photos/tilter/d3-all-in.jpg) |
+
+4. **Check the sensor sleeve's gear** is still in place over the AS5600: pushing the boards in can move it.
+5. Tuck any loose wire under the AS5600. Nothing should sit above the tray walls.
+
+There is very little room behind the boards. That is why the wires between the motor, the boards and the RJ12 have
+to be short ([sensor module](tilter-wiring.md)).
 
 ### D4. Magnet gear and lid
 Slide the magnet gear (magnet already in, step A4) into the lid's gear cage from the rod side until its

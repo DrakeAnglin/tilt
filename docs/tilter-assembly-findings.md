@@ -24,3 +24,7 @@ Things the build showed that the docs or the design have wrong. Fixed together a
    plate onto the cluster. Owner tightens fully and it turns fine; check and drop the warning if it holds.
 14. **Motor lead colors:** the build uses a red/black pair to the motor; the sensor module page says a white pair.
    Fix on the sensor module page when we do that guide.
+15. **Board order in the tray:** AS5600, then RJ12 into its slot, then the DRV8833 nudged in with a screwdriver
+   (guide D3). README step 7 says DRV8833 first, then RJ12. Fix README.
+16. **Wire lengths:** the sensor module page says cut leads ~6 cm and trim at fitting. There is very little room behind
+   the boards; give real short lengths per wire on the sensor module page (measure from this build).
