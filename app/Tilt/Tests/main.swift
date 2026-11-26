@@ -547,7 +547,8 @@ final class FakeUploader: FirmwareUploader, @unchecked Sendable {
     }
 }
 /// A controller update through a fake hub: `infos` are the hub's /api/info answers in turn (the last one repeats).
-func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boots: [String], hub fresh: (@Sendable () -> HubClient)? = nil) -> FirmwareInstaller {
+/// `boots` are the controller's boot ids at each look in turn (the last one repeats); nil is a hello that does not answer.
+func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boots: [String?], hub fresh: (@Sendable () -> HubClient)? = nil) -> FirmwareInstaller {
     let seen = Cell(0), bootsLeft = Cell(boots)
     let hub = HubClient(transport: ScriptedDevice(name: "hub", log: log, address: "10.0.0.2/hub") { c in
         guard cmdPath(c) == HubApi.info else { return #"{"ok":1}"# }
@@ -556,6 +557,7 @@ func fakeInstaller(_ log: Recorder, infos: [String], uploads: [String] = [], boo
     var f = FirmwareInstaller(hub: { fresh?() ?? hub }, uploader: FakeUploader(log: log, answers: uploads), sleep: { _ in }, download: { file, _ in log.add("download \(file)"); return Data(file.utf8) })
     f.look = { host in
         var b = bootsLeft.value; let boot = b.count > 1 ? b.removeFirst() : b[0]; bootsLeft.value = b
+        guard let boot else { log.add("look -"); return nil }
         log.add("look \(boot)"); return Hello(id: "den1", name: "Den", fw: boot == "b2" ? "2.3.0" : "2.2.1", boot: boot, img: "aaa", owned: 1, home: nil, net: "thread", hub: 1)
     }
     return f
@@ -584,6 +586,29 @@ check(patched.steps.prefix(3) == [.downloading, .sending, .downloading], "the st
 let keepAt = plog.all.firstIndex(of: "ctrl /api/keep"), newBootAt = plog.all.firstIndex(of: "look b2")
 check(plog.count("ctrl /api/keep") == 1 && keepAt != nil && newBootAt != nil && keepAt! > newBootAt!, "kept once, and only after the boot id changed")
 check(patched.steps.suffix(3) == [.restarting, .confirming, .done("2.3.0")], "restart, check it runs, done")
+
+// The first hello does not answer once: it is asked again, and the update is kept only after the boot id changed
+let hlog1 = Recorder()
+let retried = await collect(fakeInstaller(hlog1, infos: [hubInfoJSON("den1", hubCid: nil, ota: 3)], boots: [nil, "b1", "b1", "b1", "b2"])
+    .install(.file(Data("f.bin".utf8)), on: fwCtrl(hlog1), id: "den1"))
+let rKeepAt = hlog1.all.firstIndex(of: "ctrl /api/keep"), rNewBootAt = hlog1.all.firstIndex(of: "look b2")
+check(retried.error == nil && retried.steps.last == .done("2.3.0"), "a lost first hello is asked again and the update finishes (\(retried.error?.localizedDescription ?? "-"))")
+check(hlog1.count("ctrl /api/keep") == 1 && rKeepAt != nil && rNewBootAt != nil && rKeepAt! > rNewBootAt!, "after a lost first hello: kept once, only after the boot id changed")
+
+// The first hello does not answer and the controller never restarts: never kept (issue #109)
+let hlog2 = Recorder()
+let noRestart = await collect(fakeInstaller(hlog2, infos: [hubInfoJSON("den1", hubCid: nil, ota: 3)], boots: [nil, "b1"])
+    .install(.file(Data("f.bin".utf8)), on: fwCtrl(hlog2), id: "den1"))
+check(hlog2.count("ctrl /api/keep") == 0, "a controller that never restarted is not kept, also after a lost first hello")
+check(noRestart.error?.localizedDescription.hasPrefix("The controller did not come back.") == true, "it says the controller did not come back (\(noRestart.error?.localizedDescription ?? "-"))")
+
+// No hello ever answers: stopped before the upload, nothing sent
+let hlog3 = Recorder()
+let silent = await collect(fakeInstaller(hlog3, infos: [hubInfoJSON("den1", hubCid: nil, ota: 3)], boots: [nil])
+    .install(.file(Data("f.bin".utf8)), on: fwCtrl(hlog3), id: "den1"))
+check(silent.error?.localizedDescription == "The controller is not answering. Nothing was sent. Try again in a moment." && silent.steps == [.sending],
+      "a controller that never answers the first hello: stopped before the upload (\(silent.error?.localizedDescription ?? "-"))")
+check(hlog3.count("upload") == 0 && hlog3.count("ctrl /api/keep") == 0 && hlog3.count("look -") == 5, "nothing posted, nothing kept, five tries")
 
 // The hub gets a new address during an update: each look at its progress asks for the hub's client again
 let mlog = Recorder(), clientAsks = Cell(0)
