@@ -9,6 +9,30 @@ PR=${1:?usage: merge_pr.sh <pr> [--check]}
 MODE=${2:-}
 [ -z "$MODE" ] || [ "$MODE" = --check ] || { echo "usage: merge_pr.sh <pr> [--check]" >&2; exit 2; }
 
+# Always judge by the rules on main, never by an older copy in this branch's worktree: an old copy once
+# added needs-human by rules that had already changed. Unpack main's tools/agent/ and run that copy.
+if [ -z "${MERGE_PR_FROM_MAIN:-}" ]; then
+  git fetch -q origin main 2>/dev/null || true
+  T=$(mktemp -d)
+  if git archive origin/main tools/agent 2>/dev/null | tar -x -C "$T" 2>/dev/null && [ -f "$T/tools/agent/merge_pr.sh" ]; then
+    RC=0; MERGE_PR_FROM_MAIN=1 sh "$T/tools/agent/merge_pr.sh" "$@" || RC=$?
+    rm -rf "$T"; exit $RC
+  fi
+  rm -rf "$T"; echo "merge_pr: could not read main's copy; using this one." >&2
+fi
+
+# One merge at a time, across every worktree on this Mac: each merge moves main, and the next pull request
+# is checked against the new main. A lock older than 15 minutes is stale.
+if [ "$MODE" != --check ]; then
+  QLOCK="$(git rev-parse --path-format=absolute --git-common-dir)/merge-queue.lock"; WAITED=0
+  until mkdir "$QLOCK" 2>/dev/null; do
+    if [ -n "$(find "$QLOCK" -maxdepth 0 -mmin +15 2>/dev/null)" ]; then rm -rf "$QLOCK"; continue; fi
+    [ "$WAITED" -lt 900 ] || { echo "merge_pr: another merge has held the queue for 15 minutes; try again." >&2; exit 1; }
+    sleep 15; WAITED=$((WAITED + 15))
+  done
+  trap 'rm -rf "$QLOCK"' EXIT INT TERM
+fi
+
 MAX_REVIEWS=10
 
 J=$(gh pr view "$PR" --json number,state,isDraft,isCrossRepository,baseRefName,headRefName,headRefOid,mergeable,additions,deletions,labels,comments)
@@ -32,7 +56,11 @@ case "$(get .mergeable)" in
 esac
 
 # A label set by hand, or by the gate, wins over everything else.
-[ "$(get '[.labels[].name] | index("needs-human")')" = null ] || no "has the needs-human label"
+# IGNORE_NEEDS_HUMAN=1 (with --check only) asks: would the rules still send this to a human without the label?
+# tools/agent/clear_stale_label.sh uses it to take off a label whose reason is gone.
+if [ -z "${IGNORE_NEEDS_HUMAN:-}" ] || [ "$MODE" != --check ]; then
+  [ "$(get '[.labels[].name] | index("needs-human")')" = null ] || no "has the needs-human label"
+fi
 
 # Every changed file (and the old name of a renamed one), not only the first page.
 FILE_JSON=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq '.[] | {f: .filename, p: (.previous_filename // ""), n: (.additions + .deletions)}')
@@ -68,7 +96,8 @@ markers() { get "[.comments[] | select(.author.login == \"$ME\") | .body | captu
 field() { printf '%s' "$1" | tr ' ' '\n' | sed -n "s/^$2=//p"; }
 REVIEW=$(markers factory-review | jq -r 'last // ""')
 GATE=$(markers factory-gate | jq -r 'last // ""')
-[ "$(markers factory-review | jq -r length)" -le "$MAX_REVIEWS" ] || no "More than $MAX_REVIEWS rounds of review without a clean result. Confirm: read the last review and decide whether to go on."
+# A look again after a clean merge from main (round=merge) is not a round of disagreement: it does not count.
+[ "$(markers factory-review | jq -r '[.[] | select(test("round=merge") | not)] | length')" -le "$MAX_REVIEWS" ] || no "More than $MAX_REVIEWS rounds of review without a clean result. Confirm: read the last review and decide whether to go on."
 if [ -z "$REVIEW" ]; then wait_for "no review yet (run the pr-reviewer agent)"
 elif [ "$(field "$REVIEW" sha)" != "$SHA" ]; then wait_for "the review is for an older commit (run pr-reviewer again)"
 else

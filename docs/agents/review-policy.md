@@ -78,7 +78,7 @@ The reviewer then looks again. For each answer it either drops the finding (and 
 
 The owner gets a pull request only for what a person must judge: a large blast radius, a test-script change beyond adding tests, two agents that cannot agree, or ten rounds.
 
-`needs-human` sticks: a pull request with it is never merged by an agent, and only the owner takes it off. The door labels do not stick: the reviewer moves them when the door changes.
+`needs-human` sticks while its reason holds: a pull request with it is never merged by an agent. When the reason is gone (the gate said human for an older commit, CI was red or never ran, an old copy of the merge script added it, a repo move carried it over), `tools/agent/clear_stale_label.sh` takes it off. It asks the rules on main, with the label ignored, whether a person is still needed, and leaves a comment when it removes the label. That script is the only way an agent takes the label off. The owner keeps a pull request for themselves with a comment that starts with `/hold`. Red, unfinished or missing CI is always "not yet", never a reason for a person. The door labels do not stick: the reviewer moves them when the door changes.
 
 **A human merges** in every other case, and the pull request always says why. See below.
 

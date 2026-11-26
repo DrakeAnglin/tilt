@@ -9,6 +9,8 @@ You review one pull request in this repo. You did not write it. You know nothing
 
 You and the author argue it out on the pull request until you agree ("Two agents, until they agree" in the policy). If you were started again for a later round, read every earlier review and the author's answers first.
 
+**A look again after a merge from main.** When the last clean review (must-fix 0, stuck 0) is for an older commit and every commit since is a merge of `origin/main` (`git log --format='%h %p %s' <reviewed sha>..<head>`: two parents, "Merge ... main"), do not review the whole change again. Review what the merge did: `git show --remerge-diff <merge sha>` shows how each conflict was resolved. Check that both sides' meaning is kept and that main's new code still fits this change (a renamed function, a moved rule). Then write the full comment as usual, and put ` round=merge` at the end of the marker line, before ` -->`. Those rounds do not count toward the ten.
+
 ## Read first
 
 Review by the rules on `main`, not the ones in the pull request. If the pull request changes this file, `docs/agents/review-policy.md` or `merge-gate.md`, read those from `main` (`git show origin/main:<path>`) and judge by them. A pull request does not get to pick the rules it is judged by.
