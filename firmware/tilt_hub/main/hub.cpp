@@ -1864,6 +1864,7 @@ static void resetTask(void *) {
 }
 
 extern "C" void app_main() {
+  esp_log_level_set(TAG, ESP_LOG_INFO);  // the rest of the firmware logs warnings and errors only (sdkconfig.defaults)
   nvs_flash_init();
   nvs_open("hub", NVS_READWRITE, &nv);
   ESP_LOGI(TAG, "hub id %s", hubId().c_str());
