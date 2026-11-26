@@ -30,6 +30,11 @@ const float END_STALL_DEG = 10.0f;              // a stall this close to a close
 const float WRONG_WAY_DEG = 10.0f;
 const uint32_t LOOK_MS = 500;
 const float HAND_MOVE_DEG = 5.0f;               // moved this much in LOOK_MS with the motor off: a hand (a still reading wanders +-1.5)
+// A dropout (Tilter::lost: the sensor gives nothing, away from its zero) is never taken as the position. Waking, the
+// sensor gets this long to give a reading before the move gives up; running, the move stops after this long without one.
+// A plain jog (Setup's hold-to-run, 2 s at most) runs without one: it is how a blind is turned off a sensor that reads
+// nothing (sitting at its zero just after a restart).
+const uint32_t WAKE_LOST_MS = 300, LOST_STOP_MS = 1000;
 
 // Seek: the end is where the rod has not gained SEEK_STEP_DEG in its direction of travel for SEEK_STALL_MS (it has to
 // first move SEEK_START_DEG either way to know which way that is). Jitter at a stall is about +-1.5 degrees.
@@ -69,6 +74,7 @@ struct Move {
   const char *why = nullptr;    // forced stop reason
   bool motorOn = false;         // the motor is driven just now
   float noted = NAN;            // the last true reading (motor stopped); NAN = no tilter
+  uint32_t lostT = 0;           // MS_RUN: when the sensor stopped giving readings (0: it gives them)
 };
 // The middle one of the last five readings (around `near`, so it works across the sensor's zero).
 inline float median5(const float hb[5], float near) {
@@ -94,7 +100,8 @@ struct Tilter {
   virtual uint32_t ms() = 0;                    // the clock
   virtual bool wake() = 0;                      // sensor on: is a tilter plugged in?
   virtual float angle() = 0;                    // the Angle now (degrees); reads high while the motor runs
-  virtual bool noReading() = 0;                 // a PWM sensor passing its zero: the last angle() was a guess
+  virtual bool noReading() = 0;                 // no fresh reading (passing its zero, or lost): the last angle() was a guess
+  virtual bool lost() { return false; }         // a dropout: the sensor gave nothing, and the last angle() is only the last good one
   virtual float note(float a) = 0;              // a true reading (motor stopped): the Current tilt. Returns the angle kept (NAN: no tilter)
   virtual void motor(int dir, int duty) = 0;    // dir -1 / 0 (brake) / +1, duty percent
   virtual TiltSettings settings() = 0;
@@ -213,10 +220,15 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
     if (now - m.ts < 20) return;
     if (!m.woke) { m.woke = true; m.here = t.wake(); m.hn = 0; }
     // The middle of five readings, not the first one alone: the first after waking can be anything (Left read 0,
-    // 2026-11-23, and the move then took the true reading for going the wrong way).
-    m.hb[m.hn++] = t.angle();
-    if (m.here && m.hn < 5) return;
-    float a = m.hn >= 5 ? median5(m.hb, m.hb[m.hn - 1]) : m.hb[0];
+    // 2026-11-23, and the move then took the true reading for going the wrong way). A dropout is not a reading: the
+    // sensor gets WAKE_LOST_MS to give some, and with none the motor never starts.
+    float w = t.angle();
+    if (!m.here || !t.lost()) m.hb[m.hn++] = w;
+    bool late = now - m.ts >= 20 + WAKE_LOST_MS;
+    if (m.here && m.hn < 5 && !late) return;
+    if (m.here && !m.hn && (m.kind != MV_JOG || m.seek)) { finishMove(m, t, "stopped: no reading from the sensor"); return; }
+    if (!m.hn) m.hb[m.hn++] = w;
+    float a = m.hn >= 5 ? median5(m.hb, m.hb[m.hn - 1]) : m.hb[m.hn - 1];
     m.hn = 0;
     m.noted = t.note(a);
     if (!m.here) { finishMove(m, t, "no tilter plugged in"); return; }
@@ -232,6 +244,9 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
     // For stopping: the middle one of the last five readings, twice in a row. For speed and stall: quarter-second averages.
     TiltSettings s = t.settings();
     float raw = t.angle(), a = raw;
+    if (!t.lost()) m.lostT = 0;                // no reading for a while: stop (not a stall, not the wrong way, not there)
+    else if (!m.lostT) m.lostT = now ? now : 1;
+    else if (now - m.lostT >= LOST_STOP_MS && (m.kind != MV_JOG || m.seek)) { m.nudges = MAX_NUDGES + 1; toSettle(m, t, "stopped: no reading from the sensor"); return; }
     m.hb[m.hn % 5] = raw;
     m.hn++;
     if (m.hn >= 5) a = median5(m.hb, raw);     // the middle one of the last five (measured: +-1 deg jitter, spikes to +10)
@@ -334,7 +349,7 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
     float a = settledRead(m, t, now);
     if (now - m.ts < SETTLE_MS) return;
     m.noted = t.note(a);
-    if (m.fromRun && !std::isnan(m.lastA) && m.lastDir) {     // learn how far it went on after the last running reading
+    if (m.fromRun && !std::isnan(m.lastA) && m.lastDir && !t.lost()) {   // learn how far it went on after the last running reading
       float c = angDiff(a, m.lastA) * m.lastDir;
       float &ld = t.memory().lead[m.lastDir > 0];
       if (c > -10.0f && c < 12.0f) { float v = ld + (c - ld) * 0.4f; ld = v < -8.0f ? -8.0f : v > 8.0f ? 8.0f : v; }
