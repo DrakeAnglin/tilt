@@ -8,7 +8,7 @@
 static const esp_partition_t *stage;
 static uint32_t stageSize;
 static bool stageDelta;                           // the staged file is a patch (blinds_matter/main/hub_link.h)
-static uint32_t pieceBytes = 480, piecesInFlight = 6;      // measured: 480 x 6 is about 4 KB/s; 960 x 8 lost most pieces          // piece size and pieces in flight (?ch=&win= on the upload, for tuning)
+static uint32_t pieceBytes = 480, piecesInFlight = 6;   // piece size and pieces in flight (?ch=&win= on the upload, for tuning). Measured: 480 x 6 is about 4 KB/s; 960 x 8 lost most pieces
 static uint32_t uploadUntil[MAX_CTRL];           // an owner allowed an upload for this controller (sealed /api/upload)
 static void otaFail(Ctrl &k, const char *why) { k.otaSt = OTA_FAILED; cleanName(k.otaErr, sizeof k.otaErr, why); ESP_LOGW(TAG, "%s: update failed: %s", k.s.id, why); alertUpdateFailed((int)(&k - ctrls), why); }
 static void otaTask(void *arg) {
