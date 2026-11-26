@@ -505,6 +505,32 @@ static void testSteadyRead() {
     CHECK(steadyRead(s).is == STEADY_MOVING, "a spread just over 3.5 degrees: not still"); }
 }
 
+// ---- the time zone: running zone = saved zone, and Schedules follow it at once (issue #125)
+static time_t utcAt(int y, int mo, int d, int h, int mi) {
+  struct tm u = {}; u.tm_year = y - 1900; u.tm_mon = mo - 1; u.tm_mday = d; u.tm_hour = h; u.tm_min = mi;
+  return timegm(&u);
+}
+static void zoneTests() {
+  const char *was = getenv("TZ");
+  std::string keep = was ? was : "";
+  CHECK(zoneOk("CST6CDT,M3.2.0,M11.1.0", 44) && zoneOk("UTC0", 44), "a real zone is taken");
+  CHECK(!zoneOk("", 44) && !zoneOk("ab", 44), "an empty or too short zone is refused");
+  CHECK(!zoneOk(std::string(44, 'x').c_str(), 44) && zoneOk(std::string(43, 'x').c_str(), 44), "a zone must fit the field with its end");
+  const uint8_t ALL = 0x7f;
+  time_t winter = utcAt(2026, 1, 15, 18, 0);                 // a Thursday, noon in Chicago
+  zoneUse("CST6CDT,M3.2.0,M11.1.0");
+  CHECK(slotDayTime(winter, 0, 420, ALL) == (uint32_t)utcAt(2026, 1, 15, 13, 0), "07:00 Central in winter is 13:00 UTC");
+  zoneUse("PST8PDT,M3.2.0,M11.1.0");
+  CHECK(slotDayTime(winter, 0, 420, ALL) == (uint32_t)utcAt(2026, 1, 15, 15, 0), "a new zone moves the slot at once: 07:00 Pacific is 15:00 UTC");
+  zoneUse("CST6CDT,M3.2.0,M11.1.0");
+  time_t summer = utcAt(2026, 7, 15, 17, 0);                 // a Wednesday, noon in Chicago (daylight time)
+  CHECK(slotDayTime(summer, 0, 420, ALL) == (uint32_t)utcAt(2026, 7, 15, 12, 0), "07:00 Central in summer is 12:00 UTC");
+  CHECK(slotDayTime(winter, 0, 420, ALL & ~(1 << 4)) == 0, "not on a Thursday: no slot that day");
+  CHECK(slotDayTime(winter, 1, 420, 1 << 5) == (uint32_t)utcAt(2026, 1, 16, 13, 0), "the next day is a Friday: its slot");
+  CHECK(slotDayTime(winter, 1, 420, 1 << 4) == 0, "the next day is not a Thursday");
+  if (was) zoneUse(keep.c_str()); else { unsetenv("TZ"); tzset(); }
+}
+
 int main() {
   // ---- angles
   CHECK(near(angDiff(10, 350), 20, 1e-4), "angDiff crosses zero forward");
@@ -550,6 +576,7 @@ int main() {
   tilterTests();
   handWatchTests();
   settingsChangeTests();
+  zoneTests();
 
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");

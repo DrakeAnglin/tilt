@@ -3,6 +3,7 @@
 #pragma once
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <string>
@@ -158,6 +159,25 @@ inline uint32_t sunEventAt(time_t noon, double lat, double lon, bool rise) {
   if (ch < -1 || ch > 1) return 0;
   double w = acos(ch) / R, jd = jt + (rise ? -w : w) / 360.0;
   return (uint32_t)((jd - 2440587.5) * 86400.0);
+}
+
+// ---- time zone: the POSIX zone string Schedules run on (Settings.tz: cap bytes, its end included)
+// A zone a controller takes: at least 3 characters, and it fits the field.
+inline bool zoneOk(const char *tz, size_t cap) { size_t n = strlen(tz); return n >= 3 && n < cap; }
+// Run on this zone. The only place the firmware sets it (cfgApply when tz changes, schedBegin at start). It changes the
+// process's TZ: the one piece of shared state this file touches.
+inline void zoneUse(const char *tz) { setenv("TZ", tz, 1); tzset(); }
+// A slot's local clock time on the day (now + dayOff): that day at minuteOfDay in the running zone, daylight time
+// worked out by mktime. 0 when that day's weekday is not in days (bit 0 = Sunday).
+inline uint32_t slotDayTime(time_t now, int dayOff, int minuteOfDay, uint8_t days) {
+  struct tm tm, chk;
+  localtime_r(&now, &tm);
+  tm.tm_mday += dayOff;
+  tm.tm_hour = 0; tm.tm_min = minuteOfDay; tm.tm_sec = 0; tm.tm_isdst = -1;
+  time_t t = mktime(&tm);
+  localtime_r(&t, &chk);
+  if (!((days >> chk.tm_wday) & 1)) return 0;
+  return (uint32_t)t;
 }
 
 // ---- stall: once the gear play is taken up, the angle has to change by minDeg every stallMs
