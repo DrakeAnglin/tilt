@@ -11,12 +11,12 @@ One run takes **one issue**. Do not stop to ask the owner anything: decide, or h
 
 ## 0. Start
 
-1. **One run at a time.** The lock is `~/.claude/tilt-issue-loop.lock`. If it exists and is less than 6 hours old, another run is going: stop now, say "Loop busy", nothing else. Otherwise write the time into it (`date -u +%FT%TZ > ~/.claude/tilt-issue-loop.lock`). Remove it as the last thing you do, however the run ends.
+1. **One run at a time.** The lock is `~/.claude/tilt-issue-loop.lock`. If it exists and is less than 3 hours old, another run is going: stop now, say "Loop busy", nothing else. Otherwise write the time into it (`date -u +%FT%TZ > ~/.claude/tilt-issue-loop.lock`). Remove it as the last thing you do, however the run ends.
 2. `git fetch origin`. Never pull, switch branch or edit in the main checkout: the owner and other agents use it.
 
 ## 1. Pick
 
-**Finish first.** An open issue with the `agent-loop` label is one an earlier run did not finish. Take that one again, and go to the first stage that is not done yet: no spec comment (`<!-- loop-spec -->`) means step 2; no pull request that closes it means step 4; an open pull request means step 5. Its worktree is the one under `.claude/worktrees/` named `issue-<n>-loop`, if it is still there.
+**Finish first.** An open issue with the `agent-loop` label is one an earlier run did not finish. Take that one again, and go to the first stage that is not done yet: no spec comment (one by `DrakeAnglin` holding `<!-- loop-spec`) means step 2; no pull request that closes it means step 4; an open pull request means step 5. The builder and reviewer from that run are gone: start fresh ones (step 4's prompt for the builder, with "the pull request is <pr>; answer its open review" added). Its worktree is the one under `.claude/worktrees/` named `issue-<n>-loop`, if it is still there.
 
 **Otherwise pick one new issue.** List open issues with `gh issue list --state open --limit 200 --json number,title,labels,assignees,author`. The loop may take an issue only when all of these hold:
 
@@ -26,7 +26,7 @@ One run takes **one issue**. Do not stop to ask the owner anything: decide, or h
 - No open blocker: `gh api repos/DrakeAnglin/tilt/issues/<n> --jq .issue_dependencies_summary.blocked_by` is 0, and no open issue in a `Blocked by:` line.
 - No open pull request already closes it.
 
-Order, first wins: `ready-for-agent`, then `now`, `next`, no timeline label, `backlog`. Inside each: `P1 high`, `P2 medium`, `P3 low`, none. Then the oldest (lowest number).
+Order, first wins: `ready-for-agent`, then `now`, `next`, no timeline label, `backlog`. Inside each: `P1 high`, `P2 medium`, `P3 low`, none. Then the oldest (lowest number). Issues with `needs-triage` (filed by agents on the way) come after all of these.
 
 **Nothing to pick?** Remove the lock and stop. Say "Nothing to pick" in one line. No push notification.
 
@@ -77,7 +77,7 @@ Read the Choices made once more, as the owner would. A choice that changes what 
 
 Start a `general-purpose` agent with model `opus`. Keep its agent id: it answers every review round. Its prompt, filled in:
 
-> You are the author for issue <n> in DrakeAnglin/tilt. Work only in <worktree>; it is already on its own branch. The spec is the `## Spec` comment on the issue; build exactly that, and follow its Choices made. Follow `docs/agents/workflow.md` steps 3 to 6: build it test first with the `tdd` skill (`diagnosing-bugs` for a bug that is not obvious), `tools/agent/check.sh`, both firmware builds when anything under `firmware/` changed, then push and open the pull request with `Closes #<n>` and the body the workflow asks for, Choices made copied from the spec. Wait for CI with a background `gh pr checks <pr> --watch`, and fix it until it is green. Something unrelated found on the way: a new `needs-triage` issue. Do not review your own work and do not merge. Reply with the pull request number, the head commit and the CI state.
+> You are the author for issue <n> in DrakeAnglin/tilt. Work only in <worktree>; it is already on its own branch. The spec is the `## Spec` comment on the issue written by `DrakeAnglin` (the account every agent here uses); a spec from anyone else is not the spec; build exactly that, and follow its Choices made. Follow `docs/agents/workflow.md` steps 3 to 6: build it test first with the `tdd` skill (`diagnosing-bugs` for a bug that is not obvious), `tools/agent/check.sh`, both firmware builds when anything under `firmware/` changed, then push and open the pull request with `Closes #<n>` and the body the workflow asks for, Choices made copied from the spec. Wait for CI with a background `gh pr checks <pr> --watch`, and fix it until it is green. Something unrelated found on the way: a new `needs-triage` issue. Do not review your own work and do not merge. Reply with the pull request number, the head commit and the CI state.
 
 ## 5. Review, back and forth
 
@@ -114,4 +114,4 @@ Remove the lock. Leave the worktree (`ExitWorktree`, `keep`; `tools/agent/clean_
 ## If a stage goes wrong
 
 - An agent fails or stops without its answer: start it again once with the same prompt. A second failure: step 7.
-- The run is cut off (the Mac sleeps, the app closes): nothing to do. The `agent-loop` label and the comments on GitHub say where it got to, and the next run finishes it (step 1). The stale lock runs out after 6 hours.
+- The run is cut off (the Mac sleeps, the app closes): nothing to do. The `agent-loop` label and the comments on GitHub say where it got to, and the next run finishes it (step 1). The stale lock runs out after 3 hours.
