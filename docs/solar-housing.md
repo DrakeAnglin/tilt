@@ -3,9 +3,13 @@
 A white tray and an end cap that hold **three 6 V 0.8 W panels** (70 × 70 mm) in a row, wired in parallel, and stick
 flat on the window.
 
-- **Size:** 240.2 × 82.3 × 7.0 mm together. Tray about 58 g, cap about 10 g of PLA.
-- **Print:** `hardware/mechanical/stl/solar/solar_tray.stl` and `solar_cap.stl`, each as it lies (back on the bed).
-  No supports: the lips are 45 degrees.
+- **Size:** 240.1 × 82.2 × 7.0 mm together. Tray about 58 g, cap about 10 g of PLA.
+- **Print:** `hardware/mechanical/stl/solar/solar_tray.stl` and `solar_cap.stl` (wires out the right end), or
+  `solar_tray_wires_left.stl` and `solar_cap_wires_left.stl` (the mirror image: wires out the left end). Each as it
+  lies, back on the bed. No supports: the lips are 45 degrees, and nothing bridges. Keep the slicer's elephant-foot
+  compensation on (Bambu's default), or the puzzle tabs bind at the bottom.
+- **Fit:** 0.2 mm in all from top to bottom across the panels, and 0.05 mm front to back under the lips, so the
+  panels can't rock. The cap's sockets have 0.15 mm a side.
 - **Built by:** `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_solar.py --timeout 600`
   (measurements are in the `S` table at the top).
 
@@ -21,5 +25,5 @@ flat on the window.
 4. **Tape it to the window.** Double-sided tape on the window face of the left end and of the cap (15 mm pads; the
    rails take tape too), then press it flat on the glass. The panels sit 1.8 mm behind the window face.
 
-Turn it end for end to put the wire exit on the other side. The plug goes in J8 on the controller board: black on
+For the wire exit on the other side, print the `wires_left` set. The plug goes in J8 on the controller board: black on
 pin 1 (−), red on pin 2 (+).

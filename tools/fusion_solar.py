@@ -8,6 +8,7 @@ to edge. The cap then closes the right end: it drops onto two round puzzle tabs 
 Taped to the glass with the tray, it cannot lift off. Tape goes on the window
 face of the solid left end and of the cap, so the housing sticks flat on the window. Behind the panels a 10 mm channel
 runs the whole length for the solder bumps and the red and black wires; they leave through a small slot in the cap.
+A mirrored set (cap and wires at the left end) is exported too.
 Coordinates: X along the row (cap at +X), Y across (+Y = the panels' top edge, where the bumps are), Z up from the
 back. Both parts print as built: back on the bed, the lips at 45 degrees, no supports.
 """
@@ -25,12 +26,13 @@ S = {
     'panel': 70.0,        # panel side (measured 70 x 70)
     'panel_t': 1.8,       # panel thickness (measured)
     'n': 3,               # panels in the row
-    'fit': 0.15,          # clearance each side across the row (snug)
-    'play': 0.0,          # the lip's 45 degree underside meets the wall at the panel face: 0.15 room at the edge
+    'fit': 0.1,           # clearance each side across the row: 0.2 in all (top to bottom)
+    'play': -0.05,        # the lip's 45 degree underside meets the wall 0.05 under the panel face, so a centered
+                          # panel has only fit + play = 0.05 room under the lip (front to back): snug, no rocking
     'rail': 6.0,          # top and bottom rails, outside the panels (their ends carry the puzzle tabs)
     'pad': 15.0,          # tape pad at each end: the solid left end and the cap
     'lip': 1.2,           # the lip reaches this far in over each panel edge, its underside at 45 degrees
-    'lip_tip': 0.6,       # lip thickness at its inner edge
+    'lip_tip': 0.65,      # lip thickness at its inner edge
     'back': 1.2,          # back skin under the channel
     'chan_d': 2.2,        # channel depth under the panels (wires 1.8 tall + 0.4)
     'chan_y0': 10.0,      # channel from 10 to 20 mm below the panels' top edge (bumps measured 11 to 19)
@@ -196,6 +198,13 @@ if vol(tray, pulled) < 1.0:
     failures.append('the puzzle tabs do not hold the cap')
 if vol(tray, lifted) < 1.0:
     failures.append('the lips do not hold the panels down')
+# no rocking: a centered panel lifted 0.1 mm already touches both lips
+nudged = bx(S['x0'], S['x0'] + S['panel'], -S['panel'] / 2, S['panel'] / 2, S['z_floor'] + 0.1, S['z_pt'] + 0.1)
+if vol(tray, nudged) <= 0.0:
+    failures.append('a panel can rock: 0.1 mm lift does not reach the lips')
+room = S['fit'] + S['play']
+if room < 0.02:
+    failures.append('only %.2f mm under the lips: the panels may not slide in' % room)
 failures += KIT.stays_inside(tbm, [('Solar tray', tray), ('Solar cap', cap)] + parts, outline, allow=('Wire',))
 walls = {
     'socket to the outside': W2 - S['tab_y'] - S['tab_d'] / 2 - S['tab_fit'],
@@ -253,6 +262,28 @@ for g, fn in (('Tray', 'solar_tray.stl'), ('Cap', 'solar_cap.stl')):
     info[g.lower() + ' (mm)'] = 'L %.2f x W %.2f x H %.2f, %d g PLA' % (
         (q.maxPoint.x - q.minPoint.x) * 10, (q.maxPoint.y - q.minPoint.y) * 10, (q.maxPoint.z - q.minPoint.z) * 10,
         round(b.volume * 1.24))
+# the flipped set: the same tray and cap mirrored end for end, so the cap and the wires are at the left end (the
+# channel stays along the panels' top edge). Mirroring cannot add an overhang or a thin wall: the checks hold.
+flip = adsk.core.Matrix3D.create()
+flip.setCell(0, 0, -1)
+occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+occ.component.name = 'Solar Flipped'
+occ.isLightBulbOn = False
+for nm, b, fn in (('Solar tray (wires left)', tray, 'solar_tray_wires_left.stl'),
+                  ('Solar cap (wires left)', cap, 'solar_cap_wires_left.stl')):
+    m = tbm.copy(b)
+    tbm.transform(m, flip)
+    sub = occ.component.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    sub.component.name = nm
+    bb = sub.component.bRepBodies.add(m)
+    bb.name = nm
+    if abs(bb.volume - b.volume) > 0.001 or bb.lumps.count != 1:
+        failures.append('%s did not mirror cleanly' % nm)
+    path = os.path.join(STL, fn)
+    opt = design.exportManager.createSTLExportOptions(sub.component, path)
+    opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
+    design.exportManager.execute(opt)
+    exported.append(path)
 old = os.path.join(STL, 'solar_housing.stl')
 if os.path.exists(old):
     os.remove(old)
@@ -260,4 +291,5 @@ KIT.hide_helpers(design)
 result = dict({'ok': not failures, 'failures': failures,
                'housing (mm)': '%.1f x %.1f x %.2f' % (S['xr'] - S['xl'], S['W'], S['top']),
                'panel face below the window face (mm)': round(S['top'] - S['z_pt'], 2),
+               'panel room (mm)': 'top to bottom %.2f in all, front to back %.2f' % (2 * S['fit'], S['fit'] + S['play']),
                'walls (mm)': {k: round(v, 2) for k, v in walls.items()}, 'exported': exported}, **info)
