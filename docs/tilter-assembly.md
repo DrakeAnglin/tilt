@@ -14,8 +14,10 @@ Short version and design notes: [tilter README](../hardware/mechanical/stl/tilte
 **Tools:** soldering iron (it presses the inserts and solders the motor leads), flush cutters, tweezers, M3 and
 M1.6 drivers for the screws, a toothpick for the grease.
 
-**Grease:** Super Lube 21030 (PTFE). Use a toothpick and a **thin film**: about a rice grain per gear. Too much
-picks up dust and slows the motor. Where it goes is marked **Grease** in each step.
+**Grease:** Super Lube 21030 (PTFE). Where it goes is marked **Grease** in each step.
+- **A thin film is all it needs.** Put a little on, spread it with your finger, then wipe off what is left over.
+- **Too much grease is worse than too little.** The extra has to be pushed out of the way by the gears, and you can
+  feel it as a light drag when you turn them. It also picks up dust.
 
 ## Step 0. Sort the kit
 Lay everything out in four groups, one per part of this page, before you start. Then nothing gets left out, and a
@@ -84,10 +86,14 @@ Press the Ø4 × 2 magnet into the hub of the magnet gear (the small 8-tooth gea
 Grease every gear as it goes in.
 
 ### B1. Worm and wheel
-Worm wheel into the main half (case right), then the worm, its thread end over the top pin.
-**Grease:** the worm's thread and the wheel's teeth. Turn the worm by its loop a few times to spread it.
+**Grease** first, then fit:
+- the worm's thread, and the plain shaft where it runs in the case,
+- the worm wheel's teeth.
 
-📷 **Photo B1:** worm and wheel in the main half, lid off.
+Spread it with your finger and wipe off the extra. Worm wheel into the main half (case right), then the worm, its
+thread end over the top pin. Turn the worm by its loop a few times: the wheel should turn with no tight spot.
+
+![worm and wheel in the main half, lid beside it](photos/tilter/b1-worm-and-wheel.jpg)
 
 ### B2. Worm case lid
 Case left on. The worm should still turn by hand, with no tight spot through a full turn of the wheel.
