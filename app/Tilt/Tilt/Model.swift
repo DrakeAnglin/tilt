@@ -56,7 +56,7 @@ final class Controller: Identifiable {
                 do {
                     let s = try await self.client.state()
                     if s != self.state { self.state = s }
-                    BatteryAlerts.check(id: self.id, name: s.name, battery: s.batt)
+                    if !self.record.onHub { BatteryAlerts.check(id: self.id, name: s.name, battery: s.batt) }   // on a hub: the hub's push alerts
                     self.online = true
                     misses = 0
                     self.noteSeen()

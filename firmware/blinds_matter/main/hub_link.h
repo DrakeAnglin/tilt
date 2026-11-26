@@ -9,6 +9,7 @@
 //   controller -> hub   '#' | seq | piece (1) | count (1) | part   an answer longer than 1000 bytes (status and answer),
 //                                                        in up to 16 pieces; the hub joins them before passing it on
 //   controller -> hub   'S' | "00" | status JSON           pushed when something changed, and every 10 minutes
+//                                                        (b[].st: stalls since this start, for the hub's alerts)
 //   controller -> hub   'L' | "00" | one event log line
 //   controller -> hub   'G' | "00"                          leaving (factory reset): the hub stops announcing it
 //   hub -> controller   's' | seq | "200" | epoch "." mac   the hub's answer to a push: the time, for the Schedules
@@ -73,8 +74,8 @@ std::string hubStatusJson(int pct) {
      jq(cfg.name).c_str(), hexOf(bootId, 4).c_str(), (unsigned long)bootN, hkSeparate, pct, battOkToMove() ? 0 : 1, strcmp(chargeState(), "battery") ? 1 : 0, cfg.closeUp, firstMoving(), (unsigned long)backupCrc(), owned() ? 1 : 0);
   for (int i = 0; i < PORTS; i++) {
     bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
-    ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, movable(i) ? 1 : 0,
-       jn(live ? tiltOf(i, mvs[i].live) : bs[i].tilt, 0).c_str(), jn(bs[i].target, 0).c_str(), (movingPort(i) || bs[i].queued) ? 1 : 0);
+    ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d,\"st\":%u}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, movable(i) ? 1 : 0,
+       jn(live ? tiltOf(i, mvs[i].live) : bs[i].tilt, 0).c_str(), jn(bs[i].target, 0).c_str(), (movingPort(i) || bs[i].queued) ? 1 : 0, (unsigned)movesStalled[i]);
   }
   j += "]}";
   return j;

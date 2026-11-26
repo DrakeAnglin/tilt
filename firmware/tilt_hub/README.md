@@ -23,7 +23,8 @@ Thread share its antenna), and the firmware is updated over USB.
   since the firmware the controller runs (`esp_delta_ota`; releases list them under `patches`, `tools/flash.sh` makes
   one from the image it last installed), typically a tenth of the size. Progress is in
   `/hub` (`ota`, `otaPct`, `otaErr`). Releases carry a Thread build (`thread` in firmware.json).
-- **Alerts without waking anyone.** The app's background check reads battery and last check-in from `/hub`.
+- **Push alerts** (issue #70): stalls, a controller not responding, battery levels and failed updates come to every
+  owner's iPhone as a push, at home or away. See [Push alerts](#push-alerts).
 - **Settings backups.** Each controller's settings, schedules and blind positions are kept on the hub (fetched when
   the checksum in its status push changes). Setting up a replacement offers "Restore", and the hub moves the old
   Apple Home tile over (`/hub/replace`).
@@ -48,11 +49,66 @@ The protocol between hub and controller is described at the top of `../blinds_ma
 | Path | What |
 |---|---|
 | `GET /hub` | the hub's id and whether it has an owner (nothing else) |
-| `/hub/x/hello`, `/hub/x/pair`, `/hub/x/ask`, `POST /hub/x` | a phone's key on the hub, and its sealed commands: `/api/info`, `/api/keys`, `/api/net`, `/api/homecode`, `/api/backups`, `/api/upload?id=` (owner) and the people commands |
+| `/hub/x/hello`, `/hub/x/pair`, `/hub/x/ask`, `POST /hub/x` | a phone's key on the hub, and its sealed commands: `/api/info`, `/api/keys`, `/api/net`, `/api/homecode`, `/api/backups`, `/api/upload?id=`, `/api/testalert` (owner) and the people commands |
 | `GET /c/<id>/x/hello`, `POST /c/<id>/x/ask`, `POST /c/<id>/x/recover`, `GET /c/<id>/x/recstate`, `POST /c/<id>/x` | passed to the controller over Thread: its hello, asking to join, getting back in when no owner is left, and the app's sealed commands. A new controller takes its first owner over Bluetooth only, so there is no `/x/pair` here |
 | `POST /c/<id>/api/update` | a signed firmware file for that controller, only in the 5 minutes after the owner's `/api/upload?id=<id>` |
 
-## Security
+## Push alerts
+
+The hub is always on and knows each controller's check-ins, battery and stalls, so it is the one that tells the owners.
+It writes an **Alert** record to the app's iCloud container (`iCloud.app.tilt.blinds`, CloudKit public database) with
+CloudKit's server-to-server key; each owner's Tilt app has a subscription on that controller's topic (and the hub's
+own, for the hub's alerts), so iCloud sends the push. No server of our own, no other push service.
+
+| Alert | When | Sent |
+|---|---|---|
+| `stall` | a blind stalled during an ordinary move (the controller's status counts them: `b[].st`) | once per stall |
+| `silent` | a controller set up with the hub not heard for 25 minutes (it checks in every 10) | once, cleared when heard |
+| `batt-low`, `batt-crit`, `batt-dead` | under 20 %, under 10 %, too low to move | each level once; reset at 25 % |
+| `update` | a firmware update through the hub failed | once |
+| `hub-update` | the hub's own new firmware did not work and it went back | once per version |
+| `test` | `/api/testalert` (owner): try the whole path | each time |
+
+"Tilt Hub is offline" is the one alert the hub can't send: an owner's iPhone on the home Wi-Fi (the same Wi-Fi router
+as when the hub last answered) that can't reach the hub for 3 minutes shows it, once per outage.
+
+- **Code:** the rules in `main/alert_rules.h` (tested in `blinds_matter/test/logic_test.cpp`), sending in
+  `main/cloud.h`, every alert through `alertRaise()`. The app's words: `app/Tilt/Shared/Words.swift` (`AlertWords`);
+  the push is worded by the app's notification extension (`app/Tilt/TiltAlerts`).
+- **A record** holds the topic (a random name only phones that talked to the controller know), the kind, the blind
+  (port), the room's name, a short detail (the battery percent, the blind's name, why an update failed), a number and
+  a time. No keys, no addresses. There is one record per topic, kind and blind, replaced each time, so the database
+  does not grow.
+- **No internet?** Alerts wait in the hub's flash (10 at most, a week at most) and go once it is back. A try whose
+  answer was lost looks first whether iCloud already has that alert, so it never comes twice.
+- **Memory:** a TLS session takes about 22 KB of the hub's memory for a few seconds. The hub sends only with 50 KB
+  free (about 63 KB is free when it is idle) and not while a firmware file is coming in or going out; otherwise the alert waits a minute. Only the two roots
+  iCloud's certificate comes from are on the hub (`main/cloud_roots.pem`): if Apple moves to another root, the hub
+  page shows an error and that file needs the new one. `/api/mem` (owners) lists free memory and each task's stack low
+  point; `"mem"` in `/api/info`'s `cloud` gives the last send's memory before and at its lowest, and the lowest of any.
+  Wi-Fi and Bluetooth buffers and some task stacks were cut to what a hub needs (`sdkconfig.defaults`, measured the
+  same way): measure again before raising anything.
+- **Both iCloud environments:** the app built from Xcode listens in "development", the App Store app in
+  "production"; the hub writes to both. `/api/info` has `cloud` (key there, alerts waiting, last status and error).
+
+### The iCloud key (once, by the owner)
+
+The key stays out of Git, like `secrets.h`: it lives in `~/.tilt/` and in `main/cloud_key.h` (ignored), and is copied
+into the hub's flash at its next start. A public release build carries no key; each hub keeps its own in flash.
+
+1. Make the key: `~/.espressif/python_env/idf5.5_py3.9_env/bin/python tools/cloudkit_key.py new`. It prints a public
+   key.
+2. In [CloudKit Console](https://icloud.developer.apple.com/dashboard/), container `iCloud.app.tilt.blinds`:
+   **Tokens & Keys** > **Server-to-Server Keys** > **+**, paste the public key, save, and copy the **Key ID**. Keys
+   are per environment: do it once in **Development** and once in **Production** (the same public key both times).
+3. `tools/cloudkit_key.py header <Development Key ID> <Production Key ID>`, then update the hub:
+   `tools/flash_hub.sh`.
+4. Try it: `tools/cloudkit_key.py test <topic>` from the Mac, or `/api/testalert` on the hub.
+5. Done once already (2026-11-24) in Development: record type **Alert** with fields `topic`, `kind`, `name`,
+   `detail` (String), `port`, `n` (Int(64)), `at` (Date/Time), and a **Queryable** index on `topic` (the phones'
+   subscriptions need it). A server key can't make these itself. **Deploy Schema Changes** copies them to Production,
+   so App Store phones get alerts too.
+
 
 - **Setup code.** `build.sh` makes an 8-digit code once (`main/setup_pin.h`, not in Git) and prints it: put it on a
   label on the hub. The first owner (a new hub, or after its people are reset) types it in the app; it goes into the
