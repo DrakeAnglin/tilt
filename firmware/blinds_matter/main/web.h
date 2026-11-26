@@ -19,7 +19,7 @@
 #include "ota.h"                                 // trialVerdict
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev30"
+#define FW_VERSION "2.3.0-dev31"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 

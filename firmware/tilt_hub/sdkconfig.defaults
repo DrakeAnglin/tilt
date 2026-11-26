@@ -165,3 +165,41 @@ CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 CONFIG_CHIP_LOG_DEFAULT_LEVEL_ERROR=y          # Matter: errors only (its progress messages took ~100 KB); the hub's own log stays
+
+# Push alerts (main/cloud.h): one TLS client to iCloud, kept small. Only the two roots iCloud's certificate comes from
+# (main/cloud_roots.pem: DigiCert Global Root G3 and Apple Root CA - G3), not the 69 KB list of web roots, and the TLS
+# parts nothing here uses are left out. If Apple ever moves to another root, add it to that file.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="main/cloud_roots.pem"
+CONFIG_MBEDTLS_ERROR_STRINGS=n
+CONFIG_MBEDTLS_TLS_CLIENT_ONLY=y
+CONFIG_MBEDTLS_SSL_RENEGOTIATION=n
+CONFIG_MBEDTLS_SSL_ALPN=n
+CONFIG_MBEDTLS_CLIENT_SSL_SESSION_TICKETS=n
+CONFIG_MBEDTLS_X509_CRL_PARSE_C=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_RSA=n
+# TLS buffers: 4 KB in, 2 KB out, not 16 + 4 (saves 14 KB of the hub's memory during a send). iCloud's biggest
+# handshake message is about 3.1 KB (its certificates); a request and an answer are about 1 KB. (Dynamic buffers can't
+# be used: Thread needs DTLS.)
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=2048
+
+# /api/mem lists each task's stack low point
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+
+# Memory for the hub (measured with /api/mem): a hub moves little Wi-Fi and Bluetooth traffic
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_RX_BA_WIN=4
+CONFIG_ESP_WIFI_TX_BA_WIN=4
+CONFIG_ESP_WIFI_MGMT_SBUF_NUM=16
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=12
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=12
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=12
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=16
+# the server's certificates are checked during the handshake, then let go
+CONFIG_MBEDTLS_SSL_KEEP_PEER_CERTIFICATE=n

@@ -14,7 +14,7 @@ Merging puts code on `main`. It does not put it on a controller, a hub or a phon
 
 **One-way door**: merging itself does something a revert does not undo. In this repo:
 
-- Anything published by the merge: a workflow that publishes on merge, a change in `tilt-site` (a merge there goes live), a firmware release, an App Store build, a deleted GitHub release, branch or issue.
+- Anything published by the merge: a workflow that publishes on merge, a change in `site/` (a merge goes live on the website), a firmware release, an App Store build, a deleted GitHub release, branch or issue.
 - Deleting a person's data or settings.
 
 A one-way door needs a named reason: what happens on merge that a revert cannot take back. "It touches `update.h`" is not one. If you cannot name it, it is two-way.

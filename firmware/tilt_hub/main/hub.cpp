@@ -35,6 +35,7 @@
 #include <esp_coexist.h>
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
+#include <esp_heap_caps.h>
 #include <driver/gpio.h>
 #include "lights.h"
 #include <host/ble_hs.h>
@@ -219,6 +220,8 @@ static int ask(int c, char type, const std::string &payload, std::string &ans, u
 
 // ---- the hub's own key for each controller (it moves blinds like a phone would)
 static int rng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
+#include "cloud.h"                               // alertRaise: push alerts through iCloud
+#include "alert_rules.h"                         // when to send them
 // The link key for the proofs on messages between the hub and a controller that has let the hub in (and been told
 // which key is the hub's). False when there is none. Protocol: blinds_matter/main/tilt_link.h.
 static bool linkOf(int c, uint8_t link[32]) { return ctrls[c].s.keyState == KEY_IN && linkKey(ctrls[c].s.key, link); }
@@ -302,6 +305,97 @@ static std::string ctrlCommand(int c, const std::string &cmd) {
     default: ESP_LOGW(TAG, "%s: command %s failed (%d) %s", id, cmd.c_str(), r.st, r.out.c_str()); break;
   }
   return "";
+}
+
+// ---- Alert rules (alert_rules.h): when the hub tells a controller's owners. cloud.h sends them.
+struct Memo {                                    // per controller, by id (flash "amemo2"): what was already told
+  char id[13];
+  char name[33];                                 // its room's name (kept: the hub may restart while it is silent)
+  uint8_t topic[16];                             // its iCloud topic (its status, asked once with the hub's key)
+  AlertMemo r;
+};
+static Memo memos[MAX_CTRL];
+static void memosSave() { nvs_set_blob(nv, "amemo2", memos, sizeof memos); nvs_commit(nv); }
+static void memosLoad() { size_t n = sizeof memos; if (nvs_get_blob(nv, "amemo2", memos, &n) != ESP_OK || n != sizeof memos) memset(memos, 0, sizeof memos); }
+static Memo &memoOf(int c) {
+  const char *id = ctrls[c].s.id;
+  for (auto &m : memos) if (!strcmp(m.id, id)) return m;
+  int slot = -1;
+  for (int i = 0; i < MAX_CTRL && slot < 0; i++) if (!memos[i].id[0] || findCtrl(memos[i].id) < 0) slot = i;
+  if (slot < 0) slot = c;
+  memos[slot] = Memo{};
+  strlcpy(memos[slot].id, id, sizeof memos[slot].id);
+  return memos[slot];
+}
+static bool topicKnown(const Memo &m) { for (auto b : m.topic) if (b) return true; return false; }
+// A status push came in (under stateMx): battery levels, stalls, and it is no longer silent.
+static void alertsFromPush(int c, cJSON *j) {
+  Ctrl &k = ctrls[c];
+  Memo &m = memoOf(c);
+  bool save = false, told = topicKnown(m);       // no topic yet: nothing can be sent, so nothing counts as told
+  if (strcmp(m.name, k.name)) { strlcpy(m.name, k.name, sizeof m.name); save = true; }
+  if (alertHeard(m.r)) { save = true; ESP_LOGI(TAG, "%s heard again", k.s.id); }
+  if (told)
+    if (const char *kind = alertBattery(m.r, k.pct, k.low, &save)) alertRaise(m.topic, kind, 9, k.name, std::to_string(k.pct).c_str());
+  cJSON *bl = cJSON_GetObjectItem(j, "b"), *bnj = cJSON_GetObjectItem(j, "bn");
+  if (cJSON_IsNumber(cJSON_GetObjectItem(cJSON_GetArrayItem(bl, 0), "st")) && cJSON_IsNumber(bnj)) {   // a controller that counts stalls
+    int st[PORTS];
+    for (int p = 0; p < PORTS; p++) { cJSON *sv = cJSON_GetObjectItem(cJSON_GetArrayItem(bl, p), "st"); st[p] = cJSON_IsNumber(sv) ? sv->valueint : -1; }
+    int stalled = alertStalls(m.r, (uint32_t)bnj->valuedouble, st, PORTS, &save);
+    for (int p = 0; p < PORTS && told; p++) if (stalled & (1 << p)) alertRaise(m.topic, "stall", p, k.name, k.b[p].name);
+  }
+  if (save) memosSave();
+}
+// Every care round: silent controllers, and learning each controller's topic (once, with the hub's key).
+static void alertsCare() {
+  for (int c = 0; c < MAX_CTRL; c++) {
+    if (!ctrls[c].used || ctrls[c].s.keyState != KEY_IN) continue;
+    xSemaphoreTake(stateMx, portMAX_DELAY);
+    Memo &m = memoOf(c);
+    uint32_t quiet = ctrls[c].seen ? ms() - ctrls[c].seen : ms();
+    if (topicKnown(m) && otaFor != c && alertSilent(m.r, quiet)) {
+      alertRaise(m.topic, "silent", 9, m.name[0] ? m.name : ctrls[c].name);
+      memosSave();
+    }
+    bool ask = !topicKnown(m) && ctrls[c].seen && ms() - ctrls[c].seen < 60000;
+    xSemaphoreGive(stateMx);
+    static uint32_t askedAt[MAX_CTRL];
+    if (!ask || (askedAt[c] && ms() - askedAt[c] < 600000)) continue;
+    askedAt[c] = ms() | 1;
+    std::string r = ctrlCommand(c, "/api/s");
+    cJSON *j = cJSON_Parse(r.c_str());
+    const char *t = j ? cJSON_GetStringValue(cJSON_GetObjectItem(j, "topic")) : nullptr;
+    uint8_t tb[16];
+    if (t && unhex(t, tb, 16)) {
+      xSemaphoreTake(stateMx, portMAX_DELAY);
+      memcpy(memoOf(c).topic, tb, 16); memosSave();
+      xSemaphoreGive(stateMx);
+      ESP_LOGI(TAG, "%s: alert topic known", ctrls[c].s.id);
+    }
+    if (j) cJSON_Delete(j);
+  }
+}
+static void alertUpdateFailed(int c, const char *why) {     // from the update task (stateMx not held)
+  uint8_t t[16];
+  char name[33];
+  xSemaphoreTake(stateMx, portMAX_DELAY);
+  memcpy(t, memoOf(c).topic, 16);
+  strlcpy(name, ctrls[c].name, sizeof name);
+  xSemaphoreGive(stateMx);
+  alertRaise(t, "update", 9, name, why);
+}
+// The hub's own new firmware went back to the old one (it did not work): tell its owners once per version.
+static uint8_t htopic[16];
+static void alertHubUpdate() {
+  const esp_partition_t *bad = esp_ota_get_last_invalid_partition();
+  esp_app_desc_t d;
+  if (!bad || esp_ota_get_partition_description(bad, &d) != ESP_OK) return;
+  char seen[32] = {0};
+  size_t n = sizeof seen;
+  bool first = nvs_get_str(nv, "badver", seen, &n) != ESP_OK;   // an old failure from before alerts existed: no alert
+  if (!strcmp(seen, d.version)) return;
+  nvs_set_str(nv, "badver", d.version); nvs_commit(nv);
+  if (!first) alertRaise(htopic, "hub-update", 9, "Tilt Hub", d.version);
 }
 
 // ---- Matter: one bridged Window covering per blind
@@ -666,6 +760,7 @@ static void udpTask(void *) {
       x.tgt = cJSON_IsNumber(gv) ? (int)gv->valuedouble : INT32_MIN;
       x.mov = cJSON_GetNumberValue(cJSON_GetObjectItem(b, "m"));
     }
+    alertsFromPush(c, j);
     xSemaphoreGive(stateMx);
     cJSON_Delete(j);
     if (isNew || moved) ESP_LOGI(TAG, "controller %s (%s) on Thread", k.s.id, k.name);
@@ -805,6 +900,7 @@ static void careTask(void *) {
       else if (ctrls[c].s.keyState == KEY_ASKED) ctrlCommand(c, "/api/s");   // let in yet? (also tells us at once)
       if (matterUp) chip::DeviceLayer::PlatformMgr().ScheduleWork(applyStatus, (intptr_t)c);
     }
+    alertsCare();
   }
 }
 
@@ -862,7 +958,7 @@ static uint32_t stageSize;
 static bool stageDelta;                           // the staged file is a patch (blinds_matter/main/hub_link.h)
 static uint32_t pieceBytes = 480, piecesInFlight = 6;      // measured: 480 x 6 is about 4 KB/s; 960 x 8 lost most pieces          // piece size and pieces in flight (?ch=&win= on the upload, for tuning)
 static uint32_t uploadUntil[MAX_CTRL];           // an owner allowed an upload for this controller (sealed /api/upload)
-static void otaFail(Ctrl &k, const char *why) { k.otaSt = OTA_FAILED; cleanName(k.otaErr, sizeof k.otaErr, why); ESP_LOGW(TAG, "%s: update failed: %s", k.s.id, why); }
+static void otaFail(Ctrl &k, const char *why) { k.otaSt = OTA_FAILED; cleanName(k.otaErr, sizeof k.otaErr, why); ESP_LOGW(TAG, "%s: update failed: %s", k.s.id, why); alertUpdateFailed((int)(&k - ctrls), why); }
 static void otaTask(void *arg) {
   int c = (int)(intptr_t)arg;
   Ctrl &k = ctrls[c];
@@ -958,6 +1054,11 @@ static const char *stageCheck(const Ctrl &k) {
 // /api/hubupdate). The signed file goes into the spare slot; the hub checks the signature and that it is not older,
 // then starts it on trial. Kept once Wi-Fi and Apple Home have worked for a minute; otherwise it goes back by itself.
 static uint32_t hubUpdUntil = 0;
+static bool cloudBusy() {                        // a firmware file is coming in or going out: no TLS meanwhile (memory)
+  if (otaFor >= 0 || (hubUpdUntil && (int32_t)(hubUpdUntil - ms()) > 0)) return true;
+  for (auto u : uploadUntil) if (u && (int32_t)(u - ms()) > 0) return true;
+  return false;
+}
 static esp_err_t hHubUpdate(httpd_req_t *r) {
   auto no = [&](const char *st, const char *why) { httpd_resp_set_status(r, st); return httpd_resp_sendstr(r, (std::string("{\"ok\":0,\"err\":\"") + why + "\"}").c_str()); };
   if (!hubUpdUntil || (int32_t)(ms() - hubUpdUntil) > 0) return no("403 Forbidden", "the Tilt Hub's owner has to allow this update first");
@@ -1041,6 +1142,7 @@ static std::string hubIp() {
   snprintf(ip, sizeof ip, IPSTR, IP2STR(&info.ip));
   return ip;
 }
+static bool netUp() { return hubIp() != "0.0.0.0"; }
 static void announce(int c) {
   std::string ip = hubIp();
   if (ip == "0.0.0.0") return;
@@ -1145,7 +1247,7 @@ static std::string infoJson() {
     first = false;
   }
   xSemaphoreGive(stateMx);
-  j += "]," + homesJson() + ",\"new\":[";
+  j += "]," + homesJson() + "," + cloudJson() + ",\"heap\":" + std::to_string(esp_get_free_heap_size()) + ",\"heapMin\":" + std::to_string(esp_get_minimum_free_heap_size()) + ",\"new\":[";
   xSemaphoreTake(newMx, portMAX_DELAY);
   first = true;
   for (auto &n : newOnes) {
@@ -1224,7 +1326,7 @@ static HubKey hkeys[8];
 static uint32_t claimAt[8], askAt[8], pinLockUntil = 0;
 static int pinFails = 0;
 static uint64_t hlast[8];
-static uint8_t hboot[4], htopic[16];
+static uint8_t hboot[4];
 static SemaphoreHandle_t keyMx;
 static void keysSave() { nvs_set_blob(nv, "hkeys", hkeys, sizeof hkeys); nvs_commit(nv); }
 static void pinBegin();
@@ -1355,7 +1457,10 @@ static std::string hubCommand(int slot, const std::string &cmd) {
   size_t qi = cmd.find('?');
   std::string path = cmd.substr(0, qi), q = qi == std::string::npos ? "" : cmd.substr(qi + 1);
   bool owner = hkeys[slot].role == 1;
-  if (path == "/api/info") return infoJson();
+  if (path == "/api/info") {                    // owners also get the hub's alert name (their phones watch it for its pushes)
+    std::string j = infoJson();
+    return owner ? "{\"topic\":\"" + hexOf(htopic, 16) + "\"," + j.substr(1) : j;
+  }
   if (path == "/api/keys") {                     // the hub's people (as a controller lists its phones)
     xSemaphoreTake(keyMx, portMAX_DELAY);
     std::string j = "{\"ok\":1,\"keys\":[";
@@ -1423,6 +1528,22 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     return r;
   }
   if (path == "/api/net") return netJson();
+  if (path == "/api/mem" && owner) {             // where the memory goes: free, biggest block, and each task's stack low point
+    multi_heap_info_t h; heap_caps_get_info(&h, MALLOC_CAP_INTERNAL);
+    std::string j = "{\"ok\":1,\"free\":" + std::to_string(h.total_free_bytes) + ",\"big\":" + std::to_string(h.largest_free_block) +
+                    ",\"used\":" + std::to_string(h.total_allocated_bytes) + ",\"min\":" + std::to_string(h.minimum_free_bytes) +
+                    ",\"blocks\":" + std::to_string(h.allocated_blocks) + ",\"tasks\":{";
+    UBaseType_t n = uxTaskGetNumberOfTasks() + 4;
+    TaskStatus_t *t = (TaskStatus_t *)malloc(n * sizeof(TaskStatus_t));
+    if (t) {
+      n = uxTaskGetSystemState(t, n, nullptr);
+      for (UBaseType_t i = 0; i < n; i++)
+        j += std::string(i ? "," : "") + "\"" + t[i].pcTaskName + "\":" + std::to_string(t[i].usStackHighWaterMark);
+      free(t);
+    }
+    return j + "}}";
+  }
+  if (path == "/api/testalert") { alertRaise(htopic, "test", 9, "Tilt Hub"); return "{\"ok\":1}"; }   // a push to the hub's owners, to try the path
   if (path == "/api/hubupdate") { hubUpdUntil = (ms() + 300000) | 1; return "{\"ok\":1}"; }   // one hub update, 5 minutes
   if (path == "/api/upload") {                   // allow one firmware upload for this controller, for 5 minutes
     xSemaphoreTake(stateMx, portMAX_DELAY);
@@ -1527,7 +1648,7 @@ static esp_err_t hInfo(httpd_req_t *r) { return sendStatus(r, 200, "{\"hub\":\"t
 static void httpBegin() {
   httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
   hc.uri_match_fn = httpd_uri_match_wildcard;
-  hc.stack_size = 10240;
+  hc.stack_size = 6144;                         // uses about 2 KB (/api/mem)
   hc.lru_purge_enable = true;
   hc.max_open_sockets = 5;
   hc.max_uri_handlers = 12;
@@ -1826,6 +1947,7 @@ extern "C" void app_main() {
   stateMx = xSemaphoreCreateMutex();
   newMx = xSemaphoreCreateMutex();
   keysBegin();
+  cloudBegin();
   otaAcks = xQueueCreate(16, sizeof(OtaAck));
   stage = esp_ota_get_next_update_partition(nullptr);
   {
@@ -1842,6 +1964,8 @@ extern "C" void app_main() {
   }
   moves = xQueueCreate(8, sizeof(Move));
   loadCtrls();
+  memosLoad();
+  alertHubUpdate();
 
   node::config_t nc;
   strlcpy(nc.root_node.basic_information.node_label, "Tilt Hub", sizeof nc.root_node.basic_information.node_label);
@@ -1916,9 +2040,9 @@ extern "C" void app_main() {
   if (esp_netif_get_netif_impl_name(esp_openthread_get_netif(), ifr.ifr_name) != ESP_OK ||
       setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof ifr) != 0) ESP_LOGE(TAG, "the controllers' port could not be kept to Thread (errno %d)", errno);
   else ESP_LOGI(TAG, "controllers' port: Thread only (%s)", ifr.ifr_name);
-  xTaskCreate(udpTask, "udp", 6144, nullptr, 6, nullptr);
+  xTaskCreate(udpTask, "udp", 5120, nullptr, 6, nullptr);
   xTaskCreate(moveTask, "moves", 6144, nullptr, 5, nullptr);
-  xTaskCreate(careTask, "care", 8192, nullptr, 4, nullptr);
+  xTaskCreate(careTask, "care", 6144, nullptr, 4, nullptr);
   httpBegin();
   rgbBegin();                                    // the color light's pulse channel, once, before anyone uses it
   xTaskCreate(resetTask, "reset", 3072, nullptr, 2, nullptr);
