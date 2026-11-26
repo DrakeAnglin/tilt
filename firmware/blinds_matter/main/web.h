@@ -165,11 +165,9 @@ esp_err_t hSet(httpd_req_t *r) {
   else if (k == "tune.lead10") { leadMax10 = constrain(n, 20, 250); nvs.putUChar("lmax", leadMax10); }   // 2..25 degrees
   else if (k == "battMode" || k == "checkin" || k == "tx") return fail(r, "not in this version");
   else if (k == "tz") {
-    if (v.length() < 3 || v.length() >= sizeof c.tz) return fail(r, "bad time zone");
-    strlcpy(c.tz, v.c_str(), sizeof c.tz);
+    if (!zoneOk(v.c_str(), sizeof c.tz)) return fail(r, "bad time zone");
+    strlcpy(c.tz, v.c_str(), sizeof c.tz);       // used once cfgApply keeps it (motion.h)
     cleanText(c.tzName, sizeof c.tzName, arg(r, "n"));
-    setenv("TZ", c.tz, 1);
-    tzset();
   } else if (k.length() >= 4 && k[0] == 'b' && k[2] == '.') {
     int p = k[1] - '0';
     if (p < 0 || p >= PORTS) return fail(r, "no such blind");

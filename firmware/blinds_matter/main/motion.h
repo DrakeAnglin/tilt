@@ -339,8 +339,9 @@ void moveStop() { rampCancel(); stopAll("stopped"); }   // the app's or Home's s
 
 // ---- settings changes: the one way a handler writes cfg. A move steers by its blind's Marks and motor direction, so
 // a blind whose Marks or direction change has its move (running, queued or gentle) ended first. Then the new settings
-// are kept, its tilt is worked out again from the new Marks, and they are saved. (A running move that learns its motor
-// direction writes that itself: tilter.h.)
+// are kept, its tilt is worked out again from the new Marks, and they are saved. A new time zone is used at once, so
+// the running zone is always the saved one and Schedules follow a set, a restore or Reset all with no restart. (A
+// running move that learns its motor direction writes that itself: tilter.h.)
 bool blindCfgChanged(int p, const BlindCfg &n) { return steeringChanged(marksOf(p), cfg.b[p].motSign, Marks{n.up, n.open, n.down}, n.motSign); }
 void cfgApply(const Settings &n) {
   Settings next = n;
@@ -355,7 +356,9 @@ void cfgApply(const Settings &n) {
     }
     next.b[p].motSign = keptSign(next.b[p].motSign, was, cfg.b[p].motSign);   // what the stopped move learned is kept
   }
+  bool zoneChanged = strcmp(cfg.tz, next.tz) != 0;
   cfg = next;
+  if (zoneChanged) zoneUse(cfg.tz);              // logic.h
   for (int p = 0; p < PORTS; p++) {
     if (!hit[p]) continue;
     if (bs[p].seen) noteAngle(p, bs[p].ang); else bs[p].tilt = NAN;    // not read yet: it stays "not seen"

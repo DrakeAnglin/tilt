@@ -127,8 +127,8 @@ esp_err_t hBackup(httpd_req_t *r) {              // the owner, or the hub (a use
   std::string b = backupBlob();
   return sendJson(r, "{\"ok\":1,\"cv\":" + std::to_string(esp_crc32_le(0, (const uint8_t *)b.data(), b.size())) + ",\"d\":\"" + hexOf((const uint8_t *)b.data(), b.size()) + "\"}");
 }
-// Owner: put a backup back, in pieces (o = offset in bytes, d = hex, end=1 on the last). It takes effect at the next
-// start (setup restarts the controller anyway).
+// Owner: put a backup back, in pieces (o = offset in bytes, d = hex, end=1 on the last). Settings and the time zone
+// take effect at once; only the Home layout (hksep) waits for the next start.
 esp_err_t hRestore(httpd_req_t *r) {
   Lock l;
   static std::string in;
@@ -147,10 +147,12 @@ esp_err_t hRestore(httpd_req_t *r) {
   const char *p = in.data() + 9;
   Settings c; memcpy(&c, p, sizeof c); p += sizeof c;
   Tune t; memcpy(&t, p, sizeof t); p += sizeof t;
+  c.tz[sizeof c.tz - 1] = 0;
+  if (!zoneOk(c.tz, sizeof c.tz)) return fail(r, "bad time zone");   // before anything is written: nothing changes
   memcpy(&sx, p, sizeof sx); p += sizeof sx;
   if (c.magic != CFG_MAGIC) return fail(r, "not a Tilt backup");
   // The backup comes through the hub: end every string, and keep the names as if they were typed in the app (keptName).
-  c.tz[sizeof c.tz - 1] = 0; c.tzName[sizeof c.tzName - 1] = 0;
+  c.tzName[sizeof c.tzName - 1] = 0;             // (the zone was ended and checked above)
   { std::string n(c.name, strnlen(c.name, sizeof c.name)); strlcpy(c.name, keptName(n, sizeof c.name - 1).c_str(), sizeof c.name); }
   for (int i = 0; i < PORTS; i++) { std::string n(c.b[i].name, strnlen(c.b[i].name, sizeof c.b[i].name)); strlcpy(c.b[i].name, keptName(n, sizeof c.b[i].name - 1).c_str(), sizeof c.b[i].name); }
   cfgApply(c); tune = t;                         // a move on a blind whose Marks change is stopped first (motion.h)

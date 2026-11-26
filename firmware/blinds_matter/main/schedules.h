@@ -17,21 +17,14 @@ const uint32_t SX_MAGIC = 0x53580001;
 void sxSave() { nvs.putBytes("schx", &sx, sizeof sx); }
 void schedBegin() {                              // the Schedules' extra facts and place; the saved time zone
   if (nvs.getBytes("schx", &sx, sizeof sx) != sizeof sx || sx.magic != SX_MAGIC) { memset(&sx, 0, sizeof sx); sx.magic = SX_MAGIC; sx.lat = sx.lon = NAN; }
-  setenv("TZ", cfg.tz, 1);
-  tzset();
+  zoneUse(cfg.tz);                               // logic.h; later changes: cfgApply (motion.h)
 }
 // Sunrise or sunset (epoch seconds) on the day that holds `noon`, at the saved place (the math: logic.h).
 uint32_t sunEvent(time_t noon, bool rise) { return sunEventAt(noon, sx.lat, sx.lon, rise); }
 uint32_t schedTime(int i, time_t now, int dayOff) {      // when slot i fires on (today + dayOff); 0 = not that day
   const Sched &s = cfg.sched[i];
-  struct tm tm, chk;
-  localtime_r(&now, &tm);
-  tm.tm_mday += dayOff;
-  tm.tm_hour = sx.x[i].kind ? 12 : 0; tm.tm_min = sx.x[i].kind ? 0 : s.minute; tm.tm_sec = 0; tm.tm_isdst = -1;
-  time_t t = mktime(&tm);
-  localtime_r(&t, &chk);
-  if (!((s.days >> chk.tm_wday) & 1)) return 0;
-  if (!sx.x[i].kind) return (uint32_t)t;
+  uint32_t t = slotDayTime(now, dayOff, sx.x[i].kind ? 720 : s.minute, s.days);   // logic.h; a sun slot: that day's noon
+  if (!t || !sx.x[i].kind) return t;
   uint32_t e = sunEvent(t, sx.x[i].kind == 1);
   return e ? e + sx.x[i].off * 60 : 0;
 }
