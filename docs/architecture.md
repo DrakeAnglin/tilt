@@ -130,6 +130,6 @@ A reversed cord would put battery + on IN2, so the continuity check matters.
   wait on the hub while the internet is down. The only alert made on the phone is "Tilt Hub is offline" (on the home
   Wi-Fi), since the hub can't send that one. Records hold no keys or addresses. Details:
   [firmware/tilt_hub/README.md](../firmware/tilt_hub/README.md#push-alerts).
-- **Firmware updates**: signed release files on the public `DrakeAnglin/tilt-site` repo; the app hands them to the hub,
+- **Firmware updates**: signed release files on this repo's GitHub releases; the app hands them to the hub,
   which feeds them to the controller over Thread
   ([app-store.md](app-store.md)).

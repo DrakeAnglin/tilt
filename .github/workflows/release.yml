@@ -1,6 +1,6 @@
 name: Firmware release
 
-# Push a version tag on a commit in main and this builds, signs and publishes the release on DrakeAnglin/tilt-site,
+# Push a version tag on a commit in main and this builds, signs and publishes the release on this repo,
 # where the Tilt app finds it (releases/latest/download/firmware.json). How to cut one: docs/firmware-release.md.
 #   fw-v2.3.0        controller, stable        fw-v2.3.0-beta1   controller, beta        hub-v0.3.4   Tilt Hub
 # The tag's message (git tag -a ... -m "...") becomes the release notes the app shows.
@@ -27,7 +27,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # The signing key is only given to tag runs. Keep both secrets in the "release" environment, allowed for
+    # The signing key is only given to tag runs. Keep the secret in the "release" environment, allowed for
     # fw-v* and hub-v* tags only (docs/firmware-release.md).
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
     outputs:
@@ -83,20 +83,21 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: release
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: release
           path: upload
-      - name: Publish on tilt-site
+      - name: Publish the release
         env:
-          GH_TOKEN: ${{ secrets.TILT_SITE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           KIND: ${{ needs.build.outputs.kind }}
           VERSION: ${{ needs.build.outputs.version }}
         run: |
-          [ -n "$GH_TOKEN" ] || { echo "::error::no TILT_SITE_TOKEN secret"; exit 1; }
           if [ "$KIND" = hub ]; then TITLE="Tilt Hub $VERSION"; else TITLE="Firmware $VERSION"; fi
           mv upload/notes.txt notes.txt
-          gh release create "$TAG" --repo DrakeAnglin/tilt-site --title "$TITLE" --notes-file notes.txt --latest upload/*
-          echo "Published: https://github.com/DrakeAnglin/tilt-site/releases/tag/$TAG"
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file notes.txt --latest upload/*
+          echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"

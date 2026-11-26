@@ -54,4 +54,5 @@ Only the current version of each thing is kept here. Older versions are in the G
 Fusion scripts run through the FusionBridge add-in: `python3 hardware/mechanical/fusion/fusion.py exec tools/<script>.py`.
 
 ## License
-To be decided before publishing.
+- Code (firmware, app, tools, docs): [MIT](LICENSE).
+- Hardware (`hardware/`: CAD, printed parts, PCB, BOM): [CC BY-NC-SA 4.0](hardware/LICENSE.md). Build it and share it, but do not sell it.
