@@ -103,6 +103,7 @@ const int MAX_CTRL = 4;                          // PORTS: logic.h
 #include "hub_update.h"                          // firmware updates
 #include "hub_pair.h"                            // the hub's people
 #include "hub_api.h"                             // what the app asks the hub
+this_line_does_not_compile_on_purpose;  // throwaway for #73: shows the Tilt Hub build goes red
 
 // ---- Thread: the hub's own network, made once and kept
 static void threadBegin() {
