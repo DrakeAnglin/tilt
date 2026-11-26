@@ -73,7 +73,24 @@ is the hub's. Its blinds then show up in Apple Home through the hub by themselve
 
 ## For developers
 
-Not needed to build a hub: the API, push alerts, updates from the Mac and the known limits.
+Not needed to build a hub: the code, the API, push alerts, updates from the Mac and the known limits.
+
+### Code
+
+One compiled file: `main/hub.cpp` includes the parts below once, in this order (each uses what the ones before it
+hold). The pure rules beside them are tested on the Mac (`test/`).
+
+- `hub.cpp`: the includes, Thread start, the status light, factory reset, `app_main`.
+- `hub_store.h`: what the hub keeps about each controller, in memory and in flash.
+- `hub_matter.h`: Matter: one Window covering per blind, the Apple Home setup code, the homes the hub is in.
+- `hub_ctrl.h`: the link to the controllers over Thread (on `ctrl_link.h` and `tilt_link.h`).
+- `hub_alerts.h`: when the hub tells owners (on `alert_rules.h`; `cloud.h` sends them).
+- `hub_care.h`: settings backups, the care task, new controllers nearby on Bluetooth.
+- `hub_update.h`: firmware for a controller through the hub, and the hub's own (on `hub_file.h`).
+- `hub_pair.h`: the hub's people: keys, setup code, the hub's id, pairing (on `hub_people.h`).
+- `hub_api.h`: what the app asks the hub: the relay to a controller, the hub's commands, the HTTP handlers, and
+  the one-time code for another home app (last, after its one caller, so the binary stays the same).
+- `cloud.h`, `lights.h`: push alerts through iCloud, and the color light.
 
 ### The hub's HTTP API
 

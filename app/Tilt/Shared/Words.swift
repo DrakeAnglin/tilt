@@ -53,7 +53,7 @@ enum TiltWords {
 }
 
 /// The words of Tilt's push alerts (the Tilt Hub sends what happened; the alerts extension turns it into these).
-/// kind: what happened (the hub's names, firmware/tilt_hub/main/hub.cpp "Alert rules"); room: the controller's name;
+/// kind: what happened (the hub's names, firmware/tilt_hub/main/hub_alerts.h); room: the controller's name;
 /// detail: the blind's name (stall), the battery percent, or why an update failed.
 enum AlertWords {
     static func title(kind: String, room: String, detail: String) -> String {
@@ -89,7 +89,7 @@ enum AlertWords {
 
 extension ControllerState.Battery {
     /// Below this, on battery, Tilt warns that the battery is low; below criticalPercent, that it is almost empty.
-    /// The hub's alerts use the same lines (hub.cpp battLevelOf).
+    /// The hub's alerts use the same lines (alert_rules.h ALERT_LOW_PCT).
     static let lowPercent = 20, criticalPercent = 10
     var charging: Bool { st != "battery" }
     /// Below the motor cut-off: the controller won't move any blind until it is charged.

@@ -1,4 +1,4 @@
-// The link between the Tilt Hub and a controller, as pure functions both firmwares share (the hub, tilt_hub/main/hub.cpp,
+// The link between the Tilt Hub and a controller, as pure functions both firmwares share (the hub, tilt_hub/main/hub_ctrl.h,
 // and the controller, hub_link.h and sec.h): the link key and its proofs, the push anti-replay rule, the datagram
 // types and layouts, the status codes, and the sealed frame the app, the hub and the controller all speak. No ESP-IDF
 // and no shared state: test/link_test.cpp runs it on the Mac, against test/wire/link.json, which the app's tests and

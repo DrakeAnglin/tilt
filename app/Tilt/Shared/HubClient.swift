@@ -1,6 +1,6 @@
 // Talking to the Tilt Hub, in one place, like ControllerClient is for a controller. Screens and HubWatch call typed
 // methods here; they never build hub commands or decode its answers themselves. The hub's side is
-// firmware/tilt_hub/main/hub.cpp (hubCommand): a change to a command there is a change here, and nowhere else in the app.
+// firmware/tilt_hub/main/hub_api.h (hubCommand): a change to a command there is a change here, and nowhere else in the app.
 // Underneath is a transport: the real secured link (Link, at "<hub>/hub"), the demo hub (DemoHub.swift), or a test's fake.
 import CryptoKit
 import Foundation
