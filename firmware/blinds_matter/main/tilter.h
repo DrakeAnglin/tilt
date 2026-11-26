@@ -32,6 +32,8 @@ const uint32_t LOOK_MS = 500;
 const float HAND_MOVE_DEG = 5.0f;               // moved this much in LOOK_MS with the motor off: a hand (a still reading wanders +-1.5)
 // A dropout (Tilter::lost: the sensor gives nothing, away from its zero) is never taken as the position. Waking, the
 // sensor gets this long to give a reading before the move gives up; running, the move stops after this long without one.
+// A plain jog (Setup's hold-to-run, 2 s at most) runs without one: it is how a blind is turned off a sensor that reads
+// nothing (sitting at its zero just after a restart).
 const uint32_t WAKE_LOST_MS = 300, LOST_STOP_MS = 1000;
 
 // Seek: the end is where the rod has not gained SEEK_STEP_DEG in its direction of travel for SEEK_STALL_MS (it has to
@@ -224,7 +226,8 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
     if (!m.here || !t.lost()) m.hb[m.hn++] = w;
     bool late = now - m.ts >= 20 + WAKE_LOST_MS;
     if (m.here && m.hn < 5 && !late) return;
-    if (m.here && !m.hn) { finishMove(m, t, "stopped: no reading from the sensor"); return; }
+    if (m.here && !m.hn && (m.kind != MV_JOG || m.seek)) { finishMove(m, t, "stopped: no reading from the sensor"); return; }
+    if (!m.hn) m.hb[m.hn++] = w;
     float a = m.hn >= 5 ? median5(m.hb, m.hb[m.hn - 1]) : m.hb[m.hn - 1];
     m.hn = 0;
     m.noted = t.note(a);
@@ -243,7 +246,7 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
     float raw = t.angle(), a = raw;
     if (!t.lost()) m.lostT = 0;                // no reading for a while: stop (not a stall, not the wrong way, not there)
     else if (!m.lostT) m.lostT = now ? now : 1;
-    else if (now - m.lostT >= LOST_STOP_MS) { m.nudges = MAX_NUDGES + 1; toSettle(m, t, "stopped: no reading from the sensor"); return; }
+    else if (now - m.lostT >= LOST_STOP_MS && (m.kind != MV_JOG || m.seek)) { m.nudges = MAX_NUDGES + 1; toSettle(m, t, "stopped: no reading from the sensor"); return; }
     m.hb[m.hn % 5] = raw;
     m.hn++;
     if (m.hn >= 5) a = median5(m.hb, raw);     // the middle one of the last five (measured: +-1 deg jitter, spikes to +10)

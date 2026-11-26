@@ -13,7 +13,8 @@ struct BlindState {
   bool pwm = false;             // this port's sensor sends PWM (found by listening when it wakes)
   int misses = 0;               // "nothing plugged in" results in a row
   bool blind = false;           // no fresh reading just now (at its zero, or a dropout): the angle is the last good one
-  bool lost = false;            // a dropout: the sensor gave nothing, away from its zero (logic.h judgeReading)
+  bool lost = false;            // a dropout: the sensor gave nothing, away from its zero (logic.h ReadingJudge)
+  ReadingJudge judge;           // this port's readings in turn, and the last fresh angle
   uint32_t drops = 0, dropLogMs = 0;   // dropouts since the last log line; when that was
   float ang = NAN, mv = 0;      // last true angle (motor stopped)
   float tilt = NAN;             // from the marks; NAN = not set up or not read yet
@@ -70,8 +71,8 @@ float capLast[PORTS] = {0, 0, 0};
 uint32_t capLastMs[PORTS] = {0, 0, 0};       // each port's last good PWM frame
 // A reading at a rail, judged (logic.h judgeReading): the sensor's zero, or a dropout. A dropout is logged, but at most
 // one line every 10 minutes for each blind, with how many there were.
-float judged(int p, float raw, bool atRail, float last) {
-  SensorRead r = judgeReading(raw, atRail, last);
+float judged(int p, float raw, bool atRail) {
+  SensorRead r = bs[p].judge.judge(raw, atRail);
   if (r.lost && !bs[p].lost) {
     bs[p].drops++;
     uint32_t t = millis();
@@ -95,7 +96,7 @@ float readAngle(int p) {
     // No pulses for a while: within a few degrees of its zero (resting low just above it, or high just below a full
     // turn), if it was last seen there; the last good reading is kept, which is on the right side of zero (a flat 0
     // could be read as a jump of tens of degrees). Anywhere else: a dropout.
-    return judged(p, sh >= 0 ? sh * 360.0f : 0, sh < 0, capLastMs[p] ? capLast[p] * 360.0f : bs[p].ang);
+    return judged(p, sh >= 0 ? sh * 360.0f : 0, sh < 0);
   }
   float v1 = 0, v2 = 0;
   for (int k = 0; k < 4; k++) {
@@ -107,7 +108,7 @@ float readAngle(int p) {
     if (v1 > 2.5f && v1 < 3.6f && fabsf(v1 - v2) < 0.03f) break;
   }
   if (v1 > 2.5f && v1 < 3.6f && v2 > 2.5f && v2 < 3.6f) vdd = (v1 + v2) / 2;
-  return judged(p, degOf(bs[p].mv), bs[p].mv < ANALOG_RAIL_MV, bs[p].ang);   // 0 V: its zero, or a dropout
+  return judged(p, degOf(bs[p].mv), bs[p].mv < ANALOG_RAIL_MV);   // 0 V: its zero, or a dropout
 }
 // Is a tilter plugged in? An empty port floats: it keeps whatever voltage the pin was last pushed to. A sensor
 // pulls the line back to its own value. Push it low, then high, and compare. EN must be on. Leaves bs[p].mv fresh.
@@ -129,6 +130,7 @@ void noteAngle(int p, float a) {              // a true reading (motor stopped)
   // No pulses or 0 V with no good reading yet (just after a restart): its zero or a dropout, nobody can tell. The
   // tilt stays unknown until a good reading, rather than a guess of 0 degrees (Middle showed tilt 112.6: #135).
   if (bs[p].blind && isnan(bs[p].ang)) { bs[p].tilt = NAN; return; }
+  if (!bs[p].present) bs[p].judge.forget();
   bs[p].ang = bs[p].present ? a : NAN;
   bs[p].tilt = (bs[p].present && calibrated(p)) ? tiltOf(p, a) : NAN;
 }

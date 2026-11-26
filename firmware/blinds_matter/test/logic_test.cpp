@@ -114,7 +114,7 @@ struct SimTilter : Tilter {
   bool strainZeros = false;     // straining against an end stop, the PWM sensor reads 0 in bursts (Left, 2026-11-23)
   uint32_t motorAfterHand = 0;  // ms the motor ran once the hand started
   uint32_t dropAt = 0, dropMs = 0;   // the sensor gives nothing for a while (a dropout: Dining, 2026-11-25)
-  float lastGood = NAN;         // what the controller keeps meanwhile: the last good reading
+  ReadingJudge judge;           // the controller's own rule (logic.h) for what a reading at a rail is
   float rodMin = 1e9f, rodMax = -1e9f;   // how far the rod went, either way
   int dir = 0, duty = 0;
   int8_t sign = 1;
@@ -141,10 +141,7 @@ struct SimTilter : Tilter {
   uint32_t ms() override { return t; }
   bool wake() override { return true; }
   bool dropping() { return dropMs && t >= dropAt && t - dropAt < dropMs; }
-  float angle() override {
-    if (dropping()) return std::isnan(lastGood) ? 0 : lastGood;
-    return lastGood = fresh();
-  }
+  float angle() override { return dropping() ? judge.judge(0, true).ang : judge.judge(fresh(), false).ang; }
   float fresh() {
     if (firstZero) { firstZero = false; return 0; }
     float g = dir && glitchMs && t >= glitchAt && t < glitchAt + glitchMs ? glitchBy : 0;   // motor noise: only while it runs
@@ -153,7 +150,7 @@ struct SimTilter : Tilter {
     return inBlind() ? 0 : fmodf(wrapped() + (dir ? 3.0f : 0) + g + 360.0f, 360.0f);
   }
   bool noReading() override { return inBlind() || dropping(); }
-  bool lost() override { return dropping(); }
+  bool lost() override { return dropping() && judge.lost; }
   float note(float a) override { return a; }
   void motor(int d, int pct) override { dir = d; duty = pct; }
   TiltSettings settings() override { return set; }
@@ -188,7 +185,16 @@ static void dropoutTests() {
   { SensorRead r = judgeReading(0, true, 285.9f); CHECK(r.lost && r.ang == 285.9f, "analog at 0 V, last at 286 degrees: a dropout"); }
   { SensorRead r = judgeReading(0, true, 3); CHECK(!r.lost && r.guess && r.ang == 3, "no pulses, last near zero: its zero, not a dropout"); }
   { SensorRead r = judgeReading(0, true, 358); CHECK(!r.lost && r.guess, "no pulses, last just below a full turn: its zero"); }
-  { SensorRead r = judgeReading(0, true, NAN); CHECK(!r.lost && r.guess && r.ang == 0, "no pulses, nothing known yet: it may sit at its zero"); }
+  { SensorRead r = judgeReading(0, true, NAN); CHECK(r.lost && r.guess && r.ang == 0, "no pulses, nothing known yet (a restart): no reading"); }
+  // Analog, read while the motor turns it: a dropout keeps the last fresh angle, not where the move started (Right).
+  { ReadingJudge j;
+    j.judge(200, false); j.judge(215, false); j.judge(231.5f, false);
+    SensorRead r = j.judge(0, true);
+    CHECK(r.lost && j.lost && r.ang == 231.5f, "a dropout mid-move: the angle kept is the last fresh one");
+    r = j.judge(233, false);
+    CHECK(!r.lost && !j.lost && r.ang == 233, "readings back: fresh again");
+    j.forget();
+    CHECK(j.judge(0, true).lost, "unplugged and back: nothing known, so no reading at the rail"); }
   // Middle's samples at rest, one a second (83.4, then 0.0 with no pulses ten times), and Right's (analog 285.9, then
   // 0 V), read the way the idle look-round reads them, with Follow on. 0 degrees is far past Middle's closed-up mark.
   { Marks mid{60, 100, 160}, right{250, 286, 330};
@@ -218,9 +224,20 @@ static void dropoutTests() {
     CHECK(currentTiltOf(k, false, NAN, 112.6f) == 100 && currentTiltOf(k, false, NAN, -130) == -100, "Current tilt: never outside -100..100 at rest");
     CHECK(currentTiltOf(k, true, 180, 0) == 100, "Current tilt: never outside -100..100 while moving"); }
   // Moves.
-  { SimTilter s; s.dropMs = 1000000000;                       // dead from the start
+  { SimTilter s; s.dropMs = 1000000000;                       // dead from the start, nothing known (a restart)
     s.go(50);
     CHECK(s.endMsg == "stopped: no reading from the sensor" && s.last.runMs == 0 && s.rodMax == 290, "no reading at all: the motor never starts"); }
+  { SimTilter s; s.go(50); s.dropAt = s.t; s.dropMs = 1000000000;   // known, then dead before the next move
+    s.go(-50);
+    CHECK(s.endMsg == "stopped: no reading from the sensor" && s.last.runMs == 0, "dead after a good move: the next move never starts"); }
+  { SimTilter s; s.dropMs = 1000000000;                       // Setup's jog still turns a blind with no reading
+    Move m; moveFresh(m, MV_JOG, 0, s.t); m.jogDir = 1; m.pct = 100; m.deadline = s.t + 1500;
+    while (m.kind != MV_NONE && s.t < 10000) { s.step(10); moveTick(m, s, s.t); }
+    CHECK(s.endMsg == "jog" && s.last.runMs > 1000, "no reading: a jog still runs (hold-to-run), and ends on time"); }
+  { SimTilter s; s.dropMs = 1000000000;                       // but a seek, which ends at a stall, does not
+    Move m; moveFresh(m, MV_JOG, 0, s.t); m.jogDir = 1; m.pct = 100; m.seek = true; m.deadline = s.t + 30000;
+    while (m.kind != MV_NONE && s.t < 40000) { s.step(10); moveTick(m, s, s.t); }
+    CHECK(s.endMsg == "stopped: no reading from the sensor" && s.last.runMs == 0, "no reading: a seek never starts"); }
   { SimTilter s; s.dropMs = 150; float t = s.go(50);          // slow to start
     CHECK(s.endMsg == "reached" && near(t, 50, 5), "a sensor slow to wake: the move waits for it and reaches the Target"); }
   { SimTilter s; s.degPerS = 15; s.dropAt = 1500; s.dropMs = 1000000000;   // gone mid-move

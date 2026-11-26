@@ -26,17 +26,31 @@ inline float as5600Share(uint32_t high, uint32_t period) {
 // else, missing pulses are noise: keep the last good reading and keep checking for a stall.
 inline bool pwmBlindSpot(float lastShare) { return lastShare < 15.0f / 360.0f || lastShare > 345.0f / 360.0f; }
 // A reading at a rail: a PWM sensor with no pulses, or an analog one at 0 V. That is the sensor's zero only if it was
-// last seen near there (or nothing is known yet). Anywhere else it is a dropout (the sensor gave nothing: 2026-11-25,
-// Dining read 0 deg at rest and moves and Follow took it as real): no reading. Either way the angle given is the last
-// good one, and `guess` says the angle is not fresh. raw: what the sensor gave; last: the last good angle (NAN: none).
+// last seen near there. Anywhere else, or with no good reading yet (just after a restart: its zero or a dead sensor,
+// nobody can tell), it is a dropout (the sensor gave nothing: 2026-11-25, Dining read 0 deg at rest, and moves and
+// Follow took it as real): no reading. Either way the angle given is the last good one (raw when there is none), and
+// `guess` says the angle is not fresh. raw: what the sensor gave; last: the last good angle (NAN: none).
 const float ANALOG_RAIL_MV = 30.0f;                 // an analog output under this is at 0 V (about 4 degrees)
 struct SensorRead { float ang; bool guess, lost; };
 inline SensorRead judgeReading(float raw, bool atRail, float last) {
   if (!atRail) return {raw, false, false};
-  if (std::isnan(last)) return {raw, true, false};                      // nothing known yet: it may sit at its zero
+  if (std::isnan(last)) return {raw, true, true};                       // nothing known yet: no reading
   if (pwmBlindSpot(fmodf(last + 360.0f, 360.0f) / 360.0f)) return {last, true, false};   // near zero before: still there
   return {last, true, true};                                            // a dropout
 }
+// One sensor's readings, judged in turn. `good` is the last fresh angle, kept on every reading (while a motor runs
+// too), so a dropout mid-move keeps where the rod really was, not where the move started.
+struct ReadingJudge {
+  float good = NAN;
+  bool lost = false;                                  // the last reading was a dropout
+  SensorRead judge(float raw, bool atRail) {
+    SensorRead r = judgeReading(raw, atRail, good);
+    if (!r.guess) good = raw;
+    lost = r.lost;
+    return r;
+  }
+  void forget() { good = NAN; lost = false; }         // unplugged: whatever comes next is a new tilter
+};
 
 // ---- a blind's three marks (sensor angles, degrees) and tilt (-100 closed down .. 0 open .. +100 closed up)
 const float MAX_HALF_SPAN = 170.0f, MIN_HALF_SPAN = 8.0f;   // open -> closed, each way (degrees of rod turn)
