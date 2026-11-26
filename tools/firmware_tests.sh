@@ -6,6 +6,7 @@
 #   firmware/tilt_hub/test/hub_test.cpp          the Tilt Hub's people rules and update-file checks (needs mbedtls: see below)
 #   firmware/blinds_matter/test/link_test.cpp    the hub link both firmwares share
 #   firmware/tilt_hub/test/ctrl_link_test.cpp    the hub's link to one controller
+#   firmware/blinds_matter/test/pair_test.cpp    the key exchange in Pairing both firmwares share (needs mbedtls)
 #   (the two link tests use firmware/blinds_matter/test/host_mbedtls, a stand-in for mbedtls)
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -36,6 +37,9 @@ elif [ -f "$IDF_MBED/library/ecdsa.c" ]; then
   for f in sha256 ecdsa ecp ecp_curves bignum bignum_core constant_time platform_util platform asn1parse asn1write md hmac_drbg sha1 sha512 sha3 md5 ripemd160; do
     cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/$f.c" -o "$OUT/mbed_$f.o"
   done
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/ecdh.c" -o "$OUT/mbed_ecdh.o"
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/hkdf.c" -o "$OUT/mbed_hkdf.o"
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/base64.c" -o "$OUT/mbed_base64.o"
   MBED="-I$IDF_MBED/include -DMBEDTLS_USER_CONFIG_FILE=\"mbedtls_host.h\" -I. $OUT/mbed_*.o"
 else
   echo "hub test: no mbedtls. Install it (Mac: brew install mbedtls; Linux: apt-get install libmbedtls-dev) or ESP-IDF." >&2
@@ -44,3 +48,5 @@ fi
 # shellcheck disable=SC2086
 c++ -std=c++17 -Wall -Wextra -O1 $HUB_INC -o "$OUT/hub_test" hub_test.cpp $MBED
 "$OUT/hub_test"
+c++ -std=c++17 -Wall -Wextra -O1 $HUB_INC -o "$OUT/pair_test" ../../blinds_matter/test/pair_test.cpp $MBED
+"$OUT/pair_test" ../../blinds_matter/test/wire/link.json

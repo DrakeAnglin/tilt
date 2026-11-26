@@ -83,7 +83,7 @@ Someone using the blinds through Apple Home or Alexa. Never holds an app key, so
 Adding a controller to a Matter fabric (Apple Home, Alexa).
 
 **Pairing**:
-A phone gaining its own secret key for one controller, over the app's secured channel.
+A phone gaining its own secret key for one controller or for the Tilt Hub, over the app's secured channel.
 
 **Calibration**:
 Setting a blind's Marks. In the app this is **Setup**, always one word ("Setup required", "Start Setup", "Redo Setup"); never "set up" or "Marks".

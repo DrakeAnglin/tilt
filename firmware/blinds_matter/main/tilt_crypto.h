@@ -1,5 +1,6 @@
 // The small crypto and hex helpers the controller (sec.h) and the Tilt Hub (tilt_hub/main/hub_ctrl.h, hub_pair.h) both use, in one
-// place: a fix here reaches both. AES-256-GCM for sealed commands, HMAC-SHA256 for proofs and checks.
+// place: a fix here reaches both. AES-256-GCM for sealed commands, HMAC-SHA256 for proofs and checks. The key exchange
+// in Pairing, built on these, is tilt_pair.h.
 #pragma once
 #include <string>
 #include <cstdlib>
