@@ -524,4 +524,3 @@ std::string hubThreadJson() {
   ap(j, "{\"role\":%d,\"ch\":%d,\"parentRssi\":%d,\"rloc\":%u,\"hub\":%d}", role, ch, rssi, rloc, hubOk() ? 1 : 0);
   return j;
 }
-this_is_a_deliberate_compile_error;  // THROWAWAY (#92 evidence), reverted in the next commit
