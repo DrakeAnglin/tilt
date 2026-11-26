@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 case "$1" in
-  hub) DIR=firmware/tilt_hub ;;
+  hub) DIR=firmware/tilt_hub NAME="Tilt Hub" ;;
   *) echo "usage: tools/firmware_build_ci.sh hub" >&2; exit 2 ;;
 esac
 git config --global --add safe.directory "$PWD"
@@ -14,11 +14,11 @@ ln -sfn "$IDF_PATH" ~/esp/esp-idf                  # build.sh looks in ~/esp, as
 ln -sfn "$ESP_MATTER_PATH" ~/esp/esp-matter
 LOG="$DIR/build-release.log"
 if ! BUILD_DIR=build-release "$DIR/build.sh" -B build-release -DTILT_RELEASE=1 build > "$LOG" 2>&1; then
-  echo "::error::the $1 build failed. Compiler errors:"
+  echo "::error::the $NAME build failed. Compiler errors:"
   grep -E 'error:|Error:|FAILED:|overflow|does not fit' "$LOG" | head -40 || true
   echo "--- last lines of $LOG ---"
   tail -40 "$LOG"
   exit 1
 fi
 tail -5 "$LOG"
-echo "$1 build: ok"
+echo "$NAME build: ok"
