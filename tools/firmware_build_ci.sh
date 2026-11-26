@@ -6,8 +6,8 @@
 set -e
 cd "$(dirname "$0")/.."
 case "$1" in
-  hub) DIR=firmware/tilt_hub NAME="Tilt Hub" ;;
-  controller) DIR=firmware/blinds_matter NAME="controller" ;;
+  hub) DIR=firmware/tilt_hub NAME="Tilt Hub" IMAGE=tilt_hub.bin ;;
+  controller) DIR=firmware/blinds_matter NAME="controller" IMAGE=blinds_matter.bin ;;
   *) echo "usage: tools/firmware_build_ci.sh hub|controller" >&2; exit 2 ;;
 esac
 git config --global --add safe.directory "$PWD"
@@ -30,3 +30,11 @@ if ! build "$1" > "$LOG" 2>&1; then
 fi
 tail -5 "$LOG"
 echo "$NAME build: ok"
+# Room left in the smallest app slot: always printed, and the job fails under the floor long before the build would.
+FLOOR=32768
+SIZE=$(python3 tools/firmware_size.py "$DIR/build-release/$IMAGE" "$DIR/partitions.csv" --floor $FLOOR) && FITS=1 || FITS=0
+echo "$SIZE"
+if [ "$FITS" != 1 ]; then
+  echo "::error::the $NAME firmware is under the $((FLOOR / 1024)) KB floor: $SIZE. Trim it (settings in sdkconfig.defaults, as in #144) before adding more."
+  exit 1
+fi

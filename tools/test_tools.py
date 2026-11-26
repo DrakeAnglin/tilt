@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(HERE, '../hardware/pcb'))
 import bambu  # noqa: E402
 import bambu_project  # noqa: E402
 import check_docs  # noqa: E402
+import firmware_size  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
 import release_ci  # noqa: E402
@@ -359,6 +360,53 @@ class FirmwareBuildCI(unittest.TestCase):
                      'firmware/tilt_hub/main/app_main.cpp'):
             self.assertFalse(builds(path), path)
 
+
+class FirmwareSize(unittest.TestCase):
+    """The app-slot headroom check CI runs after each firmware build (tools/firmware_size.py)."""
+
+    def table(self, firmware):
+        return open(os.path.join(HERE, '..', 'firmware', firmware, 'partitions.csv')).read()
+
+    def test_hub_headroom_from_its_real_table(self):
+        self.assertEqual(firmware_size.headroom(0x1df0e0, self.table('tilt_hub')), (0x1f0000, 69408))
+
+    def test_controller_table_with_blank_offsets(self):
+        self.assertEqual(firmware_size.headroom(0, self.table('blinds_matter'))[0], 0x1e0000)
+
+    def test_smallest_app_slot_counts(self):
+        table = 'nvs, data, nvs, 0x9000, 0x6000,\nota_0, app, ota_0, , 2M,\nota_1, app, ota_1, , 1536K,\n'
+        self.assertEqual(firmware_size.headroom(1000000, table), (1536 * 1024, 1536 * 1024 - 1000000))
+
+    def test_table_with_no_app_slot_is_an_error(self):
+        with self.assertRaises(ValueError):
+            firmware_size.headroom(10, 'nvs, data, nvs, 0x9000, 0x6000,\n')
+
+    def run_cli(self, image_size):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            image = os.path.join(d, 'tilt_hub.bin')
+            with open(image, 'wb') as f:
+                f.truncate(image_size)
+            table = os.path.join(HERE, '..', 'firmware', 'tilt_hub', 'partitions.csv')
+            return subprocess.run([os.path.join(HERE, 'firmware_size.py'), image, table, '--floor', '32768'],
+                                  capture_output=True, text=True)
+
+    def test_cli_fails_one_byte_under_the_floor(self):
+        r = self.run_cli(0x1f0000 - 32768 + 1)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('32767 bytes', r.stdout)
+
+    def test_cli_passes_at_the_floor(self):
+        r = self.run_cli(0x1f0000 - 32768)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn('tilt_hub.bin: 0x1e8000 of 0x1f0000 used, 32768 bytes (32 KB) free, floor 32 KB', r.stdout)
+
+    def test_ci_build_checks_the_size_of_both_firmwares(self):
+        script = open(os.path.join(HERE, 'firmware_build_ci.sh')).read()
+        self.assertIn('firmware_size.py', script)
+        self.assertIn('--floor', script)
+        for name in ('tilt_hub.bin', 'blinds_matter.bin'):
+            self.assertIn(name, script)
 
 class HubPeopleLock(unittest.TestCase):
     """The Tilt Hub reads its people under keyMx (firmware/tilt_hub/main/hub_pair.h). The lock is only on the chip,
