@@ -304,6 +304,31 @@ class CheckDocs(unittest.TestCase):
     def test_docs_clean(self):
         self.assertEqual(check_docs.problems(os.path.join(HERE, '..')), [])
 
+class FirmwareBuildCI(unittest.TestCase):
+    """CI's Tilt Hub build (.github/workflows/ci.yml, tools/firmware_build_ci.sh)."""
+
+    def test_unknown_firmware_name_is_a_usage_error(self):
+        import subprocess
+        r = subprocess.run([os.path.join(HERE, 'firmware_build_ci.sh'), 'nonsense'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('usage:', (r.stdout + r.stderr).lower())
+
+    def workflow(self, name):
+        return open(os.path.join(HERE, '..', '.github', 'workflows', name)).read()
+
+    def test_ci_builds_with_the_release_image(self):
+        import re
+        image = r'espressif/esp-matter:[\w.-]+@sha256:[0-9a-f]{64}'
+        release = set(re.findall(image, self.workflow('release.yml')))
+        self.assertEqual(len(release), 1)
+        self.assertEqual(set(re.findall(image, self.workflow('ci.yml'))), release)
+
+    def test_ci_check_waits_for_the_hub_build(self):
+        import re
+        job = re.search(r'^  ci:\n(.*?)(?=^  \S|\Z)', self.workflow('ci.yml'), re.M | re.S).group(1)
+        needs = re.search(r'^    needs: \[([^\]]*)\]', job, re.M).group(1)
+        self.assertIn('hub-build', [n.strip() for n in needs.split(',')])
+
 
 if __name__ == '__main__':
     unittest.main()
