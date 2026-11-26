@@ -19,9 +19,9 @@ M1.6 drivers for the screws, a toothpick for the grease.
 - **Too much grease is worse than too little.** The extra has to be pushed out of the way by the gears, and you can
   feel it as a light drag when you turn them. It also picks up dust.
 
-## Step 0. Sort the kit
-Lay everything out in four groups, one per part of this page, before you start. Then nothing gets left out, and a
-missing part shows up now and not halfway through.
+## Step 0. Sort and clean up
+**Sort.** Lay everything out in four groups, one per part of this page, before you start. Then nothing gets left
+out, and a missing part shows up now and not halfway through.
 
 | Group | Printed | Bought |
 |---|---|---|
@@ -32,45 +32,40 @@ missing part shows up now and not halfway through.
 
 The parts in group A go on to B and D once they are prepped. Keep the grease out with all of them.
 
-📷 **Photo 00:** the kit laid out in its four groups, labeled A to D, with the finished sensor module in D.
+**Clean up.** A quick look over every printed part. It does not need to be perfect.
+- **Support:** remove the support from the tray lid's gear cage.
+- **Seams:** feel each part that turns or slides (worm, wheel, gears, carrier hub, sleeve nose, the bores they run
+  in). Scrape or sand off any seam bump with a hobby knife or a nail file.
+- **Gears:** pick off stringing and any blob between teeth. Run a fingernail round each gear; it should feel even.
+- **Test-fit:** each gear on its pin or shaft should turn freely by hand.
 
 ---
 
 ## Part A: prepare the printed parts
 
-### A1. Clean up
-A quick look over every printed part. It does not need to be perfect.
-- **Seams:** feel each part that turns or slides (worm, wheel, gears, carrier hub, sleeve nose, the bores they run
-  in). Scrape or sand off any seam bump with a hobby knife or a nail file.
-- **Gears:** pick off stringing and any blob between teeth. Run a fingernail round each gear; it should feel even.
-- **Support:** pick the support out of the tray lid's gear cage.
-- **Test-fit:** each gear on its pin or shaft should turn freely by hand.
-
-📷 **Photo A1:** the tray lid with the support removed.
-
-### A2. Heat-set inserts (6)
+### A1. Heat-set inserts (6)
 Soldering iron, insert on the tip, press straight down until it is flush with the surface. Let it cool before
 moving on. Check each one is straight: an M3 screw should start by hand.
 
 **Tray: 2.** One in the tall post at the back corner, one in the low block at the front corner.
 
-![tray inserts](photos/tilter/a2-tray-inserts.jpg)
+![tray inserts](photos/tilter/a1-tray-inserts.jpg)
 
 **Bearing shell: 4**, two on each face: two on the cup side (the big round cup), two on the flat side.
 
 | Cup side | Flat side |
 |---|---|
-| ![bearing shell, cup side](photos/tilter/a2-bearing-shell-front.jpg) | ![bearing shell, flat side](photos/tilter/a2-bearing-shell-back.jpg) |
+| ![bearing shell, cup side](photos/tilter/a1-bearing-shell-front.jpg) | ![bearing shell, flat side](photos/tilter/a1-bearing-shell-back.jpg) |
 
-### A3. Dowel pins (5)
+### A2. Dowel pins (5)
 - **4 into the carrier**, one in each pocket, pressed to the bottom. They are the planet axles.
 - **1 into the worm case** at the worm's top end.
 
 Press them in with flat pliers or a light tap. They must be straight: a tilted pin binds its planet.
 
-![carrier with 4 pins, worm with its top pin](photos/tilter/a3-dowel-pins.jpg)
+![carrier with 4 pins, worm with its top pin](photos/tilter/a2-dowel-pins.jpg)
 
-### A4. Magnet into the magnet gear
+### A3. Magnet into the magnet gear
 Press the Ø4 × 2 magnet into the hub of the magnet gear (the small 8-tooth gear).
 - Use a **plastic** tool to push it, not metal: the magnet jumps to steel tweezers or a screwdriver. A spare printed
   part works well. Set the magnet on the hub's hole, push it in from the top, then seat it.
@@ -78,7 +73,7 @@ Press the Ø4 × 2 magnet into the hub of the magnet gear (the small 8-tooth gea
   sits 0.8 mm above the sensor chip, and the sensor reads fine a bit farther away, but a magnet that sticks out can
   hit the chip.
 
-![magnet pressed into the magnet gear](photos/tilter/a4-magnet-gear.jpg)
+![magnet pressed into the magnet gear](photos/tilter/a3-magnet-gear.jpg)
 
 ---
 
@@ -97,8 +92,6 @@ thread end over the top pin. Turn the worm by its loop a few times: the wheel sh
 
 ### B2. Worm case lid
 Case left on. The worm should still turn by hand, with no tight spot through a full turn of the wheel.
-
-📷 **Photo B2:** worm case closed.
 
 ### B3. Ring cup and planets
 Ring cup onto the wheel's hex. Planets onto the carrier's pins, then the carrier into the cup.
@@ -145,8 +138,6 @@ pinion a little if it does not drop in. It has no bolts of its own yet; hold it 
 
 Check: turn the cluster by hand; the whole train should turn, slowly.
 
-📷 **Photo C3:** motor shell sitting on the gearbox.
-
 ### C4. Sensor sleeve
 **Grease** the sleeve's nose. Push it through the motor plate from the back and turn it until the lugs drop into the
 carrier (the last 2.4 mm). Its gear now sticks out of the plate.
@@ -157,7 +148,7 @@ The motor shell has no bolts of its own: the tray's two bolts hold it on (step D
 - **Not ready yet?** Put two **M3 × 16** in loosely, through the motor shell into the bearing shell, so it holds
   together while you wait. The one nearer the room side goes through the cluster gear. Take them out again at D2.
 
-![motor shell on, sleeve in, two M3 × 16 holding it](photos/tilter/c4-sleeve-in.jpg)
+![motor shell on, sleeve in, two M3 × 16 holding it](photos/tilter/c5-sleeve-in.jpg)
 
 ---
 
@@ -202,7 +193,7 @@ There is very little room behind the boards. That is why the wires between the m
 to be short ([sensor module](tilter-wiring.md)).
 
 ### D4. Magnet gear and lid
-Slide the magnet gear (magnet already in, step A4) into the lid's gear cage from the rod side until its
+Slide the magnet gear (magnet already in, step A3) into the lid's gear cage from the rod side until its
 hub clicks into its seat.
 **Grease:** the magnet gear's teeth.
 
@@ -234,5 +225,5 @@ Snug.
 ![the finished tilter](photos/tilter/done-tilter.jpg)
 
 ## Photos
-Photos go in `docs/photos/tilter/`, named by step: `00-kit.jpg`, `a2-tray-inserts.jpg`, `b1-worm.jpg`, and so on.
+Photos go in `docs/photos/tilter/`, named by step: `a1-tray-inserts.jpg`, `b1-worm-and-wheel.jpg`, and so on.
 Shoot on a plain white or gray background, from above, with the part filling most of the frame.
