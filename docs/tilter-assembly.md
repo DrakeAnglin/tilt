@@ -66,7 +66,7 @@ moving on. Check each one is straight: an M3 screw should start by hand.
 
 Press them in with flat pliers or a light tap. They must be straight: a tilted pin binds its planet.
 
-📷 **Photo A3:** carrier with its 4 pins up, and the worm case pin.
+![carrier with 4 pins, worm with its top pin](photos/tilter/a3-dowel-pins.jpg)
 
 ---
 
