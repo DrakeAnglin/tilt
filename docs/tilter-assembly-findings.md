@@ -16,5 +16,11 @@ Things the build showed that the docs or the design have wrong. Fixed together a
 8. **Motor pinion has a D-flat**: line it up with the shaft's flat. Add to README step 3.
 9. **Temporary M3 × 16** hold the motor shell on if the sensor module is not ready (guide C5). M3 × 16 is not in
    the BOM yet. Decide: add it, or say "use the tray bolts without the tray" if they fit.
-10. **Sensor board order:** the README says the AS5600 must go on its studs before the tray goes on. Owner wants the
-   tray on empty and the electronics in last. Check which is true on the printed part.
+10. **Sensor board order:** README step 5 says the AS5600 must go on its studs before the tray, and "cannot go in
+   afterwards". The build puts the tray on empty and pushes all boards in after (guide D3). Fix README steps 5 to 7.
+11. **Motor leads before the tray:** solder them with only the motor in the way (guide D1). README step 7 has it after.
+12. **Tray screws go through the tray before it goes on** (guide D2). Add to README step 6.
+13. **Tray bolts tightened down,** not "snug only". README step 6 warns that a hard-tightened axle bolt bows the motor
+   plate onto the cluster. Owner tightens fully and it turns fine; check and drop the warning if it holds.
+14. **Motor lead colors:** the build uses a red/black pair to the motor; the sensor module page says a white pair.
+   Fix on the sensor module page when we do that guide.

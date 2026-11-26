@@ -6,7 +6,7 @@ screws, pins, grease. Each step says what goes in, and ends with a photo of how 
 The tilter has two subassemblies:
 1. **Sensor module** (the electronics): RJ12 breakout, DRV8833 motor driver and AS5600 angle sensor, wired together.
    Build it first, on the bench: [sensor module](tilter-wiring.md).
-2. **Mechanical build** (this page). The finished sensor module goes in at step D1.
+2. **Mechanical build** (this page). The finished sensor module goes in at steps D1 to D3.
 
 Short version and design notes: [tilter README](../hardware/mechanical/stl/tilter/README.md).
 
@@ -163,29 +163,33 @@ The motor shell has no bolts of its own: the tray's two bolts hold it on (step D
 
 ## Part D: tray, boards and lid
 
-### D1. Sensor module: AS5600 into the tray
-With the tray off the tilter: the sensor module's AS5600 onto its studs, **chip up**. It cannot go in later: it lies under the sleeve's
-gear.
+### D1. Motor leads
+If you used the M3 × 16 in step C5, take them out now.
 
-📷 **Photo D1:** tray with the AS5600 on its studs.
+Solder the sensor module's two motor leads to the N20's two tabs (either way round: the controller learns the
+motor's direction on its first moves). This is easy now, with only the motor in the way. Then move the module off
+to the side so its wires don't tangle while the tray goes on.
 
 ### D2. Tray on
-Tray on from the back (two pins find the motor shell). Two **M3 × 20** through its end wall:
-- **Room-side bolt** goes through the cluster gear. Turn the gear until the bolt finds its bore. This bolt is the
-  cluster's axle.
-- **Floor bolt** under the sensor board.
+**Put the two M3 × 20 through the tray's end wall first**, then lower the tray on (its two pins find the motor
+shell). This is much easier than fishing the screws in from the back afterward.
+- The **room-side bolt** goes through the cluster gear and is its axle. Turn the gear a little until the bolt finds
+  its hole.
+- The **floor bolt** goes in beside it.
 
-**Snug only.** A hard-tightened axle bolt bows the motor plate onto the cluster.
+Tighten both down. Then check: the worm's loop turns the whole train, with no tight spot.
 
-Check: the motor shaft turns by hand (slowly) and the whole train moves.
+![tray going on with its two screws already in, sensor module to the side](photos/tilter/d2-tray-on.jpg)
 
-📷 **Photo D2:** tray on, both bolts in.
+### D3. Electronics in
+Push the sensor module's boards into the tray:
+- **AS5600** onto its studs, **chip up**, under the sleeve's gear.
+- **DRV8833** down into its slots.
+- **RJ12 board** last, jack up.
 
-### D3. Motor leads, driver, RJ12
-Solder the white pair to the N20's two tabs (either way round). DRV8833 down into its slots, then the RJ12 board,
-jack up. Tuck the leads flat so nothing sits above the tray walls.
+Tuck the wires flat so nothing sits above the tray walls.
 
-📷 **Photo D3:** looking into the tray from above, all boards seated, leads tucked.
+📷 **Photo D3:** looking into the tray from above, all boards seated, wires tucked.
 
 ### D4. Magnet gear and lid
 Slide the magnet gear (magnet already in, step A4) into the lid's gear cage from the rod side until its
