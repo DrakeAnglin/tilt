@@ -14,7 +14,7 @@ MAIN=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/n
 for F in secrets.h setup_pin.h; do
   [ -f "main/$F" ] || [ ! -f "$MAIN/$F" ] || [ "$MAIN" -ef main ] || cp "$MAIN/$F" "main/$F"
 done
-[ -f main/secrets.h ] || { cp main/secrets.h.example main/secrets.h; echo "main/secrets.h made from the example: no bench Wi-Fi in this build."; }
+[ -f main/secrets.h ] || { cp main/secrets.h.example main/secrets.h; echo "main/secrets.h made from the example: this build has no bench Wi-Fi. Build it only to check it compiles; never flash it to the bench hub or release it."; }
 # The hub's setup code (8 digits): the first owner types it in the app. Made once, kept in main/setup_pin.h (not in
 # Git). Put it on a label on the hub.
 if [ ! -f main/setup_pin.h ]; then

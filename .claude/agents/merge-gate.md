@@ -30,7 +30,7 @@ A review whose `sha` is not the current head is out of date: **not yet**, not hu
 
 CI that is red, still running or never started (a GitHub outage, a billing refusal, a runner that did not come) is **not yet**, never human. No person can judge code by a CI run that did not happen. Say what is wrong with CI in your reply.
 
-**Builds after a merge from main.** The ESP builds in Evidence may be for an older commit when every commit since is a merge of `origin/main` and those merges did not touch a firmware file this pull request changes: `git diff --name-only <built sha> <head> -- firmware/` shares no file with `git diff --name-only origin/main...<head> -- firmware/`. Then the old builds still count. Otherwise the author builds again (**not yet**).
+**Builds after a merge from main.** The ESP builds in Evidence may be for an older commit when every commit since is a merge of `origin/main` and those merges changed nothing under `firmware/`: `git diff --name-only <built sha> <head> -- firmware/` is empty. Then the old builds still count. Otherwise the author builds again (**not yet**): a header main changed can break this change's code, and CI does not build firmware.
 
 ## Post
 
@@ -63,6 +63,8 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 
 <!-- factory-gate sha=<full head sha> verdict=<merge|human> -->
 ```
+
+For a **human** verdict whose reason a new commit does not take away (a stuck finding, a large blast radius, more than ten rounds, a test-script change beyond adding tests, a fork), end the marker with ` sticky=1`: `<!-- factory-gate sha=... verdict=human sticky=1 -->`. `tools/agent/clear_stale_label.sh` never takes off a label that such a verdict put on.
 
 More than ten `factory-review` comments on the pull request: **human**, "too many rounds of review".
 

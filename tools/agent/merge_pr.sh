@@ -18,19 +18,28 @@ if [ -z "${MERGE_PR_FROM_MAIN:-}" ]; then
     RC=0; MERGE_PR_FROM_MAIN=1 sh "$T/tools/agent/merge_pr.sh" "$@" || RC=$?
     rm -rf "$T"; exit $RC
   fi
-  rm -rf "$T"; echo "merge_pr: could not read main's copy; using this one." >&2
+  rm -rf "$T"
+  # A merge by rules nobody could read is not allowed; a check only says so.
+  [ "$MODE" = --check ] || { echo "merge_pr: could not read main's copy of the rules; not merging." >&2; exit 1; }
+  echo "merge_pr: could not read main's copy; checking with this one." >&2
 fi
 
 # One merge at a time, across every worktree on this Mac: each merge moves main, and the next pull request
-# is checked against the new main. A lock older than 15 minutes is stale.
+# is checked against the new main. The lock holds the merging process's pid; it is stale only when that process
+# is gone. On the way out, the lock is removed only if it is still this process's.
 if [ "$MODE" != --check ]; then
   QLOCK="$(git rev-parse --path-format=absolute --git-common-dir)/merge-queue.lock"; WAITED=0
   until mkdir "$QLOCK" 2>/dev/null; do
-    if [ -n "$(find "$QLOCK" -maxdepth 0 -mmin +15 2>/dev/null)" ]; then rm -rf "$QLOCK"; continue; fi
+    HOLDER=$(cat "$QLOCK/pid" 2>/dev/null || true)
+    if [ -n "$HOLDER" ] && ! kill -0 "$HOLDER" 2>/dev/null; then
+      mv "$QLOCK" "$QLOCK.stale.$$" 2>/dev/null && rm -rf "$QLOCK.stale.$$"; continue
+    fi
     [ "$WAITED" -lt 900 ] || { echo "merge_pr: another merge has held the queue for 15 minutes; try again." >&2; exit 1; }
     sleep 15; WAITED=$((WAITED + 15))
   done
-  trap 'rm -rf "$QLOCK"' EXIT INT TERM
+  echo $$ > "$QLOCK/pid"
+  trap '[ "$(cat "$QLOCK/pid" 2>/dev/null)" = $$ ] && rm -rf "$QLOCK"' EXIT
+  trap 'exit 130' INT TERM
 fi
 
 MAX_REVIEWS=10
@@ -42,13 +51,17 @@ NO=""      # not allowed: a human decides
 WAIT=""    # not yet: try again later
 no() { NO="$NO
 - $1"; }
+# A reason that a new commit does not take away (a stuck finding, a large blast radius, ten rounds, a test-script
+# change, a fork). Its comment says sticky=1, and tools/agent/clear_stale_label.sh never takes such a label off.
+STICKY=""
+sticky() { STICKY=1; no "$1"; }
 wait_for() { WAIT="$WAIT
 - $1"; }
 
 [ "$(get .state)" = OPEN ] || { echo "#$PR is not open ($(get .state)). Nothing to do."; exit 1; }
 [ "$(get .isDraft)" = false ] || wait_for "pull request is a draft"
-[ "$(get .baseRefName)" = main ] || no "base is not main"
-[ "$(get .isCrossRepository)" = false ] || no "comes from a fork"
+[ "$(get .baseRefName)" = main ] || sticky "base is not main"
+[ "$(get .isCrossRepository)" = false ] || sticky "comes from a fork"
 case "$(get .mergeable)" in
   MERGEABLE) ;;
   UNKNOWN) wait_for "GitHub has not worked out yet whether it merges cleanly" ;;
@@ -76,7 +89,7 @@ AWK="$(dirname "$0")/only_adds_tests.awk"
 for F in $(printf '%s\n' "$FILES" | grep -E '^tools/(firmware_tests|app_tests)\.sh$' | sort -u || true); do
   PATCH=$(gh api "repos/{owner}/{repo}/pulls/$PR/files" --paginate --jq ".[] | select(.filename == \"$F\" and .status == \"modified\") | .patch // \"\"")
   printf '%s\n' "$PATCH" | awk -f "$AWK" ||
-    no "How the tests run changed, not only which tests run. Confirm: no test was dropped or weakened. Files: $F"
+    sticky "How the tests run changed, not only which tests run. Confirm: no test was dropped or weakened. Files: $F"
 done
 
 # CI: the 'ci' check must have passed, and nothing may be failing or still running.
@@ -97,21 +110,21 @@ field() { printf '%s' "$1" | tr ' ' '\n' | sed -n "s/^$2=//p"; }
 REVIEW=$(markers factory-review | jq -r 'last // ""')
 GATE=$(markers factory-gate | jq -r 'last // ""')
 # A look again after a clean merge from main (round=merge) is not a round of disagreement: it does not count.
-[ "$(markers factory-review | jq -r '[.[] | select(test("round=merge") | not)] | length')" -le "$MAX_REVIEWS" ] || no "More than $MAX_REVIEWS rounds of review without a clean result. Confirm: read the last review and decide whether to go on."
+[ "$(markers factory-review | jq -r '[.[] | select(test("round=merge") | not)] | length')" -le "$MAX_REVIEWS" ] || sticky "More than $MAX_REVIEWS rounds of review without a clean result. Confirm: read the last review and decide whether to go on."
 if [ -z "$REVIEW" ]; then wait_for "no review yet (run the pr-reviewer agent)"
 elif [ "$(field "$REVIEW" sha)" != "$SHA" ]; then wait_for "the review is for an older commit (run pr-reviewer again)"
 else
   # The door is not a rule: the blast radius and the review decide (docs/agents/review-policy.md).
   case "$(field "$REVIEW" blast)" in
     small|medium) ;;
-    large) no "The review says the blast radius is large: a mistake reaches devices, people's data or accounts on merge. Confirm: you want this now, and the reason in the review holds." ;;
+    large) sticky "The review says the blast radius is large: a mistake reaches devices, people's data or accounts on merge. Confirm: you want this now, and the reason in the review holds." ;;
     *) wait_for "the review has no blast radius (run pr-reviewer again)" ;;
   esac
   # stuck: findings the reviewer still holds after the author argued against them twice.
   # The two agents cannot agree, so a person settles it.
   case "$(field "$REVIEW" stuck)" in
     0|"") ;;
-    *) no "The author and the reviewer cannot agree on $(field "$REVIEW" stuck) finding(s). Confirm: read both sides in the last review and the author's answer, and say which way to go." ;;
+    *) sticky "The author and the reviewer cannot agree on $(field "$REVIEW" stuck) finding(s). Confirm: read both sides in the last review and the author's answer, and say which way to go." ;;
   esac
   [ "$(field "$REVIEW" must-fix)" = 0 ] || wait_for "the review has must-fix findings: fix them, or answer them on the pull request"
 fi
@@ -143,7 +156,7 @@ $WHY
 
 When you are happy, merge on GitHub.
 
-<!-- factory-human sha=$SHA -->" >/dev/null
+<!-- factory-human sha=$SHA${STICKY:+ sticky=1} -->" >/dev/null
     fi
   fi
   exit 1

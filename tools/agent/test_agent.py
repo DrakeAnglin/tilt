@@ -325,6 +325,8 @@ here = os.path.dirname(os.path.abspath(__file__))
 a = sys.argv[1:]
 if a[:2] == ['pr', 'view']:
     print(open(os.path.join(here, 'pr.json')).read())
+elif a[:2] == ['api', 'user']:
+    print('me')
 else:
     with open(os.path.join(here, 'calls.log'), 'a') as f:
         f.write(' '.join(a) + '\n')
@@ -334,24 +336,49 @@ else:
 class ClearStaleLabelTest(unittest.TestCase):
     """tools/agent/clear_stale_label.sh with a fake gh and a fake merge_pr.sh."""
 
-    def run_clear(self, rules_say, comments=()):
+    def run_clear(self, rules_say, comments=(), rc=1):
         import subprocess, tempfile, json, shutil
         here = os.path.dirname(os.path.abspath(__file__))
         with tempfile.TemporaryDirectory() as tmp:
             shutil.copy(os.path.join(here, 'clear_stale_label.sh'), tmp)
             with open(os.path.join(tmp, 'merge_pr.sh'), 'w') as f:
-                f.write('#!/bin/sh\n[ "$IGNORE_NEEDS_HUMAN" = 1 ] || exit 9\necho "%s"\nexit 1\n' % rules_say)
+                f.write('#!/bin/sh\n[ "$IGNORE_NEEDS_HUMAN" = 1 ] || exit 9\necho "%s"\nexit %d\n' % (rules_say, rc))
             with open(os.path.join(tmp, 'gh'), 'w') as f:
                 f.write(FAKE_GH_LABEL)
             for n in ('merge_pr.sh', 'gh'):
                 os.chmod(os.path.join(tmp, n), 0o755)
             with open(os.path.join(tmp, 'pr.json'), 'w') as f:
                 json.dump({'headRefOid': 'c' * 40, 'labels': [{'name': 'needs-human'}],
-                           'comments': [{'body': b} for b in comments]}, f)
-            env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'])
+                           'comments': [{'author': {'login': who}, 'body': b} for who, b in comments]}, f)
+            # CLEAR_FROM_MAIN: test this copy, not main's.
+            env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'], CLEAR_FROM_MAIN='1')
             r = subprocess.run([os.path.join(tmp, 'clear_stale_label.sh'), '7'], env=env, capture_output=True, text=True)
-            log = open(os.path.join(tmp, 'calls.log')).read() if os.path.exists(os.path.join(tmp, 'calls.log')) else ''
+            log = ''
+            if os.path.exists(os.path.join(tmp, 'calls.log')):
+                with open(os.path.join(tmp, 'calls.log')) as f:
+                    log = f.read()
             return r.returncode, r.stdout + r.stderr, log
+
+    def test_every_rule_passing_frees_it(self):
+        code, out, log = self.run_clear('#7 passes every rule.', rc=0)
+        self.assertEqual(code, 0, out)
+        self.assertIn('remove-label needs-human', log)
+
+    def test_an_error_keeps_it(self):
+        code, out, log = self.run_clear('gh: API rate limit exceeded')
+        self.assertEqual(code, 1, out)
+        self.assertNotIn('remove-label', log)
+
+    def test_a_sticky_verdict_keeps_it(self):
+        marker = '<!-- factory-gate sha=%s verdict=human sticky=1 -->' % ('d' * 40)
+        code, out, log = self.run_clear('Not merging #7 yet:\n- the review is for an older commit', comments=(('me', marker),))
+        self.assertEqual(code, 1, out)
+        self.assertNotIn('remove-label', log)
+
+    def test_a_stranger_cannot_hold_it(self):
+        code, out, log = self.run_clear('Not merging #7 yet:', comments=(('stranger', '/hold'),))
+        self.assertEqual(code, 0, out)
+        self.assertIn('remove-label', log)
 
     def test_a_label_with_no_reason_left_comes_off(self):
         code, out, log = self.run_clear('Not merging #7 yet:\n- the review is for an older commit')
@@ -365,7 +392,7 @@ class ClearStaleLabelTest(unittest.TestCase):
         self.assertNotIn('remove-label', log)
 
     def test_the_owner_can_hold_it(self):
-        code, out, log = self.run_clear('Not merging #7 yet:', comments=('/hold until the bench',))
+        code, out, log = self.run_clear('Not merging #7 yet:', comments=(('me', '/hold until the bench'),))
         self.assertEqual(code, 1, out)
         self.assertNotIn('remove-label', log)
 
@@ -382,6 +409,28 @@ class BuildLockTest(unittest.TestCase):
             self.assertEqual(r.returncode, 3, r.stderr)
             self.assertIn('pid', r.stdout)
             self.assertFalse(os.path.exists(lock))
+
+    def test_takes_a_lock_whose_holder_is_gone_but_not_a_live_one(self):
+        import subprocess, tempfile
+        here = os.path.dirname(os.path.abspath(__file__))
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = os.path.join(tmp, 'lock')
+            dead = subprocess.Popen(['true'])
+            dead.wait()
+            os.makedirs(lock)
+            with open(os.path.join(lock, 'pid'), 'w') as f:
+                f.write(str(dead.pid))
+            env = dict(os.environ, TILT_BUILD_LOCK=lock)
+            r = subprocess.run([os.path.join(here, 'build_lock.sh'), 'true'], env=env, capture_output=True, text=True, timeout=20)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertFalse(os.path.exists(lock))
+            # A live holder (this test) is waited for, not taken over.
+            os.makedirs(lock)
+            with open(os.path.join(lock, 'pid'), 'w') as f:
+                f.write(str(os.getpid()))
+            with self.assertRaises(subprocess.TimeoutExpired):
+                subprocess.run([os.path.join(here, 'build_lock.sh'), 'true'], env=env, capture_output=True, timeout=3)
+            self.assertTrue(os.path.exists(lock))
 
 
 if __name__ == '__main__':
