@@ -2,10 +2,12 @@
 
   python3 tools/orient.py && python3 tools/bambu_project.py     # writes both into hardware/mechanical/stl/
 
-  tilt_bulk_H2D.3mf     4 plates, everything at once; one material per plate (the plate list is BULK below):
-                          1 tilter boxes (PLA)  2 tilter gears (PLA)  3 tilter gears (PETG)  4 controller box (PLA)
-  tilt_parts_H2D.3mf    one part per plate, in the order the tilter goes together, then the controller box's two
-                          halves (SINGLE below). Reprint one part from here when a bulk plate goes wrong.
+  tilt_bulk_H2D.3mf             one tilter, 3 plates, one material per plate (BULK below):
+                                  1 tilter boxes (PLA)  2 tilter gears (PLA)  3 tilter gears (PETG)
+  tilt_parts_H2D.3mf            one tilter part per plate, in the order the tilter goes together (SINGLE below).
+                                  Reprint one part from here when a bulk plate goes wrong.
+  tilt_controller_box_H2D.3mf   the controller box on its own (CONTROLLER below): 1 tray and lid together,
+                                  2 tray only, 3 lid only.
 
 Slice them in the Bambu Studio app (Slice all). Studio 2.9's command line will not slice for the H2D ("No valid nozzle
 found"), not even the older tilter project.
@@ -58,8 +60,7 @@ NAMES = {'case_right': 'Worm case main half', 'case_left': 'Worm case lid', 'wor
          'controller_tray': 'Controller box tray', 'controller_lid': 'Controller box lid'}
 # One plate per part, in the order the tilter goes together (hardware/mechanical/stl/tilter/README.md, Assembly).
 BUILD = ['case_right', 'worm_wheel', 'worm', 'case_left', 'ring_cup', 'planet', 'carrier', 'bearing_shell', 'sun_27t',
-         'motor_shell', 'motor_pinion', 'cluster', 'sensor_sleeve', 'tray', 'magnet_gear', 'tray_lid',
-         'controller_tray', 'controller_lid']
+         'motor_shell', 'motor_pinion', 'cluster', 'sensor_sleeve', 'tray', 'magnet_gear', 'tray_lid']
 
 
 def rows(mat):
@@ -75,10 +76,12 @@ def rows(mat):
 PLA_ROWS = rows('PLA')               # orient.PARTS row 0 is the housing, row 1 the drive
 BULK = [('1 Tilter boxes (PLA)', [PLA_ROWS[0][:3], PLA_ROWS[0][3:]]),
         ('2 Tilter gears (PLA)', [PLA_ROWS[1]]),
-        ('3 Tilter gears (PETG)', rows('PETG')),
-        ('4 Controller box (PLA)', [[BOX[0]], [BOX[1]]])]
+        ('3 Tilter gears (PETG)', rows('PETG'))]
 SINGLE = [('%02d %s' % (k + 1, NAMES[n]), [copies(n)] if n in PARTS else [[n]]) for k, n in enumerate(BUILD)]
-PROJECTS = {'tilt_bulk_H2D.3mf': BULK, 'tilt_parts_H2D.3mf': SINGLE}
+CONTROLLER = [('1 Controller box (PLA)', [[BOX[0]], [BOX[1]]]),
+              ('2 %s' % NAMES[BOX[0]], [[BOX[0]]]),
+              ('3 %s' % NAMES[BOX[1]], [[BOX[1]]])]
+PROJECTS = {'tilt_bulk_H2D.3mf': BULK, 'tilt_parts_H2D.3mf': SINGLE, 'tilt_controller_box_H2D.3mf': CONTROLLER}
 
 H2D = (350.0, 320.0)                # bed
 GAP = 7.0                           # between parts on a plate (owner: keep parts close together)
