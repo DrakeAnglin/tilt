@@ -21,6 +21,8 @@ void schedBegin() {                              // the Schedules' extra facts a
 }
 // Sunrise or sunset (epoch seconds) on the day that holds `noon`, at the saved place (the math: logic.h).
 uint32_t sunEvent(time_t noon, bool rise) { return sunEventAt(noon, sx.lat, sx.lon, rise); }
+// Power source (logic.h) from input power, the clock and today's sunrise and sunset at the place.
+int powerSource() { time_t now = time(nullptr); return powerSourceOf(powered, timeValid(), now, sunEvent(now, true), sunEvent(now, false)); }
 uint32_t schedTime(int i, time_t now, int dayOff) {      // when slot i fires on (today + dayOff); 0 = not that day
   const Sched &s = cfg.sched[i];
   uint32_t t = slotDayTime(now, dayOff, sx.x[i].kind ? 720 : s.minute, s.days);   // logic.h; a sun slot: that day's noon

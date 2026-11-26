@@ -116,8 +116,9 @@ Battery level under 10%. Schedules pause and it is reported; blinds still move w
 Resting cell voltage under 3.35 V (about 3% Battery level), plugged in or not (a solar panel in weak light shows a voltage but charges nothing). No motor runs at all, whoever asks, so the cell is never drained that low; moves come back once it charges.
 _Avoid_: dead battery, empty
 
-**Charge source**:
-Where the cell is topped up from: USB-C (charge only) or the optional solar panel. The user sees only the Battery level, not a charge state. A cell that stays too hot to charge (about 45 C) surfaces only as a warning.
+**Power source**:
+Where a controller's power comes from right now: Solar, Plugged in (USB-C, charge only) or Battery. When input power is present but the controller cannot tell which, the app says Charging. It is shown next to the Battery level. A cell that stays too hot to charge (about 45 C) surfaces only as a warning.
+_Avoid_: charge source, charge state
 
 ### Reachability
 

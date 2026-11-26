@@ -283,7 +283,7 @@ static void udpTask(void *) {
         ctrls[c] = Ctrl{};
         links[c].reset();
         Ctrl &f = ctrls[c];
-        f.mx = m; f.pct = -1; f.chg = -1; f.sep = -1; f.own = -1;
+        f.mx = m; f.pct = -1; f.chg = -1; f.src = -1; f.sep = -1; f.own = -1;
         for (auto &b : f.b) b.tilt = b.tgt = INT32_MIN;
         for (int t = 0; t < PORTS; t++) f.tileLift[t] = f.tileOp[t] = -1;
         strlcpy(f.s.id, id, 13); f.used = true;
@@ -311,6 +311,8 @@ static void udpTask(void *) {
     k.low = cJSON_GetNumberValue(cJSON_GetObjectItem(j, "low"));
     cJSON *chgj = cJSON_GetObjectItem(j, "chg");
     k.chg = cJSON_IsNumber(chgj) ? chgj->valueint : -1;
+    cJSON *srcj = cJSON_GetObjectItem(j, "src");
+    k.src = cJSON_IsNumber(srcj) ? srcj->valueint : -1;
     cJSON *ownj = cJSON_GetObjectItem(j, "own");
     if (cJSON_IsNumber(ownj) && ownj->valueint != k.own) { k.own = ownj->valueint; k.announced = false; k.hello.clear(); }   // its hello says "owned": ask it again
     cJSON *cvj = cJSON_GetObjectItem(j, "cv");

@@ -51,6 +51,16 @@ check(TiltWords.action(0) == "Open" && TiltWords.action(100) == "Close up" && Ti
 let low = ControllerState.Battery(v: 3.6, pct: 15, st: "battery", low: 0), ok = ControllerState.Battery(v: 3.9, pct: 70, st: "battery", low: 0)
 let chargingLow = ControllerState.Battery(v: 3.6, pct: 15, st: "charging", low: 0), empty = ControllerState.Battery(v: 3.3, pct: 2, st: "charging", low: 1)
 check(low.isLow && !ok.isLow, "under 20% on battery is low")
+
+// ---- Power source (Shared/Words.swift): a named source only when the charging flag backs it up and the controller is sure
+check([nil, 0, 1, 2, 3].allSatisfy { TiltWords.powerSource(charging: false, src: $0) == nil }, "not charging: nothing, whatever src says")
+check(TiltWords.powerSource(charging: true, src: 1) == "Solar" && TiltWords.powerSource(charging: true, src: 2) == "Plugged in", "solar and USB")
+check(TiltWords.powerSource(charging: true, src: 3) == "Charging" && TiltWords.powerSource(charging: true, src: nil) == "Charging", "unknown, or an older controller or hub: Charging")
+check(TiltWords.powerSource(charging: true, src: 0) == "Charging" && TiltWords.powerSource(charging: true, src: 7) == "Charging", "a value it cannot back up: Charging")
+let battSrc = #"{"v":4.1,"pct":93,"st":"charging","vin":4.6,"low":0,"src":2}"#, battOld = #"{"v":4.1,"pct":93,"st":"charging","vin":4.6,"low":0}"#
+check((try? JSONDecoder().decode(ControllerState.Battery.self, from: Data(battSrc.utf8)))?.src == 2, "/api/s batt with src")
+let oldBatt = try? JSONDecoder().decode(ControllerState.Battery.self, from: Data(battOld.utf8))
+check(oldBatt != nil && oldBatt?.src == nil, "/api/s batt from an older controller: no src")
 check(!chargingLow.isLow, "charging is not low")
 check(empty.isLow && empty.tooLowToMove, "too low to move is low even while charging")
 
@@ -403,7 +413,7 @@ let hi = try? JSONDecoder().decode(HubInfo.self, from: hubInfoData)
 check(hi?.fw == "0.3.5" && hi?.ip == "192.168.1.40" && hi?.ch == 15 && hi?.home == 1 && hi?.homes?.first?.vendor == 4937, "hub_info.json: the hub's own fields")
 check(hi?.c[0].name == "Den \"Caf\u{E9}\"", "hub_info.json: a controller name with quotes and an accent")
 check(hi?.c.count == 2 && hi?.c[0].hubCid == "0011223344556677" && hi?.c[0].own == 1 && hi?.c[0].signal == -61, "hub_info.json: a controller on the hub")
-check(hi?.c[0].chg == 0 && hi?.c[1].chg == nil, "hub_info.json: on the cable or not, and nothing said by an older controller")
+check(hi?.c[0].chg == 1 && hi?.c[0].src == 2 && hi?.c[1].chg == nil && hi?.c[1].src == nil, "hub_info.json: on the cable and its Power source, and nothing said by an older controller")
 check(hi?.c[1].notResponding == true && hi?.c[1].signal == nil && hi?.c[1].ota == 4 && hi?.c[1].otaErr == "the controller stopped answering", "hub_info.json: a silent controller whose update failed")
 check(hi?.new.first?.ble == "aa:bb:cc:dd:ee:ff", "hub_info.json: a new controller nearby")
 let renamedKey = Data(String(decoding: hubInfoData, as: UTF8.self).replacingOccurrences(of: "\"seenS\"", with: "\"seen\"").utf8)

@@ -161,6 +161,18 @@ inline uint32_t sunEventAt(time_t noon, double lat, double lon, bool rise) {
   return (uint32_t)((jd - 2440587.5) * 86400.0);
 }
 
+// ---- Power source (CONTEXT.md): where input power comes from, sent as `src` next to `chg`. On the v2.2 board solar and
+// USB share one input line and overlap in voltage, so the only safe call is "input power while the sun is well down":
+// a panel gives nothing in the dark, so it can only be the cable. Anything else with input power is unknown. Solar (1)
+// is never sent here; a v3 board that reads the sources apart replaces this rule. rise/set: today's, 0 if not known.
+enum PowerSource { SRC_BATTERY = 0, SRC_SOLAR = 1, SRC_USB = 2, SRC_UNKNOWN = 3 };
+const uint32_t SRC_NIGHT_MARGIN_S = 3600;      // past twilight: the nearly unloaded input line can hold a panel's voltage
+inline PowerSource powerSourceOf(bool powered, bool clockOk, uint32_t now, uint32_t rise, uint32_t set) {
+  if (!powered) return SRC_BATTERY;
+  if (clockOk && rise && set && (now + SRC_NIGHT_MARGIN_S < rise || now > set + SRC_NIGHT_MARGIN_S)) return SRC_USB;
+  return SRC_UNKNOWN;
+}
+
 // ---- time zone: the POSIX zone string Schedules run on (Settings.tz: cap bytes, its end included)
 // A zone a controller takes: at least 3 characters, and it fits the field.
 inline bool zoneOk(const char *tz, size_t cap) { size_t n = strlen(tz); return n >= 3 && n < cap; }

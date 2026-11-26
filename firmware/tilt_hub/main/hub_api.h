@@ -112,6 +112,7 @@ static std::string infoJson() {
     std::string tailj = std::string(nums) + (k.otaErr[0] ? ",\"otaErr\":\"" + std::string(k.otaErr) + "\"" : std::string()) +
                         (k.s.keyState ? ",\"hubCid\":\"" + hexOf(k.s.cid, 8) + "\"" : std::string()) +   // the hub's own key on it (its join request)
                         (k.chg >= 0 ? ",\"chg\":" + std::to_string(k.chg) : std::string()) +   // on the charging cable (not said by an older controller)
+                        (k.src >= 0 ? ",\"src\":" + std::to_string(k.src) : std::string()) +   // Power source, as sent (not said by an older controller)
                         ",\"own\":" + std::to_string(k.own) + "}";                                            // it has an owner (-1 not known)
     j += std::string(first ? "" : ",") + "{\"id\":\"" + std::string(k.s.id, strnlen(k.s.id, 12)) + "\",\"name\":" + jq(k.name) +
          ",\"fw\":\"" + std::string(k.fw, strnlen(k.fw, 23)) + "\"" + tailj;
