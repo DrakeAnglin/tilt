@@ -83,6 +83,8 @@ enum Prefs {
     static let scenes = "scenes.v1"
     static let myName = "myName"
     static let devMode = "devMode"
+    /// The person tapped Not Now on the first-launch name sheet: do not ask again (Settings still has Display Name).
+    static let nameSkipped = "nameSkipped"
     static let appearance = "appearance"
     /// Developer builds only: follow the beta firmware channel, and where to look for firmware.
     static let firmwareBeta = "fwBeta"
