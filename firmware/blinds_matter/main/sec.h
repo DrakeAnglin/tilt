@@ -2,15 +2,20 @@
 // key, and every command is encrypted and authenticated with it (AES-256-GCM). Nothing else on the network can read
 // the blinds' state or move them.
 //
-//   GET  /x/hello   who am I: id, name, firmware, this start's number ("boot"), is there an owner yet
-//   POST /x/pair    make a key. JSON {"pub": base64 P-256 public key, "name": "..."}
-//                   Only for the first phone (it becomes an owner). Both sides do ECDH; the key is HKDF-SHA256 of the result.
-//   POST /x/ask     ask to join a controller that has an owner. Same JSON as /x/pair. The key is made
-//                   but does nothing until an owner approves it in the app (/api/approve). Both phones show the
-//                   same 4-digit code, made from the key, so the owner can tell it is the right phone.
-//   POST /x         a command. Bytes: client id (8) | nonce (12) | ciphertext | tag (16)
-//                   nonce = boot (4) | counter (8, must rise). Plain text inside: "/api/go?b=0&t=50".
-//                   The answer comes back the same way: nonce (12) | ciphertext | tag.
+// The requests, over Bluetooth (ble.h: the letter) and through the Tilt Hub (hub_link.h: the letter; the app sends the
+// hub the path, which the hub turns into the letter):
+//   H  GET  /x/hello     who am I: id, name, firmware, this start's number ("boot"), is there an owner yet
+//   P                    make a key. JSON {"pub": base64 P-256 public key, "name": "..."}. Bluetooth only: only for
+//                        the first phone (it becomes an owner). Both sides do ECDH; the key is HKDF-SHA256 of the result.
+//   A  POST /x/ask       ask to join a controller that has an owner. Same JSON as P. The key is made but does nothing
+//                        until an owner approves it in the app (/api/approve). Both phones show the same 4-digit code,
+//                        made from the key, so the owner can tell it is the right phone.
+//   R  POST /x/recover   no owner left: ask to join, then turn a blind's wand to become an owner (people.h)
+//   Q  GET  /x/recstate  how far that recovery has got
+//   X  POST /x           a command. Bytes: client id (8) | nonce (12) | ciphertext | tag (16)
+//                        nonce = boot (4) | counter (8, must rise). Plain text inside: "/api/go?b=0&t=50".
+//                        The answer comes back the same way: nonce (12) | ciphertext | tag. Who may send which
+//                        command: routes.h.
 //
 // A captured command cannot be replayed: the counter must rise, and after a restart the boot number is new.
 #pragma once
@@ -114,28 +119,10 @@ bool hubMacOk(const std::string &what, const std::string &mac) {
   for (size_t i = 0; i < want.size(); i++) d |= want[i] ^ mac[i];
   return d == 0;
 }
-std::string body(httpd_req_t *r, size_t maxLen) {
-  std::string b;
-  if (r->content_len > maxLen) return b;
-  b.resize(r->content_len);
-  size_t got = 0;
-  while (got < b.size()) {
-    int n = httpd_req_recv(r, &b[got], b.size() - got);
-    if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
-    if (n <= 0) return "";
-    got += n;
-  }
-  return b;
-}
-esp_err_t plain(httpd_req_t *r, const char *status, const std::string &j) {
-  httpd_resp_set_status(r, status);
-  httpd_resp_set_type(r, "application/json");
-  return httpd_resp_send(r, j.c_str(), j.size());
-}
-
 // ---- pairing
-// Returns the HTTP-style status ("200 OK", ...) and fills out with the JSON answer. Used over Bluetooth and through the hub.
-const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
+// Returns the HTTP-style status ("200 OK", ...) and fills out with the JSON answer. Over Bluetooth ('P', 'A') and through
+// the hub ('A'); recoverDo (people.h) starts with an ask too.
+const char *pairDo(const std::string &b, std::string &out, bool ask = false, bool recovering = false) {
   std::string pubB64 = jsonStr(b, "pub");
   uint8_t cpub[65];
   size_t n = 0;
@@ -170,13 +157,13 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
 
   KeysLock kl;                                 // the key is ready: claim a slot now (the slow part ran unlocked)
   if (!first != owned()) { out = "{\"err\":\"another phone paired at the same moment. Try again.\"}"; return "409 Conflict"; }
-  int slot = -1;
-  if (ask && asksWaiting() >= 2) {               // at most two waiting: a new ask takes the place of one older than 10 minutes
-    for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && (!askAt[i] || millis() - askAt[i] > 600000)) { slot = i; break; }
-    if (slot < 0) { out = "{\"err\":\"two requests are waiting already. Try again later.\"}"; return "429 Too Many Requests"; }
-  }
-  else for (int i = 0; i < MAX_KEYS; i++) if (!keys[i].used) { slot = i; break; }
+  uint8_t used[MAX_KEYS];                        // the slot rule (logic.h keySlot): at most two asks wait, a recovery always gets in
+  uint32_t waited[MAX_KEYS];
+  for (int i = 0; i < MAX_KEYS; i++) { used[i] = keys[i].used; waited[i] = askAt[i] ? millis() - askAt[i] : UINT32_MAX; }
+  int slot = keySlot(used, waited, MAX_KEYS, ask, recovering);
+  if (slot == KEY_TWO_WAITING) { out = "{\"err\":\"two requests are waiting already. Try again later.\"}"; return "429 Too Many Requests"; }
   if (slot < 0) { out = "{\"err\":\"no room for another phone\"}"; return "403 Forbidden"; }
+  if (keys[slot].used == 2) event("%s's request to join was replaced by a newer one", keys[slot].name);
   ClientKey &k = keys[slot];
   memset(&k, 0, sizeof k);
   k.used = ask ? 2 : 1; k.role = first ? 1 : 0;
@@ -195,8 +182,6 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false) {
   out = std::string("{\"pub\":\"") + std::string((char *)pb, pn) + "\",\"cid\":\"" + hexOf(k.id, 8) + "\",\"check\":\"" + hexOf(chk, 8) + "\",\"owner\":" + (first ? "1" : "0") + ",\"wait\":" + (ask ? "1" : "0") + ",\"topic\":\"" + hexOf(cloudTopic, 16) + "\"}";
   return "200 OK";
 }
-esp_err_t hPair(httpd_req_t *r) { std::string out; const char *st = pairDo(body(r, 600), out); return plain(r, st, out); }
-esp_err_t hAsk(httpd_req_t *r) { std::string out; const char *st = pairDo(body(r, 600), out, true); return plain(r, st, out); }
 // The 4 digits both phones show for a request to join.
 std::string askCode(const ClientKey &k) {
   uint8_t h[32]; char c[6];
@@ -207,14 +192,13 @@ std::string askCode(const ClientKey &k) {
 
 
 // ---- commands
-struct Route { const char *uri; httpd_method_t m; esp_err_t (*fn)(httpd_req_t *); };
+struct Route { const char *uri; esp_err_t (*fn)(httpd_req_t *); Who who; };      // made from routes.h (web.h)
 extern const Route routes[];
 extern const int routeCount;
-// ---- who may do what: the one place every request is decided (secured, over Bluetooth or through the hub)
+// ---- who may do what: the one place every command is decided (over Bluetooth or through the hub)
 struct Caller {
-  bool secure;                                   // came over the secured connection (else: plain HTTP)
-  bool owner;                                    // secured: the phone is an owner (else a user)
-  const uint8_t *id;                             // secured: the phone's 8-byte id
+  bool owner;                                    // the phone is an Owner (else a Guest)
+  const uint8_t *id;                             // the phone's 8-byte id
 };
 std::string qarg(const std::string &query, const char *key) {
   char v[80] = "";
@@ -222,9 +206,8 @@ std::string qarg(const std::string &query, const char *key) {
 }
 // nullptr: allowed. Otherwise the reason it is refused. Rules about the target (you cannot remove yourself, the last
 // owner stays) live in the handlers; who the caller is and what that lets them do is decided only here.
-const char *permit(const Route *rt, const std::string &path, const std::string &query, const Caller &c) {
-  return permitRule(c.secure, c.owner, !owned() || openApi, false, path,
-                    c.secure ? qarg(query, "cid") : std::string(), c.secure ? hexOf(c.id, 8) : std::string());
+const char *permit(const Route &rt, const std::string &query, const Caller &c) {
+  return permitRule(rt.who, c.owner, qarg(query, "cid"), hexOf(c.id, 8));
 }
 // The answer is sealed bytes when the status is "200 OK", plain JSON otherwise.
 const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool *fromHub = nullptr) {
@@ -260,9 +243,9 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool 
   size_t q = cmd.find('?');
   std::string path = cmd.substr(0, q), query = q == std::string::npos ? "" : cmd.substr(q + 1), out;
   const Route *rt = nullptr;
-  for (int i = 0; i < routeCount; i++) if (path == routes[i].uri && routes[i].m == HTTP_GET && !path.compare(0, 5, "/api/")) rt = &routes[i];
+  for (int i = 0; i < routeCount; i++) if (path == routes[i].uri) rt = &routes[i];
   if (!rt) out = "{\"ok\":0,\"err\":\"unknown command\"}";
-  else if (const char *why = permit(rt, path, query, Caller{true, owner, p})) out = std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
+  else if (const char *why = permit(*rt, query, Caller{owner, p})) out = std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
   else {
     xSemaphoreTake(secMx, portMAX_DELAY);
     bool still;                                  // removed by a command that ran just before this one?
@@ -280,11 +263,4 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool 
   memcpy(aad2, "blinds-v1r", 10); memcpy(aad2 + 10, p, 8); memcpy(aad2 + 18, nonce, 12);
   if (!gcm(true, key, o, aad2, 30, (const uint8_t *)out.data(), out.size(), o + 12, o + 12 + out.size())) { resp = "{\"err\":\"seal\"}"; return "500 Internal Server Error"; }
   return "200 OK";
-}
-esp_err_t hSecure(httpd_req_t *r) {
-  std::string resp;
-  const char *st = secDo(body(r, 2200), resp, r);
-  if (strcmp(st, "200 OK")) return plain(r, st, resp);
-  httpd_resp_set_type(r, "application/octet-stream");
-  return httpd_resp_send(r, resp.data(), resp.size());
 }

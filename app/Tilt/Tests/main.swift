@@ -649,5 +649,14 @@ let shown = People.shown([pk("x", 0, 0), pk("hub", 0, 1), pk("w", 0, 1), pk("me"
 check(shown.map(\.cid) == ["me", "w", "x"], "the hub's own key is left out; this phone first, then requests")
 check(People.shown([pk("hub", 0, 1)], hubCid: nil).count == 1, "not on a hub: nobody is left out")
 
+// Recovery progress through the hub: a lost answer or two does not end it, three in a row do.
+do {
+    var poll = RecoveryPoll()
+    check(!poll.missed() && !poll.missed(), "two lost answers: keep watching")
+    poll.answered()
+    check(!poll.missed() && !poll.missed(), "an answer starts the count again")
+    check(poll.missed(), "three in a row: give up")
+}
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -64,13 +64,16 @@ enum Secure {
     static func pair(host: String, phoneName: String, how: Joining, salt: Data = Data()) async throws -> Paired {
         try await pair(phoneName: phoneName, salt: salt) { try await http(host, how.rawValue, body: $0) }
     }
-    /// The three ways in: the first phone of a new controller, asking an owner, or proving you are at the window.
+    /// The three ways in: the first phone (of a Tilt Hub; a new controller's first phone pairs over Bluetooth), asking an
+    /// owner, or proving you are at the window.
     enum Joining: String { case first = "/x/pair", ask = "/x/ask", recover = "/x/recover" }
-    /// How far a recovery has got: steps done (0…3) and seconds left; nil when none is running.
-    static func recovery(_ host: String) async -> (step: Int, left: Int)? {
+    /// How far a recovery has got: steps done (0…3) and seconds left; nil when none is running. Throws when no answer
+    /// came (through the hub one can be lost: see RecoveryPoll).
+    static func recovery(_ host: String) async throws -> (step: Int, left: Int)? {
         struct R: Decodable { let on: Int, step: Int, left: Int }
-        guard let (st, d) = try? await http(host, "/x/recstate"), st == 200, let r = try? JSONDecoder().decode(R.self, from: d), r.on == 1 else { return nil }
-        return (r.step, r.left)
+        let (st, d) = try await http(host, "/x/recstate")
+        guard st == 200, let r = try? JSONDecoder().decode(R.self, from: d) else { throw TiltError("No answer about the recovery.") }
+        return r.on == 1 ? (r.step, r.left) : nil
     }
     /// The same, through any channel that carries the request and brings back (status, answer).
     static func pair(phoneName: String, salt: Data = Data(), via: (Data) async throws -> (Int, Data)) async throws -> Paired {
@@ -90,6 +93,15 @@ enum Secure {
         guard mine == check else { throw TiltError("The controller's key did not match. Pairing was cancelled.") }
         return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1, waiting: (j["wait"] as? Int) == 1, topic: (j["topic"] as? String) ?? "", blindName: (j["blindName"] as? String) ?? "")
     }
+}
+
+/// Watching a recovery's progress: one lost answer through the hub is not the end of it. Only `limit` in a row are.
+struct RecoveryPoll {
+    let limit = 3
+    private(set) var missedInARow = 0
+    mutating func answered() { missedInARow = 0 }
+    /// One poll got no answer. True: give up.
+    mutating func missed() -> Bool { missedInARow += 1; return missedInARow >= limit }
 }
 
 /// The secured message format, shared with the firmware (sec.h secDo) and tested against it (Tests/main.swift).

@@ -1,5 +1,6 @@
-// What every web handler uses to read a request and answer it, whether it came as plain HTTP or as a secured
-// command (sec.h) over Bluetooth or through the Tilt Hub. Also the handlers' lock (Lock) and the request bookkeeping beside it.
+// What every command handler uses to read its command and answer it: a secured command (sec.h secDo) that came
+// over Bluetooth or through the Tilt Hub. (There is no web server: httpd_req_t is only the handlers' signature.)
+// Also the handlers' lock (Lock) and the request bookkeeping beside it.
 #pragma once
 #include <esp_http_server.h>
 #include "ardu.h"
@@ -13,9 +14,8 @@ void pokeBlinds();                       // app_main.cpp: wake the blinds task
 
 // ---- small helpers (ap, jq, jn: wire.h)
 std::string arg(httpd_req_t *r, const char *key) {       // a value from the address's ?a=b&c=d part, decoded
-  char q[600], v[300];
-  if (secQuery) { if (httpd_query_key_value(secQuery, key, v, sizeof v) != ESP_OK) return ""; }      // a secured command
-  else if (httpd_req_get_url_query_str(r, q, sizeof q) != ESP_OK || httpd_query_key_value(q, key, v, sizeof v) != ESP_OK) return "";
+  char v[300];
+  if (!secQuery || httpd_query_key_value(secQuery, key, v, sizeof v) != ESP_OK) return "";
   std::string o;
   for (char *p = v; *p; p++) {
     if (*p == '+') o += ' ';
@@ -26,10 +26,9 @@ std::string arg(httpd_req_t *r, const char *key) {       // a value from the add
 }
 int argi(httpd_req_t *r, const char *key) { return atoi(arg(r, key).c_str()); }
 esp_err_t sendJson(httpd_req_t *r, const std::string &j) {
-  if (secOut) { *secOut = j; return ESP_OK; }    // a secured command: the answer is sealed by hSecure
-  httpd_resp_set_type(r, "application/json");
-  httpd_resp_set_hdr(r, "Cache-Control", "no-store");
-  return httpd_resp_send(r, j.c_str(), j.size());
+  if (!secOut) return ESP_FAIL;                  // not inside a secured command: nobody to answer
+  *secOut = j;                                   // secDo seals it
+  return ESP_OK;
 }
 esp_err_t ok(httpd_req_t *r) { return sendJson(r, "{\"ok\":1}"); }
 esp_err_t fail(httpd_req_t *r, const char *e) { return sendJson(r, std::string("{\"ok\":0,\"err\":") + jq(e) + "}"); }

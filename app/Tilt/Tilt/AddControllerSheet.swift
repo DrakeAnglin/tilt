@@ -48,13 +48,13 @@ struct AddControllerSheet: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(f.name).foregroundStyle(.primary)
-                                    Text(f.owned ? "Tap to ask its owner to let you in" : "New: tap to add").font(.footnote).foregroundStyle(.secondary)
+                                    Text(f.owned ? "Tap to ask its owner to let you in" : "New: add it over Bluetooth, above").font(.footnote).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                if busy { SlatLoader(size: 20) } else { Text(f.owned ? "Ask to Join" : "Add").fontWeight(.medium) }
+                                if busy { SlatLoader(size: 20) } else if f.owned { Text("Ask to Join").fontWeight(.medium) }
                             }
                         }
-                        .disabled(busy)
+                        .disabled(busy || !f.owned)          // a new controller's first owner pairs over Bluetooth only
                     }
                 } header: { Text("Already on your Tilt Hub") }
                 if !model.hasDemo && hub.record == nil {           // with a Tilt Hub there is real hardware to set up

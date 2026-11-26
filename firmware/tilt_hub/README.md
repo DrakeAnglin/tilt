@@ -50,7 +50,7 @@ The protocol between hub and controller is described at the top of `../blinds_ma
 |---|---|
 | `GET /hub` | the hub's id and whether it has an owner (nothing else) |
 | `/hub/x/hello`, `/hub/x/pair`, `/hub/x/ask`, `POST /hub/x` | a phone's key on the hub, and its sealed commands: `/api/info`, `/api/keys`, `/api/net`, `/api/homecode`, `/api/backups`, `/api/upload?id=`, `/api/testalert` (owner) and the people commands |
-| `/c/<id>/x...` | the app's sealed commands, passed to the controller over Thread |
+| `GET /c/<id>/x/hello`, `POST /c/<id>/x/ask`, `POST /c/<id>/x/recover`, `GET /c/<id>/x/recstate`, `POST /c/<id>/x` | passed to the controller over Thread: its hello, asking to join, getting back in when no owner is left, and the app's sealed commands. A new controller takes its first owner over Bluetooth only, so there is no `/x/pair` here |
 | `POST /c/<id>/api/update` | a signed firmware file for that controller, only in the 5 minutes after the owner's `/api/upload?id=<id>` |
 
 ## Push alerts

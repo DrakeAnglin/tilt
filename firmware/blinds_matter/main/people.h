@@ -100,36 +100,42 @@ void recoverTick() {                             // from webTick, once a second
   event("%s recovered access by turning blind %d", k.name, p + 1);
   recover.slot = -1;
 }
-esp_err_t hRecover(httpd_req_t *r) {             // POST /x/recover: the same JSON as /x/ask
+// Start getting back in ('R', over Bluetooth or through the hub): the same JSON as an ask ('A'). Returns the status
+// ("200 OK", ...) and the answer, which is the ask's with the blind to turn.
+const char *recoverDo(const std::string &b, std::string &out) {
   int p = -1;
-  for (int i = 0; i < PORTS && p < 0; i++) if (movable(i)) p = i;
-  if (p < 0) return plain(r, "409 Conflict", "{\"err\":\"no blind is set up, so there is nothing to turn\"}");
   bool busy;
-  { KeysLock kl; busy = recover.slot >= 0; }
-  if (busy) return plain(r, "429 Too Many Requests", "{\"err\":\"a recovery is already under way. Try again in two minutes.\"}");
-  std::string out;
-  const char *st = pairDo(body(r, 600), out, true);
-  if (strcmp(st, "200 OK")) return plain(r, st, out);
+  {
+    KeysLock kl;                                 // the controller lock: bs, cfg and recover are shared with the blinds task
+    for (int i = 0; i < PORTS && p < 0; i++) if (movable(i)) p = i;
+    busy = recover.slot >= 0;
+  }
+  if (p < 0) { out = "{\"err\":\"no blind is set up, so there is nothing to turn\"}"; return "409 Conflict"; }
+  if (busy) { out = "{\"err\":\"a recovery is already under way. Try again in two minutes.\"}"; return "429 Too Many Requests"; }
+  const char *st = pairDo(b, out, true, true);
+  if (strcmp(st, "200 OK")) return st;
   uint8_t id[8];
   unhex(jsonStr(out, "cid"), id, 8);
+  std::string name;
   {
     KeysLock kl;                                 // recover, ramps and keys[] are also used by the main loop (recoverTick)
     for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) recover.slot = i;
     rampCancel();                                // a gentle move would run the motor and end the attempt
     recover.port = p; recover.step = 0; recover.until = millis() + 120000; recover.moves = movesEver();
+    name = cfg.b[p].name;
   }
   event("recovery started: turn blind %d", p + 1);
   out.pop_back();                                // the closing brace
-  out += std::string(",\"recover\":1,\"blind\":") + std::to_string(p) + ",\"blindName\":" + jq(cfg.b[p].name) + "}";
-  return plain(r, st, out);
+  out += std::string(",\"recover\":1,\"blind\":") + std::to_string(p) + ",\"blindName\":" + jq(name.c_str()) + "}";
+  return st;
 }
-esp_err_t hRecoverState(httpd_req_t *r) {        // GET /x/recstate: how far the turning has got (0..3), seconds left
+std::string recoverStateJson() {                 // 'Q': how far the turning has got (0..3), seconds left
   std::string j;
   Recover now;
   { KeysLock kl; now = recover; }                // a copy under the lock: recoverTick changes it in the blinds task
   bool on = now.slot >= 0;
   ap(j, "{\"on\":%d,\"step\":%d,\"left\":%d}", on ? 1 : 0, on ? now.step : 0, on ? (int)((int32_t)(now.until - millis()) / 1000) : 0);
-  return plain(r, "200 OK", j);
+  return j;
 }
 esp_err_t hMakeOwner(httpd_req_t *r) {           // owner: give another phone the owner's rights too
   Lock l;
