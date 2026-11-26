@@ -50,42 +50,42 @@ final class Controller: Identifiable {
     func start() {
         guard task == nil else { return }
         task = Task { [weak self] in
-            var misses = 0
+            var memory = ControllerPoll.Memory()
             while !Task.isCancelled {
                 guard let self else { return }
-                do {
-                    let s = try await self.client.state()
-                    if s != self.state { self.state = s }
-                    if !self.record.onHub { BatteryAlerts.check(id: self.id, name: s.name, battery: s.batt) }   // on a hub: the hub's push alerts
-                    self.online = true
-                    misses = 0
-                    self.noteSeen()
-                    if self.record.waiting == true { self.record.waiting = nil; self.record.code = nil; self.changed?(); Task { await Cloud.clearJoin(cid: self.record.cid) } }      // an owner let this phone in
-                    if let t = s.topic, !t.isEmpty, t != self.record.topic { self.record.topic = t; self.changed?() }
-                    if let t = self.record.topic { if self.record.owner { await Cloud.watch(topic: t) } else { await Cloud.unwatch(topic: t) } }      // owners get a push when someone asks to join
-                    if let m = s.me, (m == 1) != self.record.owner { self.record.owner = m == 1; self.changed?() }
-                    if self.record.owner, (s.asks ?? 0) != self.asked { await self.loadRequests() }
-                    // Set up before the controller knew which key is the hub's: tell it (once per start of the app).
-                    if self.record.owner, self.record.onHub, s.hkey == 0, !self.hubKeyTold {
-                        self.hubKeyTold = true
-                        // May run alongside a setup's own admitHub: harmless, a request already let in is not let in again.
-                        if let hub = try? HubWatch.shared.client() { _ = await hub.admitHub(on: self.client, controllerId: self.id) }
-                    }
-                } catch LinkProblem.waiting {
-                    self.online = true
-                    try? await Task.sleep(for: .seconds(2))
-                } catch LinkProblem.notPaired {
-                    if self.record.waiting == true { self.denied = true; return }
-                    self.removed = true          // the controller answered and no longer knows this phone: an owner removed it
-                    self.changed?()
-                    return
-                } catch {
-                    misses += 1
-                    if misses >= 3 { self.online = false }
+                let answer: ControllerPoll.Answer
+                do { answer = .state(try await self.client.state()) }
+                catch LinkProblem.waiting { answer = .waiting }
+                catch LinkProblem.notPaired { answer = .notPaired }
+                catch { answer = .failed }
+                let o = ControllerPoll.reconcile(answer, record: self.record, memory: memory, asked: self.asked,
+                                                 moving: (self.state?.mv ?? -1) >= 0, boost: self.boost)
+                memory = o.memory
+                if o.record != self.record { self.record = o.record }
+                if let on = o.online { self.online = on }
+                if case .state(let s) = answer, s != self.state { self.state = s }
+                if o.answered { self.noteSeen() }
+                for e in o.effects { await self.apply(e) }
+                switch o.next {
+                case .after(let gap): try? await Task.sleep(for: gap)
+                case .denied: self.denied = true; return
+                case .removed: self.removed = true; self.changed?(); return      // an Owner removed this phone
                 }
-                let fast = (self.state?.mv ?? -1) >= 0 || self.boost
-                try? await Task.sleep(for: .milliseconds(fast ? 350 : 1200))
             }
+        }
+    }
+    /// What the poll rules asked for (ControllerPoll.Effect), done.
+    private func apply(_ e: ControllerPoll.Effect) async {
+        switch e {
+        case .saveRecord: changed?()
+        case .clearJoin(let cid): Task { await Cloud.clearJoin(cid: cid) }
+        case .watch(let t): await Cloud.watch(topic: t)
+        case .unwatch(let t): await Cloud.unwatch(topic: t)
+        case .loadRequests: await loadRequests()
+        case .admitHub:
+            // May run alongside a setup's own admitHub: harmless, a request already let in is not let in again.
+            if let hub = try? HubWatch.shared.client() { _ = await hub.admitHub(on: client, controllerId: id) }
+        case .batteryNotice(let name, let reading): BatteryAlerts.check(id: id, name: name, reading: reading)
         }
     }
     func stop() { task?.cancel(); task = nil }
@@ -96,7 +96,6 @@ final class Controller: Identifiable {
 
     /// Requests the controller listed last, the hub's own included (so a hub request still open does not reload every poll).
     private var asked = 0
-    private var hubKeyTold = false
     func loadRequests() async {
         guard let people = try? await client.people() else { return }
         var asks = people.filter { $0.wait == 1 }

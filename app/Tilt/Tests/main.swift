@@ -733,5 +733,93 @@ do {
     check(Paired(cid: Data(repeating: 1, count: 8), key: key, owner: true).request == nil, "an owner has no request")
 }
 
+// ---- the controller poll rules (Shared/ControllerPoll.swift): what the app does with each answer from a controller
+do {
+    typealias P = ControllerPoll
+    let batt = ControllerState.Battery(v: 3.9, pct: 80, st: "battery", low: 0)
+    func pollState(mv: Int = -1, asks: Int? = nil, hkey: Int? = 1, me: Int? = 1, topic: String? = "t1") -> ControllerState {
+        ControllerState(v: "2.2.1", name: "Den", batt: batt, closeUp: 1, sync: 0, mv: mv, hk: nil, asks: asks, hkey: hkey,
+                        me: me, gentle: nil, topic: topic, b: [])
+    }
+    let home = ControllerRecord(id: "aa", name: "Den", host: "192.168.1.5", cid: "c1", owner: true, waiting: nil, code: nil, topic: "t1")
+    var hubbed = home; hubbed.host = "hub.local/c/aa"
+    func poll(_ a: P.Answer, _ r: ControllerRecord, memory: P.Memory = P.Memory(), asked: Int = 0, moving: Bool = false, boost: Bool = false) -> P.Outcome {
+        P.reconcile(a, record: r, memory: memory, asked: asked, moving: moving, boost: boost)
+    }
+    func saves(_ o: P.Outcome) -> Int { o.effects.filter { $0 == .saveRecord }.count }
+
+    // 1. a plain answer for an Owner, nothing new
+    let plain = poll(.state(pollState()), hubbed)
+    check(plain.online == true && plain.answered && plain.record == hubbed, "a plain answer: online, answered, record as it was")
+    check(plain.effects == [.watch(topic: "t1")], "a plain answer for an Owner: only the watch (got \(plain.effects))")
+    check(plain.next == .after(.milliseconds(1200)), "a plain answer: ask again in 1200 ms")
+
+    // 2. a Join request that was waiting is answered
+    var asking = hubbed; asking.waiting = true; asking.code = "1585"
+    let let_in = poll(.state(pollState()), asking)
+    check(let_in.record.waiting == nil && let_in.record.code == nil, "let in: no longer waiting, the code is gone")
+    check(saves(let_in) == 1 && let_in.effects.contains(.clearJoin(cid: "c1")), "let in: saved once, the iCloud note taken away")
+
+    // 3. a new topic
+    let newTopic = poll(.state(pollState(topic: "t2")), hubbed)
+    check(newTopic.record.topic == "t2" && saves(newTopic) == 1 && newTopic.effects.contains(.watch(topic: "t2")), "a new topic is kept, saved and watched")
+    check(saves(poll(.state(pollState(topic: "")), hubbed)) == 0 && poll(.state(pollState(topic: "")), hubbed).record.topic == "t1", "an empty topic changes nothing")
+    check(saves(poll(.state(pollState(topic: "t1")), hubbed)) == 0, "the same topic changes nothing")
+
+    // 4. the role follows the controller, before watch / unwatch
+    let madeGuest = poll(.state(pollState(me: 0)), hubbed)
+    check(!madeGuest.record.owner && saves(madeGuest) == 1, "me 0 on an Owner record: now a Guest, saved")
+    check(madeGuest.effects.contains(.unwatch(topic: "t1")) && !madeGuest.effects.contains(.watch(topic: "t1")), "a new Guest is unwatched on this ask")
+    var guest = hubbed; guest.owner = false
+    let madeOwner = poll(.state(pollState(me: 1)), guest)
+    check(madeOwner.record.owner && madeOwner.effects.contains(.watch(topic: "t1")), "me 1 on a Guest record: now an Owner, watched")
+    check(poll(.state(pollState(me: nil)), guest).record.owner == false && poll(.state(pollState(me: nil)), hubbed).record.owner, "no me (older firmware): the role stays")
+
+    // 5. three healings at once: one save
+    let all3 = poll(.state(pollState(me: 0, topic: "t2")), asking)
+    check(saves(all3) == 1 && all3.record.waiting == nil && all3.record.topic == "t2" && !all3.record.owner, "three healings, one save")
+
+    // 6. Join requests to load
+    check(poll(.state(pollState(asks: 2)), hubbed, asked: 0).effects.contains(.loadRequests), "new Join requests: load them")
+    check(!poll(.state(pollState(asks: 2)), hubbed, asked: 2).effects.contains(.loadRequests), "the same count: no load")
+    check(!poll(.state(pollState(asks: 2, me: 0)), guest, asked: 0).effects.contains(.loadRequests), "a Guest never loads them")
+
+    // 7. tell the controller the hub's key, once
+    let tell = poll(.state(pollState(hkey: 0)), hubbed)
+    check(tell.effects.contains(.admitHub) && tell.memory.hubKeyTold, "Owner on a hub, hkey 0: tell it the hub's key")
+    check(!poll(.state(pollState(hkey: 0)), hubbed, memory: tell.memory).effects.contains(.admitHub), "told once: not again")
+    check(!poll(.state(pollState(hkey: 0)), home).effects.contains(.admitHub), "not on a hub: no hub key")
+    check(!poll(.state(pollState(hkey: 0, me: 0)), guest).effects.contains(.admitHub), "a Guest: no hub key")
+    check(!poll(.state(pollState(hkey: 1)), hubbed).effects.contains(.admitHub), "hkey 1: already knows")
+
+    // 8. the battery: the phone judges it only off a hub
+    check(poll(.state(pollState()), home).effects.contains(.batteryNotice(name: "Den", reading: batt.reading)), "not on a hub: the phone checks the battery")
+    check(!poll(.state(pollState()), hubbed).effects.contains { if case .batteryNotice = $0 { true } else { false } }, "on a hub: the hub's alerts")
+
+    // 9. pace
+    check(poll(.state(pollState(mv: 0)), hubbed).next == .after(.milliseconds(350)), "a move under way: 350 ms")
+    check(poll(.state(pollState()), hubbed, boost: true).next == .after(.milliseconds(350)), "boost: 350 ms")
+    check(poll(.state(pollState()), hubbed, moving: true).next == .after(.milliseconds(1200)), "a state with no move: its own mv wins, 1200 ms")
+
+    // 10. misses
+    var m = P.Memory(), onlines: [Bool?] = []
+    for _ in 0..<3 { let o = poll(.failed, hubbed, memory: m); m = o.memory; onlines.append(o.online) }
+    check(onlines == [nil, nil, false] && m.misses == 3, "Unreachable from the third miss in a row (got \(onlines))")
+    let back = poll(.state(pollState()), hubbed, memory: m)
+    check(back.memory.misses == 0 && back.online == true, "an answer after misses: online, misses reset")
+    check(poll(.failed, hubbed, moving: true).next == .after(.milliseconds(350)) && poll(.failed, hubbed).next == .after(.milliseconds(1200)), "a miss: the usual gap")
+    check(!poll(.failed, hubbed).answered && poll(.failed, hubbed).effects.isEmpty, "a miss: no answer, no effects")
+
+    // 11. waiting for an Owner
+    let wait = poll(.waiting, asking, memory: P.Memory(misses: 2, hubKeyTold: false))
+    check(wait.online == true && wait.memory.misses == 2 && wait.effects.isEmpty && wait.record == asking && !wait.answered, "waiting: online, nothing else")
+    check(wait.next == .after(.milliseconds(3200)), "waiting: 2 s more than the usual gap")
+
+    // 12. not paired
+    let no = poll(.notPaired, asking)
+    check(no.next == .denied && no.effects.isEmpty, "not paired while waiting: turned down")
+    check(poll(.notPaired, hubbed).next == .removed, "not paired once in: removed")
+}
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)
