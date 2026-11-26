@@ -68,8 +68,19 @@ def gh(*args):
 
 def comments(issue):
     out = gh('api', '--paginate', 'repos/{owner}/{repo}/issues/%s/comments' % issue)
-    # --paginate prints one JSON array per page.
-    return [c for page in re.split(r'(?<=\])\s*(?=\[)', out.strip()) if page for c in json.loads(page)]
+    return pages(out)
+
+
+def pages(out):
+    """`gh api --paginate` prints one JSON array per page, back to back: read them one after the other."""
+    dec, i, items = json.JSONDecoder(), 0, []
+    while True:
+        while i < len(out) and out[i].isspace():
+            i += 1
+        if i >= len(out):
+            return items
+        page, i = dec.raw_decode(out, i)
+        items.extend(page)
 
 
 def main(argv):
@@ -90,6 +101,7 @@ def main(argv):
     if mode == '--release':
         for c in mine:
             gh('api', '-X', 'DELETE', 'repos/{owner}/{repo}/issues/comments/%s' % c['id'])
+        gh('issue', 'edit', issue, '--remove-assignee', '@me')
         print('released #%s' % issue)
         return 0
 
@@ -100,8 +112,17 @@ def main(argv):
     live = [comment for _, comment in live_claims(found, me, now)]
     stale_mine = [c for c in mine if c['id'] not in live]
     mine = [c for c in mine if c['id'] in live]
-    if mode != '--resume' and not mine:
-        prs = json.loads(gh('pr', 'list', '--state', 'open', '--json', 'number,closingIssuesReferences'))
+    # Ours from before, even gone stale: the open pull request and the assignee are ours too.
+    ours_before = bool(mine) or bool(stale_mine)
+    any_claim = any(MARK.search(c.get('body') or '') and (c.get('user') or {}).get('login') == me for c in found)
+    if mode != '--resume' and not ours_before and not any_claim:
+        assignees = json.loads(gh('api', 'repos/{owner}/{repo}/issues/%s' % issue, '--jq', '[.assignees[].login]'))
+        if assignees:
+            # Assigned with no claim ever made: the owner took it by hand, or a session from before claims.
+            print('#%s is taken: assigned to %s with no claim. Pick another issue.' % (issue, ', '.join(assignees)))
+            return 3
+    if mode != '--resume' and not ours_before:
+        prs = json.loads(gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,closingIssuesReferences'))
         open_pr = [p['number'] for p in prs if any(str(i.get('number')) == issue for i in p['closingIssuesReferences'])]
         if open_pr:
             print('#%s is taken: pull request #%s is open for it. Pick another issue.' % (issue, open_pr[0]))

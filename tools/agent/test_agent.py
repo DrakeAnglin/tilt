@@ -443,7 +443,8 @@ now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 if a[:2] == ['api', 'user']:
     out = st['me']
 elif a[0] == 'api' and a[1] == '--paginate':
-    out = json.dumps(st['comments'])
+    half = len(st['comments']) // 2  # two pages, as gh prints them
+    out = json.dumps(st['comments'][:half]) + json.dumps(st['comments'][half:])
 elif a[:3] == ['api', '-X', 'DELETE']:
     cid = int(a[3].rsplit('/', 1)[1])
     st['comments'] = [c for c in st['comments'] if c['id'] != cid]
@@ -460,6 +461,12 @@ elif a[:2] == ['issue', 'comment']:
         st['comments'].insert(len(st['comments']) - 1, st.pop('rival'))
 elif a[:2] == ['pr', 'list']:
     out = json.dumps(st['prs'])
+elif a[0] == 'api' and a[1].endswith('/issues/5'):
+    out = json.dumps(st.get('assignees', []))
+elif a[:2] == ['issue', 'edit'] and '--remove-assignee' in a:
+    st['assignees'] = []
+elif a[:2] == ['issue', 'edit']:
+    st['assignees'] = [st['me']]
 json.dump(st, open(state_file, 'w'))
 print(out)
 """
@@ -478,7 +485,7 @@ class ClaimTest(unittest.TestCase):
         return {'id': cid, 'user': {'login': login}, 'body': 'x <!-- agent-claim id=%s -->' % claim_id,
                 'created_at': t, 'updated_at': t}
 
-    def run_claim(self, comments=(), prs=(), args=('5', 'loop-a'), rival=None):
+    def run_claim(self, comments=(), prs=(), args=('5', 'loop-a'), rival=None, assignees=()):
         import subprocess, tempfile, json
         here = os.path.dirname(os.path.abspath(__file__))
         with tempfile.TemporaryDirectory() as tmp:
@@ -488,7 +495,8 @@ class ClaimTest(unittest.TestCase):
             os.chmod(fake, 0o755)
             state = os.path.join(tmp, 'state.json')
             with open(state, 'w') as f:
-                json.dump({'me': 'me', 'comments': list(comments), 'prs': list(prs), 'next': 100, 'rival': rival}, f)
+                json.dump({'me': 'me', 'comments': list(comments), 'prs': list(prs), 'next': 100, 'rival': rival,
+                           'assignees': list(assignees)}, f)
             env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'], CLAIM_STATE=state)
             r = subprocess.run([sys.executable, os.path.join(here, 'claim.py'), *args], env=env,
                                capture_output=True, text=True)
@@ -538,9 +546,31 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual(self.ids(comments), ['work-b'])
 
     def test_release_takes_the_claim_off(self):
-        code, out, comments = self.run_claim([self.claim_comment(1, 'loop-a')], args=('5', 'loop-a', '--release'))
+        code, out, comments = self.run_claim([self.claim_comment(1, 'loop-a')], args=('5', 'loop-a', '--release'),
+                                             assignees=['me'])
         self.assertEqual(code, 0, out)
         self.assertEqual(comments, [])
+
+    def test_text_that_looks_like_a_page_break_reads(self):
+        odd = {'id': 2, 'user': {'login': 'x'}, 'body': '- [x] [ ] todo ] [ done', 'created_at': self.at(1), 'updated_at': self.at(1)}
+        code, out, _ = self.run_claim([odd, self.claim_comment(3, 'work-b', hours_ago=1)])
+        self.assertEqual(code, 3, out)
+        self.assertIn('work-b', out)
+
+    def test_assigned_with_no_claim_is_taken(self):
+        code, out, _ = self.run_claim(assignees=['me'])
+        self.assertEqual(code, 3, out)
+        self.assertIn('assigned', out)
+
+    def test_assigned_with_only_a_stale_claim_is_free(self):
+        code, out, _ = self.run_claim([self.claim_comment(1, 'work-b', hours_ago=5)], assignees=['me'])
+        self.assertEqual(code, 0, out)
+
+    def test_refreshing_a_stale_own_claim_with_its_pull_request_open(self):
+        prs = [{'number': 9, 'closingIssuesReferences': [{'number': 5}]}]
+        code, out, comments = self.run_claim([self.claim_comment(1, 'loop-a', hours_ago=5)], prs=prs, assignees=['me'])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.ids(comments), ['loop-a'])
 
     def test_bad_arguments(self):
         code, _, _ = self.run_claim(args=('five', 'loop-a'))

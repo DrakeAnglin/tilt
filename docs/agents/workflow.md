@@ -45,10 +45,10 @@ How one agent takes one issue from request to `main`, without a person in the lo
 
 Every agent here uses the owner's GitHub account, so the assignee cannot say which agent has an issue. Run the claim script as it is on `main` (the main checkout may be behind, and you claim before you have a worktree). Run it as `git show origin/main:tools/agent/claim.py | python3 - <n> <id>`. It can:
 
-- **Claim:** it posts a claim comment and assigns the issue. Exit 0: it is yours. Exit 3: another agent has a live claim, or a pull request for the issue is open. Leave it alone.
+- **Claim:** it posts a claim comment and assigns the issue. Exit 0: it is yours. Exit 3: another agent has a live claim, a pull request for the issue is open, or it is assigned with no claim ever made (the owner took it by hand). Leave it alone.
 - **Refresh:** run it again with the same id. A claim lasts 4 hours from its last refresh, then it is abandoned and anyone may take the issue. Refresh before each step that can take long: the build, each review round. Once your pull request is open, it keeps the issue yours too.
 - **Take over a pull request** left by a session that stopped: `--resume`.
-- **Release:** `--release`, when you hand over or give up.
+- **Release:** `--release`, when you hand over or give up. It takes the claim and the assignee off.
 
 `<id>` names this session: its branch name, or `issue-loop` for the hourly loop. Two agents that claim in the same moment both post, then read again. The earlier claim wins, and the other takes its own claim off.
 
