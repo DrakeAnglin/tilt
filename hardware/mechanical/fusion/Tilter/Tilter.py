@@ -99,7 +99,7 @@ def make_parts(S):
     h = FIT.ROD_BORE / 2
     S.D(car, S.box(g['hub_end_x'] + 1, X['disc1'] - 1, -h, h, RZ - h, RZ + h))
     for pc in planet_centers():
-        S.D(car, S.cyl(pc, g['pin_d'] / 2 - g['pin_press'], X['disc1'] - 1, X['disc1'] + g['pin_pocket']))
+        S.D(car, S.cyl(pc, g['pin_d'] / 2 + g['pin_hole_clear'], X['disc1'] - 1, X['disc1'] + g['pin_pocket']))
     kw, kr, kd = g['lug_w'] / 2 + g['lug_clear'], g['nose_r'] + 0.1, g['lug_len'] + 0.2      # slots for the sleeve's four lugs
     S.D(car, S.box(X['disc1'] - 1, X['disc1'] + kd, -kw, kw, RZ - kr, RZ + kr), S.box(X['disc1'] - 1, X['disc1'] + kd, -kr, kr, RZ - kw, RZ + kw))
     out['Carrier'] = car
