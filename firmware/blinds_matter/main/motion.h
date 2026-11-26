@@ -126,6 +126,9 @@ bool probePresent(int p) {
 }
 void noteAngle(int p, float a) {              // a true reading (motor stopped)
   bs[p].seen = true;
+  // No pulses or 0 V with no good reading yet (just after a restart): its zero or a dropout, nobody can tell. The
+  // tilt stays unknown until a good reading, rather than a guess of 0 degrees (Middle showed tilt 112.6: #135).
+  if (bs[p].blind && isnan(bs[p].ang)) { bs[p].tilt = NAN; return; }
   bs[p].ang = bs[p].present ? a : NAN;
   bs[p].tilt = (bs[p].present && calibrated(p)) ? tiltOf(p, a) : NAN;
 }
@@ -416,14 +419,17 @@ void followHand(int p, float t) {
 // A reading for a mark: the sensor has to hold still for 0.6 s. A still PWM reading wanders about +-1.5 degrees (brush
 // noise on the shared wires), so "still" is within STEADY_DEG; a wand being turned moves far more. Returns NAN if not.
 const float STEADY_DEG = 3.5f;
+bool steadyLost = false;                       // the last steadyAngle had a dropout in it (no mark is taken from that)
 float steadyAngle(int p) {
   float a0 = readAngle(p), lo = 0, hi = 0, sum = 0;
+  steadyLost = bs[p].lost;
   for (int k = 0; k < 12; k++) {
     delay(50);
     float d = angDiff(readAngle(p), a0);
+    steadyLost |= bs[p].lost;
     lo = min(lo, d); hi = max(hi, d); sum += d;
   }
-  if (hi - lo > STEADY_DEG) return NAN;
+  if (steadyLost || hi - lo > STEADY_DEG) return NAN;
   return fmodf(a0 + sum / 12 + 360.0f, 360.0f);
 }
 // ---- marks (setup): take the blind's present position as closed-up / open / closed-down
@@ -437,6 +443,7 @@ const char *setMark(int p, const String &w) {
   watchSync(p);
   if (!bs[p].present) return "no tilter plugged in";
   float st = steadyAngle(p);
+  if (isnan(st) && steadyLost) return "the sensor gave no reading: check the tilter's cable, then tap again";
   if (isnan(st)) return "the slats are still moving: let them settle, then tap again";
   noteAngle(p, st);
   // Setup starts (closed up is its first mark): the first move after it checks the motor's direction again, so a
