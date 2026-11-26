@@ -20,7 +20,8 @@ import argparse, hashlib, json, os, re, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FW = os.path.join(ROOT, 'firmware', 'blinds_matter')
 OUT = os.path.join(ROOT, 'firmware', 'releases')
-KEY = os.path.expanduser('~/.tilt/firmware-signing-key.pem')
+# TILT_SIGNING_KEY: another key, for test files only (firmware/tilt_hub/test/make_files.sh).
+KEY = os.environ.get('TILT_SIGNING_KEY') or os.path.expanduser('~/.tilt/firmware-signing-key.pem')
 
 def der_to_raw(der):
     """An ECDSA signature as OpenSSL writes it (DER) to r | s, 32 bytes each."""

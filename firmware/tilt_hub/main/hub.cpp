@@ -80,8 +80,8 @@
 #define HUB_SETUP_PIN ""
 #endif
 #include "fwkey.h"                               // FW_SIGN_PUB: the key Tilt firmware is signed with (blinds_matter/main)
-#include <mbedtls/sha256.h>
-#include <mbedtls/ecdsa.h>
+#include "hub_file.h"                            // the update-file checks (tested on the Mac)
+#include "hub_people.h"                          // the hub's people and who may do what (tested on the Mac)
 
 static const char *TAG = "hub";
 using namespace esp_matter;
@@ -1023,47 +1023,19 @@ static void otaTask(void *arg) {
   otaFor = -1;
   vTaskDelete(nullptr);
 }
-// A file written to a partition as it came (its last 72 bytes: signature (64) and magic (8)): signed with the Tilt
-// release key over everything before the signature.
-static bool fileSigned(const esp_partition_t *p, uint32_t size, const char magic[8]) {
-  if (size < 1000) return false;
-  uint8_t tail[72], hash[32];
-  esp_partition_read(p, size - 72, tail, 72);
-  if (memcmp(tail + 64, magic, 8)) return false;
-  mbedtls_sha256_context sh;
-  mbedtls_sha256_init(&sh); mbedtls_sha256_starts(&sh, 0);
-  static uint8_t buf[4096];
-  for (uint32_t o = 0, end = size - 72; o < end;) {
-    uint32_t n = end - o < sizeof buf ? end - o : sizeof buf;
-    esp_partition_read(p, o, buf, n);
-    mbedtls_sha256_update(&sh, buf, n);
-    o += n;
-  }
-  mbedtls_sha256_finish(&sh, hash); mbedtls_sha256_free(&sh);
-  mbedtls_ecp_group grp; mbedtls_ecp_point q; mbedtls_mpi r, sv;
-  mbedtls_ecp_group_init(&grp); mbedtls_ecp_point_init(&q); mbedtls_mpi_init(&r); mbedtls_mpi_init(&sv);
-  bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_ecp_point_read_binary(&grp, &q, FW_SIGN_PUB, 65) == 0 &&
-            mbedtls_mpi_read_binary(&r, tail, 32) == 0 && mbedtls_mpi_read_binary(&sv, tail + 32, 32) == 0 && mbedtls_ecdsa_verify(&grp, hash, 32, &q, &r, &sv) == 0;
-  mbedtls_ecp_group_free(&grp); mbedtls_ecp_point_free(&q); mbedtls_mpi_free(&r); mbedtls_mpi_free(&sv);
-  return ok;
-}
-static const char SIG_MAGIC[8] = {'T', 'I', 'L', 'T', 'S', 'I', 'G', '1'}, DLT_MAGIC[8] = {'T', 'I', 'L', 'T', 'D', 'L', 'T', '1'};
-// The file in the staging area: signed, and (a full file) not older than what the controller runs. A patch is
-// signed as a file too; the controller checks the image it makes and its version.
+// The update-file checks (hub_file.h) read the staging partition as it was written.
+struct PartReader : ByteReader {
+  const esp_partition_t *p;
+  explicit PartReader(const esp_partition_t *part) : p(part) {}
+  void read(uint32_t off, void *buf, uint32_t n) override { esp_partition_read(p, off, buf, n); }
+};
+static_assert(offsetof(esp_app_desc_t, magic_word) == 0 && offsetof(esp_app_desc_t, version) == 16 && offsetof(esp_app_desc_t, project_name) == 48 &&
+              sizeof(((esp_app_desc_t *)0)->version) == 32 && sizeof(((esp_app_desc_t *)0)->project_name) == 32 && ESP_APP_DESC_MAGIC_WORD == APP_DESC_MAGIC,
+              "hub_file.h reads the app description at these places");
+// The file in the staging area, for controller k (hub_file.h).
 static const char *stageCheck(const Ctrl &k) {
-  if (stageSize < 1000) return "that is not a firmware file";
-  uint8_t head[4];
-  esp_partition_read(stage, 0, head, 4);
-  stageDelta = head[0] == 0x10 && head[1] == 0xde && head[2] == 0xcd && head[3] == 0xfc;
-  bool ok = fileSigned(stage, stageSize, stageDelta ? DLT_MAGIC : SIG_MAGIC);
-  if (!ok) return "the file's signature is not valid";
-  if (stageDelta) return nullptr;
-  esp_app_desc_t d;                                // after the image header (24 bytes) and the first segment header (8)
-  esp_partition_read(stage, 32, &d, sizeof d);
-  if (d.magic_word != ESP_APP_DESC_MAGIC_WORD) return "that is not a firmware file";
-  d.version[sizeof d.version - 1] = 0;
-  if (k.fw[0] && fwIsOlder(d.version, k.fw)) return "that firmware is older than the one it runs";
-  return nullptr;
+  PartReader rd(stage);
+  return stageCheck(rd, stageSize, k.fw, FW_SIGN_PUB, stageDelta);
 }
 // ---- the hub's own firmware, over Wi-Fi: POST /hub/api/update, in the 5 minutes after its owner allowed it (sealed
 // /api/hubupdate). The signed file goes into the spare slot; the hub checks the signature and that it is not older,
@@ -1093,16 +1065,14 @@ static esp_err_t hHubUpdate(httpd_req_t *r) {
     got += n;
   }
   otaFor = -1;
-  if (!fileSigned(stage, got, SIG_MAGIC)) return no("403 Forbidden", "the file's signature is not valid");
-  esp_app_desc_t d;
-  esp_partition_read(stage, 32, &d, sizeof d);   // after the image header (24) and the first segment header (8)
-  d.version[sizeof d.version - 1] = 0;
-  if (d.magic_word != ESP_APP_DESC_MAGIC_WORD || strncmp(d.project_name, "tilt_hub", sizeof d.project_name)) return no("400 Bad Request", "that is not a hub firmware file");
-  if (fwIsOlder(d.version, esp_app_get_description()->version)) return no("403 Forbidden", "that firmware is older than the one the hub runs");
+  PartReader rd(stage);
+  const char *why = nullptr;
+  char version[32];
+  if (int st = hubFileCheck(rd, got, esp_app_get_description()->version, FW_SIGN_PUB, why, version)) return no(st == 400 ? "400 Bad Request" : "403 Forbidden", why);
   if (esp_ota_set_boot_partition(stage) != ESP_OK) return no("500 Internal Server Error", "the file was not accepted");
-  ESP_LOGW(TAG, "hub firmware %s accepted: restarting", d.version);
+  ESP_LOGW(TAG, "hub firmware %s accepted: restarting", version);
   httpd_resp_set_type(r, "application/json");
-  httpd_resp_sendstr(r, (std::string("{\"ok\":1,\"fw\":\"") + d.version + "\"}").c_str());
+  httpd_resp_sendstr(r, (std::string("{\"ok\":1,\"fw\":\"") + version + "\"}").c_str());
   xTaskCreate([](void *) { vTaskDelay(pdMS_TO_TICKS(1500)); esp_restart(); }, "restart", 2048, nullptr, 3, nullptr);
   return ESP_OK;
 }
@@ -1335,25 +1305,18 @@ static std::string netJson() {
   return "{\"ok\":1,\"ds\":\"" + hexOf(tlv.mTlvs, tlv.mLength) + "\"}";
 }
 
-// ---- the hub's people: the same scheme as a controller's (blinds_matter/main/sec.h), so the app pairs with it the
-// same way (its address "<hub>/hub"). The first phone is the owner; others ask to join and an owner lets them in.
-// Owners can add controllers (the network), add the hub to Apple Home (its code), use backups and invite people.
-struct HubKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // used 1 in, 2 asked, 3 first owner not yet proven; role 1 owner
-static HubKey hkeys[8];
-// The first owner (a new hub, or after its people were reset) must know the setup code on the hub's label: it is
-// mixed into the key, so a phone with the wrong code makes a key the hub does not share, and its first command fails.
-// Until then the place is held for a minute; five wrong codes close connecting for five minutes.
-static uint32_t claimAt[8], askAt[8], pinLockUntil = 0;
-static int pinFails = 0;
-static uint64_t hlast[8];
+// ---- the hub's people (hub_people.h: the rules, tested on the Mac). keyMx guards people.
+static HubPeople people;
 static uint8_t hboot[4];
 static SemaphoreHandle_t keyMx;
-static void keysSave() { nvs_set_blob(nv, "hkeys", hkeys, sizeof hkeys); nvs_commit(nv); }
+static void keysSave(const HubPeople &p) { nvs_set_blob(nv, "hkeys", p.keys, sizeof p.keys); nvs_commit(nv); }
 static void pinBegin();
 static void keysBegin() {
   keyMx = xSemaphoreCreateMutex();
-  size_t n = sizeof hkeys;
-  if (nvs_get_blob(nv, "hkeys", hkeys, &n) != ESP_OK || n != sizeof hkeys) memset(hkeys, 0, sizeof hkeys);
+  people.clock = ms;
+  people.save = keysSave;
+  size_t n = sizeof people.keys;
+  if (nvs_get_blob(nv, "hkeys", people.keys, &n) != ESP_OK || n != sizeof people.keys) memset(people.keys, 0, sizeof people.keys);
   n = sizeof htopic;
   if (nvs_get_blob(nv, "htopic", htopic, &n) != ESP_OK || n != sizeof htopic) { esp_fill_random(htopic, sizeof htopic); nvs_set_blob(nv, "htopic", htopic, sizeof htopic); nvs_commit(nv); }
   esp_fill_random(hboot, sizeof hboot);
@@ -1367,7 +1330,7 @@ static void pinBegin() {
   if (setupPin[0]) { nvs_set_str(nv, "pin", setupPin); nvs_commit(nv); }
   else ESP_LOGE(TAG, "no setup code: build once over USB with main/setup_pin.h");
 }
-static bool hubOwned() { for (auto &k : hkeys) if (k.used == 1 && k.role == 1) return true; return false; }
+static bool hubOwned() { return people.owned(); }
 // The hub's id: made from its chip's MAC the first time, then kept in its saved data. So a new hub that takes over an
 // old one's saved data (copied from the old chip) is the same hub to the app. A factory reset forgets it too.
 static std::string hubIdKept;
@@ -1407,20 +1370,12 @@ static int pairDo(const std::string &b, std::string &out, bool ask) {
   uint8_t cpub[65];
   size_t n = 0;
   if (mbedtls_base64_decode(cpub, sizeof cpub, &n, (const uint8_t *)pubB64.c_str(), pubB64.length()) != 0 || n != 65) { out = "{\"err\":\"bad key\"}"; return 400; }
-  bool first = !hubOwned();
-  if (ask && first) { out = "{\"err\":\"this hub has no owner yet: connect to it\"}"; return 403; }
-  if (!ask && !first) { out = "{\"err\":\"this hub has an owner. Ask to join from the app.\"}"; return 403; }
-  if (!ask) {
-    if (pinLockUntil && (int32_t)(ms() - pinLockUntil) < 0) { out = "{\"err\":\"too many wrong codes: try again in a few minutes\"}"; return 429; }
-    xSemaphoreTake(keyMx, portMAX_DELAY);
-    bool busy = false;
-    for (int i = 0; i < 8; i++) if (hkeys[i].used == 3) { if (ms() - claimAt[i] < 60000) busy = true; else memset(&hkeys[i], 0, sizeof hkeys[i]); }
-    xSemaphoreGive(keyMx);
-    if (busy) { out = "{\"err\":\"someone else is connecting to this hub: try again in a minute\"}"; return 409; }
-  }
-  static uint32_t lastAsk = 0;
-  if (ask && lastAsk && ms() - lastAsk < 10000) { out = "{\"err\":\"try again in a few seconds\"}"; return 429; }
-  if (ask) lastAsk = ms();
+  bool first = false;
+  const char *why = nullptr;
+  xSemaphoreTake(keyMx, portMAX_DELAY);
+  int st = people.pairGate(ask, first, why);
+  xSemaphoreGive(keyMx);
+  if (st) { out = std::string("{\"err\":\"") + why + "\"}"; return st; }
   mbedtls_ecp_group grp; mbedtls_mpi d, z; mbedtls_ecp_point Q, Qp;
   mbedtls_ecp_group_init(&grp); mbedtls_mpi_init(&d); mbedtls_mpi_init(&z); mbedtls_ecp_point_init(&Q); mbedtls_ecp_point_init(&Qp);
   uint8_t dpub[65], shared[32], okm[32], okm0[32], info[9 + 130];   // okm0: the same without the setup code (for the check)
@@ -1439,25 +1394,14 @@ static int pairDo(const std::string &b, std::string &out, bool ask) {
   mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&d); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&Q); mbedtls_ecp_point_free(&Qp);
   if (!ok) { out = "{\"err\":\"key exchange failed\"}"; return 400; }
   xSemaphoreTake(keyMx, portMAX_DELAY);
-  int slot = -1, waiting = 0;
-  for (auto &k : hkeys) if (k.used == 2) waiting++;
-  if (ask && waiting >= 2) {                     // at most two waiting: a new ask takes the place of one older than 10 minutes
-    for (int i = 0; i < 8; i++) if (hkeys[i].used == 2 && (!askAt[i] || ms() - askAt[i] > 600000)) { slot = i; break; }
-    if (slot < 0) { xSemaphoreGive(keyMx); out = "{\"err\":\"two requests are waiting already. Try again later.\"}"; return 429; }
-  }
-  else for (int i = 0; i < 8; i++) if (!hkeys[i].used) { slot = i; break; }
-  if (slot < 0) { xSemaphoreGive(keyMx); out = "{\"err\":\"no room for another phone\"}"; return 403; }
-  HubKey &k = hkeys[slot];
-  memset(&k, 0, sizeof k);
-  k.used = ask ? 2 : 3; k.role = first ? 1 : 0;
-  askAt[slot] = ask ? (ms() ? ms() : 1) : 0;
-  claimAt[slot] = ask ? 0 : ms();
-  esp_fill_random(k.id, 8);
-  memcpy(k.key, okm, 32);
-  cleanName(k.name, sizeof k.name, jsonStr(b, "name"));
-  if (!k.name[0]) strlcpy(k.name, "iPhone", sizeof k.name);
-  hlast[slot] = 0;
-  keysSave();
+  int slot = people.pairPlace(ask, st, why);
+  if (slot < 0) { xSemaphoreGive(keyMx); out = std::string("{\"err\":\"") + why + "\"}"; return st; }
+  uint8_t id[8];
+  char name[sizeof(HubKey::name)];
+  esp_fill_random(id, 8);
+  cleanName(name, sizeof name, jsonStr(b, "name"));
+  people.pairTake(slot, ask, first, id, okm, name);
+  HubKey &k = people.keys[slot];
   if (ask) ESP_LOGI(TAG, "%s asked to join the hub", k.name); else ESP_LOGI(TAG, "%s is connecting (owner, once its code is right)", k.name);
   uint8_t chk[32], pb[100];
   mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), okm0, 32, (const uint8_t *)"confirm", 7, chk);   // never from the code
@@ -1476,7 +1420,8 @@ static std::string qv(const std::string &q, const char *key) {
 static std::string hubCommand(int slot, const std::string &cmd) {
   size_t qi = cmd.find('?');
   std::string path = cmd.substr(0, qi), q = qi == std::string::npos ? "" : cmd.substr(qi + 1);
-  bool owner = hkeys[slot].role == 1;
+  bool owner = people.keys[slot].role == 1;
+  if (const char *why = hubPermit(path, owner ? HUB_OWNER : HUB_USER)) return std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
   if (path == "/api/info") {                    // owners also get the hub's alert name (their phones watch it for its pushes)
     std::string j = infoJson();
     return owner ? "{\"topic\":\"" + hexOf(htopic, 16) + "\"," + j.substr(1) : j;
@@ -1485,8 +1430,8 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     xSemaphoreTake(keyMx, portMAX_DELAY);
     std::string j = "{\"ok\":1,\"keys\":[";
     bool first = true;
-    for (int i = 0; i < 8; i++) {
-      HubKey &k = hkeys[i];
+    for (int i = 0; i < HUB_KEYS; i++) {
+      HubKey &k = people.keys[i];
       if (!k.used) continue;
       j += std::string(first ? "" : ",") + "{\"cid\":\"" + hexOf(k.id, 8) + "\",\"name\":\"" + k.name + "\",\"owner\":" + (k.role ? "1" : "0") + ",\"me\":" + (i == slot ? "1" : "0") +
            ",\"wait\":" + (k.used == 2 ? "1" : "0") + ",\"code\":\"" + (k.used == 2 && owner ? askCode(k) : std::string()) + "\"}";   // the code: owners only
@@ -1497,17 +1442,13 @@ static std::string hubCommand(int slot, const std::string &cmd) {
   }
   if (path == "/api/leave") {                    // this phone leaves the hub (everywhere, not just on the phone)
     xSemaphoreTake(keyMx, portMAX_DELAY);
-    int owners = 0, others = 0;
-    for (int i = 0; i < 8; i++) if (i != slot && hkeys[i].used) { others++; if (hkeys[i].used == 1 && hkeys[i].role == 1) owners++; }
-    if (owner && owners == 0 && others > 0) { xSemaphoreGive(keyMx); return "{\"ok\":0,\"err\":\"you are the hub's only owner: make someone else an owner first, or reset its people\"}"; }
-    ESP_LOGI(TAG, "%s left the hub", hkeys[slot].name);
-    memset(&hkeys[slot], 0, sizeof hkeys[slot]);
-    keysSave();
+    PeopleResult res = people.apply(PO_LEAVE, slot);
     xSemaphoreGive(keyMx);
+    if (res.err) return std::string("{\"ok\":0,\"err\":\"") + res.err + "\"}";
+    ESP_LOGI(TAG, "%s left the hub", res.name);
     announceHub();                               // no owner left: it says so (a new person can connect)
     return "{\"ok\":1}";
   }
-  if (!owner) return "{\"ok\":0,\"err\":\"only the hub's owner can do that\"}";
   if (path == "/api/light") {                    // test: which light is which on this board (lights.h). For a minute.
     lightTestUntil = (ms() + 60000) | 1;
     std::string l = qv(q, "l");
@@ -1517,8 +1458,7 @@ static std::string hubCommand(int slot, const std::string &cmd) {
   }
   if (path == "/api/resetpeople") {              // forget every phone: the next one to connect becomes the owner.
     xSemaphoreTake(keyMx, portMAX_DELAY);        // (Its controllers, their Home tiles and Apple Home stay.)
-    memset(hkeys, 0, sizeof hkeys);
-    keysSave();
+    people.apply(PO_RESET, slot);
     xSemaphoreGive(keyMx);
     ESP_LOGW(TAG, "people reset: waiting for a new owner");
     announceHub();
@@ -1527,25 +1467,14 @@ static std::string hubCommand(int slot, const std::string &cmd) {
   if (path == "/api/approve" || path == "/api/revoke" || path == "/api/makeowner") {
     uint8_t id[8];
     if (!unhex(qv(q, "cid").c_str(), id, 8)) return "{\"ok\":0,\"err\":\"bad id\"}";
+    PeopleOp op = path == "/api/approve" ? (qv(q, "ok") == "1" ? PO_APPROVE : PO_DENY)
+                : path == "/api/makeowner" ? (qv(q, "on") == "1" ? PO_MAKEOWNER : PO_UNOWNER) : PO_REVOKE;
     xSemaphoreTake(keyMx, portMAX_DELAY);
-    std::string r = "{\"ok\":0,\"err\":\"no such phone\"}";
-    for (int i = 0; i < 8; i++) {
-      HubKey &k = hkeys[i];
-      if (!k.used || memcmp(k.id, id, 8)) continue;
-      HubKey before = k;                         // put back if the change would leave the hub with no owner
-      if (path == "/api/approve") {
-        if (k.used != 2) break;
-        if (qv(q, "ok") == "1") { k.used = 1; k.role = qv(q, "owner") == "1"; hlast[i] = 0; ESP_LOGI(TAG, "%s let into the hub", k.name); }
-        else memset(&k, 0, sizeof k);
-      } else if (path == "/api/makeowner") k.role = qv(q, "on") == "1";
-      else { if (i == slot) { r = "{\"ok\":0,\"err\":\"you cannot remove yourself\"}"; break; } memset(&k, 0, sizeof k); }
-      if (!hubOwned()) { k = before; r = "{\"ok\":0,\"err\":\"the hub needs an owner: make someone else an owner first\"}"; break; }
-      keysSave();
-      r = "{\"ok\":1}";
-      break;
-    }
+    PeopleResult res = people.apply(op, slot, id, qv(q, "owner") == "1");
     xSemaphoreGive(keyMx);
-    return r;
+    if (res.err) return std::string("{\"ok\":0,\"err\":\"") + res.err + "\"}";
+    if (op == PO_APPROVE) ESP_LOGI(TAG, "%s let into the hub", res.name);
+    return "{\"ok\":1}";
   }
   if (path == "/api/net") return netJson();
   if (path == "/api/mem" && owner) {             // where the memory goes: free, biggest block, and each task's stack low point
@@ -1608,29 +1537,20 @@ static int secDo(const std::string &b, std::string &resp) {
   memcpy(aad, "blinds-v1", 9); memcpy(aad + 9, p, 8);
   std::string cmd(n, 0);
   xSemaphoreTake(keyMx, portMAX_DELAY);
-  int slot = -1;
-  for (int i = 0; i < 8; i++) if (hkeys[i].used && !memcmp(hkeys[i].id, p, 8)) slot = i;
+  int slot = people.find(p);
   if (slot < 0) { xSemaphoreGive(keyMx); resp = "{\"err\":\"not paired\"}"; return 401; }
-  if (memcmp(nonce, hboot, 4) || ctr <= hlast[slot]) { xSemaphoreGive(keyMx); resp = "{\"err\":\"stale\",\"boot\":\"" + hexOf(hboot, 4) + "\"}"; return 409; }
-  memcpy(key, hkeys[slot].key, 32);
+  if (memcmp(nonce, hboot, 4) || ctr <= people.last[slot]) { xSemaphoreGive(keyMx); resp = "{\"err\":\"stale\",\"boot\":\"" + hexOf(hboot, 4) + "\"}"; return 409; }
+  memcpy(key, people.keys[slot].key, 32);
   if (!gcm(false, key, nonce, aad, 17, ct, n, (uint8_t *)&cmd[0], (uint8_t *)(ct + n))) {
-    bool claim = hkeys[slot].used == 3;
-    if (claim) {                                 // a first owner with the wrong setup code: the place goes
-      memset(&hkeys[slot], 0, sizeof hkeys[slot]);
-      if (++pinFails >= 5) { pinFails = 0; pinLockUntil = (ms() + 300000) | 1; ESP_LOGW(TAG, "five wrong setup codes: connecting closed for 5 minutes"); }
-    }
+    bool claim = people.openFailed(slot);       // a first owner with the wrong setup code: the place goes
+    if (claim && people.pinFails == 0) ESP_LOGW(TAG, "five wrong setup codes: connecting closed for 5 minutes");
     xSemaphoreGive(keyMx);
     resp = claim ? "{\"err\":\"wrong setup code\"}" : "{\"err\":\"bad key\"}";
     return 401;
   }
-  hlast[slot] = ctr;
-  if (hkeys[slot].used == 3) {                   // the right code: this phone is the owner now
-    hkeys[slot].used = 1; pinFails = 0;
-    keysSave();
-    ESP_LOGI(TAG, "%s connected (owner)", hkeys[slot].name);
-  }
-  bool waiting = hkeys[slot].used != 1;
-  if (waiting && cmd == "/api/leave") { memset(&hkeys[slot], 0, sizeof hkeys[slot]); keysSave(); xSemaphoreGive(keyMx); resp = "{\"err\":\"not paired\"}"; return 401; }
+  if (people.opened(slot, ctr)) ESP_LOGI(TAG, "%s connected (owner)", people.keys[slot].name);   // the right code: the owner now
+  bool waiting = people.role(slot) == HUB_WAITING;
+  if (waiting && !hubPermit(cmd, HUB_WAITING)) { people.forget(slot); xSemaphoreGive(keyMx); resp = "{\"err\":\"not paired\"}"; return 401; }
   xSemaphoreGive(keyMx);
   if (waiting) { resp = "{\"err\":\"waiting\"}"; return 403; }
   std::string out = hubCommand(slot, cmd);
