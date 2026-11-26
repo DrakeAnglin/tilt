@@ -180,7 +180,8 @@ void histPush(float v) {
   histSave();
 }
 
-// Names come from a browser: keep only characters that are safe inside JSON and HTML.
+// The time zone name and phone names only: keeps letters, digits and a few signs. Blind, controller and Scene names
+// are kept as typed (wire.h keptName).
 void cleanText(char *dst, size_t n, const String &src) {
   size_t k = 0;
   for (size_t i = 0; i < src.length() && k + 1 < n; i++) {

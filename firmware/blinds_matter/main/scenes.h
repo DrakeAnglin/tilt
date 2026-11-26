@@ -49,7 +49,7 @@ esp_err_t hScene(httpd_req_t *r) {
   SceneSlot &s = scn.s[at];
   memset(&s, 0, sizeof s);
   s.gid = w.gid; s.ver = w.ver; s.mask = w.mask;
-  std::string nm = sceneName(w.name, sizeof s.name - 1);          // as typed (UTF-8), not cleanText: see wire.h
+  std::string nm = keptName(w.name, sizeof s.name - 1);          // as typed (UTF-8), not cleanText: see wire.h
   strlcpy(s.name, nm.empty() ? "Scene" : nm.c_str(), sizeof s.name);
   strlcpy(s.sym, w.sym.c_str(), sizeof s.sym);
   for (int p = 0; p < PORTS; p++) s.tilt[p] = w.t[p];

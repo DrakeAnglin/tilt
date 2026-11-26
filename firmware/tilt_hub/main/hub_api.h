@@ -113,8 +113,8 @@ static std::string infoJson() {
                         (k.s.keyState ? ",\"hubCid\":\"" + hexOf(k.s.cid, 8) + "\"" : std::string()) +   // the hub's own key on it (its join request)
                         (k.chg >= 0 ? ",\"chg\":" + std::to_string(k.chg) : std::string()) +   // on the charging cable (not said by an older controller)
                         ",\"own\":" + std::to_string(k.own) + "}";                                            // it has an owner (-1 not known)
-    j += std::string(first ? "" : ",") + "{\"id\":\"" + std::string(k.s.id, strnlen(k.s.id, 12)) + "\",\"name\":\"" + std::string(k.name, strnlen(k.name, 32)) +
-         "\",\"fw\":\"" + std::string(k.fw, strnlen(k.fw, 23)) + "\"" + tailj;
+    j += std::string(first ? "" : ",") + "{\"id\":\"" + std::string(k.s.id, strnlen(k.s.id, 12)) + "\",\"name\":" + jq(k.name) +
+         ",\"fw\":\"" + std::string(k.fw, strnlen(k.fw, 23)) + "\"" + tailj;
     first = false;
   }
   xSemaphoreGive(stateMx);
@@ -140,8 +140,7 @@ static std::string backupsJson() {
     BackupMeta m; size_t n = sizeof m;
     if (nvs_get_blob(nv, key, &m, &n) != ESP_OK || n != sizeof m) continue;
     m.name[32] = 0;
-    for (char *p = m.name; *p; p++) if (*p == '"' || *p == '\\') *p = '\'';
-    j += std::string(first ? "" : ",") + "{\"id\":\"" + m.id + "\",\"name\":\"" + m.name + "\",\"when\":" + std::to_string(m.when) + "}";
+    j += std::string(first ? "" : ",") + "{\"id\":\"" + m.id + "\",\"name\":" + jq(m.name) + ",\"when\":" + std::to_string(m.when) + "}";
     first = false;
   }
   return j + "]}";

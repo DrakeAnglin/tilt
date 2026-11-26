@@ -95,6 +95,7 @@ const uint16_t HUB_PORT = 49100;
 const int MAX_CTRL = 4;                          // PORTS: logic.h
 
 // The parts, in order: each one uses what the ones before it hold (firmware/tilt_hub/README.md, "Code").
+#include "wire.h"                                // keptName, jq: names as the controller keeps them
 #include "hub_store.h"                           // what it keeps about each controller
 #include "hub_matter.h"                          // Apple Home (Matter)
 #include "hub_ctrl.h"                            // the link to the controllers

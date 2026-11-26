@@ -19,7 +19,7 @@
 #include "ota.h"                                 // Trial
 #include "people.h"
 
-#define FW_VERSION "2.3.0-dev31"
+#define FW_VERSION "2.3.0-dev32"
 int homesPaired();                       // app_main.cpp
 static temperature_sensor_handle_t tsens = nullptr;
 
@@ -149,7 +149,10 @@ esp_err_t hSet(httpd_req_t *r) {
   std::string k = arg(r, "k"), v = arg(r, "v");
   int n = atoi(v.c_str());
   Settings c = cfg;                              // changed here, then put in place by cfgApply (motion.h)
-  if (k == "name") cleanText(c.name, sizeof c.name, v);
+  if (k == "name") {                             // as typed (UTF-8), not cleanText: see wire.h keptName
+    strlcpy(c.name, keptName(v, sizeof c.name - 1).c_str(), sizeof c.name);
+    if (!c.name[0]) strlcpy(c.name, "Blinds", sizeof c.name);   // the default (store.h)
+  }
   else if (k == "closeUp") c.closeUp = n ? 1 : 0;
   else if (k == "loc") { float la = NAN, lo = NAN; if (sscanf(v.c_str(), "%f,%f", &la, &lo) != 2 || fabsf(la) > 90 || fabsf(lo) > 180) return fail(r, "bad place"); sx.lat = la; sx.lon = lo; sxSave(); }
   else if (k == "sync") { syncMode = n ? 1 : 0; syncSave(); hand.reset(); }   // start fresh: no following of old turns
@@ -172,7 +175,10 @@ esp_err_t hSet(httpd_req_t *r) {
     if (p < 0 || p >= PORTS) return fail(r, "no such blind");
     std::string f = k.substr(3);
     BlindCfg &b = c.b[p];
-    if (f == "name") { cleanText(b.name, sizeof b.name, v); if (!b.name[0]) snprintf(b.name, sizeof b.name, "Blind %d", p + 1); }
+    if (f == "name") {                           // as typed (UTF-8): see wire.h keptName
+      strlcpy(b.name, keptName(v, sizeof b.name - 1).c_str(), sizeof b.name);
+      if (!b.name[0]) snprintf(b.name, sizeof b.name, "Blind %d", p + 1);
+    }
     else if (f == "speed") b.speed = constrain(n, 50, 100);
     else if (f == "fav") b.fav = constrain(n, -100, 100);
     else if (f == "hid") b.hidden = n ? 1 : 0;

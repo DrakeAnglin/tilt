@@ -29,7 +29,7 @@ static std::string readFile(const char *path) {               // the whole file,
 }
 
 // The known controller state behind the shared fixture test/wire/cfg.json (the app's tests decode the same file).
-static const WireBlind FIX_B[3] = {{"Left", 0, 100, 0}, {"Middle", 0, 80, -50}, {"Right", 1, 50, 100}};
+static const WireBlind FIX_B[3] = {{"Mom\xE2\x80\x99s caf\xC3\xA9", 0, 100, 0}, {"Middle", 0, 80, -50}, {"Right", 1, 50, 100}};
 static const WireSlot FIX_EMPTY = {0, 127, 0, 480, 0, 0, 0, 0, 0};
 static const WireSlot FIX_S[8] = {{1, 62, 7, 420, 0, 0, 0, 0, 1}, FIX_EMPTY, {1, 127, 5, 480, -100, 2, -15, 10, 4000000000u},
                                   FIX_EMPTY, FIX_EMPTY, FIX_EMPTY, FIX_EMPTY, FIX_EMPTY};
@@ -769,11 +769,27 @@ int main() {
     sq["t"] = "-300,40,300"; sq["mask"] = "15"; sq["sym"] = "Bed.Double\"x";
     g = sceneOfArgs(sarg, 3);
     CHECK(g.mask == 7 && g.t[0] == -100 && g.t[1] == 40 && g.t[2] == 100 && g.sym == "ed.oublex", "Scene values brought into range, icon cleaned");
-    CHECK(sceneName("Movie \"night\"", 47) == "Movie \"night\"", "a Scene name keeps its quotes");
-    CHECK(sceneName("Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", 47) == "Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", "curly apostrophe, accent and emoji kept");
-    CHECK(sceneName("a\nb\x01" "c", 47) == "abc", "control characters dropped");
-    CHECK(sceneName("abcd\xF0\x9F\x8E\xAC", 6) == "abcd", "a name cut to fit never ends inside a character");
-    CHECK(sceneName("ab  ", 47) == "ab" && sceneName(std::string(60, 'x'), 47).size() == 47, "trailing spaces trimmed, 47 bytes at most");
+    CHECK(keptName("Movie \"night\"", 47) == "Movie \"night\"", "a Scene name keeps its quotes");
+    CHECK(keptName("Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", 47) == "Mom\xE2\x80\x99s caf\xC3\xA9 \xF0\x9F\x8E\xAC", "curly apostrophe, accent and emoji kept");
+    CHECK(keptName("a\nb\x01" "c", 47) == "abc", "control characters dropped");
+    CHECK(keptName("abcd\xF0\x9F\x8E\xAC", 6) == "abcd", "a name cut to fit never ends inside a character");
+    CHECK(keptName("ab  ", 47) == "ab" && keptName(std::string(60, 'x'), 47).size() == 47, "trailing spaces trimmed, 47 bytes at most");
+    CHECK(keptName("a\xC3" "b", 47) == "ab" && keptName("a\x80" "b", 47) == "ab" && keptName("a\xC0\xAF" "b", 47) == "ab",
+          "a lone lead byte, a lone continuation byte and an overlong pair are dropped, the text around them kept");
+    CHECK(keptName("ab\xE2\x80", 47) == "ab" && keptName("\xED\xA0\x80x\xF5\x80\x80\x80y", 47) == "xy", "a cut-off character, a surrogate and a byte past U+10FFFF are dropped");
+    // Blind (19 bytes) and controller (23 bytes) names: the same list as app/Tilt/Tests/main.swift (NameRule.fit).
+    struct NameCase { const char *in; size_t bytes; const char *kept; };
+    const NameCase names[] = {
+        {"Left", 19, "Left"},
+        {"Mom\xE2\x80\x99s caf\xC3\xA9", 19, "Mom\xE2\x80\x99s caf\xC3\xA9"},
+        {"Cr\xC3\xA8me br\xC3\xBBl\xC3\xA9" "e", 19, "Cr\xC3\xA8me br\xC3\xBBl\xC3\xA9" "e"},
+        {"Living Room Left \xF0\x9F\x8E\xAC", 19, "Living Room Left"},
+        {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 19, "aaaaaaaaaaaaaaaaaaa"},
+        {"Den \"Caf\xC3\xA9\"", 23, "Den \"Caf\xC3\xA9\""},
+        {"Master Bedroom East \xF0\x9F\x8E\xAC", 23, "Master Bedroom East"},
+        {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 23, "bbbbbbbbbbbbbbbbbbbbbbb"},
+    };
+    for (const NameCase &c : names) CHECK(keptName(c.in, c.bytes) == c.kept, "a blind or controller name kept as the app fits it");
     sq["mask"] = "1"; sq["t"] = "20";
     g = sceneOfArgs(sarg, 3);
     CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");
