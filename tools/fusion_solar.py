@@ -1,11 +1,13 @@
-"""The solar housing in a fresh document: a tray for three 70 x 70 mm panels in a row (wired in parallel) and an end
-cap. Checks (panels slide in, parts fit, stays-inside) and the two print STLs.
+"""The solar housing in a fresh document: 1 to 6 panels (70 x 70 mm) in a row, wired in parallel, in tray sections of up
+to 3 panels that lock together end to end, and an end cap. Checks (panels slide in across every joint, parts fit,
+stays-inside) for every count, and the print STLs.
 
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_solar.py --timeout 600
 
 The panels slide in from the right end, face up, under a 45 degree lip along the top and bottom edges, and butt edge
-to edge. The cap then closes the right end: it drops onto two round puzzle tabs on the tray's rails and locks along X.
-Taped to the glass with the tray, it cannot lift off. Tape goes on the window
+to edge. Each section ends in two round puzzle tabs on its rails; the next section, or the cap, drops onto them and
+locks along X. Taped to the glass, nothing can lift off. Section pieces: "start" (closed left end with a tape pad) and
+"add" (open left end with the sockets), each for 1, 2 or 3 panels; PIECES says which make each count. Tape goes on the window
 face of the solid left end and of the cap, so the housing sticks flat on the window. Behind the panels a 10 mm channel
 runs the whole length for the solder bumps and the red and black wires; they leave through a small slot in the cap.
 A mirrored set (cap and wires at the left end) is exported too.
@@ -25,11 +27,11 @@ B = adsk.fusion.BooleanTypes
 S = {
     'panel': 70.0,        # panel side (measured 70 x 70)
     'panel_t': 1.8,       # panel thickness (measured)
-    'n': 3,               # panels in the row
     'fit': 0.1,           # clearance each side across the row: 0.2 in all (top to bottom)
     'play': -0.05,        # the lip's 45 degree underside meets the wall 0.05 under the panel face, so a centered
                           # panel has only fit + play = 0.05 room under the lip (front to back): snug, no rocking
-    'rail': 6.0,          # top and bottom rails, outside the panels (their ends carry the puzzle tabs)
+    'rail': 8.0,          # top and bottom rails, outside the panels (their ends carry the puzzle tabs, and an "add"
+                          # section's left end carries the sockets, so the socket needs a wall each side)
     'pad': 15.0,          # tape pad at each end: the solid left end and the cap
     'lip': 1.2,           # the lip reaches this far in over each panel edge, its underside at 45 degrees
     'lip_tip': 0.65,      # lip thickness at its inner edge
@@ -42,7 +44,7 @@ S = {
     'ledge': 5.0,         # with open_back: floor kept under each panel's edges
     'win_gap': 3.0,       # floor kept beside the channel
     'corner': 3.0,        # outside corner radius (the four outer corners only)
-    'tab_y': 37.45,       # puzzle tab center line (|Y|)
+    'lead': 0.4,          # 45 degree lead-in on the floor and lip edges at every section's right end
     'tab_neck': 2.4,      # neck width
     'tab_neck_len': 2.0,
     'tab_d': 4.4,         # round head
@@ -50,12 +52,11 @@ S = {
     'wire_d': 1.8,
     'bump_h': 1.2,        # mock solder bump height (under the wires' 1.8)
 }
-S['pl'] = S['n'] * S['panel'] + S['fit']                 # slot length: left wall to the cap
 S['pw'] = S['panel'] + 2 * S['fit']                      # slot width
 S['W'] = S['pw'] + 2 * S['rail']
-S['x0'] = -S['pl'] / 2                                   # left wall (inside)
-S['xj'] = S['pl'] / 2                                    # tray end = cap face
-S['xl'], S['xr'] = S['x0'] - S['pad'], S['xj'] + S['pad']
+S['tab_y'] = S['pw'] / 2 + 1.2 + S['tab_d'] / 2 + S['tab_fit']    # 1.2 of wall between a socket and the slot
+S['x0'] = 0.0                                            # left wall (inside); the row runs to +X
+S['xl'] = S['x0'] - S['pad']
 S['z_floor'] = S['back'] + S['chan_d']                   # panels rest here
 S['z_pt'] = S['z_floor'] + S['panel_t']                  # panel face
 S['z_lip'] = S['z_pt'] + S['play']                       # where the 45 degree underside meets the wall
@@ -63,6 +64,9 @@ S['top'] = S['z_lip'] + S['lip'] + S['lip_tip']          # window face
 S['yt'] = S['panel'] / 2                                 # panels' top edge (Y)
 S['cy0'], S['cy1'] = S['yt'] - S['chan_y1'], S['yt'] - S['chan_y0']
 assert S['cy0'] - S['win_gap'] > -S['panel'] / 2 + S['ledge'] + 10
+# panels per section for each count: no section over 3 panels (about 231 mm, fits the H2D bed with room)
+PIECES = {1: [1], 2: [2], 3: [3], 4: [2, 2], 5: [3, 2], 6: [3, 3]}
+SHOW = 6                                                 # the count left visible in the document
 
 
 def P3(x, y, z):
@@ -107,114 +111,157 @@ def vol(a, b):
 
 
 W2, pw2 = S['W'] / 2, S['pw'] / 2
-outline = rbox(S['xl'], S['xr'], -W2, W2, 0, S['top'], S['corner'])
-X_END = S['xr'] + 1
+c45 = 1 / math.sqrt(2)
 
 
-def slot(x1):
-    """The panels' way in, from the left wall to x1: the groove under the lips, the opening between them, and the
-    45 degree wedge under each lip (wall at Y = +-pw2, Z = z_lip, rising inward)."""
-    s = bx(S['x0'], x1, -pw2, pw2, S['z_floor'], S['z_lip'])
-    op(s, bx(S['x0'], x1, -(pw2 - S['lip']), pw2 - S['lip'], S['z_floor'], S['top'] + 1), B.UnionBooleanType)
-    c = 1 / math.sqrt(2)
+def slot(xa, x1):
+    """The panels' way in, from xa to x1: the groove under the lips, the opening between them, and the 45 degree
+    wedge under each lip (wall at Y = +-pw2, Z = z_lip, rising inward)."""
+    s = bx(xa, x1, -pw2, pw2, S['z_floor'], S['z_lip'])
+    op(s, bx(xa, x1, -(pw2 - S['lip']), pw2 - S['lip'], S['z_floor'], S['top'] + 1), B.UnionBooleanType)
     for sg in (1, -1):
         # a big box whose face is the 45 degree plane through (Y = sg*pw2, Z = z_lip), lying on the inner, lower side
-        n = (0, -sg * c, -c)                              # into the wedge side
+        n = (0, -sg * c45, -c45)                          # into the wedge side
         p = (0, sg * pw2 + n[1] * 10, S['z_lip'] + n[2] * 10)
-        big = obox(((S['x0'] + x1) / 2, p[1], p[2]), (1, 0, 0), (0, sg * c, -c), x1 - S['x0'], 40, 20)
-        wedge = op(big, bx(S['x0'], x1, sg * pw2, sg * (pw2 - S['lip']), S['z_lip'] - 0.01, S['top'] + 1),
+        big = obox(((xa + x1) / 2, p[1], p[2]), (1, 0, 0), (0, sg * c45, -c45), x1 - xa, 40, 20)
+        wedge = op(big, bx(xa, x1, sg * pw2, sg * (pw2 - S['lip']), S['z_lip'] - 0.01, S['top'] + 1),
                    B.IntersectionBooleanType)
         op(s, wedge, B.UnionBooleanType)
     return s
 
 
-body = tbm.copy(outline)
-op(body, slot(X_END), B.DifferenceBooleanType)
-# the wire channel under the whole row, open at the right end
-op(body, bx(S['x0'], X_END, S['cy0'], S['cy1'], S['back'], S['z_floor'] + 0.01), B.DifferenceBooleanType)
-# a square window through the back under each panel, inside its ledge and clear of the channel
-for i in range(S['n'] if S['open_back'] else 0):
-    xa = S['x0'] + i * S['panel']
-    op(body, bx(xa + S['ledge'], xa + S['panel'] - S['ledge'], -S['panel'] / 2 + S['ledge'], S['cy0'] - S['win_gap'],
-                -1, S['z_floor'] + 0.01), B.DifferenceBooleanType)
-# split: the tray and the cap
-tray = op(tbm.copy(body), bx(S['xl'] - 1, S['xj'], -W2 - 1, W2 + 1, -1, S['top'] + 1), B.IntersectionBooleanType)
-cap = op(tbm.copy(outline), bx(S['xj'], S['xr'] + 1, -W2 - 1, W2 + 1, -1, S['top'] + 1), B.IntersectionBooleanType)
-# the cap's wire exit: just wide enough for the two wires, in line with the channel, open on the back so the wires
-# drop in before the cap goes on
-ey = (S['cy0'] + S['cy1']) / 2
-op(cap, bx(S['xj'] - 1, X_END, ey - S['exit_w'] / 2, ey + S['exit_w'] / 2, -1, S['back'] + S['wire_d'] + 0.4),
-   B.DifferenceBooleanType)
-# the puzzle joint: a round tab on the end of each rail, a matching socket in the cap (grown by tab_fit)
+def lead_in(x):
+    """45 degree lead-ins at a section's right end (x): on the floor's edge and on each lip's lower edge, so a panel
+    sliding in from the right can't catch on a joint that prints a little high or low."""
+    d = S['lead'] * math.sqrt(2)
+    cut = obox((x, 0, S['z_floor']), (c45, 0, c45), (0, 1, 0), d, S['pw'], d)
+    for sg in (1, -1):
+        op(cut, obox((x, sg * (pw2 - S['lip'] / 2), S['z_lip']), (c45, 0, c45), (0, 1, 0), d, S['lip'], d),
+           B.UnionBooleanType)
+    return cut
 
 
-def tab(sg, grow):
+def tab(xj, sg, grow):
+    """The round puzzle tab on a rail end at xj (grow = 0), or its socket (grow = the clearance)."""
     y = sg * S['tab_y']
-    hx = S['xj'] + S['tab_neck_len'] + S['tab_d'] / 2
-    t = bx(S['xj'] - (1 if grow else 0), hx, y - S['tab_neck'] / 2 - grow, y + S['tab_neck'] / 2 + grow,
+    hx = xj + S['tab_neck_len'] + S['tab_d'] / 2
+    t = bx(xj - (1 if grow else 0), hx, y - S['tab_neck'] / 2 - grow, y + S['tab_neck'] / 2 + grow,
            -1 if grow else 0, S['top'] + (1 if grow else 0))
     op(t, cyl((hx, y, -1 if grow else 0), (hx, y, S['top'] + (1 if grow else 0)), S['tab_d'] / 2 + grow), B.UnionBooleanType)
     return t
 
 
-for sg in (1, -1):
-    op(tray, tab(sg, 0), B.UnionBooleanType)
-    op(cap, tab(sg, S['tab_fit']), B.DifferenceBooleanType)
+def build(n):
+    """The housing for n panels: (sections [(piece name, body)], cap, mock parts, failures)."""
+    sizes = PIECES[n]
+    xj = S['x0'] + n * S['panel'] + S['fit']             # last section's end = cap face
+    xr = xj + S['pad']
+    x_end = xr + 1
+    outline = rbox(S['xl'], xr, -W2, W2, 0, S['top'], S['corner'])
+    body = tbm.copy(outline)
+    op(body, slot(S['x0'], x_end), B.DifferenceBooleanType)
+    # the wire channel under the whole row, open at the right end
+    op(body, bx(S['x0'], x_end, S['cy0'], S['cy1'], S['back'], S['z_floor'] + 0.01), B.DifferenceBooleanType)
+    for i in range(n if S['open_back'] else 0):           # optional window through the back under each panel
+        xa = S['x0'] + i * S['panel']
+        op(body, bx(xa + S['ledge'], xa + S['panel'] - S['ledge'], -S['panel'] / 2 + S['ledge'], S['cy0'] - S['win_gap'],
+                    -1, S['z_floor'] + 0.01), B.DifferenceBooleanType)
+    # split into sections at the panel joints, then the cap
+    cuts, k = [], 0
+    for m in sizes:
+        k += m
+        cuts.append(xj if k == n else S['x0'] + k * S['panel'])
+    sections, xa = [], S['xl'] - 1
+    for i, (m, xb) in enumerate(zip(sizes, cuts)):
+        sec = op(tbm.copy(body), bx(xa, xb, -W2 - 1, W2 + 1, -1, S['top'] + 1), B.IntersectionBooleanType)
+        op(sec, lead_in(xb), B.DifferenceBooleanType)
+        for sg in (1, -1):
+            op(sec, tab(xb, sg, 0), B.UnionBooleanType)
+        if i:                                            # an "add" section: sockets for the last section's tabs
+            for sg in (1, -1):
+                op(sec, tab(xa, sg, S['tab_fit']), B.DifferenceBooleanType)
+        sections.append(('%s_%d' % ('add' if i else 'start', m), sec))
+        xa = xb
+    cap = op(tbm.copy(outline), bx(xj, xr + 1, -W2 - 1, W2 + 1, -1, S['top'] + 1), B.IntersectionBooleanType)
+    # the cap's wire exit: just wide enough for the two wires, in line with the channel, open on the back so the
+    # wires drop in before the cap goes on
+    ey = (S['cy0'] + S['cy1']) / 2
+    op(cap, bx(xj - 1, x_end, ey - S['exit_w'] / 2, ey + S['exit_w'] / 2, -1, S['back'] + S['wire_d'] + 0.4),
+       B.DifferenceBooleanType)
+    for sg in (1, -1):
+        op(cap, tab(xj, sg, S['tab_fit']), B.DifferenceBooleanType)
 
-# mock-ups: the panels, a solder bump on each, the red and black wires along the channel and out of the cap
-parts = []
-for i in range(S['n']):
-    xa = S['x0'] + i * S['panel']
-    parts.append(('Panel %d' % (i + 1), bx(xa, xa + S['panel'], -S['panel'] / 2, S['panel'] / 2, S['z_floor'], S['z_pt'])))
-    xc = xa + S['panel'] / 2
-    parts.append(('Bump %d' % (i + 1), bx(xc - 6, xc + 6, S['yt'] - 19, S['yt'] - 11, S['z_floor'] - S['bump_h'], S['z_floor'])))
-zw = S['back'] + S['wire_d'] / 2 + 0.05
-for nm, yy in (('Wire red', ey + 1.1), ('Wire black', ey - 1.1)):
-    parts.append((nm, cyl((S['x0'] + 20, yy, zw), (S['xr'] + 15, yy, zw), S['wire_d'] / 2)))
+    # mock-ups: the panels, a solder bump on each, the red and black wires along the channel and out of the cap
+    parts = []
+    for i in range(n):
+        xa = S['x0'] + i * S['panel']
+        parts.append(('Panel %d' % (i + 1), bx(xa, xa + S['panel'], -S['panel'] / 2, S['panel'] / 2, S['z_floor'], S['z_pt'])))
+        xc = xa + S['panel'] / 2
+        parts.append(('Bump %d' % (i + 1), bx(xc - 6, xc + 6, S['yt'] - 19, S['yt'] - 11, S['z_floor'] - S['bump_h'], S['z_floor'])))
+    zw = S['back'] + S['wire_d'] / 2 + 0.05
+    for nm, yy in (('Wire red', ey + 1.1), ('Wire black', ey - 1.1)):
+        parts.append((nm, cyl((S['x0'] + 20, yy, zw), (xr + 15, yy, zw), S['wire_d'] / 2)))
+
+    f = []
+    solids = sections + [('cap', cap)]
+    for nm, b in parts:
+        for what, solid in solids:
+            v = vol(solid, b)
+            if v > 0.01:
+                f.append('%s runs into %s: %.2f mm3' % (nm, what, v))
+    for i in range(len(solids)):
+        for j in range(i + 1, len(solids)):
+            if vol(solids[i][1], solids[j][1]) > 0.01:
+                f.append('%s runs into %s' % (solids[i][0], solids[j][0]))
+    # the way in: each panel with its bump slides in from beyond the right end, across every joint, to its place
+    for nm, b in parts:
+        if nm.startswith(('Panel', 'Bump')):
+            q = b.boundingBox
+            sweep = bx(q.minPoint.x * 10, xr + 80, q.minPoint.y * 10, q.maxPoint.y * 10, q.minPoint.z * 10, q.maxPoint.z * 10)
+            for what, solid in sections:
+                v = vol(solid, sweep)
+                if v > 0.01:
+                    f.append('%s cannot slide in through %s: %.2f mm3 in the way' % (nm, what, v))
+    # each joint is locked along X: the next piece pulled 0.5 mm away hits the tabs
+    for i in range(1, len(solids)):
+        pulled = tbm.copy(solids[i][1])
+        mv = adsk.core.Matrix3D.create()
+        mv.translation = adsk.core.Vector3D.create(0.05, 0, 0)
+        tbm.transform(pulled, mv)
+        if vol(solids[i - 1][1], pulled) < 1.0:
+            f.append('the tabs do not hold %s on %s' % (solids[i][0], solids[i - 1][0]))
+    # the lips hold every panel down (0.4 mm lift hits), with no rocking (0.1 mm lift already touches)
+    for i in range(n):
+        xa = S['x0'] + i * S['panel'] + 3                # clear of the lead-ins at the joints
+        for lift, need, msg in ((0.4, 1.0, 'the lips do not hold panel %d down'), (0.1, 1e-6, 'panel %d can rock')):
+            probe = bx(xa, xa + S['panel'] - 6, -S['panel'] / 2, S['panel'] / 2, S['z_floor'] + lift, S['z_pt'] + lift)
+            if sum(vol(solid, probe) for _, solid in sections) < need:
+                f.append(msg % (i + 1))
+    f += KIT.stays_inside(tbm, solids + parts, outline, allow=('Wire',))
+    return sections, cap, parts, f
+
 
 failures = []
-for nm, b in parts:
-    for what, solid in (('tray', tray), ('cap', cap)):
-        v = vol(solid, b)
-        if v > 0.01:
-            failures.append('%s runs into the %s: %.2f mm3' % (nm, what, v))
-if vol(tray, cap) > 0.01:
-    failures.append('the cap runs into the tray')
-# the way in: each panel with its bump slides in from beyond the right end to its place
-for nm, b in parts:
-    if nm.startswith(('Panel', 'Bump')):
-        q = b.boundingBox
-        sweep = bx(q.minPoint.x * 10, S['xr'] + 80, q.minPoint.y * 10, q.maxPoint.y * 10, q.minPoint.z * 10, q.maxPoint.z * 10)
-        v = vol(tray, sweep)
-        if v > 0.01:
-            failures.append('%s cannot slide in from the end: %.2f mm3 in the way' % (nm, v))
-# the lip holds the panels down: lifted 0.4 mm, a panel hits the lips
-lifted = bx(S['x0'], S['x0'] + S['panel'], -S['panel'] / 2, S['panel'] / 2, S['z_floor'] + 0.4, S['z_pt'] + 0.4)
-# the cap is locked along X: pulled 0.5 mm off the end, it hits the tabs
-pulled = tbm.copy(cap)
-mv = adsk.core.Matrix3D.create()
-mv.translation = adsk.core.Vector3D.create(0.05, 0, 0)
-tbm.transform(pulled, mv)
-if vol(tray, pulled) < 1.0:
-    failures.append('the puzzle tabs do not hold the cap')
-if vol(tray, lifted) < 1.0:
-    failures.append('the lips do not hold the panels down')
-# no rocking: a centered panel lifted 0.1 mm already touches both lips
-nudged = bx(S['x0'], S['x0'] + S['panel'], -S['panel'] / 2, S['panel'] / 2, S['z_floor'] + 0.1, S['z_pt'] + 0.1)
-if vol(tray, nudged) <= 0.0:
-    failures.append('a panel can rock: 0.1 mm lift does not reach the lips')
 room = S['fit'] + S['play']
 if room < 0.02:
     failures.append('only %.2f mm under the lips: the panels may not slide in' % room)
-failures += KIT.stays_inside(tbm, [('Solar tray', tray), ('Solar cap', cap)] + parts, outline, allow=('Wire',))
 walls = {
     'socket to the outside': W2 - S['tab_y'] - S['tab_d'] / 2 - S['tab_fit'],
+    'socket to the slot': S['tab_y'] - S['tab_d'] / 2 - S['tab_fit'] - pw2,
     'socket to the wire exit': S['tab_y'] - S['tab_d'] / 2 - S['tab_fit'] - ((S['cy0'] + S['cy1']) / 2 + S['exit_w'] / 2),
     'beside the channel': W2 - S['cy1'],
 }
 for k, v in walls.items():
     if v < 0.9:
         failures.append('wall %s is only %.2f mm' % (k, v))
+builds, pieces, cap = {}, {}, None
+for n in PIECES:
+    secs, cap_n, parts_n, f = build(n)
+    failures += ['%d panels: %s' % (n, x) for x in f]
+    builds[n] = (secs, cap_n, parts_n)
+    for nm, b in secs:
+        pieces.setdefault(nm, b)
+    cap = cap_n
 
 # ------------------------------------------------------------------ document
 design = KIT.fresh_document(app, 'solar')
@@ -234,63 +281,60 @@ def appearance(name):
             return design.appearances.addByCopy(src, name)
 
 
-comps = {}
-for g, lst, look in (('Tray', [('Solar tray', tray)], 'Plastic - Matte (White)'),
-                     ('Cap', [('Solar cap', cap)], 'Plastic - Matte (White)'),
-                     ('Parts', parts, 'Plastic - Matte (Black)')):
-    occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-    occ.component.name = 'Solar ' + g
-    comps[g] = occ.component
-    for nm, b in lst:
+def add_comp(parent, name, bodies, visible=True):
+    occ = parent.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    occ.component.name = name
+    occ.isLightBulbOn = visible
+    for nm, b in bodies:
         bb = occ.component.bRepBodies.add(b)
         bb.name = nm
-        col = 'Plastic - Glossy (Red)' if nm == 'Wire red' else ('Plastic - Glossy (Blue)' if nm.startswith('Panel') else look)
+        col = 'Plastic - Glossy (Red)' if nm == 'Wire red' else ('Plastic - Glossy (Blue)' if nm.startswith('Panel') else
+              ('Plastic - Matte (Black)' if nm.startswith(('Bump', 'Wire')) else 'Plastic - Matte (White)'))
         a = appearance(col)
         if a:
             bb.appearance = a
+    return occ.component
 
-exported, info = [], {}
-for g, fn in (('Tray', 'solar_tray.stl'), ('Cap', 'solar_cap.stl')):
-    b = comps[g].bRepBodies.item(0)
-    if b.lumps.count != 1:
-        failures.append('the %s is in %d pieces' % (g.lower(), b.lumps.count))
-    path = os.path.join(STL, fn)
-    opt = design.exportManager.createSTLExportOptions(comps[g], path)
-    opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
-    design.exportManager.execute(opt)
-    exported.append(path)
-    q = b.boundingBox
-    info[g.lower() + ' (mm)'] = 'L %.2f x W %.2f x H %.2f, %d g PLA' % (
-        (q.maxPoint.x - q.minPoint.x) * 10, (q.maxPoint.y - q.minPoint.y) * 10, (q.maxPoint.z - q.minPoint.z) * 10,
-        round(b.volume * 1.24))
-# the flipped set: the same tray and cap mirrored end for end, so the cap and the wires are at the left end (the
-# channel stays along the panels' top edge). Mirroring cannot add an overhang or a thin wall: the checks hold.
+
+secs, cap_s, parts_s = builds[SHOW]
+add_comp(root, 'Solar %d panels' % SHOW, [('Solar ' + nm, b) for nm, b in secs] + [('Solar cap', cap_s)])
+add_comp(root, 'Solar Parts', parts_s)
+
+# the print pieces: every section shape once, and the cap; then the same mirrored end for end (cap and wires at the
+# left end, the channel still along the panels' top edge). Mirroring cannot add an overhang or a thin wall.
 flip = adsk.core.Matrix3D.create()
 flip.setCell(0, 0, -1)
-occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-occ.component.name = 'Solar Flipped'
-occ.isLightBulbOn = False
-for nm, b, fn in (('Solar tray (wires left)', tray, 'solar_tray_wires_left.stl'),
-                  ('Solar cap (wires left)', cap, 'solar_cap_wires_left.stl')):
-    m = tbm.copy(b)
-    tbm.transform(m, flip)
-    sub = occ.component.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-    sub.component.name = nm
-    bb = sub.component.bRepBodies.add(m)
-    bb.name = nm
-    if abs(bb.volume - b.volume) > 0.001 or bb.lumps.count != 1:
-        failures.append('%s did not mirror cleanly' % nm)
-    path = os.path.join(STL, fn)
-    opt = design.exportManager.createSTLExportOptions(sub.component, path)
-    opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
-    design.exportManager.execute(opt)
-    exported.append(path)
-old = os.path.join(STL, 'solar_housing.stl')
-if os.path.exists(old):
-    os.remove(old)
+lib = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+lib.component.name = 'Solar print pieces'
+lib.isLightBulbOn = False
+for old in os.listdir(STL):
+    if old.endswith('.stl'):
+        os.remove(os.path.join(STL, old))
+exported, info = [], {}
+for nm, b in sorted(pieces.items()) + [('cap', cap)]:
+    for side, tag in (('right', ''), ('left', '_wires_left')):
+        m = tbm.copy(b)
+        if side == 'left':
+            tbm.transform(m, flip)
+        comp = add_comp(lib.component, 'solar_%s%s' % (nm, tag), [('solar_%s%s' % (nm, tag), m)])
+        bb = comp.bRepBodies.item(0)
+        if bb.lumps.count != 1:
+            failures.append('%s%s is in %d pieces' % (nm, tag, bb.lumps.count))
+        if abs(bb.volume - b.volume) > 0.001:
+            failures.append('%s%s did not mirror cleanly' % (nm, tag))
+        path = os.path.join(STL, 'solar_%s%s.stl' % (nm, tag))
+        opt = design.exportManager.createSTLExportOptions(comp, path)
+        opt.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
+        design.exportManager.execute(opt)
+        exported.append(os.path.basename(path))
+    q = b.boundingBox
+    info[nm] = 'L %.1f x W %.1f x H %.2f, %d g PLA solid' % ((q.maxPoint.x - q.minPoint.x) * 10, (q.maxPoint.y - q.minPoint.y) * 10,
+                                                          (q.maxPoint.z - q.minPoint.z) * 10, round(b.volume * 1.24))
 KIT.hide_helpers(design)
-result = dict({'ok': not failures, 'failures': failures,
-               'housing (mm)': '%.1f x %.1f x %.2f' % (S['xr'] - S['xl'], S['W'], S['top']),
-               'panel face below the window face (mm)': round(S['top'] - S['z_pt'], 2),
-               'panel room (mm)': 'top to bottom %.2f in all, front to back %.2f' % (2 * S['fit'], S['fit'] + S['play']),
-               'walls (mm)': {k: round(v, 2) for k, v in walls.items()}, 'exported': exported}, **info)
+result = {'ok': not failures, 'failures': failures,
+          'lengths (mm)': {n: round(n * S['panel'] + S['fit'] + 2 * S['pad'], 1) for n in PIECES},
+          'width x height (mm)': '%.1f x %.2f' % (S['W'], S['top']),
+          'pieces per count': {n: ['start_%d' % v[0]] + ['add_%d' % m for m in v[1:]] + ['cap'] for n, v in PIECES.items()},
+          'piece sizes': info,
+          'panel room (mm)': 'top to bottom %.2f in all, front to back %.2f' % (2 * S['fit'], S['fit'] + S['play']),
+          'walls (mm)': {k: round(v, 2) for k, v in walls.items()}, 'exported': len(exported)}
