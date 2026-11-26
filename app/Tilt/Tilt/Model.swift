@@ -204,10 +204,12 @@ final class AppModel {
     }
     func stopAll() { (controllers + waiting).forEach { $0.stop() } }
 
-    /// Add the controller at `host`: a new one makes this phone its owner; one that has an owner is asked to let this phone join.
+    /// Ask the controller at `host` (through the Tilt Hub) to let this phone join. A new one, with no owner yet, takes
+    /// its first owner over Bluetooth only (BluetoothSetup), so it is not added from here.
     func add(host: String) async throws {
         let h = try await Secure.hello(host)
-        adopt(h, host: host, paired: try await Secure.pair(host: host, phoneName: AppModel.myName, how: h.owned == 1 ? .ask : .first))
+        guard h.owned == 1 else { throw TiltError("This controller has no owner yet: add it over Bluetooth instead.") }
+        adopt(h, host: host, paired: try await Secure.pair(host: host, phoneName: AppModel.myName, how: .ask))
     }
     /// Add the demo room: a pretend controller for trying the app without one.
     func addDemo() {

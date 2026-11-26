@@ -2,7 +2,9 @@
 // passes the app's secured commands along, so this controller can sleep: it only wakes to check in with the hub.
 //
 // UDP on port 49100, one datagram each way:
-//   hub -> controller   type (1) | seq (2) | payload       H hello, X secured command (sec.h), A ask to join, P pair
+//   hub -> controller   type (1) | seq (2) | payload       H hello, X secured command (sec.h), A ask to join,
+//                                                        R recover (people.h), Q recovery progress. (No P: the first
+//                                                        owner pairs over Bluetooth only.)
 //   controller -> hub   type in lower case | seq | status (3 digits, "200") | answer
 //   controller -> hub   '#' | seq | piece (1) | count (1) | part   an answer longer than 1000 bytes (status and answer),
 //                                                        in up to 16 pieces; the hub joins them before passing it on
@@ -351,6 +353,7 @@ static void hubTask(void *) {
   timeval tmo = {1, 0};                          // wake once a second: an update that stalled is stopped here
   setsockopt(hubSock, SOL_SOCKET, SO_RCVTIMEO, &tmo, sizeof tmo);
   static char buf[2400];
+  static KeptAnswer lastJoin;                    // the last ask or recovery ('A', 'R'): the same one sent again gets the same answer
   for (;;) {
     sockaddr_in6 from;
     socklen_t fl = sizeof from;
@@ -359,7 +362,7 @@ static void hubTask(void *) {
     if (n < 0) { if (errno != EAGAIN && errno != EWOULDBLOCK) vTaskDelay(pdMS_TO_TICKS(100)); continue; }   // never spin on an error
     // Only what the hub sends. (Anything else, such as this controller's own multicast or an answer, is ignored:
     // answering it could start an endless exchange.) Pairing as the first owner is Bluetooth only, never over Thread.
-    if (n < 3 || !strchr("HXABWEs", buf[0])) continue;
+    if (n < 3 || !hubAsks(buf[0])) continue;
     char t = buf[0];
     std::string in(buf + 3, n - 3), out;
     // The hub, proven (a good proof, or a command sealed with its key): where to send pushes, and "the hub is there".
@@ -385,7 +388,14 @@ static void hubTask(void *) {
       bool fromHub = false;
       st = secDo(in, out, nullptr, &fromHub);
       if (st[0] == '2') { awake(); hubLinkSeen = millis() ? millis() : 1; if (fromHub) heard(); }
-    } else if (t == 'A') { st = pairDo(in, out, true); if (st[0] == '2') awake(); }
+    } else if ((t == 'A' || t == 'R') && lastJoin.again(std::string(1, t) + in, millis())) { st = lastJoin.st; out = lastJoin.out; }   // its answer was lost
+    else if (t == 'A' || t == 'R') {
+      st = t == 'A' ? pairDo(in, out, true) : recoverDo(in, out);
+      if (st[0] == '2') { awake(); lastJoin.keep(std::string(1, t) + in, st, out, millis()); }
+    } else if (t == 'Q') {
+      out = recoverStateJson(); st = "200";
+      if (out.find("\"on\":1") != std::string::npos) awake();   // a recovery is running: its next poll comes in a second
+    }
     else if (t == 'B') { OtaReply r = hubOtaBegin(in); st = r.status; out = r.out; if (st[0] == '2') { heard(); awake(); } }
     else if (t == 'E' && !hubOtaRx.going()) { OtaReply r = hubOtaRx.end(millis()); st = r.status; out = r.out; }   // its answer was lost: the same again
     else if (t == 'W' || t == 'E') {             // pieces only from where the proven begin came from

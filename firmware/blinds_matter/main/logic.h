@@ -6,6 +6,7 @@
 #include <cstring>
 #include <ctime>
 #include <string>
+#include "routes.h"                              // Who: the roles permitRule decides by
 
 const int PORTS = 3;                                         // a controller has 3 ports
 
@@ -161,15 +162,42 @@ inline bool fwIsOlder(const char *candidate, const char *running) {
   return false;
 }
 
-// ---- who may do what (sec.h permit() gathers the facts and asks this)
-// plainOpen: no phone owns the controller yet, or the developer switch is on. cidArg: the "cid" in the command; ownCid: the
-// caller's own id (hex). nullptr: allowed. Otherwise the reason it is refused.
-inline const char *permitRule(bool secure, bool owner, bool plainOpen, bool isUpdate, const std::string &path,
-                              const std::string &cidArg, const std::string &ownCid) {
-  if (!secure) return (isUpdate || plainOpen) ? nullptr : "use the app";   // an update checks its own signature
-  if (owner) return nullptr;
-  // a user: see the blinds and move them, see the people, rename only themself, make and change Scenes
-  for (const char *ok : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys", "/api/scenes", "/api/scene"}) if (path == ok) return nullptr;
-  if (path == "/api/keyname" && !cidArg.empty() && cidArg == ownCid) return nullptr;
+// ---- which slot a new phone key takes (sec.h pairDo). used: 0 free, 1 paired, 2 asked to join and waiting; waitMs:
+// how long each waiting one has waited (a very large number when not known). At most two asks wait: a new ask takes
+// the place of one that has waited over 10 minutes. A recovery (people.h) is never kept out by waiting asks (the
+// phone's own ask and the Tilt Hub's are often among them): it takes a free slot, else the oldest waiting ask.
+// Returns the slot, KEY_TWO_WAITING or KEY_FULL.
+const int KEY_TWO_WAITING = -1, KEY_FULL = -2;
+inline int keySlot(const uint8_t *used, const uint32_t *waitMs, int n, bool ask, bool recovering) {
+  int waiting = 0, oldest = -1;
+  for (int i = 0; i < n; i++) if (used[i] == 2) { waiting++; if (oldest < 0 || waitMs[i] > waitMs[oldest]) oldest = i; }
+  if (ask && !recovering && waiting >= 2) {
+    for (int i = 0; i < n; i++) if (used[i] == 2 && waitMs[i] > 600000) return i;
+    return KEY_TWO_WAITING;
+  }
+  for (int i = 0; i < n; i++) if (!used[i]) return i;
+  if (recovering && oldest >= 0) return oldest;
+  return KEY_FULL;
+}
+
+// ---- an answer kept for a request that may come again: the hub sends a request a second time when no answer came
+// (its answer was lost, or late), and an ask or a recovery must not run twice for the same key (hub_link.h).
+struct KeptAnswer {
+  std::string in, out;
+  const char *st = nullptr;
+  uint32_t at = 0;
+  bool again(const std::string &req, uint32_t now, uint32_t forMs = 30000) const { return st && in == req && now - at < forMs; }
+  void keep(const std::string &req, const char *status, const std::string &answer, uint32_t now) { in = req; st = status; out = answer; at = now; }
+};
+
+// ---- the requests the Tilt Hub may send this controller (hub_link.h); anything else is ignored, never answered
+inline bool hubAsks(char t) { return t && strchr("HXAQRBWEs", t); }
+
+// ---- who may do what (sec.h permit() gathers the facts and asks this; the roles are in routes.h)
+// owner: the caller is an Owner (else a Guest). cidArg: the "cid" in the command; ownCid: the caller's own id (hex).
+// nullptr: allowed. Otherwise the reason it is refused.
+inline const char *permitRule(Who who, bool owner, const std::string &cidArg, const std::string &ownCid) {
+  if (owner || who == GUEST) return nullptr;
+  if (who == SELF && !cidArg.empty() && cidArg == ownCid) return nullptr;
   return "only the owner can do that";
 }

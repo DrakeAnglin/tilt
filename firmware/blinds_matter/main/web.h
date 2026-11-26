@@ -45,12 +45,6 @@ float tiltWord(int p, const std::string &to) {
 
 std::string hubThreadJson();                     // hub_link.h
 bool hubJoined();
-// ---- pages
-esp_err_t hRoot(httpd_req_t *r) {
-  lastWeb = millis() ? millis() : 1;
-  httpd_resp_set_type(r, "text/plain");           // the built-in web page is gone: the Tilt app is the way in
-  return httpd_resp_sendstr(r, "Tilt blinds controller. Use the Tilt app.");
-}
 // The status the app polls (/api/s). Short keys, kept short on purpose (it goes over Thread often):
 //   t epoch, tok clock set, up seconds running, batt {v rest volts, pct, st charge state, vin, low}, closeUp, sync
 //   follow mode, par move at the same time, mv the blind moving (-1 none), log event count, hk in a Matter home,
@@ -290,7 +284,6 @@ std::string helloJson() {                       // from the hub task and Bluetoo
      name.c_str(), img.c_str(), hexOf(bootId, 4).c_str(), own ? 1 : 0, open, homesPaired() ? 1 : 0, hubOk() ? 1 : 0, LINK_PROTO);
   return j;
 }
-esp_err_t hHello(httpd_req_t *r) { return plain(r, "200 OK", helloJson()); }
 void openHomeWindow();                           // app_main.cpp
 std::string homeCodeJson();                      // home_code.h
 esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) add this controller in the next 10 minutes
@@ -299,15 +292,6 @@ esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) ad
 }
 esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = millis() + 300000; event("firmware updates allowed for 5 minutes"); return ok(r); }
 esp_err_t hOpenApi(httpd_req_t *r) { Lock l; openApi = argi(r, "v") ? 1 : 0; nvs.putUChar("plainopen", openApi); return ok(r); }
-// Every plain (not secured) request comes through here: once a phone is paired and the plain side is switched off,
-// only the secured connection answers.
-esp_err_t hGuard(httpd_req_t *r) {
-  const Route *rt = (const Route *)r->user_ctx;
-  if (const char *why = permit(rt, rt->uri, "", Caller{false, false, nullptr})) return plain(r, "401 Unauthorized", std::string("{\"err\":\"") + why + "\"}");
-  return rt->fn(r);
-}
-
-esp_err_t hRoot(httpd_req_t *r);
 esp_err_t hHome(httpd_req_t *r);                // hub_link.h
 esp_err_t hHubJoin(httpd_req_t *r);
 esp_err_t hSwapFw(httpd_req_t *r);
@@ -316,21 +300,9 @@ esp_err_t hHubNet(httpd_req_t *r);
 esp_err_t hFactory(httpd_req_t *r);
 esp_err_t hBackup(httpd_req_t *r);
 esp_err_t hRestore(httpd_req_t *r);
-const Route routes[] = {
-  {"/", HTTP_GET, hRoot}, {"/api/s", HTTP_GET, hState}, {"/api/dev", HTTP_GET, hDev}, {"/api/cfg", HTTP_GET, hCfg}, {"/api/log", HTTP_GET, hLog},
-  {"/api/hist", HTTP_GET, hHist}, {"/api/set", HTTP_GET, hSet}, {"/api/sched", HTTP_GET, hSched}, {"/api/scenes", HTTP_GET, hScenes}, {"/api/scene", HTTP_GET, hScene}, {"/api/go", HTTP_GET, hGo}, {"/api/stop", HTTP_GET, hStop},
-  {"/api/jog", HTTP_GET, hJog}, {"/api/angle", HTTP_GET, hAngle}, {"/api/mark", HTTP_GET, hMark}, {"/api/reset", HTTP_GET, hReset}, {"/api/reboot", HTTP_GET, hReboot},
-  {"/api/awake", HTTP_GET, hAwake},
-  {"/api/keep", HTTP_GET, hKeep}, {"/api/watch", HTTP_GET, hWatch}, {"/api/trace", HTTP_GET, hTrace},
-  {"/api/homeopen", HTTP_GET, hHomeOpen},
-  {"/api/keys", HTTP_GET, hKeys}, {"/api/revoke", HTTP_GET, hRevoke}, {"/api/approve", HTTP_GET, hApprove}, {"/api/keyname", HTTP_GET, hKeyName}, {"/api/makeowner", HTTP_GET, hMakeOwner}, {"/api/openapi", HTTP_GET, hOpenApi}, {"/api/otaopen", HTTP_GET, hOtaOpen},
-  {"/api/home", HTTP_GET, hHome}, {"/api/hubjoin", HTTP_GET, hHubJoin}, {"/api/swapfw", HTTP_GET, hSwapFw}, {"/api/hubkey", HTTP_GET, hHubKey},
-  {"/api/hubnet", HTTP_GET, hHubNet}, {"/api/factory", HTTP_GET, hFactory},
-  {"/api/backup", HTTP_GET, hBackup}, {"/api/restore", HTTP_GET, hRestore},
-#ifdef TILT_DEVLOG
-  {"/api/powerlog", HTTP_GET, hPowerLog},
-#endif
-};
+#define TILT_ROUTE(p, fn, w) {p, fn, w},
+const Route routes[] = { TILT_ROUTES(TILT_ROUTE) };      // the commands and who may send each: routes.h
+#undef TILT_ROUTE
 const int routeCount = sizeof routes / sizeof routes[0];
 
 // The chip's temperature sensor, for the developer page. (No web server: everything comes over Bluetooth or through

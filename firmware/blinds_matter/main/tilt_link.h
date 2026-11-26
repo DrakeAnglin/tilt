@@ -20,6 +20,7 @@ const int LINK_PROTO = 1;
 // ---- datagrams (UDP port 49100 over Thread; the layouts are in hub_link.h's header)
 enum Dg : char {
   DG_HELLO = 'H', DG_COMMAND = 'X', DG_ASK = 'A', DG_PAIR = 'P',      // hub -> controller, answered in lower case
+  DG_RECOVER = 'R', DG_RECOVER_STATE = 'Q',                           //   getting back in with no owner left (people.h)
   DG_BEGIN = 'B', DG_PIECE = 'W', DG_END = 'E',                       //   a firmware file: begin, pieces, end
   DG_TIME = 's',                                                      // hub -> controller: the answer to a push
   DG_PUSH = 'S', DG_LOG = 'L', DG_BYE = 'G',                          // controller -> hub, seq "00"
