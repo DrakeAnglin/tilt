@@ -25,6 +25,18 @@ inline float as5600Share(uint32_t high, uint32_t period) {
 // No pulses means the sensor sits within a few degrees of its zero, but only if it was last seen near there. Anywhere
 // else, missing pulses are noise: keep the last good reading and keep checking for a stall.
 inline bool pwmBlindSpot(float lastShare) { return lastShare < 15.0f / 360.0f || lastShare > 345.0f / 360.0f; }
+// A reading at a rail: a PWM sensor with no pulses, or an analog one at 0 V. That is the sensor's zero only if it was
+// last seen near there (or nothing is known yet). Anywhere else it is a dropout (the sensor gave nothing: 2026-11-25,
+// Dining read 0 deg at rest and moves and Follow took it as real): no reading. Either way the angle given is the last
+// good one, and `guess` says the angle is not fresh. raw: what the sensor gave; last: the last good angle (NAN: none).
+const float ANALOG_RAIL_MV = 30.0f;                 // an analog output under this is at 0 V (about 4 degrees)
+struct SensorRead { float ang; bool guess, lost; };
+inline SensorRead judgeReading(float raw, bool atRail, float last) {
+  if (!atRail) return {raw, false, false};
+  if (std::isnan(last)) return {raw, true, false};                      // nothing known yet: it may sit at its zero
+  if (pwmBlindSpot(fmodf(last + 360.0f, 360.0f) / 360.0f)) return {last, true, false};   // near zero before: still there
+  return {last, true, true};                                            // a dropout
+}
 
 // ---- a blind's three marks (sensor angles, degrees) and tilt (-100 closed down .. 0 open .. +100 closed up)
 const float MAX_HALF_SPAN = 170.0f, MIN_HALF_SPAN = 8.0f;   // open -> closed, each way (degrees of rod turn)
@@ -55,11 +67,11 @@ inline bool steeringChanged(const Marks &a, int signA, const Marks &b, int signB
 // what the stopped move left (it may have learned or put back the direction while ending).
 inline int8_t keptSign(int8_t asked, int8_t before, int8_t afterStop) { return asked != before ? asked : afterStop; }
 // Current tilt (CONTEXT.md: it always wins): the sensor now. While a move runs, its live reading; at rest, the last
-// true reading (noted, worked out when it was read). Not set up: unknown, moving or not.
+// true reading (noted, worked out when it was read). Not set up: unknown, moving or not. Always -100..100.
 inline float currentTiltOf(const Marks &m, bool moving, float live, float noted) {
   if (marksProblemOf(m)) return NAN;
-  if (moving && !std::isnan(live)) return tiltOfMarks(m, live);
-  return noted;
+  float t = moving && !std::isnan(live) ? tiltOfMarks(m, live) : noted;
+  return std::isnan(t) ? t : fminf(fmaxf(t, -100.0f), 100.0f);     // past a closed mark is still closed: never over 100
 }
 
 // ---- can a blind be moved? Set up (all three marks good), its tilter not missing, and the battery above the motor

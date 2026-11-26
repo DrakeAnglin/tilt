@@ -113,6 +113,8 @@ struct SimTilter : Tilter {
   bool firstZero = false;       // the first reading after the sensor wakes is 0 (Left, 2026-11-23)
   bool strainZeros = false;     // straining against an end stop, the PWM sensor reads 0 in bursts (Left, 2026-11-23)
   uint32_t motorAfterHand = 0;  // ms the motor ran once the hand started
+  uint32_t dropAt = 0, dropMs = 0;   // the sensor gives nothing for a while (a dropout: Dining, 2026-11-25)
+  float lastGood = NAN;         // what the controller keeps meanwhile: the last good reading
   float rodMin = 1e9f, rodMax = -1e9f;   // how far the rod went, either way
   int dir = 0, duty = 0;
   int8_t sign = 1;
@@ -138,14 +140,20 @@ struct SimTilter : Tilter {
   bool inBlind() { float a = wrapped(); return blindLo >= 0 && (a >= blindLo || a <= blindHi); }
   uint32_t ms() override { return t; }
   bool wake() override { return true; }
+  bool dropping() { return dropMs && t >= dropAt && t - dropAt < dropMs; }
   float angle() override {
+    if (dropping()) return std::isnan(lastGood) ? 0 : lastGood;
+    return lastGood = fresh();
+  }
+  float fresh() {
     if (firstZero) { firstZero = false; return 0; }
     float g = dir && glitchMs && t >= glitchAt && t < glitchAt + glitchMs ? glitchBy : 0;   // motor noise: only while it runs
     if (spikeEvery && ++reads % spikeEvery == 0) g += spikeBy;
     if (strainZeros && dir && (rod <= lo + 0.5f || rod >= hi - 0.5f) && ++reads % 60 < 15) return 0;
     return inBlind() ? 0 : fmodf(wrapped() + (dir ? 3.0f : 0) + g + 360.0f, 360.0f);
   }
-  bool noReading() override { return inBlind(); }
+  bool noReading() override { return inBlind() || dropping(); }
+  bool lost() override { return dropping(); }
   float note(float a) override { return a; }
   void motor(int d, int pct) override { dir = d; duty = pct; }
   TiltSettings settings() override { return set; }
@@ -171,6 +179,62 @@ static void sensorTests() {
   CHECK(as5600Share(500, 0) < 0, "no frame yet: no reading");
   CHECK(pwmBlindSpot(3.0f / 360) && pwmBlindSpot(358.0f / 360), "no pulses just above or below zero: the blind spot");
   CHECK(!pwmBlindSpot(252.0f / 360), "no pulses at 252 degrees: noise, not the blind spot");
+}
+// A sensor dropout (issue #135): the AS5600 sometimes gives nothing (PWM: no pulses, analog: 0 V) far from its zero.
+// It is no reading: never the angle, never a stop "near the target", never a turn by hand, and tilt stays in -100..100.
+static void dropoutTests() {
+  { SensorRead r = judgeReading(83.4f, false, 80); CHECK(r.ang == 83.4f && !r.guess && !r.lost, "a fresh reading is the angle"); }
+  { SensorRead r = judgeReading(0, true, 83.4f); CHECK(r.lost && r.guess && r.ang == 83.4f, "no pulses at 83 degrees: a dropout, the last angle kept"); }
+  { SensorRead r = judgeReading(0, true, 285.9f); CHECK(r.lost && r.ang == 285.9f, "analog at 0 V, last at 286 degrees: a dropout"); }
+  { SensorRead r = judgeReading(0, true, 3); CHECK(!r.lost && r.guess && r.ang == 3, "no pulses, last near zero: its zero, not a dropout"); }
+  { SensorRead r = judgeReading(0, true, 358); CHECK(!r.lost && r.guess, "no pulses, last just below a full turn: its zero"); }
+  { SensorRead r = judgeReading(0, true, NAN); CHECK(!r.lost && r.guess && r.ang == 0, "no pulses, nothing known yet: it may sit at its zero"); }
+  // Middle's samples at rest, one a second (83.4, then 0.0 with no pulses ten times), and Right's (analog 285.9, then
+  // 0 V), read the way the idle look-round reads them, with Follow on. 0 degrees is far past Middle's closed-up mark.
+  { Marks mid{60, 100, 160}, right{250, 286, 330};
+    CHECK(tiltOfMarks(mid, 0) > 200, "(the dropout as an angle would be a tilt far over 100)");
+    HandWatch h;
+    float last[2] = {NAN, NAN}, noted[2] = {NAN, NAN};
+    bool watched = false, followed = false, inRange = true;
+    uint32_t now = 1000;
+    auto look = [&](int p, const Marks &k, float raw, bool rail) {
+      SensorRead r = judgeReading(raw, rail, last[p]);
+      last[p] = r.ang;                                         // noteAngle keeps what readAngle gave
+      noted[p] = tiltOfMarks(k, r.ang);
+      h.reading(p, noted[p], r.ang, r.guess, now);
+      HandWatchNow w = h.tick(now);
+      watched |= w.watchPort >= 0; followed |= w.followFrom >= 0;
+      float c = currentTiltOf(k, false, NAN, noted[p]);
+      inRange &= c >= -100 && c <= 100;
+      now += 500;
+    };
+    for (int i = 0; i < 3; i++) { look(0, mid, 83.4f, false); look(1, right, 285.9f, false); }
+    for (int i = 0; i < 10; i++) { look(0, mid, 0, true); look(1, right, 0, true); }
+    for (int i = 0; i < 3; i++) { look(0, mid, 83.4f, false); look(1, right, 285.9f, false); }
+    CHECK(!watched && !followed, "dropouts at rest: no turn by hand, nothing follows");
+    CHECK(inRange && near(noted[0], 41.5f, 0.1f), "dropouts at rest: the tilt stays where it was, inside -100..100"); }
+  // Past a closed mark (the rod carries on, or a bad reading): still told as closed, never over 100.
+  { Marks k{200, 290, 40};
+    CHECK(currentTiltOf(k, false, NAN, 112.6f) == 100 && currentTiltOf(k, false, NAN, -130) == -100, "Current tilt: never outside -100..100 at rest");
+    CHECK(currentTiltOf(k, true, 180, 0) == 100, "Current tilt: never outside -100..100 while moving"); }
+  // Moves.
+  { SimTilter s; s.dropMs = 1000000000;                       // dead from the start
+    s.go(50);
+    CHECK(s.endMsg == "stopped: no reading from the sensor" && s.last.runMs == 0 && s.rodMax == 290, "no reading at all: the motor never starts"); }
+  { SimTilter s; s.dropMs = 150; float t = s.go(50);          // slow to start
+    CHECK(s.endMsg == "reached" && near(t, 50, 5), "a sensor slow to wake: the move waits for it and reaches the Target"); }
+  { SimTilter s; s.degPerS = 15; s.dropAt = 1500; s.dropMs = 1000000000;   // gone mid-move
+    Move m; moveFresh(m, MV_TILT, 0, s.t); m.tgt = -100;
+    uint32_t off = 0;
+    while (m.kind != MV_NONE && s.t < 60000) { s.step(10); moveTick(m, s, s.t); if (s.dir && s.t >= s.dropAt) off = s.t; }
+    CHECK(s.endMsg == "stopped: no reading from the sensor", "a dropout mid-move: it stops and says why");
+    CHECK(off < s.dropAt + LOST_STOP_MS + 50, "a dropout mid-move: the motor stops within about a second");
+    CHECK(s.log.find("wrong way") == std::string::npos && s.sign > 0, "a dropout mid-move: not taken for going the wrong way"); }
+  { SimTilter s; s.dropAt = 4000; s.dropMs = 400; float t = s.go(50);   // a short dropout mid-move
+    CHECK(s.endMsg == "reached" && near(t, 50, 5), "a short dropout mid-move: it carries on and reaches the Target"); }
+  { SimTilter s; s.degPerS = 15; s.go(50); uint32_t at = s.t;           // a dropout while it settles at the Target
+    s.dropAt = at + 2000; s.dropMs = 600; float t = s.go(50);
+    CHECK(s.endMsg == "already there" && near(t, 50, 5), "a dropout after a move: the next move to the same tilt does nothing"); }
 }
 static void tilterTests() {
   { SimTilter s; float t = s.go(50);
@@ -425,6 +489,7 @@ int main() {
 
   // ---- one blind's Move, on a simulated Tilter
   sensorTests();
+  dropoutTests();
   tilterTests();
   handWatchTests();
   settingsChangeTests();

@@ -12,7 +12,9 @@ struct BlindState {
   bool present = false, seen = false;
   bool pwm = false;             // this port's sensor sends PWM (found by listening when it wakes)
   int misses = 0;               // "nothing plugged in" results in a row
-  bool blind = false;           // PWM sensor, but no pulses just now: within a few degrees of its zero
+  bool blind = false;           // no fresh reading just now (at its zero, or a dropout): the angle is the last good one
+  bool lost = false;            // a dropout: the sensor gave nothing, away from its zero (logic.h judgeReading)
+  uint32_t drops = 0, dropLogMs = 0;   // dropouts since the last log line; when that was
   float ang = NAN, mv = 0;      // last true angle (motor stopped)
   float tilt = NAN;             // from the marks; NAN = not set up or not read yet
   float target = NAN;           // tilt it is moving to
@@ -66,19 +68,34 @@ float degOf(float mv) { return constrain(mv / 1000.0f / (vdd - EN_DROP_V), 0.0f,
 // measured just before and just after the angle: if the two disagree, the reading is thrown away and taken again.
 float capLast[PORTS] = {0, 0, 0};
 uint32_t capLastMs[PORTS] = {0, 0, 0};       // each port's last good PWM frame
+// A reading at a rail, judged (logic.h judgeReading): the sensor's zero, or a dropout. A dropout is logged, but at most
+// one line every 10 minutes for each blind, with how many there were.
+float judged(int p, float raw, bool atRail, float last) {
+  SensorRead r = judgeReading(raw, atRail, last);
+  if (r.lost && !bs[p].lost) {
+    bs[p].drops++;
+    uint32_t t = millis();
+    if (!bs[p].dropLogMs || t - bs[p].dropLogMs > 600000) {
+      event("%s: the sensor gave no reading (%lu time%s): the last angle is kept", cfg.b[p].name, (unsigned long)bs[p].drops, bs[p].drops == 1 ? "" : "s");
+      bs[p].dropLogMs = t ? t : 1;
+      bs[p].drops = 0;
+    }
+  }
+  bs[p].blind = r.guess;
+  bs[p].lost = r.lost;
+  return r.ang;
+}
 float readAngle(int p) {
   if (bs[p].pwm) {                            // PWM sensor: the share of the frame that is high
     float sh = capShare(p);
     uint32_t t = millis();
     if (sh >= 0) { capLast[p] = sh; capLastMs[p] = t ? t : 1; }
     else if (capLastMs[p] && t - capLastMs[p] < 200) sh = capLast[p];     // a few frames lost to noise: keep the last good one
-    bs[p].blind = sh < 0 && (!capLastMs[p] || pwmBlindSpot(capLast[p]));
-    // No pulses for a while: the sensor is within a few degrees of its zero (resting low just above it, or high just
-    // below a full turn). Keep the last good reading, which is on the right side of zero; a flat 0 there could be read
-    // as a jump of tens of degrees (a blind turning through zero then looked like it was going the wrong way).
-    if (sh < 0) sh = capLastMs[p] ? capLast[p] : 0;
-    bs[p].mv = sh * 3300.0f;                  // shown on the developer page in place of the voltage
-    return sh * 360.0f;
+    bs[p].mv = sh >= 0 ? sh * 3300.0f : 0;    // shown on the developer page in place of the voltage
+    // No pulses for a while: within a few degrees of its zero (resting low just above it, or high just below a full
+    // turn), if it was last seen there; the last good reading is kept, which is on the right side of zero (a flat 0
+    // could be read as a jump of tens of degrees). Anywhere else: a dropout.
+    return judged(p, sh >= 0 ? sh * 360.0f : 0, sh < 0, capLastMs[p] ? capLast[p] * 360.0f : bs[p].ang);
   }
   float v1 = 0, v2 = 0;
   for (int k = 0; k < 4; k++) {
@@ -90,7 +107,7 @@ float readAngle(int p) {
     if (v1 > 2.5f && v1 < 3.6f && fabsf(v1 - v2) < 0.03f) break;
   }
   if (v1 > 2.5f && v1 < 3.6f && v2 > 2.5f && v2 < 3.6f) vdd = (v1 + v2) / 2;
-  return degOf(bs[p].mv);
+  return judged(p, degOf(bs[p].mv), bs[p].mv < ANALOG_RAIL_MV, bs[p].ang);   // 0 V: its zero, or a dropout
 }
 // Is a tilter plugged in? An empty port floats: it keeps whatever voltage the pin was last pushed to. A sensor
 // pulls the line back to its own value. Push it low, then high, and compare. EN must be on. Leaves bs[p].mv fresh.
@@ -195,6 +212,7 @@ struct EspTilter : Tilter {
   bool wake() override { senseWake(p); return bs[p].present; }
   float angle() override { return readAngle(p); }
   bool noReading() override { return bs[p].blind; }
+  bool lost() override { return bs[p].lost; }
   float note(float a) override { noteAngle(p, a); return bs[p].ang; }
   void motor(int d, int pct) override { motorRaw(p, d, pct); }
   TiltSettings settings() override {
