@@ -22,8 +22,8 @@ firmware/blinds_matter/build.sh -p /dev/cu.usbmodemXXXX flash monitor
 ```
 
 ### Updates
-- **From the app:** a room's settings show "Update to …" when a newer firmware is published. Release files are signed and live on the
-  public `DrakeAnglin/tilt-site` repo; how to publish one: [docs/app-store.md](../docs/app-store.md).
+- **From the app:** a room's settings show "Update to …" when a newer firmware is published. Release files are signed and live on this
+  repo's GitHub releases; how to publish one: [docs/app-store.md](../docs/app-store.md).
 - **From the Mac** (developer): build, sign and send through the hub. A firmware that cannot reach the hub rolls back
   by itself.
 

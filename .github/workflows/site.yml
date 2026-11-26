@@ -1,0 +1,49 @@
+name: Site
+
+# The public website, from site/ (Jekyll, the same build GitHub Pages uses). A pull request builds and checks it;
+# a merge to main publishes it to https://drakeanglin.github.io/tilt/.
+on:
+  pull_request:
+    paths: ['site/**', '.github/workflows/site.yml']
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/site.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./site
+          destination: ./_site
+      - name: Every page is there
+        run: |
+          for PAGE in index.html privacy/index.html support/index.html; do
+            test -s "_site/$PAGE" || { echo "missing: $PAGE"; exit 1; }
+          done
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -52,9 +52,45 @@ enum TiltWords {
     }
 }
 
+/// The words of Tilt's push alerts (the Tilt Hub sends what happened; the alerts extension turns it into these).
+/// kind: what happened (the hub's names, firmware/tilt_hub/main/hub.cpp "Alert rules"); room: the controller's name;
+/// detail: the blind's name (stall), the battery percent, or why an update failed.
+enum AlertWords {
+    static func title(kind: String, room: String, detail: String) -> String {
+        switch kind {
+        case "stall": return detail.isEmpty ? "\(room): a blind got stuck" : "\(room): \(detail) got stuck"
+        case "silent": return "\(room) is not responding"
+        case "batt-low": return "\(room): battery low"
+        case "batt-crit": return "\(room): battery almost empty"
+        case "batt-dead": return "\(room): battery empty"
+        case "update": return "\(room): update failed"
+        case "hub-update": return "Tilt Hub: update failed"
+        case "hub-offline": return "Tilt Hub is offline"
+        case "test": return "\(room): test alert"
+        default: return "\(room) needs a look"
+        }
+    }
+    static func body(kind: String, room: String, detail: String) -> String {
+        let pct = Int(detail).map { "The battery is at \($0)%. " } ?? ""
+        switch kind {
+        case "stall": return "It stopped before it got where it was going. Check that nothing is in its way, then try again."
+        case "silent": return "Your Tilt Hub has not heard from it for a while. Check that its battery is charged and that it is within reach of the hub."
+        case "batt-low": return pct + "Plug in the charging cable soon."
+        case "batt-crit": return pct + "Plug in the charging cable: the blinds will stop moving soon."
+        case "batt-dead": return "The battery is too low to move the blinds. Plug in the charging cable."
+        case "update": return detail.isEmpty ? "The new firmware did not go on. It still runs the old one: try again from the Tilt Hub page." : "\(detail.capitalizedFirst). It still runs the old firmware: try again from the Tilt Hub page."
+        case "hub-update": return "The new firmware \(detail) did not start, so the hub went back to the one it had. Everything still works."
+        case "test": return "Push alerts from your Tilt Hub work."
+        case "hub-offline": return "Your iPhone is on your home Wi-Fi but can't reach the hub. Check that it is plugged in."
+        default: return "Open Tilt to see what happened."
+        }
+    }
+}
+
 extension ControllerState.Battery {
-    /// Below this, on battery, Tilt warns that the battery is low.
-    static let lowPercent = 20
+    /// Below this, on battery, Tilt warns that the battery is low; below criticalPercent, that it is almost empty.
+    /// The hub's alerts use the same lines (hub.cpp battLevelOf).
+    static let lowPercent = 20, criticalPercent = 10
     var charging: Bool { st != "battery" }
     /// Below the motor cut-off: the controller won't move any blind until it is charged.
     var tooLowToMove: Bool { low == 1 }

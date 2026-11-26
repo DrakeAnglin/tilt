@@ -326,6 +326,18 @@ check(!HomeSetup.inAlexa(hubHomes: [keychain, home]), "Apple's two connections o
 check(!HomeSetup.inAlexa(hubHomes: []) && !HomeSetup.inAlexa(hubHomes: [.init(node: nil, vendor: nil)]), "no homes, or a hub too old to give makers: not in Alexa")
 check(!HomeSetup.inAlexa(hubHomes: [.init(node: "00000000000000AA", vendor: 4447)]), "another maker's home: not Alexa")
 check(!HomeSetup.inHome(hubSays: true, hubHomes: [alexa], appleNodes: [0x77]), "in Alexa only: not in Apple Home")
+// ---- the Tilt Hub's push alerts: every kind the hub sends has its own words, and the battery lines are the hub's
+let hubKinds = ["stall", "silent", "batt-low", "batt-crit", "batt-dead", "update", "hub-update", "test"]
+for k in hubKinds + ["hub-offline"] {
+    check(AlertWords.title(kind: k, room: "Den", detail: "15") != AlertWords.title(kind: "something-new", room: "Den", detail: ""), "alert \(k) has its own title")
+}
+check(AlertWords.title(kind: "stall", room: "Den", detail: "Left") == "Den: Left got stuck", "a stall names the blind")
+check(AlertWords.body(kind: "batt-low", room: "Den", detail: "15").hasPrefix("The battery is at 15%."), "the battery alert gives the percent")
+let rules = (try? String(contentsOfFile: "../../firmware/tilt_hub/main/alert_rules.h", encoding: .utf8)) ?? ""
+check(rules.contains("ALERT_LOW_PCT = \(ControllerState.Battery.lowPercent),") && rules.contains("ALERT_CRIT_PCT = \(ControllerState.Battery.criticalPercent),"), "the hub's battery lines are the app's (alert_rules.h)")
+let hubSrc = rules + ((try? String(contentsOfFile: "../../firmware/tilt_hub/main/hub.cpp", encoding: .utf8)) ?? "")
+for k in hubKinds { check(hubSrc.contains("\"\(k)\""), "the hub sends alert \(k) (as \"\(k)\" in alert_rules.h or hub.cpp)") }
+
 // ---- blind setup (Shared/BlindSetup.swift)
 func blind(hid: Int = 0, pres: Int = 1, seen: Int = 1, cal: Int = 1, mov: Int = 0, q: Int = 0, last: String = "") -> BlindState {
     BlindState(name: "B", hid: hid, pres: pres, seen: seen, cal: cal, tilt: 0, tgt: nil, mov: mov, q: q, fav: 0, ang: nil, last: last)
