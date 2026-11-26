@@ -360,5 +360,57 @@ class FirmwareBuildCI(unittest.TestCase):
             self.assertFalse(builds(path), path)
 
 
+class HubPeopleLock(unittest.TestCase):
+    """The Tilt Hub reads its people under keyMx (firmware/tilt_hub/main/hub_pair.h). The lock is only on the chip,
+    so these read the source."""
+    MAIN = os.path.join(HERE, '..', 'firmware', 'tilt_hub', 'main')
+
+    def source(self, name):
+        with open(os.path.join(self.MAIN, name)) as f:
+            return f.read()
+
+    def hub_owned_body(self):
+        import re
+        m = re.search(r'^static bool hubOwned\(\) \{(.*?)^\}', self.source('hub_pair.h'), re.M | re.S)
+        self.assertIsNotNone(m, 'hubOwned() not found in hub_pair.h')
+        return m.group(1)
+
+    def test_hub_owned_reads_the_people_under_the_lock(self):
+        body = self.hub_owned_body()
+        take = body.find('xSemaphoreTake(keyMx')
+        read = body.find('people.owned()')
+        give = body.find('xSemaphoreGive(keyMx')
+        self.assertNotEqual(read, -1)
+        self.assertTrue(-1 < take < read < give, body)
+
+    def test_owned_is_read_only_through_hub_owned(self):
+        body = self.hub_owned_body()
+        for name in sorted(os.listdir(self.MAIN)):
+            path = os.path.join(self.MAIN, name)
+            if name == 'hub_people.h' or not os.path.isfile(path):
+                continue
+            text = self.source(name)
+            if name == 'hub_pair.h':
+                text = text.replace(body, '')
+            self.assertNotIn('people.owned()', text, name + ': read "owned" through hubOwned(), which holds keyMx')
+
+    def test_no_owned_call_while_holding_the_lock(self):
+        import re
+        lock = re.compile(r'xSemaphore(Take|Give)\(keyMx')
+        call = re.compile(r'(?<!static bool )(?<!static void )\b(hubOwned|announceHub)\(\)')  # not its declaration
+        calls = 0
+        for name in ('hub_pair.h', 'hub_api.h', 'hub_matter.h'):
+            text = self.source(name)
+            for m in call.finditer(text):
+                before = text[:m.start()]
+                line = text.count('\n', 0, m.start()) + 1
+                calls += 1
+                last = list(lock.finditer(before))
+                self.assertFalse(last and last[-1].group(1) == 'Take',
+                                 '%s:%d calls %s() while holding keyMx (it takes keyMx: the hub would hang)'
+                                 % (name, line, m.group(1)))
+        self.assertGreaterEqual(calls, 6)        # helloJson, hInfo, announceHub's own read, three announceHub calls
+
+
 if __name__ == '__main__':
     unittest.main()
