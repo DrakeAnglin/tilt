@@ -1,5 +1,6 @@
 // Firmware updates: the file comes through the Tilt Hub (hub_link.h hubOta). The new firmware runs on trial: it is
 // kept once it has heard from the hub for a minute; if it cannot reach the hub it goes back to this one.
+// If there is no firmware to go back to, it stays on this one, still on trial.
 // A firmware file may carry a signature at its end: image | signature (64 bytes, r then s) | "TILTSIG1".
 // Only a signed file is taken: the signature proves it came from whoever holds the release key. And an owner must have
 // allowed updates first (/api/otaopen, 5 minutes).

@@ -16,7 +16,7 @@
 #include "schedules.h"
 #include "scenes.h"
 #include "update.h"
-#include "ota.h"                                 // trialVerdict
+#include "ota.h"                                 // Trial
 #include "people.h"
 
 #define FW_VERSION "2.3.0-dev31"
@@ -314,9 +314,9 @@ void webBegin() {
 extern volatile uint32_t hubLinkSeen;            // hub_link.h
 // Restart (or go back to the firmware before, rollback) once the last answers have gone out. From the blinds task,
 // which holds mx: mx is let go for the wait, so no other task waits behind it. A restart stops and holds the motors
-// first (no handler may start one meanwhile). A rollback leaves the moves alone, as before: if going back is refused,
-// the controller carries on as it was, moves included.
-void restartNow(bool rollback, uint32_t waitMs) {
+// first (no handler may start one meanwhile). A rollback leaves the moves alone, as before: if going back is refused
+// (no valid firmware in the other slot), it returns why, and the controller carries on as it was, moves included.
+esp_err_t restartNow(bool rollback, uint32_t waitMs) {
   if (!rollback) {
     motorsHeld = true;
     rampCancel();
@@ -329,19 +329,22 @@ void restartNow(bool rollback, uint32_t waitMs) {
   xSemaphoreGive(mx);
   vTaskDelay(pdMS_TO_TICKS(waitMs));
   if (!rollback) esp_restart();
-  esp_ota_mark_app_invalid_rollback_and_reboot();  // returns only if refused
+  esp_err_t e = esp_ota_mark_app_invalid_rollback_and_reboot();  // returns only if refused
   xSemaphoreTake(mx, portMAX_DELAY);
+  return e;
 }
-// A new firmware is on trial until Thread to the Tilt Hub has worked for a minute (ota.h trialVerdict).
+// A new firmware is on trial until Thread to the Tilt Hub has worked for a minute (ota.h Trial). Going back refused:
+// it is asked and logged once, then the controller stays on this firmware, still on trial (it can still be kept).
 static void trialTick(uint32_t now) {
-  static uint32_t hubSince = 0;
-  hubSince = trialLinkSince(hubSince, trialLinkUp(hubOk(), hubLinkSeen, now), now);
+  static Trial trial;
+  TrialVerdict v = trial.tick(now, trialLinkUp(hubOk(), hubLinkSeen, now), hubJoined());
   if (!otaPending) return;
-  TrialVerdict v = trialVerdict(now, hubSince, hubJoined());
   if (v == TRIAL_KEEP) trialKeep();
   else if (v == TRIAL_ROLLBACK) {
     event("new firmware could not reach the Tilt Hub: going back");
-    restartNow(true, 200);
+    esp_err_t e = restartNow(true, 200);
+    trial.rollbackRefused();
+    event("cannot go back (%s): staying on this firmware", esp_err_to_name(e));
   }
 }
 // Once an hour: the battery history (and, on a developer build, the power log's temperature).

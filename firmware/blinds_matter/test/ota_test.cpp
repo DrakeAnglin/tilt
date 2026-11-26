@@ -258,6 +258,37 @@ static void stalled() {
   CHECK(!rx2.stalled(0xFFFFF000u + 20000) && rx2.stalled(0xFFFFF000u + 30001), "the stall is timed across millis wrapping");
 }
 
+// Trial: the rule with its memory, ticked once a second as webTick does. A refused rollback is asked once, not every second.
+struct TrialRun { int rollbacks = 0; uint32_t firstBack = 0, keptAt = 0; bool waitAfterBack = true; };
+static TrialRun runTrial(uint32_t untilMs, uint32_t linkUpAt, bool refuse, bool hubJoined = true) {
+  Trial t; TrialRun r;
+  for (uint32_t now = 1000; now <= untilMs && !r.keptAt; now += 1000) {
+    TrialVerdict v = t.tick(now, linkUpAt && now >= linkUpAt, hubJoined);
+    if (v == TRIAL_ROLLBACK) { if (!r.rollbacks++) r.firstBack = now; if (refuse) t.rollbackRefused(); }
+    else if (v == TRIAL_KEEP) r.keptAt = now;
+    else if (r.rollbacks && v != TRIAL_WAIT) r.waitAfterBack = false;
+  }
+  return r;
+}
+static void trialWithMemory() {
+  TrialRun a = runTrial(3600000, 0, true);
+  CHECK(a.rollbacks == 1 && a.firstBack == 301000 && a.waitAfterBack && !a.keptAt, "a refused rollback: asked once, then wait for good");
+  TrialRun b = runTrial(3600000, 600000, true);
+  CHECK(b.rollbacks == 1 && b.firstBack == 301000 && b.keptAt == 661000, "refused, then the link comes up at 10 minutes: kept a minute later");
+  TrialRun c = runTrial(3600000, 0, false);
+  CHECK(c.rollbacks == 3300 && c.firstBack == 301000 && !c.keptAt, "not refused: the rule still answers go back on every tick after 5 minutes");
+  // The link comes up at 20 s, drops at 50 s, is back at 100 s: the same answer as the free functions.
+  Trial t; uint32_t keptAt = 0, backAt = 0;
+  for (uint32_t now = 1000; now < 400000 && !keptAt && !backAt; now += 1000) {
+    TrialVerdict v = t.tick(now, (now >= 20000 && now < 50000) || now >= 100000, true);
+    if (v == TRIAL_KEEP) keptAt = now;
+    if (v == TRIAL_ROLLBACK) backAt = now;
+  }
+  CHECK(keptAt == 161000 && !backAt, "Trial: a dropped link starts the minute again");
+  TrialRun d = runTrial(900000, 0, true, false);
+  CHECK(!d.rollbacks && !d.keptAt, "Trial: not set up with a hub yet: wait for 15 minutes");
+}
+
 static void trial() {
   CHECK(trialVerdict(1000, 0, true) == TRIAL_WAIT, "just started: wait");
   CHECK(trialVerdict(300000, 0, true) == TRIAL_WAIT && trialVerdict(300001, 0, true) == TRIAL_ROLLBACK, "no hub for 5 minutes: back to the one before");
@@ -284,6 +315,7 @@ static void trial() {
   }
   CHECK(backAt == 301000 && !keptAt, "never reached the hub: back at 5 minutes");
   CHECK(trialLinkSince(0, true, 0) == 1, "up at millis 0 still counts as up");
+  trialWithMemory();
 }
 
 int main(int argc, char **argv) {
