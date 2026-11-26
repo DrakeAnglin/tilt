@@ -158,6 +158,17 @@ class BambuProject(unittest.TestCase):
         printed = [n for _, rows in bambu_project.SINGLE for r in rows for n in r]
         self.assertEqual(sorted(printed), self.EVERY)
 
+    def test_every_project_has_studio_project_info(self):
+        self.assertEqual(set(bambu_project.PROFILE), set(bambu_project.PROJECTS))
+        for name in bambu_project.PROJECTS:
+            info = bambu_project.project_info(name)
+            for key in ('Title', 'Designer', 'Description', 'ProfileTitle', 'ProfileDescription'):
+                self.assertTrue(info[key], (name, key))
+        model = bambu_project.set_metadata('<metadata name="Title"></metadata>\n <resources>', {'Title': 'a & b',
+                                                                                                  'Designer': 'x'})
+        self.assertIn('<metadata name="Title">a &amp;amp; b</metadata>', model)
+        self.assertIn('<metadata name="Designer">x</metadata>', model)
+
     def test_controller_box_is_its_own_project(self):
         self.assertEqual(sorted(n for _, rows in bambu_project.CONTROLLER[:1] for r in rows for n in r),
                          sorted(bambu_project.BOX))
