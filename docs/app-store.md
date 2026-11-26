@@ -64,7 +64,7 @@ about 3 minutes; trim in Photos.
 >
 > 3. HOW TO REVIEW (no login, no hardware needed): on the first screen tap "No controller yet? Try the Demo" (also under
 > + then Try the Demo). The demo room, "Living Room (Demo)", acts like a real one: tap Open or Close, press and hold
-> them for a gentle move, tap the room to move one blind, press and hold a blind for Set Tilt…, run the Morning or Movie scene, add a
+> them for a gentle move or Set Tilt…, tap the room to move one blind, run the Morning or Movie scene, add a
 > schedule in Automations, and change room and blind settings in Settings. Bluetooth setup, Apple Home, the Tilt Hub and sharing with family need the hardware; they are shown in the
 > recording. Sign in with Apple is optional and only fills in the display name that people you share with see. There is
 > no account and nothing to log in to.
