@@ -41,8 +41,9 @@ PETG is for the parts that rub or mesh against PLA all the time.
 | Part | Qty | Where |
 |---|---|---|
 | M3 heat-set insert | 6 | bearing shell 4 (2 case bolts, 2 tray bolts), tray 2 (sensor bolt, lid corner) |
-| M3 × 25 flat-head | 3 | 2 case bolts, 1 sensor bolt (through the lid's column and the AS5600) |
-| M3 × 20 flat-head | 2 | tray bolts; the room-side one is also the cluster gear's axle |
+| M3 × 25 flat-head | 1 | sensor bolt (through the lid's column and the AS5600) |
+| M3 × 20 flat-head | 4 | 2 case bolts, 2 tray bolts; the room-side tray bolt is also the cluster gear's axle |
+| M3 × 16 flat-head | 2, optional | hold the motor shell on while the sensor module is not ready; reusable |
 | M3 × 8 flat-head | 1 | lid's corner bolt |
 | M1.6 × 4 | 2 | N20 to the motor shell |
 | Ø2 × 6 dowel pin | 5 | 4 planet axles in the carrier, 1 worm top pin in the worm case |
@@ -51,47 +52,18 @@ PETG is for the parts that rub or mesh against PLA all the time.
 
 Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter).
 
-## Before you start
-1. **Wire the sensor module on the bench:** [sensor module](../../../../docs/tilter-wiring.md). The AS5600 is already
-   switched to PWM. Leave the two motor leads loose.
-2. **Press the inserts** with a soldering iron: 4 in the bearing shell, 2 in the tray.
-3. **Press the dowels:** 4 into the carrier, 1 into the worm case for the worm's top end.
-
 ## Assembly
-Step by step with photos: [tilter assembly](../../../../docs/tilter-assembly.md). Short version:
+Two subassemblies, each step by step with photos:
+1. **Sensor module** (the electronics), on the bench: [sensor module](../../../../docs/tilter-wiring.md).
+2. **Mechanical build** (printed parts, screws, grease): [tilter assembly](../../../../docs/tilter-assembly.md).
 
-Grease every gear as it goes in.
-
-1. **Worm case:** wheel and worm into the main half, lid on. Ring cup onto the wheel's hex. Planets onto the carrier's
-   dowels, carrier into the cup.
-2. **Bearing shell** over the cup (its two pins find the lid). Sun piece in. Two M3 × 25 from the main half's back,
-   snug.
-3. **Motor shell:** screw the N20 to its plate with the 2 M1.6 × 4 (the heads sit down in their wells). Drop in the
-   motor pinion and the cluster. The motor shell has no bolts of its own: hold it on the bearing shell (two pins); the
-   cluster gets its axle when the tray's bolt goes in.
-4. **Sensor sleeve:** push its nose through the motor plate from the back and turn it until the lugs drop into the
-   carrier (the last 2.4 mm). Its gear now sticks out of the plate.
-5. **AS5600 onto its studs in the tray first**, with the tray still off, chip up. It lies under the sleeve's gear, so
-   it cannot go in afterwards.
-6. **Tray** on from the back (its two pins find the motor shell). Two M3 × 20 through holes in its end wall: the
-   room-side one through the cluster gear (turn the gear until the bolt finds its bore), the floor one under the sensor
-   board. Snug, not hard: a hard-tightened axle bolt can bow the motor plate onto the cluster.
-7. **Solder the motor leads** to the N20's tabs. **DRV8833** down into its slots, then the **RJ12** board, jack up.
-8. **Lid:** press the magnet into the magnet gear's hub. Pick the support out of the lid's gear cage, then slide the
-   gear in from the rod side until its hub clicks into its seat. Lower the lid straight down over the jack; the gear
-   turns itself into mesh. M3 × 25 down through the column and the sensor board, M3 × 8 in the corner. Snug.
-9. **Felt pads.** Stick 4 felt pads under the floor, one in each corner, and 1 on the middle of each long side wall.
-   They keep the tilter off the metal rail, which would otherwise carry the motor's buzz into the room. Felt, not
-   rubber: rubber still passes the vibration on.
-   If the rod binds once it is in, use thinner pads, or leave the side ones off.
-10. **Into the rail**, then push the rod through. Turn the wand a little if it stops.
-
-Plug the cord in and set the blind up in the app: [build guide](../../../../docs/build-guide.md).
+Then plug the cord in and set the blind up in the app: [build guide](../../../../docs/build-guide.md).
 
 ## Checked in Fusion
 - No part touches another, with a rod right through the tilter included.
 - Gears turned through their meshes in motor mode, wand mode and at the fast end: no overlap.
-- Assembly paths swept in the order above: all clear.
+- Assembly paths swept in the old build order: all clear. The photo build changed the order (see the tilter assembly);
+  not swept again yet.
 - Sleeve end play: 0.25 mm forward, 0.35 mm back.
 - Print files scanned for overhangs: only the lid's gear shelf needs support.
 - Thin-wall scan (`tools/fusion_thin.py`): what it still lists is on purpose (the 0.8 mm bearing wall between the gear

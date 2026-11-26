@@ -14,6 +14,9 @@ Short version and design notes: [tilter README](../hardware/mechanical/stl/tilte
 **Tools:** soldering iron (it presses the inserts and solders the motor leads), flush cutters, tweezers, M3 and
 M1.6 drivers for the screws, a toothpick for the grease.
 
+**Screws:** tighten every screw down unless the step says otherwise. Only the tiny motor screws (C1) and the
+optional temporary screws (C5) stay snug.
+
 **Grease:** Super Lube 21030 (PTFE). Where it goes is marked **Grease** in each step.
 - **A thin film is all it needs.** Put a little on, spread it with your finger, then wipe off what is left over.
 - **Too much grease is worse than too little.** The extra has to be pushed out of the way by the gears, and you can
@@ -106,7 +109,7 @@ carrier's hub where it turns in the wheel.
 
 ### B4. Bearing shell on
 Bearing shell over the cup, cup side down (its two pins find the lid). Two **M3 × 20** from the main half's back into
-the bearing shell's inserts. **Snug, not tight.**
+the bearing shell's inserts. Tighten them down.
 
 ![bearing shell on the gearbox](photos/tilter/b4-bearing-shell-on.jpg)
 
@@ -145,7 +148,7 @@ carrier (the last 2.4 mm). Its gear now sticks out of the plate.
 ### C5. Hold it together
 The motor shell has no bolts of its own: the tray's two bolts hold it on (step D2).
 - **Sensor module ready?** Go straight on to Part D.
-- **Not ready yet?** Put two **M3 × 16** in loosely, through the motor shell into the bearing shell, so it holds
+- **Not ready yet?** Put two **M3 × 16** in, snug only, through the motor shell into the bearing shell, so it holds
   together while you wait. The one nearer the room side goes through the cluster gear. Take them out again at D2.
 
 ![motor shell on, sleeve in, two M3 × 16 holding it](photos/tilter/c5-sleeve-in.jpg)
@@ -202,7 +205,7 @@ Lower the lid straight down over the jack. The magnet gear turns itself into mes
 - **M3 × 25** on the sensor side, down through the lid's column and the AS5600.
 - **M3 × 8** in the far corner.
 
-Snug.
+Tighten them down.
 
 ![lid going on](photos/tilter/d5-lid-going-on.jpg)
 

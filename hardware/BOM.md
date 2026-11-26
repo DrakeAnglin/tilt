@@ -65,8 +65,9 @@ If a faster motor overshoots (the log shows "turn-backs"), raise the stop-early 
 ### Hardware
 | Part | Per tilter | Sold as | Link |
 |---|---|---|---|
-| M3 × 25 flat-head screw | 3 (2 case, 1 sensor) | pack of 50 | [B0DKY4B3VG](https://www.amazon.com/dp/B0DKY4B3VG) |
-| M3 × 20 flat-head screw | 2 (tray; one is the cluster gear's axle) | in the M3 kit ([Buy once](#buy-once)) | |
+| M3 × 25 flat-head screw | 1 (sensor, through the lid and the AS5600) | pack of 50 | [B0DKY4B3VG](https://www.amazon.com/dp/B0DKY4B3VG) |
+| M3 × 20 flat-head screw | 4 (2 case, 2 tray; one tray bolt is the cluster gear's axle) | in the M3 kit ([Buy once](#buy-once)) | |
+| M3 × 16 flat-head screw | 2, optional and reusable: hold the motor shell on while the sensor module is not ready ([step C5](../docs/tilter-assembly.md#c5-hold-it-together)) | in the M3 kit ([Buy once](#buy-once)) | |
 | M3 × 8 flat-head screw | 1 (lid corner) | in the M3 kit ([Buy once](#buy-once)) | |
 | M3 heat-set insert, M3 × 5.7 × 4.6 (Ø4.0 hole) | 6 | pack of 100 (the boxes use them too) | [B0DQL4ZSCP](https://www.amazon.com/dp/B0DQL4ZSCP) |
 | M1.6 × 4 socket screw (holds the N20 to the motor shell) | 2 | in the M1.6 kit ([Buy once](#buy-once)) | |
@@ -75,7 +76,7 @@ If a faster motor overshoots (the log shows "turn-backs"), raise the stop-early 
 | Stick-on **felt** pad, about 8 mm across and 1.5 to 2 mm tall (the same pack as the box's feet) | 6 (4 under, 1 on each side) | [Buy once](#buy-once) | |
 
 The felt pads keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use felt, not
-rubber: rubber still passes the vibration on. Where they go: [tilter build, step 9](mechanical/stl/tilter/README.md#assembly).
+rubber: rubber still passes the vibration on. Where they go: [tilter assembly, step D6](../docs/tilter-assembly.md#d6-felt-pads).
 
 ### Cord to the controller
 | Part | Per tilter | Sold as | Link |
@@ -160,7 +161,7 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 
 | Part | Uses | Sold as | Link |
 |---|---|---|---|
-| M3 countersunk screw kit, 4–20 mm | M3 × 20 and M3 × 8 (3 per tilter), M3 × 10 (3 per box) | kit | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
+| M3 countersunk screw kit, 4–20 mm | M3 × 20, M3 × 16 and M3 × 8 (5 per tilter, plus 2 reusable M3 × 16), M3 × 10 (3 per box) | kit | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
 | M1.6 × 4 socket screws | 2 per tilter | kit | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) |
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm per tilter | kit | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) |
 | 22 AWG stranded wire, red and black | about 12 cm per tilter, 5 cm per controller | small roll each | search "22 AWG silicone wire red black" |
