@@ -206,13 +206,16 @@ Slide the magnet gear (magnet already in, step A4) into the lid's gear cage from
 hub clicks into its seat.
 **Grease:** the magnet gear's teeth.
 
-📷 **Photo D4:** the lid upside down, magnet gear in its cage.
-
 ### D5. Lid on
-Lower the lid straight down over the jack. The gear turns itself into mesh. **M3 × 25** down through the column
-and the sensor board; **M3 × 8** in the corner. Snug.
+Lower the lid straight down over the jack. The magnet gear turns itself into mesh with the sleeve's gear. Two screws:
+- **M3 × 25** on the sensor side, down through the lid's column and the AS5600.
+- **M3 × 8** in the far corner.
 
-📷 **Photo D5:** the closed tilter, jack side.
+Snug.
+
+![lid going on](photos/tilter/d5-lid-going-on.jpg)
+
+![lid on, jack side](photos/tilter/d5-lid-on.jpg)
 
 ### D6. Felt pads
 4 under the floor (one each corner), 1 on the middle of each long side wall. Felt, not rubber.
@@ -228,7 +231,7 @@ and the sensor board; **M3 × 8** in the corner. Snug.
 3. Then into the rail, and push the rod through. Turn the wand a little if it stops. If the rod binds, use thinner
    pads or leave the side ones off.
 
-📷 **Photo 99:** the finished tilter in the rail, rod through.
+![the finished tilter](photos/tilter/done-tilter.jpg)
 
 ## Photos
 Photos go in `docs/photos/tilter/`, named by step: `00-kit.jpg`, `a2-tray-inserts.jpg`, `b1-worm.jpg`, and so on.
