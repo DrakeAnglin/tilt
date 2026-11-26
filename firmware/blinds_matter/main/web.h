@@ -88,7 +88,7 @@ esp_err_t hDev(httpd_req_t *r) {
   ap(j, ",\"st\":{\"boots\":%lu,\"brown\":%lu,\"crash\":%lu,\"wdt\":%lu,\"wakes\":0,\"checkins\":0,\"ota\":%lu,\"motorS\":%lu}", (unsigned long)stats.boots, (unsigned long)stats.brownouts, (unsigned long)stats.crashes,
      (unsigned long)stats.wdt, (unsigned long)stats.otaOk, (unsigned long)(stats.motorMs / 1000));
   Move &dm = mvs[max(firstMoving(), 0)];          // the developer page shows one move: the first blind that is moving
-  ap(j, ",\"tune\":{\"grace\":%d,\"stall\":%d,\"deg10\":%d,\"max\":%d},\"mv\":{\"kind\":%d,\"port\":%d,\"st\":%d,\"nudges\":%d,\"live\":%s},\"p\":[", tune.graceMs, tune.stallMs, tune.stallDeg10, tune.moveMaxS, dm.kind, dm.port, dm.st, dm.nudges, jn(dm.live, 1).c_str());
+  ap(j, ",\"tune\":{\"grace\":%d,\"stall\":%d,\"deg10\":%d,\"max\":%d,\"lead10\":%d},\"mv\":{\"kind\":%d,\"port\":%d,\"st\":%d,\"nudges\":%d,\"live\":%s},\"p\":[", tune.graceMs, tune.stallMs, tune.stallDeg10, tune.moveMaxS, leadMax10, dm.kind, dm.port, dm.st, dm.nudges, jn(dm.live, 1).c_str());
   for (int i = 0; i < PORTS; i++) {
     BlindCfg &c = cfg.b[i];
     const char *pr = marksProblem(i);
@@ -159,6 +159,7 @@ esp_err_t hSet(httpd_req_t *r) {
   else if (k == "tune.stall") { tune.stallMs = constrain(n, 200, 10000); tuneSave(); }
   else if (k == "tune.deg10") { tune.stallDeg10 = constrain(n, 1, 100); tuneSave(); }
   else if (k == "tune.max") { tune.moveMaxS = constrain(n, 5, 600); tuneSave(); }
+  else if (k == "tune.lead10") { leadMax10 = constrain(n, 20, 250); nvs.putUChar("lmax", leadMax10); }   // 2..25 degrees
   else if (k == "battMode" || k == "checkin" || k == "tx") return fail(r, "not in this version");
   else if (k == "tz") {
     if (v.length() < 3 || v.length() >= sizeof c.tz) return fail(r, "bad time zone");

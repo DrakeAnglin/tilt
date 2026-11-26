@@ -48,9 +48,10 @@ const int BATT_HIST = 168;     // hourly, one week
 
 Settings cfg;
 // The drive has play: after a change of direction the motor turns for a while before the rod, and the sensor on it,
-// moves at all. So a stall is only called after a long quiet time. The play was measured at 6 to 8.5 s with the old
-// 150 RPM motor; the 300 RPM N20 (about 185 RPM on the cell) takes it up in roughly half that, 3 to 4.5 s. The grace
-// keeps a wide margin over that (a slow speed setting or a low battery stretches it).
+// moves at all. So a stall is only called after a long quiet time. The play was 6 to 8.5 s on the old 88:1 train; on
+// today's 20:1 tilter with the 150 RPM N20 it is 0.3 to 1.7 s (dining room jogs, 2026-11-25), and a 300 RPM motor
+// takes it up in about half that. The grace keeps a wide margin over that (a slow speed setting or a low battery
+// stretches it), so it suits 100 to 300 RPM motors as it is.
 struct Tune {
   uint16_t magic;
   uint16_t graceMs;            // after a change of direction: no stall check for this long (gear play being taken up)
@@ -60,6 +61,7 @@ struct Tune {
 };
 const uint16_t TUNE_MAGIC = 0x7403;
 Tune tune = {TUNE_MAGIC, 8000, 2500, 10, 180};    // grace about twice the expected play; a saved tune (app) wins
+uint8_t leadMax10 = 80;         // the most a blind may learn to stop early, tenths of a degree (TiltSettings::leadMax). Own NVS key ("lmax"), so a saved tune keeps working.
 uint8_t syncMode = 1;           // 1: blinds follow each other: moving one (app, Home, or its wand by hand) sends them all to the same tilt. Own NVS key.
 uint8_t parMode = 1;            // 1: blinds that have to move all move at the same time; 0: one after another. Own NVS key.
 uint8_t hkSeparate = 0;         // 1: Apple Home shows one Window covering per blind; 0: one for all. Own NVS key ("hksep").
@@ -150,6 +152,7 @@ void storeBegin() {
   syncMode = nvs.getUChar("sync", 1);
   parMode = nvs.getUChar("par", 1);
   hkSeparate = nvs.getUChar("hksep", 0);
+  leadMax10 = nvs.getUChar("lmax", 80);
   if (nvs.getUChar("angv", 1) < 2) {             // marks made with the first angle scale (rail - 0.10 V): rescale once
     for (int i = 0; i < PORTS; i++) {
       float *m[3] = {&cfg.b[i].up, &cfg.b[i].open, &cfg.b[i].down};

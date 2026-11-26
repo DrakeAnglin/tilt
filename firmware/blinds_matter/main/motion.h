@@ -221,7 +221,7 @@ struct EspTilter : Tilter {
   float note(float a) override { noteAngle(p, a); return bs[p].ang; }
   void motor(int d, int pct) override { motorRaw(p, d, pct); }
   TiltSettings settings() override {
-    return {marksOf(p), cfg.b[p].speed, tune.graceMs, tune.stallMs, (uint32_t)tune.moveMaxS * 1000, tune.stallDeg10 / 10.0f};
+    return {marksOf(p), cfg.b[p].speed, tune.graceMs, tune.stallMs, (uint32_t)tune.moveMaxS * 1000, tune.stallDeg10 / 10.0f, leadMax10 / 10.0f};
   }
   int8_t &motSign() override { return cfg.b[p].motSign; }
   TiltMemory &memory() override { return bs[p].mem; }

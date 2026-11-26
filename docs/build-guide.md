@@ -127,4 +127,6 @@ Tilt Hub" on the hub page in the app).
 - PCB readings: [PCB build, "If something reads wrong"](pcb-build.md#if-something-reads-wrong).
 - A blind moves the wrong way: nothing to rewire. The motor leads can go either way round; on its first moves the
   controller sees which way the angle changes, turns the motor the other way if needed, and remembers it.
+- A blind is slow, stalls, or overshoots: check its motor's speed and pick another to suit the blind
+  ([motor speed](../hardware/BOM.md#motor-speed), [check on arrival](../hardware/BOM.md#check-on-arrival)).
 - Open problems and planned work: [GitHub issues](https://github.com/DrakeAnglin/tilt/issues).

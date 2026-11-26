@@ -259,6 +259,9 @@ static void tilterTests() {
   { SimTilter s; s.go(50); float before = s.mem.lead[0];
     SimTilter s2; s2.mem.lead[0] = -1; s2.go(50);
     CHECK(s2.mem.lead[0] > -1 && near(before, 2.5f, 1.5f), "lead is learned toward what the rod really does"); }
+  { SimTilter s; s.set.leadMax = 1.0f; s.mem.lead[0] = 6; s.mem.lead[1] = -6;
+    for (int i = 0; i < 3; i++) { s.go(50); s.go(-50); }
+    CHECK(fabsf(s.mem.lead[0]) <= 1.0f && fabsf(s.mem.lead[1]) <= 1.0f, "the learned lead stays inside the lead limit setting"); }
   { SimTilter s; s.lo = 270; s.go(50);
     CHECK(s.endMsg == "blocked (stalled)" && s.last.stalled, "a stall short of the Target reports blocked"); }
   { SimTilter s; s.lo = 206; s.go(100);

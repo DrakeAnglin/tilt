@@ -4,7 +4,7 @@ How the parts fit together today: the tilter on each blind, the controller that 
 Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md](../CONTEXT.md).
 
 ## The parts
-- **Tilter** (one per blind): a printed worm gearbox on the blind's tilt rod, an N20 300 RPM motor, and a sensor module
+- **Tilter** (one per blind): a printed worm gearbox on the blind's tilt rod, an N20 150 RPM motor ([other speeds](../hardware/BOM.md#motor-speed)), and a sensor module
   with an AS5600 angle sensor, a DRV8833 motor driver and an RJ12 jack. The wand still turns the blind by hand.
   Build: [tilter](../hardware/mechanical/stl/tilter/README.md), [wiring](tilter-wiring.md).
 - **Controller** (one per up to 3 blinds): an ESP32-C6 SuperMini on a carrier PCB, one protected 18650 cell, an
