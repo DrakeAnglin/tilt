@@ -15,7 +15,7 @@ White PLA for the housing and most gears, white PETG for the four parts that rub
 ### Electronics
 | Part | Per tilter | Buy | Link |
 |---|---|---|---|
-| N20 gear motor, 6 V 300 RPM, metal gearbox, 3 mm D-shaft, no encoder (3-pack) | 1 | 3 packs (9) | [B0F83X6C77](https://www.amazon.com/dp/B0F83X6C77) |
+| N20 gear motor, 6 V **150 RPM**, metal gearbox, 3 mm D-shaft, no encoder (3-pack); see [motor speed](#motor-speed) | 1 | 3 packs (9) | [B0F83X6C77](https://www.amazon.com/dp/B0F83X6C77) |
 | AS5600 magnetic angle sensor board, with its Ø4 × 2 mm magnet (5-pack) | 1 | 2 packs (10) | [B097QNG1CN](https://www.amazon.com/dp/B097QNG1CN) |
 | DRV8833 dual motor driver board, Suuoo (10-pack) | 1 | 1 pack (10) | [B0GX9F695H](https://www.amazon.com/dp/B0GX9F695H) |
 | RJ11/RJ12 6P6C breakout board, risingsaplings (4-pack) | 1 | 2 packs (8) + 1 spare pack | [B0B9BHX7T3](https://www.amazon.com/dp/B0B9BHX7T3) |
@@ -23,6 +23,19 @@ White PLA for the housing and most gears, white PETG for the four parts that rub
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm | 1 kit | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) |
 | 22 AWG stranded wire, red and black | about 12 cm | 1 small roll each | search "22 AWG silicone wire red black" |
 | White flat 2-conductor 22 AWG (motor leads) | about 8 cm | 1 roll (30 ft) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
+
+### Motor speed
+150 RPM is the default: quiet, and strong enough for the owner's blinds. The tilter gears it down 20:1, so the rod
+turns at most 45°/s at 6 V with no load. On the 4 V battery, a blind goes from closed to open in about 6 to 7 s.
+
+The speed is a free choice per blind. Any 6 V N20 with the same shaft fits, and the controller adapts on its own
+(it watches the angle, learns how far each blind coasts, and stops on a stall):
+- **Heavy or stiff blind** (it stalls or crawls): a slower motor, 100 RPM. More torque, slower.
+- **Light blind**, or you want it quicker: 300 RPM. About twice as fast, half the torque, a little louder.
+
+If a faster motor overshoots (the log shows "turn-backs"), raise the stop-early limit:
+`/api/set?k=tune.lead10&v=120` (tenths of a degree, 20 to 250; default 80). The motor power per blind
+(`speed`, 50 to 100 %) also slows a blind without changing the motor.
 
 ### Hardware
 | Part | Per tilter | Buy | Link |
@@ -126,5 +139,11 @@ the ESP. Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF
   ([tilter wiring, step 1](../docs/tilter-wiring.md#1-prepare-the-boards-before-any-wiring)).
 - **ESP32-C6 SuperMini:** check the pin order against the board. Flash it on the bench before it goes in the box.
 - **18650:** the plug's red wire must read **+3.0 to +4.2 V** on the meter. A minus sign means it is wired backwards.
+- **N20 motors:** they carry no speed marking. Check one from each pack: put a tape flag on the shaft, run it from
+  5 V (a USB supply) and count turns for 10 s, or film it in slow motion. **150 RPM: about 20 turns. 300 RPM: about
+  40. 100 RPM: about 14.** Keep the packs apart until checked.
+- **In the blind:** each move's line in the controller's log shows its time and °/s. With 150 RPM on battery, a full
+  closed-to-open move takes about 6 to 7 s (15 to 19°/s); 300 RPM is about half that. One blind far off the others
+  with the same motor points to friction in that blind or its gears.
 - **RJ12 cords:** pin 1 to pin 1 on every cord ("straight-wired" is used loosely in listings).
 - **Solar panel (if used):** check its polarity with the meter in sun before crimping its plug.

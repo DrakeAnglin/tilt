@@ -87,7 +87,9 @@ struct TiltMemory {
   // readings, and the rod carrying on. Learned at every stop; the motor is stopped this much early.
   float lead[2] = {2.5f, -3.0f};   // measured: it reads about 3 deg high while running, either way
 };
-struct TiltSettings { Marks marks; int speed; uint32_t graceMs, stallMs, maxMs; float stallDeg; };
+// leadMax: the most the learned stop-early amount (TiltMemory::lead) may grow to, either way. A faster motor coasts
+// further after it stops, so it may need more than the default.
+struct TiltSettings { Marks marks; int speed; uint32_t graceMs, stallMs, maxMs; float stallDeg; float leadMax = 8.0f; };
 
 // The seam: what a Move needs from its blind's Tilter and settings.
 struct Tilter {
@@ -337,7 +339,8 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
     if (m.fromRun && !std::isnan(m.lastA) && m.lastDir) {     // learn how far it went on after the last running reading
       float c = angDiff(a, m.lastA) * m.lastDir;
       float &ld = t.memory().lead[m.lastDir > 0];
-      if (c > -10.0f && c < 12.0f) { float v = ld + (c - ld) * 0.4f; ld = v < -8.0f ? -8.0f : v > 8.0f ? 8.0f : v; }
+      float lm = t.settings().leadMax;                    // readings further off than this (plus some slack) are noise
+      if (c > -lm - 2.0f && c < lm + 4.0f) { float v = ld + (c - ld) * 0.4f; ld = v < -lm ? -lm : v > lm ? lm : v; }
       m.fromRun = false;
     }
     m.live = a;
