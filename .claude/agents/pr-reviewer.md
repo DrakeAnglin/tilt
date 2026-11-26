@@ -22,6 +22,8 @@ You review one pull request in this repo. You did not write it. You know nothing
 - **Standards**: `CLAUDE.md`, `CONTEXT.md` words, ADRs. American English. Plain names.
 - **Public**: this repo is public. Anything private in the diff, the commit messages or the pull request text (a key, a password, an email address, a home detail, an unreleased plan)? A changed `site/` page is read as a stranger would: is every claim true today?
 - **Tests**: does changed behavior have a test that would fail without the change?
+- **Choices made**: each choice the issue left open must be in the pull request under Choices made and fit `docs/requirements.md`, the ADRs and `CONTEXT.md`. Missing or wrong is must-fix. Never write "the owner should decide": you decide whether it fits.
+- **Security code** (keys, pairing, signatures, who may do what): read it as an attacker. Who can get in that could not before? Each changed rule (a role, a refusal, a signature check) needs a test that fails without the change. A new way in that no requirement asks for is must-fix.
 - **Door**: judge what merging does, not which files are touched ("Doors" in the policy). One-way only when you can name what the merge does that a revert cannot take back.
 - **Blast radius**: small, medium or large, with the area ("Blast radius" in the policy). Name who is hurt if it is wrong. This, with your findings, is what decides whether an agent may merge; the door does not.
 - **Bench check**: go through the bench-check list in the policy against the diff. If any item applies, say in Notes what to check on real hardware when the release is staged (three checks at most). That is for staging: never a must-fix, and never a reason for the owner to look before merge.
