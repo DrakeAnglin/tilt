@@ -46,7 +46,7 @@ PETG is for the parts that rub or mesh against PLA all the time.
 | M3 × 16 flat-head | 2, optional | hold the motor shell on while the sensor module is not ready; reusable |
 | M3 × 8 flat-head | 1 | lid's corner bolt |
 | M1.6 × 4 | 2 | N20 to the motor shell |
-| Ø2 × 6 dowel pin | 5 | 4 planet axles in the carrier, 1 worm top pin in the worm case |
+| Ø2 × 6 dowel pin | 5 | 4 planet axles in the carrier, 1 in the worm's thread end (turns in a pocket in the case) |
 | Super Lube 21030 | a little | worm, wheel, every gear, the carrier's hub, the sleeve's nose |
 | Felt pad, about 8 mm, 1.5 to 2 mm tall | 6 | 4 under the floor, 1 on each long side wall (step D6) |
 

@@ -62,9 +62,10 @@ moving on. Check each one is straight: an M3 screw should start by hand.
 
 ### A2. Dowel pins (5)
 - **4 into the carrier**, one in each pocket, pressed to the bottom. They are the planet axles.
-- **1 into the worm case** at the worm's top end.
+- **1 into the worm's thread end** (the end away from the loop). Press it in firmly: it stays in the worm and turns
+  in a small pocket in the case.
 
-Press them in with flat pliers or a light tap. They must be straight: a tilted pin binds its planet.
+Press them in with flat pliers or a light tap. They must be straight: a tilted pin binds its gear.
 
 ![carrier with 4 pins, worm with its top pin](photos/tilter/a2-dowel-pins.jpg)
 
@@ -89,7 +90,7 @@ Grease every gear as it goes in.
 - the worm wheel's teeth.
 
 Spread it with your finger and wipe off the extra. Worm wheel into the main half (case right), then the worm, its
-thread end over the top pin. Turn the worm by its loop a few times: the wheel should turn with no tight spot.
+pin into its pocket in the case. Turn the worm by its loop a few times: the wheel should turn with no tight spot.
 
 ![worm and wheel in the main half, lid beside it](photos/tilter/b1-worm-and-wheel.jpg)
 
@@ -98,8 +99,8 @@ Case left on. The worm should still turn by hand, with no tight spot through a f
 
 ### B3. Ring cup and planets
 Ring cup onto the wheel's hex. Planets onto the carrier's pins, then the carrier into the cup.
-- **Planets bed side up.** Put each planet on with the face that sat on the print bed facing up, away from the
-  carrier. That face is flatter, and the planet turns more easily on its pin.
+- **Planets bed side away from the carrier.** The face that sat on the print bed is often a little tighter. Put it
+  facing up, away from the carrier, so the planets spin freely.
 - The planets should float freely on their pins. Nothing here is tight.
 
 **Grease** a thin film on everything that touches: the pins, the planets' teeth, the ring cup's teeth, and the
@@ -214,7 +215,7 @@ Tighten them down.
 ### D6. Felt pads
 4 under the floor (one each corner), 1 on the middle of each long side wall. Felt, not rubber.
 
-📷 **Photo D6:** underside with the 4 pads.
+📷 **Photo D6:** coming soon: where the pads go.
 
 ---
 
