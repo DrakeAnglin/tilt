@@ -59,7 +59,6 @@ bool selfUpd = false;
 esp_pm_lock_handle_t awake;
 
 float tiltOfLift(int lift) { return tiltOfHomeLift(lift, cfg.closeUp); }
-float liveTilt(int p) { return (movingPort(p) && !isnan(mvs[p].live)) ? tiltOf(p, mvs[p].live) : bs[p].tilt; }
 
 static esp_err_t attr_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id,
                          esp_matter_attr_val_t *val, void *priv_data)
@@ -112,8 +111,10 @@ void report(bool force)
     for (int e = 0; e < nEp; e++) {
         BlindNow b[PORTS];
         int n = 0;
-        for (int p = 0; p < PORTS; p++)
-            if ((epPort[e] < 0 || epPort[e] == p) && movable(p)) b[n++] = {liveTilt(p), movingPort(p) || bs[p].queued, bs[p].target};
+        for (int p = 0; p < PORTS; p++) {
+            BlindReport r = blindNow(p);         // the same answer the app and the hub get
+            if ((epPort[e] < 0 || epPort[e] == p) && r.movable) b[n++] = {r.tilt, r.busy, r.target};
+        }
         HomeView v = homeViewOf(b, n);
         HomeSend s = homeSendOf(v, force, lastLift[e], lastOp[e]);
         if (s.lift) {

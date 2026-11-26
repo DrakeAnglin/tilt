@@ -146,6 +146,14 @@ inline void finishMove(Move &m, Tilter &t, const char *msg) {
   t.ended(m, msg);
   m = Move();
 }
+// End a move at once, motor braked, because the settings it steers by are about to change (motion.h cfgApply). The
+// reading is taken with the motor stopped; a move still waking its sensor has none.
+inline void stopNow(Move &m, Tilter &t, const char *why) {
+  if (m.kind == MV_NONE) return;
+  drive(m, t, 0, 0);
+  if (m.st != MS_WAKE || m.woke) m.noted = t.note(t.angle());
+  finishMove(m, t, why);
+}
 inline void toSettle(Move &m, Tilter &t, const char *why) {
   m.fromRun = m.st == MS_RUN;
   drive(m, t, 0, 0);
@@ -194,6 +202,12 @@ inline float settledRead(Move &m, Tilter &t, uint32_t now) {
 inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second while the move lasts
   if (m.motorOn) m.runMs += now - m.lastTick;
   m.lastTick = now;
+  // A move to a tilt steers by the Marks. If they stop being good under it (cleared, or Setup redone), it ends now,
+  // not at a stall or the time limit with a distance of NaN.
+  if (m.kind == MV_TILT && m.st != MS_POST && marksProblemOf(t.settings().marks)) {
+    if (m.st == MS_WAKE) finishMove(m, t, "stopped: Setup changed"); else endMove(m, t, "stopped: Setup changed");
+    return;
+  }
 
   if (m.st == MS_WAKE) {
     if (now - m.ts < 20) return;

@@ -54,6 +54,7 @@ volatile bool hubWantsStatus = false;
 static uint32_t bootN = 0;                       // counts every start (flash): pushes carry it, so an old one is never taken again
 static volatile bool hubOtaStallReq = false;     // the blinds task saw an update stall; the hub task stops it
 static int hubSock = -1;
+// The hub's addresses: written by the hub task and read by the blinds task, so both hold mx for them.
 static sockaddr_in6 hubAddr;                     // where the hub last answered from (Thread build)
 static bool hubAddrOk = false;
 static sockaddr_in6 hubHelloAddr;                // where the hub's last hello came from (not proven: only for sending)
@@ -70,9 +71,9 @@ std::string hubStatusJson(int pct) {
   ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"boot\":\"%s\",\"bn\":%lu,\"sep\":%d,\"pct\":%d,\"low\":%d,\"chg\":%d,\"closeUp\":%d,\"mv\":%d,\"cv\":%lu,\"own\":%d,\"b\":[", ctrlId().c_str(),
      jq(cfg.name).c_str(), hexOf(bootId, 4).c_str(), (unsigned long)bootN, hkSeparate, pct, battOkToMove() ? 0 : 1, strcmp(chargeState(), "battery") ? 1 : 0, cfg.closeUp, firstMoving(), (unsigned long)backupCrc(), owned() ? 1 : 0);
   for (int i = 0; i < PORTS; i++) {
-    bool live = movingPort(i) && !isnan(mvs[i].live) && calibrated(i);
-    ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d,\"st\":%u}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, movable(i) ? 1 : 0,
-       jn(live ? tiltOf(i, mvs[i].live) : bs[i].tilt, 0).c_str(), jn(bs[i].target, 0).c_str(), (movingPort(i) || bs[i].queued) ? 1 : 0, (unsigned)movesStalled[i]);
+    BlindReport b = blindNow(i);
+    ap(j, "%s{\"n\":%s,\"h\":%d,\"ok\":%d,\"t\":%s,\"g\":%s,\"m\":%d,\"st\":%u}", i ? "," : "", jq(cfg.b[i].name).c_str(), cfg.b[i].hidden, b.movable ? 1 : 0,
+       jn(b.tilt, 0).c_str(), jn(b.target, 0).c_str(), b.busy ? 1 : 0, (unsigned)movesStalled[i]);
   }
   j += "]}";
   return j;
@@ -150,9 +151,9 @@ esp_err_t hRestore(httpd_req_t *r) {
   c.tz[sizeof c.tz - 1] = 0; c.tzName[sizeof c.tzName - 1] = 0;
   { std::string n(c.name, strnlen(c.name, sizeof c.name)); cleanText(c.name, sizeof c.name, n); }
   for (int i = 0; i < PORTS; i++) { std::string n(c.b[i].name, strnlen(c.b[i].name, sizeof c.b[i].name)); cleanText(c.b[i].name, sizeof c.b[i].name, n); }
-  cfg = c; tune = t;
+  cfgApply(c); tune = t;                         // a move on a blind whose Marks change is stopped first (motion.h)
   syncMode = p[0]; parMode = p[1]; hkSeparate = p[2]; pwmSaved = p[3];
-  cfgSave(); tuneSave(); sxSave(); syncSave(); nvs.putUChar("hksep", hkSeparate); nvs.putUChar("pwm", pwmSaved); nvs.putUChar("angv", 2);
+  tuneSave(); sxSave(); syncSave(); nvs.putUChar("hksep", hkSeparate); nvs.putUChar("pwm", pwmSaved); nvs.putUChar("angv", 2);
   in.clear();
   event("settings restored from a backup");
   return ok(r);
@@ -333,7 +334,9 @@ static OtaReply hubOtaBegin(const std::string &in) {
   size_t dot = in.find('.');
   if (dot == std::string::npos || !hubMacOk(proofText(Proof::HubOta, bootId, in.substr(0, dot)), in.substr(dot + 1)))
     return {"403", "{\"err\":\"not from the Tilt Hub\"}"};
-  return hubOtaRx.begin(in.substr(0, dot), (long)time(nullptr), openApi || (int32_t)(otaWindow - millis()) > 0, millis());
+  bool allowed;
+  { QuietLock l; allowed = openApi || (int32_t)(otaWindow - millis()) > 0; }   // both are set by handlers
+  return hubOtaRx.begin(in.substr(0, dot), (long)time(nullptr), allowed, millis());
 }
 static void hubTask(void *) {
   hubSock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
@@ -363,6 +366,7 @@ static void hubTask(void *) {
     auto heard = [&]() {
       if (!hubSeen) event("first proven message from the hub ('%c')", t);
       hubSeen = millis() ? millis() : 1;
+      QuietLock l;                               // the blinds task sends pushes there (hubDest)
       hubAddr = from; hubAddrOk = true;
     };
     // Check in fast for a few seconds: the next message (the app's command after its hello, or more) comes soon. Only
@@ -375,7 +379,7 @@ static void hubTask(void *) {
       static uint32_t lastHello = 0;
       out = helloJson(); st = "200";
       hubLinkSeen = millis() ? millis() : 1;
-      hubHelloAddr = from; hubHelloOk = true;
+      { QuietLock l; hubHelloAddr = from; hubHelloOk = true; }
       if (!lastHello || millis() - lastHello > 20000) { lastHello = millis() ? millis() : 1; hubWantsStatus = true; awake(); }
     } else if (t == 'X') {
       bool fromHub = false;

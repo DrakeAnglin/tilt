@@ -44,6 +44,22 @@ inline float tiltOfMarks(const Marks &m, float ang) {
 inline float xOfTiltMarks(const Marks &m, float t) {
   return t >= 0 ? t / 100.0f * fabsf(angDiff(m.up, m.open)) : t / 100.0f * fabsf(angDiff(m.down, m.open));
 }
+// Does a settings change pull the ground from under a running move? A move steers by the Marks and the motor's
+// direction (only which way: +-1 to +-2 is the move itself learning it).
+inline bool sameAngle(float a, float b) { return (std::isnan(a) && std::isnan(b)) || a == b; }
+inline bool steeringChanged(const Marks &a, int signA, const Marks &b, int signB) {
+  return !sameAngle(a.up, b.up) || !sameAngle(a.open, b.open) || !sameAngle(a.down, b.down) || (signA > 0) != (signB > 0);
+}
+// The motor direction after a settings change that stopped a move: the one asked for if the change set it, else
+// what the stopped move left (it may have learned or put back the direction while ending).
+inline int8_t keptSign(int8_t asked, int8_t before, int8_t afterStop) { return asked != before ? asked : afterStop; }
+// Current tilt (CONTEXT.md: it always wins): the sensor now. While a move runs, its live reading; at rest, the last
+// true reading (noted, worked out when it was read). Not set up: unknown, moving or not.
+inline float currentTiltOf(const Marks &m, bool moving, float live, float noted) {
+  if (marksProblemOf(m)) return NAN;
+  if (moving && !std::isnan(live)) return tiltOfMarks(m, live);
+  return noted;
+}
 
 // ---- can a blind be moved? Set up (all three marks good), its tilter not missing, and the battery above the motor
 // cut-off (CONTEXT.md: under 3.35 V resting, no motor runs, whoever asks). nullptr = yes, else why not.
