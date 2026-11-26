@@ -16,7 +16,7 @@
 #include "schedules.h"
 #include "scenes.h"
 #include "update.h"
-#include "ota.h"                                 // trialVerdict
+#include "ota.h"                                 // Trial
 #include "people.h"
 
 #define FW_VERSION "2.3.0-dev31"
