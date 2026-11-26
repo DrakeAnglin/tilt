@@ -14,7 +14,7 @@
 // Either way the signature checked is of the image the sink ended up with, so a patch can never make anything the
 // full file could not.
 //
-// Also here: the rule for keeping a new firmware on trial (trialVerdict).
+// Also here: the rule for keeping a new firmware on trial (trialVerdict, and Trial with its memory).
 #pragma once
 #include <cstdint>
 #include <cstdio>
@@ -209,3 +209,17 @@ inline TrialVerdict trialVerdict(uint32_t now, uint32_t linkUpSince, bool hubJoi
   if (!linkUpSince && now > 300000 && hubJoined) return TRIAL_ROLLBACK;   // setup is done, and no hub
   return TRIAL_WAIT;
 }
+// The rule with its memory, as the firmware runs it once a second (web.h trialTick): since when the link has been up,
+// and whether going back was refused. Refused (no valid firmware in the other slot): it never asks again, since
+// waiting cannot make one, and stays on this firmware, still on trial. Being kept still works the normal way.
+struct Trial {
+  TrialVerdict tick(uint32_t now, bool linkUp, bool hubJoined) {
+    linkSince = trialLinkSince(linkSince, linkUp, now);
+    TrialVerdict v = trialVerdict(now, linkSince, hubJoined);
+    return v == TRIAL_ROLLBACK && refused ? TRIAL_WAIT : v;
+  }
+  void rollbackRefused() { refused = true; }
+ private:
+  uint32_t linkSince = 0;
+  bool refused = false;
+};
