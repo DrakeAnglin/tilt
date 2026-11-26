@@ -23,10 +23,10 @@ missing part shows up now and not halfway through.
 
 | Group | Printed | Bought |
 |---|---|---|
-| **A. Prep** | bearing shell, tray, carrier, worm case half with the pin hole, tray lid | 6 M3 heat-set inserts, 5 Ø2 × 6 dowel pins |
+| **A. Prep** | bearing shell, tray, carrier, worm, tray lid, magnet gear | 6 M3 heat-set inserts, 5 Ø2 × 6 dowel pins, the Ø4 × 2 magnet |
 | **B. Gearbox** | case right (main half), case left (lid), worm, worm wheel, ring cup, 4 planets, sun 27T | 2 M3 × 25 |
 | **C. Motor end** | motor shell, motor pinion, cluster (20T / 9T), sensor sleeve | N20 motor, 2 M1.6 × 4 |
-| **D. Tray and lid** | magnet gear (magnet goes in at A4) | the finished sensor module, the Ø4 × 2 magnet, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 felt pads |
+| **D. Tray and lid** | (tray, lid and magnet gear from A) | the finished sensor module, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 felt pads |
 
 The parts in group A go on to B and D once they are prepped. Keep the grease out with all of them.
 
