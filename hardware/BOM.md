@@ -172,7 +172,8 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 
 ## Tools
 Soldering iron (also presses the heat-set inserts), multimeter with beep mode, flush cutters, a USB-C cable to flash
-the ESP. Only for a cord through a wall: a drill and a 5/8 in bit. Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC)) for charge and motor current.
+the ESP. Only for a cord through a wall: a drill and a 5/8 in bit.
+Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC)) for charge and motor current.
 
 ## Check on arrival
 - **AS5600:** switch it to PWM output once with the bench tool before it goes in a tilter

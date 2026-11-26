@@ -15,12 +15,13 @@ for the cords.
    with the slot at the bottom.
 4. Push the plug into the hole until its cap sits flat on the wall. Then do the other side.
 
-The slot holds **two flat RJ12 cords**, one on top of the other. The shank is only 6 mm long, so a plug fits on each
-side of a single sheet of 1/2 in drywall. To take a plug out, pull it out by the cap.
+The slot holds **two flat RJ12 cords** (about 6.6 × 3.3 mm each), one on top of the other. The shank is only 6 mm
+long, so a plug fits on each side of a single sheet of 1/2 in drywall. To take a plug out, pull it out by the cap.
 
 ## Size
 - Cap: 25 mm across and 1.6 mm thick, with a 45 degree bevel round the face. It covers about 3.8 mm round the hole.
-- Shank: 15.4 mm across, hollow, with 6 crush ribs that grip a 5/8 in hole. Fit checked on a test print.
+- Shank: 15.4 mm across, hollow, with 6 crush ribs (8 drawn, the slot cuts 2 away) that grip a 5/8 in hole.
+  Fit checked on a test print.
 - U slot: 7.2 mm wide, the whole height of the plug.
 
 ## Print

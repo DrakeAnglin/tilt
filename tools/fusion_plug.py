@@ -21,13 +21,13 @@ B = adsk.fusion.BooleanTypes
 
 S = {
     'hole': 15.875,       # 5/8 in drill
-    'cap_r': 12.5,        # 25 mm cap: covers 4.5 mm of torn edge all round
+    'cap_r': 12.5,        # 25 mm cap: covers about 3.8 mm round the hole (inside the bevel)
     'cap_t': 1.6,         # cap thickness (how far it stands off the wall)
     'bevel': 0.8,         # 45 degree bevel round the face edge
     'shank_r': 7.7,       # shank radius: 0.24 under the hole
     'shank_h': 6.0,       # shank length into the hole
     'bore_r': 5.4,        # hollow shank: a 2.3 mm ring that springs in
-    'rib_n': 8,           # crush ribs round the shank
+    'rib_n': 8,           # crush ribs round the shank; the U slot cuts 2 away, so the print has 6
     'rib_r': 0.6,         # rib radius
     'rib_reach': 8.2,     # ribs reach this far out: 0.26 into the hole's wall
     'lead': 1.0,          # lead-in at the shank's tip
