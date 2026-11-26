@@ -1,7 +1,7 @@
 // The phones on this controller: the list, rename, remove, approve, owner rights, and getting back in by turning a blind.
 // Its state (recover) is under the controller lock (lock.h); recoverTick runs in the blinds task.
 #pragma once
-#include "motion.h"                              // bs, movable, moving, the watch, rampCancel, stats, event
+#include "motion.h"                              // bs, movable, moving, movesEver, the watch, rampCancel, stats, event
 #include "sec.h"                                 // keys, pairing, KeysLock
 #include "api.h"                                 // Lock, arg, ok, fail, sendJson
 
@@ -71,7 +71,6 @@ esp_err_t hApprove(httpd_req_t *r) {             // owner: answer a phone that a
 // down, then level (open), within two minutes. Only someone at the window can do that. The phone that asked becomes
 // an owner; the blinds' settings and the other phones are left as they are.
 struct Recover { int slot = -1, port = 0, step = 0; uint32_t until = 0, moves = 0; } recover;
-uint32_t movesEver() { uint32_t n = 0; for (int p = 0; p < PORTS; p++) n += stats.moves[p]; return n; }
 void recoverTick() {                             // from webTick, once a second
   if (recover.slot < 0) return;
   uint32_t now = millis();
