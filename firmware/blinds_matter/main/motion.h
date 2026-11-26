@@ -7,6 +7,7 @@
 #include "pwmin.h"
 #include "request.h"
 #include "handwatch.h"
+#include "lock.h"                                // mx, Unlocked: the mark's steady reading waits unlocked
 
 struct BlindState {
   bool present = false, seen = false;
@@ -418,35 +419,43 @@ void followHand(int p, float t) {
   int n = moveBlinds(moveAsk(FROM_HAND, p, t)).started;
   event("%s turned by hand to tilt %.0f: %d other blind%s follow%s", cfg.b[p].name, t, n, n == 1 ? "" : "s", n == 1 ? "s" : "");
 }
-// A reading for a mark: the sensor has to hold still for 0.6 s. A still PWM reading wanders about +-1.5 degrees (brush
-// noise on the shared wires), so "still" is within STEADY_DEG; a wand being turned moves far more. Returns NAN if not.
-const float STEADY_DEG = 3.5f;
-bool steadyLost = false;                       // the last steadyAngle had a dropout in it (no mark is taken from that)
-float steadyAngle(int p) {
-  float a0 = readAngle(p), lo = 0, hi = 0, sum = 0;
-  steadyLost = bs[p].lost;
-  for (int k = 0; k < 12; k++) {
-    delay(50);
-    float d = angDiff(readAngle(p), a0);
-    steadyLost |= bs[p].lost;
-    lo = min(lo, d); hi = max(hi, d); sum += d;
-  }
-  if (steadyLost || hi - lo > STEADY_DEG) return NAN;
-  return fmodf(a0 + sum / 12 + 360.0f, 360.0f);
-}
 // ---- marks (setup): take the blind's present position as closed-up / open / closed-down
+uint32_t movesEver() { uint32_t n = 0; for (int p = 0; p < PORTS; p++) n += stats.moves[p]; return n; }
+// The mark's steady reading (logic.h steadyRead) on blind p. Each read is under the lock; each 50 ms wait lets it go,
+// so the blinds task, a Bluetooth hello and the hub task carry on meanwhile. Back under the lock, the reading is cut
+// short if a motor ran or the watch left this blind (its sensor may have been switched off).
+struct MarkSensor : SteadySensor {
+  int p;
+  uint32_t moves = movesEver();
+  bool motorRan = false;
+  explicit MarkSensor(int port) : p(port) {}
+  float angle() override { return readAngle(p); }
+  bool lost() override { return bs[p].lost; }
+  bool wait(uint32_t ms) override {
+    { Unlocked u; delay(ms); }
+    motorRan = moving() || movesEver() != moves;
+    return !motorRan && sensorPort == p && bs[p].present;
+  }
+};
 const char *setMark(int p, const String &w) {
   if (p < 0 || p >= PORTS) return "no such blind";
   if (moving()) return "wait until it stops";
-  Settings n = cfg;
-  BlindCfg &c = n.b[p];
-  if (w == "clear") { c.up = c.open = c.down = NAN; cfgApply(n); event("%s: marks cleared", c.name); return nullptr; }
-  hand.setupOpen(p, millis());                 // keep its sensor on: steadyAngle reads it
+  if (w == "clear") {
+    Settings n = cfg;
+    BlindCfg &c = n.b[p];
+    c.up = c.open = c.down = NAN; cfgApply(n); event("%s: marks cleared", c.name); return nullptr;
+  }
+  hand.setupOpen(p, millis());                 // keep its sensor on: the steady reading reads it
   watchSync(p);
   if (!bs[p].present) return "no tilter plugged in";
-  float st = steadyAngle(p);
-  if (isnan(st) && steadyLost) return "the sensor gave no reading: check the tilter's cable, then tap again";
-  if (isnan(st)) return "the slats are still moving: let them settle, then tap again";
+  MarkSensor ms(p);
+  SteadyResult sr = steadyRead(ms);
+  if (sr.is == STEADY_CUT) return ms.motorRan ? "wait until it stops" : "interrupted: tap again";
+  if (sr.is == STEADY_LOST) return "the sensor gave no reading: check the tilter's cable, then tap again";
+  if (sr.is == STEADY_MOVING) return "the slats are still moving: let them settle, then tap again";
+  float st = sr.ang;
+  Settings n = cfg;                            // taken after the reading: what the blinds task saved meanwhile is kept
+  BlindCfg &c = n.b[p];
   noteAngle(p, st);
   // Setup starts (closed up is its first mark): the first move after it checks the motor's direction again, so a
   // motor or tilter changed since is learned afresh. The direction is kept as the first guess.
