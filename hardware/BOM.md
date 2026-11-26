@@ -138,8 +138,8 @@ panel on J8.
 | Part | Per controller | Sold as | Link |
 |---|---|---|---|
 | 6 V 0.8 W mono ETFE solar panel, 70 × 70 mm | 1 to 3, wired in parallel | 3-pack | [B0H1LQFFPN](https://www.amazon.com/dp/B0H1LQFFPN) |
-| Solar housing (3 panels in a row, printed) | 1 | | [docs/solar-housing.md](../docs/solar-housing.md) |
-| Double-sided tape, for the housing's rim on the window | about 60 cm | 1 roll | search "clear double sided mounting tape" |
+| Solar housing: tray + end cap (3 panels in a row, printed) | 1 | | [docs/solar-housing.md](../docs/solar-housing.md) |
+| Double-sided tape, for the housing's ends on the window | about 20 cm | 1 roll | search "clear double sided mounting tape" |
 | JST-ZH 1.5 mm 2-pin plugs | 1 | pack of 20 + 20 | [B0D9SMKFNS](https://www.amazon.com/dp/B0D9SMKFNS) |
 
 ## One Tilt Hub
