@@ -45,10 +45,10 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 ### Notes
 1. Blast radius small or medium: yes/no
 2. CI green on the reviewed commit: yes/no
-3. Nothing left to fix: yes/no
+3. Author and reviewer agree (must-fix 0, stuck 0): yes/no
 4. Tested, or docs only: yes/no
 5. Does the issue and nothing else: yes/no
-6. No human-only path: yes/no <name the paths when no>
+6. No human-only path (a test-script change beyond adding tests): yes/no <name the paths when no>
 
 ### Human Review
 <merge: "Not needed." human: fill in both lines below>
@@ -61,6 +61,10 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 ```
 
 More than ten `factory-review` comments on the pull request: **human**, "too many rounds of review".
+
+A review with `stuck` above 0: **human**. The **Why** is that two agents read the same code and cannot agree; the **Confirm** lines are the stuck findings, each with both sides in a few words.
+
+A review with must-fix above 0 and stuck 0: **not yet**, not human. The author still has to fix or answer them.
 
 Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge; for human, `--add-label needs-human` and take `auto-merge-ok` off. Never take `needs-human` off: only the owner does. If it is already on, the verdict is **human**, and you say what the owner still has to confirm. Never add `needs-human` without this comment.
 

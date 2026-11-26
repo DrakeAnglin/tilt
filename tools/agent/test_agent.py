@@ -234,5 +234,75 @@ class CleanWorktreesTest(unittest.TestCase):
             self.assertIn('b-open', branches)
 
 
+FAKE_GH = '''#!/usr/bin/env python3
+import sys, json, subprocess
+d = json.loads(open(sys.argv[0] + ".json").read())
+a = sys.argv[1:]
+def out(v):
+    if "--jq" in a:
+        subprocess.run(["jq", "-c", a[a.index("--jq") + 1]], input=json.dumps(v), text=True)
+    else:
+        print(json.dumps(v))
+if a[:2] == ["pr", "view"]: out(d["pr"])
+elif a[:2] == ["pr", "checks"]: out(d["checks"])
+elif a[:2] == ["api", "user"]: print("me")
+elif a[0] == "api": out(d["files"])
+else: sys.exit("unexpected gh " + " ".join(a))
+'''
+
+
+class MergeScriptTest(unittest.TestCase):
+    """tools/agent/merge_pr.sh --check with a fake gh: whether the two agents agree decides, not which files."""
+
+    def run_check(self, review, files=('tools/agent/merge_pr.sh', 'docs/agents/review-policy.md')):
+        import subprocess, tempfile, json
+        here = os.path.dirname(os.path.abspath(__file__))
+        sha = 'a' * 40
+        me = lambda body: {'author': {'login': 'me'}, 'body': body}
+        pr = {'number': 7, 'state': 'OPEN', 'isDraft': False, 'isCrossRepository': False, 'baseRefName': 'main',
+              'headRefName': 'b', 'headRefOid': sha, 'mergeable': 'MERGEABLE', 'additions': 1, 'deletions': 1,
+              'labels': [], 'comments': [
+                  me('<!-- factory-review sha=%s door=two-way blast=small %s -->' % (sha, review)),
+                  me('<!-- factory-gate sha=%s verdict=merge -->' % sha)]}
+        data = {'pr': pr, 'checks': [{'name': 'ci', 'bucket': 'pass'}],
+                'files': [{'filename': f, 'additions': 1, 'deletions': 1, 'status': 'modified', 'patch': ''} for f in files]}
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = os.path.join(tmp, 'gh')
+            with open(fake, 'w') as f:
+                f.write(FAKE_GH)
+            with open(fake + '.json', 'w') as f:
+                json.dump(data, f)
+            os.chmod(fake, 0o755)
+            env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'])
+            r = subprocess.run([os.path.join(here, 'merge_pr.sh'), '7', '--check'], env=env, capture_output=True, text=True)
+            return r.returncode, r.stdout + r.stderr
+
+    def test_an_agreed_change_to_the_rules_merges(self):
+        code, out = self.run_check('must-fix=0 stuck=0')
+        self.assertEqual(code, 0, out)
+        self.assertIn('passes every rule', out)
+
+    def test_a_review_without_stuck_still_reads(self):
+        code, out = self.run_check('must-fix=0')
+        self.assertEqual(code, 0, out)
+
+    def test_no_agreement_goes_to_a_human(self):
+        code, out = self.run_check('must-fix=1 stuck=1')
+        self.assertEqual(code, 1, out)
+        self.assertIn('A human decides', out)
+        self.assertIn('cannot agree', out)
+
+    def test_open_findings_go_back_to_the_author(self):
+        code, out = self.run_check('must-fix=2 stuck=0')
+        self.assertEqual(code, 1, out)
+        self.assertNotIn('A human decides', out)
+        self.assertIn('answer them on the pull request', out)
+
+    def test_a_test_script_change_still_goes_to_a_human(self):
+        code, out = self.run_check('must-fix=0 stuck=0', files=('tools/firmware_tests.sh',))
+        self.assertEqual(code, 1, out)
+        self.assertIn('How the tests run changed', out)
+
+
 if __name__ == '__main__':
     unittest.main()
