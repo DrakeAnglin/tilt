@@ -6,17 +6,17 @@ panel gives only about 1 mA (direct sun: about 106 mA, measured 2026-11-26).
 
 ## Pieces for each count
 
-Every set is 86.2 mm wide and 7.0 mm thick. A section holds at most 3 panels (about 231 mm, so it fits the bed); more
+Every set is 86.2 mm wide and 7.0 mm thick. A section holds at most 3 panels (about 232 mm, so it fits the bed); more
 panels take a second section that locks onto the first.
 
 | Panels | Length | Print |
 |---|---|---|
-| 1 | 100 mm | `start_1` + `cap` |
-| 2 | 170 mm | `start_2` + `cap` |
-| 3 | 240 mm | `start_3` + `cap` |
-| 4 | 310 mm | `start_2` + `add_2` + `cap` |
-| 5 | 380 mm | `start_3` + `add_2` + `cap` |
-| 6 | 450 mm | `start_3` + `add_3` + `cap` |
+| 1 | 101 mm | `start_1` + `cap` |
+| 2 | 171 mm | `start_2` + `cap` |
+| 3 | 242 mm | `start_3` + `cap` |
+| 4 | 312 mm | `start_2` + `add_2` + `cap` |
+| 5 | 383 mm | `start_3` + `add_2` + `cap` |
+| 6 | 453 mm | `start_3` + `add_3` + `cap` |
 
 The files are `hardware/mechanical/stl/solar/solar_<piece>.stl` (wires out the right end) and
 `solar_<piece>_wires_left.stl` (the mirror image: wires out the left end). A set must be all one side.
@@ -30,7 +30,8 @@ The files are `hardware/mechanical/stl/solar/solar_<piece>.stl` (wires out the r
 - **Built by:** `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_solar.py --timeout 1500`. It builds
   and checks every count (panels slide in across every joint, joints lock, lips hold, nothing pokes out) and exports
   every piece. Measurements are in the `S` table; `PIECES` sets the sections per count.
-- **Fit:** 0.2 mm in all from top to bottom across the panels, and 0.05 mm front to back under the lips, so the
+- **Fit:** 70.5 mm of slot per panel along the row (real panels run about 70.3: three came out 0.9 mm over 210),
+  0.2 mm in all from top to bottom across the panels, and 0.05 mm front to back under the lips, so the
   panels can't rock. Sockets have 0.15 mm a side. Every section's slot has a small 45 degree lead-in at its right end,
   so a panel can't catch on a joint that prints a little high or low.
 
