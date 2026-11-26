@@ -10,10 +10,14 @@ struct AddControllerSheet: View {
     @State private var busy = false
     @State private var problem: String?
     @State private var ble = BleSetup()
+    /// The controller this phone just asked to join: the sheet shows the request in place of the list.
+    @State private var asked: FoundController?
 
     var body: some View {
         NavigationStack {
             Form {
+            if let asked { RequestSent(name: asked.name, progress: model.joinProgress(asked.id)) { dismiss() } }
+            else {
             Group {
                 // Not yours yet. A controller announced through the hub counts only if the hub has heard from it (a phone
                 // remembers announcements for a while after a reset).
@@ -65,12 +69,15 @@ struct AddControllerSheet: View {
                 if busy { Section { HStack(spacing: 12) { SlatLoader(size: 20); ProgressWords(steps: ["Reaching it through the Tilt Hub…", "Making a key for this iPhone…", "It checks in about once a second: one moment…", "Almost there…"]) } } }
                 if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
             }
+            }
         }
             .navigationDestination(for: BleSetup.Found.self) { d in BluetoothSetupView(ble: ble, device: d) { dismiss() } }
             .onAppear { ble.start(); hub.start() }
             .navigationTitle("Add a New Device")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            // Once the request is out, closing does not take it back: Cancel becomes Done.
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(asked == nil ? "Cancel" : "Done") { dismiss() } } }
+            .onChange(of: asked.map { model.joinProgress($0.id) }) { _, p in if p == .gone { dismiss() } }   // taken back
         }
         .onDisappear { ble.stop() }                      // when the whole sheet closes
     }
@@ -79,7 +86,35 @@ struct AddControllerSheet: View {
         busy = true; problem = nil
         Task {
             defer { busy = false }
-            do { try await model.add(host: f.host); hub.justAdded(); dismiss() } catch { problem = error.localizedDescription }
+            do {
+                try await model.add(host: f.host); hub.justAdded()
+                if case .waiting = model.joinProgress(f.id) { asked = f } else { dismiss() }
+            } catch { problem = error.localizedDescription }
         }
+    }
+}
+
+/// After Ask to Join: the request went out, the code to compare with the owner's phone, and what happens next.
+private struct RequestSent: View {
+    let name: String
+    let progress: JoinProgress
+    let done: () -> Void
+    var body: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(name).font(.title3.weight(.semibold))
+                switch progress {
+                case .waiting(let code):
+                    JoinWaitingLines(code: code)
+                    Text("This request stays on the Blinds page until they answer.").font(.footnote).foregroundStyle(.secondary)
+                case .approved: Label("You are in.", systemImage: "checkmark.circle.fill").foregroundStyle(Palette.good)
+                case .declined: Label("The owner declined your request.", systemImage: "xmark.circle").foregroundStyle(Palette.warning)
+                case .gone: EmptyView()
+                }
+            }
+            .padding(.vertical, 4)
+        } header: { Text("Request Sent") }
+        Section { Button { done() } label: { Text("Done").frame(maxWidth: .infinity) }.buttonStyle(.borderedProminent).controlSize(.large) }
+            .listRowBackground(Color.clear).listRowInsets(EdgeInsets())
     }
 }
