@@ -31,7 +31,7 @@ out, and a missing part shows up now and not halfway through.
 | **A. Prep** | bearing shell, tray, carrier, worm, tray lid, magnet gear | 6 M3 heat-set inserts, 5 Ø2 × 6 dowel pins, the Ø4 × 2 magnet |
 | **B. Gearbox** | case right (main half), case left (lid), worm, worm wheel, ring cup, 4 planets | 2 M3 × 20 |
 | **C. Motor end** | motor shell, sun piece (27T), motor pinion, cluster (20T / 9T), sensor sleeve | N20 motor, 2 M1.6 × 4 |
-| **D. Tray and lid** | (tray, lid and magnet gear from A) | the finished sensor module, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 felt pads |
+| **D. Tray and lid** | (tray, lid and magnet gear from A) | the finished sensor module, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 foam pads |
 
 The parts in group A go on to B and D once they are prepped. Keep the grease out with all of them.
 
@@ -212,8 +212,11 @@ Tighten them down.
 
 ![lid on, jack side](photos/tilter/d5-lid-on.jpg)
 
-### D6. Felt pads
-4 under the floor (one each corner), 1 on the middle of each long side wall. Felt, not rubber.
+### D6. Foam pads
+Stick-on foam pads, about 10 mm across and 2 mm thick: 4 under the floor (one each corner), 1 on the middle of
+each long side wall. They keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use
+soft foam (or felt), not hard rubber: hard rubber passes the vibration on. If the rod binds once the tilter is in,
+leave the side pads off.
 
 📷 **Photo D6:** coming soon: where the pads go.
 
