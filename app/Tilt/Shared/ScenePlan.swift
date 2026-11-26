@@ -57,21 +57,10 @@ enum ScenePlan {
     /// The longest Scene name a controller keeps, in UTF-8 bytes (firmware scenes.h name[48]).
     static let nameBytes = 47
 
-    /// A name as it can be typed: no control characters, at most `nameBytes` bytes, never cut inside a character.
-    static func limitName(_ s: String) -> String {
-        var out = ""
-        for ch in s where !ch.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) {
-            if out.utf8.count + String(ch).utf8.count > nameBytes { break }
-            out.append(ch)
-        }
-        return out
-    }
-    /// A name as the controller keeps it (firmware wire.h sceneName): limited, without trailing spaces.
-    static func fitName(_ s: String) -> String {
-        var n = limitName(s)
-        while n.hasSuffix(" ") { n.removeLast() }
-        return n
-    }
+    /// A Scene name as it can be typed (NameRule.limit, at `nameBytes`).
+    static func limitName(_ s: String) -> String { NameRule.limit(s, bytes: nameBytes) }
+    /// A Scene name as the controller keeps it (NameRule.fit, firmware wire.h keptName).
+    static func fitName(_ s: String) -> String { NameRule.fit(s, bytes: nameBytes) }
     /// The Scenes, put together from the controllers that answered (`read`), with the phone's copy (`kept`) for the
     /// controllers that did not. A kept Scene that was on a controller but that no answering controller has any more
     /// was deleted on another phone: only its part on controllers that did not answer is left, or nothing. A kept Scene
