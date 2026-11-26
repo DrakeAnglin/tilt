@@ -85,7 +85,13 @@ struct FirmwareInstaller: Sendable {
         let host = await c.transport.host
         // The hub takes the file and feeds it over Thread.
         guard host.contains(ControllerRecord.hubPath) else { throw TiltError("This controller is not on a Tilt Hub. Set it up again to put it on the hub.") }
-        let before = await look(host)
+        // The boot id before the upload: the proof of a restart later. Asked a few times, since one answer can be lost.
+        var first: Hello?
+        for i in 0..<5 {
+            if i > 0 { try await sleep(.seconds(2)) }
+            if let h = await look(host) { first = h; break }
+        }
+        guard let before = first else { throw TiltError("The controller is not answering. Nothing was sent. Try again in a moment.") }
         try await post(file, to: host + HubApi.upload, timeout: 240, refused: "The controller did not take the update.")
         step(.hub(0))
         var done = false
@@ -104,8 +110,9 @@ struct FirmwareInstaller: Sendable {
         try await sleep(.seconds(10))
         step(.confirming)
         for _ in 0..<40 {                                  // up to a minute or two more for it to come back
-            // Kept only once it has restarted (a new boot id): keeping before that would keep the old firmware's trial.
-            if let h = await look(host), h.boot != before?.boot, (try? await c.keepFirmware()) != nil { step(.done(h.fw)); return }
+            // Kept only once it has restarted: a boot id other than the one read before the upload, which is always known.
+            // Keeping before that would keep the old firmware's trial.
+            if let h = await look(host), h.boot != before.boot, (try? await c.keepFirmware()) != nil { step(.done(h.fw)); return }
             try await sleep(.seconds(3))
         }
         throw TiltError("The controller did not come back. If it restarts later it goes back to the old firmware by itself.")
