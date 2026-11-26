@@ -14,3 +14,7 @@ Things the build showed that the docs or the design have wrong. Fixed together a
 6. **Grease:** thin film, spread with a finger, wipe off the extra; too much gives a felt drag. Add to README.
 7. **M1.6 motor screws: snug only**, they strip plastic. Add to README step 3.
 8. **Motor pinion has a D-flat**: line it up with the shaft's flat. Add to README step 3.
+9. **Temporary M3 × 16** hold the motor shell on if the sensor module is not ready (guide C5). M3 × 16 is not in
+   the BOM yet. Decide: add it, or say "use the tray bolts without the tray" if they fit.
+10. **Sensor board order:** the README says the AS5600 must go on its studs before the tray goes on. Owner wants the
+   tray on empty and the electronics in last. Check which is true on the printed part.

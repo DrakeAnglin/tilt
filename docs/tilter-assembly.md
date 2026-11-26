@@ -148,11 +148,16 @@ Check: turn the cluster by hand; the whole train should turn, slowly.
 📷 **Photo C3:** motor shell sitting on the gearbox.
 
 ### C4. Sensor sleeve
-Push the sleeve's nose through the motor plate from the back. Turn it until the lugs drop into the carrier (the
-last 2.4 mm). Its gear now sticks out of the plate.
-**Grease:** the sleeve's nose.
+**Grease** the sleeve's nose. Push it through the motor plate from the back and turn it until the lugs drop into the
+carrier (the last 2.4 mm). Its gear now sticks out of the plate.
 
-📷 **Photo C4:** sleeve in, its gear sticking out.
+### C5. Hold it together
+The motor shell has no bolts of its own: the tray's two bolts hold it on (step D2).
+- **Sensor module ready?** Go straight on to Part D.
+- **Not ready yet?** Put two **M3 × 16** in loosely, through the motor shell into the bearing shell, so it holds
+  together while you wait. The one nearer the room side goes through the cluster gear. Take them out again at D2.
+
+![motor shell on, sleeve in, two M3 × 16 holding it](photos/tilter/c4-sleeve-in.jpg)
 
 ---
 
