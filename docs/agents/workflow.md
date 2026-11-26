@@ -20,12 +20,22 @@ How one agent takes one issue from request to `main`, without a person in the lo
 4. **Check locally.** `tools/agent/check.sh` must pass. Changed anything under `firmware/`? Build both firmwares too (`firmware/blinds_matter/build.sh`, `firmware/tilt_hub/build.sh`, in the background: see "Waiting") and put the result in Evidence with the commit: `ESP builds: both ok at <short sha>`. CI does not build firmware, so without this line the gate cannot merge.
 5. **Open the pull request.** `git push -u origin <branch>`, then `gh pr create`. Write the body in the template's shape (Matt Pocock's `pr` skill, when installed, is the guide): `Closes #<n>`, summary, evidence, door, blast radius, what could go wrong. Last, turn on the app's watch for the pull request (Auto-fix: `set_monitor` with `auto_fix`), so this session is woken on a conflict, a red CI or a comment. If that tool is not there or is not approved, go on without it.
 6. **Wait for CI.** `gh pr checks <pr> --watch` as a background command (see "Waiting"). Red? Fix it, push, wait again. Start the review (step 7) while CI runs; you do not need to wait for green to review.
-7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context. It posts its own summary, evidence, merge danger and findings as a comment on the pull request. If the agent type is not there (the session started outside this repo), start a `general-purpose` agent on Sonnet and have it read `.claude/agents/pr-reviewer.md` and follow it. The same goes for `merge-gate`.
-8. **Fix what must be fixed**, push, and have `pr-reviewer` look again. Every must-fix and every "not yet" from the gate is yours to fix, not the owner's: a missing test, a missing build, a bug. Ten rounds at most; the merge script counts them, and after that it goes to a human.
+7. **Review, by someone else.** Start the `pr-reviewer` agent with only the pull request number. It has no part of this session's context: never review your own work, and never use a fork of this session. It posts its own summary, evidence, merge danger and findings as a comment on the pull request. If the agent type is not there (the session started outside this repo), start a `general-purpose` agent on Sonnet and have it read `.claude/agents/pr-reviewer.md` and follow it. The same goes for `merge-gate`.
+8. **Answer every must-fix**, on the pull request. Fix it, or disagree with a reason when the reviewer is wrong. One comment per round:
+
+   ```
+   ## Answer to review of <short sha>
+   - **M1** Fixed in <sha>: <one line>
+   - **M2** Disagree: <why, with file and line, a test or a log>
+
+   <!-- factory-answer sha=<the sha that was reviewed> -->
+   ```
+
+   Push, then have the reviewer look again: continue the same `pr-reviewer` with `SendMessage` ("Look again at pull request <n>"), or start a fresh one with only the number. Either reads your answer on the pull request. Disagree only when you have a reason; do not argue to save work. Every "not yet" from the gate is yours too: a missing test, a missing build. When you both agree, go on to the gate. When the reviewer still holds a finding you have argued twice, it is stuck and goes to the owner. Ten rounds at most; the merge script counts them.
 9. **Gate.** Start the `merge-gate` agent with the pull request number. It reads the review and the policy and decides: merge, or human.
 10. **Merge or hand over.**
     - Merge: `tools/agent/merge_pr.sh <pr>`. It checks the rules again and squash-merges.
-    - Human: the `needs-human` label, always with a comment that says why: a TL;DR first, notes after. Then notify the owner (below), tell them the TL;DR and stop. Do not merge.
+    - Human (a stuck finding, ten rounds, a large blast radius, a test-script change): the `needs-human` label, always with a comment that says why: a TL;DR first, notes after. Then notify the owner (below), tell them the TL;DR and stop. Do not merge.
 11. **Clean up.** The issue closes itself through `Closes #<n>`. Worktrees clean themselves: `tools/agent/clean_worktrees.sh` removes every worktree under `.claude/worktrees/` whose pull request is merged or closed, with its local branch and build folders. It runs after every merge (`merge_pr.sh`) and at the start of every session, and keeps anything that could be lost (uncommitted changes, commits not in the pull request, no pull request, detached HEAD). When the owner merges or closes your pull request on GitHub, the next session clears your worktree. Run it with `--dry-run` to see what it would do. Removal also deletes files Git ignores, so keep local-only files (secrets, `.env`) in the main checkout, never only in a worktree.
 
 ## Waiting
