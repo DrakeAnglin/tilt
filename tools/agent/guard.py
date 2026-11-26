@@ -15,7 +15,7 @@ import sys
 MERGE = 'merge with tools/agent/merge_pr.sh <pr>, or leave it for the owner.'
 MAIN = 'nothing is pushed to main; open a pull request.'
 HOOK = 'no going around the pre-push hook.'
-LABEL = 'only the owner takes off needs-human.'
+LABEL = 'only the owner takes off needs-human; a stale one goes with tools/agent/clear_stale_label.sh <pr>.'
 SEPARATORS = {';', '&&', '||', '|', '&', '(', ')', '|&', ';;'}
 # Words that can stand in front of a command without changing what it is.
 PREFIXES = {'command', 'env', 'sudo', 'time', 'nohup', 'exec', 'builtin', 'if', 'then', 'else', 'elif', 'do', 'while',

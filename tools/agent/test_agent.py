@@ -254,14 +254,15 @@ else: sys.exit("unexpected gh " + " ".join(a))
 class MergeScriptTest(unittest.TestCase):
     """tools/agent/merge_pr.sh --check with a fake gh: whether the two agents agree decides, not which files."""
 
-    def run_check(self, review, files=('tools/agent/merge_pr.sh', 'docs/agents/review-policy.md')):
+    def run_check(self, review, files=('tools/agent/merge_pr.sh', 'docs/agents/review-policy.md'), labels=(), env_extra=None, rounds=0):
         import subprocess, tempfile, json
         here = os.path.dirname(os.path.abspath(__file__))
         sha = 'a' * 40
         me = lambda body: {'author': {'login': 'me'}, 'body': body}
+        earlier = [me('<!-- factory-review sha=%s door=two-way blast=small must-fix=0 stuck=0 round=merge -->' % ('b' * 40))] * rounds
         pr = {'number': 7, 'state': 'OPEN', 'isDraft': False, 'isCrossRepository': False, 'baseRefName': 'main',
               'headRefName': 'b', 'headRefOid': sha, 'mergeable': 'MERGEABLE', 'additions': 1, 'deletions': 1,
-              'labels': [], 'comments': [
+              'labels': [{'name': n} for n in labels], 'comments': earlier + [
                   me('<!-- factory-review sha=%s door=two-way blast=small %s -->' % (sha, review)),
                   me('<!-- factory-gate sha=%s verdict=merge -->' % sha)]}
         data = {'pr': pr, 'checks': [{'name': 'ci', 'bucket': 'pass'}],
@@ -273,7 +274,8 @@ class MergeScriptTest(unittest.TestCase):
             with open(fake + '.json', 'w') as f:
                 json.dump(data, f)
             os.chmod(fake, 0o755)
-            env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'])
+            # MERGE_PR_FROM_MAIN: test this copy, not main's.
+            env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'], MERGE_PR_FROM_MAIN='1', **(env_extra or {}))
             r = subprocess.run([os.path.join(here, 'merge_pr.sh'), '7', '--check'], env=env, capture_output=True, text=True)
             return r.returncode, r.stdout + r.stderr
 
@@ -302,6 +304,134 @@ class MergeScriptTest(unittest.TestCase):
         code, out = self.run_check('must-fix=0 stuck=0', files=('tools/firmware_tests.sh',))
         self.assertEqual(code, 1, out)
         self.assertIn('How the tests run changed', out)
+
+    def test_the_label_still_stops_a_merge(self):
+        code, out = self.run_check('must-fix=0 stuck=0', labels=('needs-human',))
+        self.assertEqual(code, 1, out)
+        self.assertIn('has the needs-human label', out)
+
+    def test_the_stale_label_question_ignores_the_label(self):
+        code, out = self.run_check('must-fix=0 stuck=0', labels=('needs-human',), env_extra={'IGNORE_NEEDS_HUMAN': '1'})
+        self.assertEqual(code, 0, out)
+
+    def test_looks_after_a_merge_from_main_do_not_count(self):
+        code, out = self.run_check('must-fix=0 stuck=0', rounds=12)
+        self.assertEqual(code, 0, out)
+
+
+FAKE_GH_LABEL = r'''#!/usr/bin/env python3
+import sys, json, os
+here = os.path.dirname(os.path.abspath(__file__))
+a = sys.argv[1:]
+if a[:2] == ['pr', 'view']:
+    print(open(os.path.join(here, 'pr.json')).read())
+elif a[:2] == ['api', 'user']:
+    print('me')
+else:
+    with open(os.path.join(here, 'calls.log'), 'a') as f:
+        f.write(' '.join(a) + '\n')
+'''
+
+
+class ClearStaleLabelTest(unittest.TestCase):
+    """tools/agent/clear_stale_label.sh with a fake gh and a fake merge_pr.sh."""
+
+    def run_clear(self, rules_say, comments=(), rc=1):
+        import subprocess, tempfile, json, shutil
+        here = os.path.dirname(os.path.abspath(__file__))
+        with tempfile.TemporaryDirectory() as tmp:
+            shutil.copy(os.path.join(here, 'clear_stale_label.sh'), tmp)
+            with open(os.path.join(tmp, 'merge_pr.sh'), 'w') as f:
+                f.write('#!/bin/sh\n[ "$IGNORE_NEEDS_HUMAN" = 1 ] || exit 9\necho "%s"\nexit %d\n' % (rules_say, rc))
+            with open(os.path.join(tmp, 'gh'), 'w') as f:
+                f.write(FAKE_GH_LABEL)
+            for n in ('merge_pr.sh', 'gh'):
+                os.chmod(os.path.join(tmp, n), 0o755)
+            with open(os.path.join(tmp, 'pr.json'), 'w') as f:
+                json.dump({'headRefOid': 'c' * 40, 'labels': [{'name': 'needs-human'}],
+                           'comments': [{'author': {'login': who}, 'body': b} for who, b in comments]}, f)
+            # CLEAR_FROM_MAIN: test this copy, not main's.
+            env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'], CLEAR_FROM_MAIN='1')
+            r = subprocess.run([os.path.join(tmp, 'clear_stale_label.sh'), '7'], env=env, capture_output=True, text=True)
+            log = ''
+            if os.path.exists(os.path.join(tmp, 'calls.log')):
+                with open(os.path.join(tmp, 'calls.log')) as f:
+                    log = f.read()
+            return r.returncode, r.stdout + r.stderr, log
+
+    def test_every_rule_passing_frees_it(self):
+        code, out, log = self.run_clear('#7 passes every rule.', rc=0)
+        self.assertEqual(code, 0, out)
+        self.assertIn('remove-label needs-human', log)
+
+    def test_an_error_keeps_it(self):
+        code, out, log = self.run_clear('gh: API rate limit exceeded')
+        self.assertEqual(code, 1, out)
+        self.assertNotIn('remove-label', log)
+
+    def test_a_sticky_verdict_keeps_it(self):
+        marker = '<!-- factory-gate sha=%s verdict=human sticky=1 -->' % ('d' * 40)
+        code, out, log = self.run_clear('Not merging #7 yet:\n- the review is for an older commit', comments=(('me', marker),))
+        self.assertEqual(code, 1, out)
+        self.assertNotIn('remove-label', log)
+
+    def test_a_stranger_cannot_hold_it(self):
+        code, out, log = self.run_clear('Not merging #7 yet:', comments=(('stranger', '/hold'),))
+        self.assertEqual(code, 0, out)
+        self.assertIn('remove-label', log)
+
+    def test_a_label_with_no_reason_left_comes_off(self):
+        code, out, log = self.run_clear('Not merging #7 yet:\n- the review is for an older commit')
+        self.assertEqual(code, 0, out)
+        self.assertIn('pr edit 7 --remove-label needs-human', log)
+        self.assertIn('pr comment 7', log)
+
+    def test_a_label_the_rules_still_need_stays(self):
+        code, out, log = self.run_clear('Not merging #7. A human decides:\n- cannot agree')
+        self.assertEqual(code, 1, out)
+        self.assertNotIn('remove-label', log)
+
+    def test_the_owner_can_hold_it(self):
+        code, out, log = self.run_clear('Not merging #7 yet:', comments=(('me', '/hold until the bench'),))
+        self.assertEqual(code, 1, out)
+        self.assertNotIn('remove-label', log)
+
+
+class BuildLockTest(unittest.TestCase):
+    def test_runs_the_command_and_lets_go(self):
+        import subprocess, tempfile
+        here = os.path.dirname(os.path.abspath(__file__))
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = os.path.join(tmp, 'lock')
+            env = dict(os.environ, TILT_BUILD_LOCK=lock)
+            r = subprocess.run([os.path.join(here, 'build_lock.sh'), 'sh', '-c', 'cat "$TILT_BUILD_LOCK/owner"; exit 3'],
+                               env=env, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 3, r.stderr)
+            self.assertIn('pid', r.stdout)
+            self.assertFalse(os.path.exists(lock))
+
+    def test_takes_a_lock_whose_holder_is_gone_but_not_a_live_one(self):
+        import subprocess, tempfile
+        here = os.path.dirname(os.path.abspath(__file__))
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = os.path.join(tmp, 'lock')
+            dead = subprocess.Popen(['true'])
+            dead.wait()
+            os.makedirs(lock)
+            with open(os.path.join(lock, 'pid'), 'w') as f:
+                f.write(str(dead.pid))
+            env = dict(os.environ, TILT_BUILD_LOCK=lock)
+            r = subprocess.run([os.path.join(here, 'build_lock.sh'), 'true'], env=env, capture_output=True, text=True, timeout=20)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertFalse(os.path.exists(lock))
+            # A live holder (this test) is waited for, not taken over.
+            os.makedirs(lock)
+            with open(os.path.join(lock, 'pid'), 'w') as f:
+                f.write(str(os.getpid()))
+            with self.assertRaises(subprocess.TimeoutExpired):
+                subprocess.run([os.path.join(here, 'build_lock.sh'), 'true'], env=env, capture_output=True, timeout=3)
+            self.assertTrue(os.path.exists(lock))
+
 
 CLAIM_GH = """#!/usr/bin/env python3
 import json, os, sys, time
