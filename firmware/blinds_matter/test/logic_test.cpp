@@ -12,6 +12,7 @@
 #include <ctime>
 #include <fstream>
 #include <map>
+#include <vector>
 #include <sstream>
 #include <string>
 
@@ -468,6 +469,42 @@ static void settingsChangeTests() {
     CHECK(m.kind == MV_NONE && s.dir == 0 && s.endMsg == "stopped: settings changed", "settings change while waking: ended, nothing read"); }
 }
 
+// A sensor for a mark's steady reading: plays back a list of readings (and which were dropouts), writes down each
+// wait, and stops the reading at one wait when asked to.
+struct PlaySteady : SteadySensor {
+  std::vector<float> ang;
+  std::vector<bool> drop;
+  std::vector<uint32_t> waits;
+  int reads = 0, stopAt = 0;                                // stopAt: the wait (1, 2, ...) that says stop; 0 = none
+  bool last = false;
+  float angle() override { int k = reads++; last = k < (int)drop.size() && drop[k]; return ang[k % ang.size()]; }
+  bool lost() override { return last; }
+  bool wait(uint32_t ms) override { waits.push_back(ms); return (int)waits.size() != stopAt; }
+};
+static void testSteadyRead() {
+  { PlaySteady s; s.ang = {120, 121.5f, 118.5f, 120.5f, 119.5f, 121, 119, 120, 120.2f, 119.8f, 120, 121, 119};
+    SteadyResult r = steadyRead(s);
+    bool fifty = s.waits.size() == 12;
+    for (uint32_t w : s.waits) fifty &= w == 50;
+    CHECK(r.is == STEADY_OK && near(r.ang, 120, 0.2), "a still sensor: steady, the mean");
+    CHECK(s.reads == 13 && fifty, "13 readings, 12 waits of 50 ms"); }
+  { PlaySteady s; s.ang = {359, 1, 0.5f, 359.5f};
+    SteadyResult r = steadyRead(s);
+    CHECK(r.is == STEADY_OK && fabsf(angDiff(r.ang, 0)) < 0.5f, "readings either side of zero: steady, a mean near 0 (not 180)"); }
+  { PlaySteady s; s.ang = {100, 100.5f, 101, 101.5f, 102, 102.5f, 103, 103.5f, 104, 104.5f, 105, 105.5f, 106};
+    CHECK(steadyRead(s).is == STEADY_MOVING, "a sensor that drifts over 3.5 degrees: not still"); }
+  for (int at : {0, 6, 12}) {
+    PlaySteady s; s.ang = {120}; s.drop.assign(13, false); s.drop[at] = true;
+    CHECK(steadyRead(s).is == STEADY_LOST, "one dropout anywhere (the first included), angles still: dropout");
+  }
+  { PlaySteady s; s.ang = {120}; s.stopAt = 3;
+    CHECK(steadyRead(s).is == STEADY_CUT && s.reads == 3 && s.waits.size() == 3, "wait says stop on the third: cut short, no more readings"); }
+  { PlaySteady s; s.ang = {200, 203.4f};
+    CHECK(steadyRead(s).is == STEADY_OK, "a spread just under 3.5 degrees: steady"); }
+  { PlaySteady s; s.ang = {200, 203.6f};
+    CHECK(steadyRead(s).is == STEADY_MOVING, "a spread just over 3.5 degrees: not still"); }
+}
+
 int main() {
   // ---- angles
   CHECK(near(angDiff(10, 350), 20, 1e-4), "angDiff crosses zero forward");
@@ -798,6 +835,8 @@ int main() {
     CHECK(alertHeard(m) && !alertHeard(m), "heard again: cleared (no alert for that)");
     CHECK(alertSilent(m, ALERT_SILENT_MS + 1), "silent again later: a new alert");
   }
+
+  testSteadyRead();
 
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;

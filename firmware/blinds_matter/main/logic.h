@@ -88,6 +88,32 @@ inline float currentTiltOf(const Marks &m, bool moving, float live, float noted)
   return std::isnan(t) ? t : fminf(fmaxf(t, -100.0f), 100.0f);     // past a closed mark is still closed: never over 100
 }
 
+// ---- a reading for a mark (motion.h setMark): the sensor has to hold still for 0.6 s. One first reading, then 12 more
+// with a 50 ms wait before each. A still PWM reading wanders about +-1.5 degrees (brush noise on the shared wires), so
+// "still" is a spread within STEADY_DEG; a wand being turned moves far more. The answer is the mean, taken the short
+// way round across the sensor's zero. Any dropout among the readings: no mark is taken from that.
+const float STEADY_DEG = 3.5f;
+struct SteadySensor {
+  virtual float angle() = 0;                    // the Angle now (degrees)
+  virtual bool lost() = 0;                      // that reading was a dropout
+  virtual bool wait(uint32_t ms) = 0;           // wait; false = stop, the reading can no longer be trusted
+};
+enum SteadyIs { STEADY_OK, STEADY_MOVING, STEADY_LOST, STEADY_CUT };
+struct SteadyResult { float ang; SteadyIs is; };   // ang: the mean (NAN unless STEADY_OK)
+inline SteadyResult steadyRead(SteadySensor &s) {
+  float a0 = s.angle(), lo = 0, hi = 0, sum = 0;
+  bool lost = s.lost();
+  for (int k = 0; k < 12; k++) {
+    if (!s.wait(50)) return {NAN, STEADY_CUT};
+    float d = angDiff(s.angle(), a0);
+    lost |= s.lost();
+    lo = fminf(lo, d); hi = fmaxf(hi, d); sum += d;
+  }
+  if (lost) return {NAN, STEADY_LOST};
+  if (hi - lo > STEADY_DEG) return {NAN, STEADY_MOVING};
+  return {fmodf(a0 + sum / 13 + 360.0f, 360.0f), STEADY_OK};
+}
+
 // ---- can a blind be moved? Set up (all three marks good), its tilter not missing, and the battery above the motor
 // cut-off (CONTEXT.md: under 3.35 V resting, no motor runs, whoever asks). nullptr = yes, else why not.
 inline const char *cannotMoveWhy(bool calibrated, bool seen, bool present, bool battOk) {
