@@ -1,32 +1,50 @@
 # Solar housing
 
-A white tray and an end cap that hold **three 6 V 0.8 W panels** (70 × 70 mm) in a row, wired in parallel, and stick
-flat on the window.
+White tray sections and an end cap that hold **1 to 6 panels** (6 V 0.8 W, 70 × 70 mm) in a row, wired in parallel,
+and stick flat on the window. Use more panels where the window gets little light: in a window with no direct sun one
+panel gives only about 1 mA (direct sun: about 106 mA, measured 2026-11-26).
 
-- **Size:** 240.1 × 82.2 × 7.0 mm together. Tray about 90 g, cap about 10 g of PLA if solid (less with normal infill). The back is solid, so the panel backs and their labels do not show.
-- **Print:** `hardware/mechanical/stl/solar/solar_tray.stl` and `solar_cap.stl` (wires out the right end), or
-  `solar_tray_wires_left.stl` and `solar_cap_wires_left.stl` (the mirror image: wires out the left end). Each as it
-  lies, back on the bed. No supports: the lips are 45 degrees, and nothing bridges. Keep the slicer's elephant-foot
-  compensation on (Bambu's default), or the puzzle tabs bind at the bottom.
+## Pieces for each count
+
+Every set is 86.2 mm wide and 7.0 mm thick. A section holds at most 3 panels (about 231 mm, so it fits the bed); more
+panels take a second section that locks onto the first.
+
+| Panels | Length | Print |
+|---|---|---|
+| 1 | 100 mm | `start_1` + `cap` |
+| 2 | 170 mm | `start_2` + `cap` |
+| 3 | 240 mm | `start_3` + `cap` |
+| 4 | 310 mm | `start_2` + `add_2` + `cap` |
+| 5 | 380 mm | `start_3` + `add_2` + `cap` |
+| 6 | 450 mm | `start_3` + `add_3` + `cap` |
+
+The files are `hardware/mechanical/stl/solar/solar_<piece>.stl` (wires out the right end) and
+`solar_<piece>_wires_left.stl` (the mirror image: wires out the left end). A set must be all one side.
+
+- **Print:** each piece as it lies, back on the bed. No supports: the lips are 45 degrees, and nothing bridges. Keep
+  the slicer's elephant-foot compensation on (Bambu's default), or the puzzle tabs bind at the bottom. About 0.42 g
+  of PLA per mm of section if printed solid; less with normal infill.
+- **Bambu Studio:** `python3 tools/bambu_solar.py <panels> [--left]` packs one set on a plate (H2D 0.4 nozzle,
+  0.20 mm Standard, white PLA, no supports) as `solar_housing_<panels>[_wires_left]_H2D.3mf`. The 3- and 6-panel
+  projects are in the folder.
+- **Built by:** `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_solar.py --timeout 1500`. It builds
+  and checks every count (panels slide in across every joint, joints lock, lips hold, nothing pokes out) and exports
+  every piece. Measurements are in the `S` table; `PIECES` sets the sections per count.
 - **Fit:** 0.2 mm in all from top to bottom across the panels, and 0.05 mm front to back under the lips, so the
-  panels can't rock. The cap's sockets have 0.15 mm a side.
-- **Bambu Studio:** `hardware/mechanical/stl/solar/solar_housing_H2D.3mf` (or `solar_housing_wires_left_H2D.3mf`):
-  tray and cap on one plate, H2D 0.4 nozzle, 0.20 mm Standard, white PLA, no supports. Rebuilt by
-  `python3 tools/bambu_solar.py` (`--left` for the wires-left set).
-- **Built by:** `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_solar.py --timeout 600`
-  (measurements are in the `S` table at the top).
+  panels can't rock. Sockets have 0.15 mm a side. Every section's slot has a small 45 degree lead-in at its right end,
+  so a panel can't catch on a joint that prints a little high or low.
 
 ## How it goes together
 
-1. **Wire the panels in parallel.** Solder B's red to A's + pad and B's black to A's − pad, then C to B the same way.
-   Check each panel in the sun first (+6 to 7 V, red on +). The panel with the plug goes in last (right end).
-2. **Slide the panels in from the right end**, face up, under the 45 degree lips along the top and bottom. Push each
-   one to the left. Lay the wires in the 10 mm channel behind them (10 to 20 mm below the panels' top edge, over the
-   solder bumps).
-3. **Drop the cap on.** Lay the two wires in the small slot on the cap's back, then press the cap down onto the two
-   round puzzle tabs at the tray's end. It locks the panels in.
-4. **Tape it to the window.** Double-sided tape on the window face of the left end and of the cap (15 mm pads; the
-   rails take tape too), then press it flat on the glass. The panels sit 1.8 mm behind the window face.
+1. **Wire the panels in parallel.** Solder each panel's red to the next one's + pad and its black to the − pad.
+   Check each panel in the sun first (+6 to 7 V, red on +). The panel with the plug goes in last (at the cap end).
+2. **Join the sections.** Press the `add` section down onto the `start` section's two round tabs.
+3. **Slide the panels in from the cap end**, face up, under the 45 degree lips along the top and bottom. Push each one
+   all the way along. Lay the wires in the 10 mm channel behind them (10 to 20 mm below the panels' top edge, over
+   the solder bumps).
+4. **Drop the cap on.** Lay the two wires in the small slot on the cap's back, then press the cap down onto the last
+   section's tabs. It locks the panels in.
+5. **Tape it to the window.** Double-sided tape on the window face of the left end and of the cap (15 mm pads; the
+   8 mm rails take tape too), then press it flat on the glass. The panels sit 1.8 mm behind the window face.
 
-For the wire exit on the other side, print the `wires_left` set. The plug goes in J8 on the controller board: black on
-pin 1 (−), red on pin 2 (+).
+The plug goes in J8 on the controller board: black on pin 1 (−), red on pin 2 (+).

@@ -1,8 +1,9 @@
-"""Build the solar housing's Bambu Studio project: the tray and the end cap on one plate, packed close together.
+"""Build the solar housing's Bambu Studio project: the tray sections and the end cap for a panel count, packed close
+together (arranged on as few plates as they fit).
 
   python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_solar.py --timeout 600   # first: the STLs
-  python3 tools/bambu_solar.py            # writes hardware/mechanical/stl/solar/solar_housing_H2D.3mf (wires right)
-  python3 tools/bambu_solar.py --left     # writes solar_housing_wires_left_H2D.3mf
+  python3 tools/bambu_solar.py 3          # writes hardware/mechanical/stl/solar/solar_housing_3_H2D.3mf (wires right)
+  python3 tools/bambu_solar.py 6 --left   # writes solar_housing_6_wires_left_H2D.3mf
 
 H2D 0.4 nozzle, 0.20 mm Standard, white PLA on textured PEI, no supports (the lips are 45 degrees). Both parts lie as
 exported: back on the bed.
@@ -22,23 +23,26 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STL = os.path.join(REPO, 'hardware/mechanical/stl/solar')
 PRESETS = (('machine', 'Bambu Lab H2D 0.4 nozzle'), ('process', '0.20mm Standard @BBL H2D'),
            ('filament', 'Bambu PLA Basic @BBL H2D'))
+# the pieces for each panel count (tools/fusion_solar.py PIECES)
+PIECES = {1: ['start_1'], 2: ['start_2'], 3: ['start_3'], 4: ['start_2', 'add_2'], 5: ['start_3', 'add_2'],
+          6: ['start_3', 'add_3']}
 TWEAKS = {'filament_colour': ['#FFFFFF'], 'enable_support': '0', 'curr_bed_type': 'Textured PEI Plate'}
 
 
-def main(left=False):
+def main(n=3, left=False):
     tag = '_wires_left' if left else ''
-    stls = [os.path.join(STL, 'solar_%s%s.stl' % (p, tag)) for p in ('tray', 'cap')]
+    stls = [os.path.join(STL, 'solar_%s%s.stl' % (p, tag)) for p in PIECES[n] + ['cap']]
     for s in stls:
         if not os.path.exists(s):
             sys.exit('%s is missing: run tools/fusion_solar.py first' % os.path.relpath(s, REPO))
-    out = os.path.join(STL, 'solar_housing%s_H2D.3mf' % tag)
+    out = os.path.join(STL, 'solar_housing_%d%s_H2D.3mf' % (n, tag))
     tmp = tempfile.mkdtemp()
     files = []
-    for n, (kind, name) in enumerate(PRESETS):
+    for k, (kind, name) in enumerate(PRESETS):
         d = flatten(kind, name)
         d.pop('inherits', None)
         d.update({'from': 'system', 'instantiation': 'true', 'name': name})
-        path = os.path.join(tmp, '%s%d.json' % (kind, n))
+        path = os.path.join(tmp, '%s%d.json' % (kind, k))
         json.dump(d, open(path, 'w'), indent=1)
         files.append(path)
     raw = os.path.join(tmp, 'raw.3mf')
@@ -59,4 +63,5 @@ def main(left=False):
 
 
 if __name__ == '__main__':
-    main(left='--left' in sys.argv)
+    nums = [int(a) for a in sys.argv[1:] if a.isdigit()]
+    main(nums[0] if nums else 3, left='--left' in sys.argv)
