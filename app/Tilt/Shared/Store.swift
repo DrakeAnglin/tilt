@@ -20,7 +20,11 @@ struct BlindState: Decodable, Equatable {
     var moving: Bool { mov == 1 || q == 1 }
 }
 struct ControllerState: Decodable, Equatable {
-    struct Battery: Decodable, Equatable { let v: Double; let pct: Int; let st: String; let low: Int }
+    struct Battery: Decodable, Equatable {
+        let v: Double; let pct: Int; let st: String; let low: Int
+        /// Power source: 0 battery, 1 solar, 2 USB, 3 input power but not sure which (nil: an older controller).
+        var src: Int? = nil
+    }
     let v: String, name: String
     let batt: Battery
     let closeUp: Int, sync: Int, mv: Int

@@ -92,7 +92,9 @@ From `firmware/blinds_matter/main/config.h` (PCB v2):
 | 3 | GPIO16 | GPIO17 | GPIO1 | GPIO2 |
 
 Battery voltage on GPIO3 and input power (USB or solar) on GPIO0, each through a 1 MΩ / 1 MΩ divider. USB reads
-about 4.3 V on the input line.
+about 4.3 V on the input line. Solar and USB share that one line, so the v2.2 board cannot tell them apart by day: the
+controller sends `src` 2 (USB) only for input power more than an hour after sunset or before sunrise, and 3 (not sure)
+otherwise (`powerSourceOf` in `logic.h`).
 
 ## RJ12 pinout
 Cords must be **straight-wired**: pin 1 to pin 1. Check every cord.
