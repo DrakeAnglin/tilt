@@ -13,7 +13,7 @@ How one agent takes one issue from request to `main`, without a person in the lo
 
 ## Steps
 
-1. **Pick up the issue.** `gh issue view <n> --comments`. No issue yet? Make one first from the request. Claim it: `gh issue edit <n> --add-assignee @me`.
+1. **Pick up the issue.** `gh issue view <n> --comments`. No issue yet? Make one first from the request. Claim it: `git show origin/main:tools/agent/claim.py | python3 - <n> <worktree name>` (see "Claiming an issue"). Exit 3 means another agent has it: stop and say who, do not start.
 2. **Branch in a worktree.** If the session is not already in its own worktree:
    `git fetch origin && git worktree add .claude/worktrees/issue-<n> -b issue-<n>-<short-name> origin/main`, then work there.
 3. **Build it.** Read `CONTEXT.md` and the ADRs for the area. Write the test first where there is a place for one (`/tdd`). Small commits.
@@ -37,6 +37,17 @@ How one agent takes one issue from request to `main`, without a person in the lo
     - Merge: `tools/agent/merge_pr.sh <pr>`. It checks the rules again and squash-merges.
     - Human (a stuck finding, ten rounds, a large blast radius, a test-script change): the `needs-human` label, always with a comment that says why: a TL;DR first, notes after. Then notify the owner (below), tell them the TL;DR and stop. Do not merge.
 11. **Clean up.** The issue closes itself through `Closes #<n>`. Worktrees clean themselves: `tools/agent/clean_worktrees.sh` removes every worktree under `.claude/worktrees/` whose pull request is merged or closed, with its local branch and build folders. It runs after every merge (`merge_pr.sh`) and at the start of every session, and keeps anything that could be lost (uncommitted changes, commits not in the pull request, no pull request, detached HEAD). When the owner merges or closes your pull request on GitHub, the next session clears your worktree. Run it with `--dry-run` to see what it would do. Removal also deletes files Git ignores, so keep local-only files (secrets, `.env`) in the main checkout, never only in a worktree.
+
+## Claiming an issue
+
+Every agent here uses the owner's GitHub account, so the assignee cannot say which agent has an issue. Run the claim script as it is on `main` (the main checkout may be behind, and you claim before you have a worktree). `git show origin/main:tools/agent/claim.py | python3 - <n> <id>` can:
+
+- **Claim:** it posts a claim comment and assigns the issue. Exit 0: it is yours. Exit 3: another agent has a live claim, or a pull request for the issue is open. Leave it alone.
+- **Refresh:** run it again with the same id. A claim lasts 4 hours from its last refresh, then it is abandoned and anyone may take the issue. Refresh before each step that can take long: the build, each review round. Once your pull request is open, it keeps the issue yours too.
+- **Take over a pull request** left by a session that stopped: `--resume`.
+- **Release:** `--release`, when you hand over or give up.
+
+`<id>` names this session: the worktree name, or `issue-loop` for the hourly loop. Two agents that claim in the same moment both post, then read again. The earlier claim wins, and the other takes its own claim off.
 
 ## Waiting
 
