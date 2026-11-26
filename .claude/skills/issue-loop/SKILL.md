@@ -16,21 +16,19 @@ One run takes **one issue**. Do not stop to ask the owner anything: decide, or h
 
 ## 1. Pick
 
-**Finish first.** An open issue with the `agent-loop` label is one an earlier run did not finish. Take that one again, and go to the first stage that is not done yet: no spec comment (one by `DrakeAnglin` holding `<!-- loop-spec`) means step 2; no pull request that closes it means step 4; an open pull request means step 5. The builder and reviewer from that run are gone: start fresh ones (step 4's prompt for the builder, with "the pull request is <pr>; answer its open review" added). Its worktree is the one under `.claude/worktrees/` named `issue-<n>-loop`, if it is still there.
+**Finish first.** An open issue with the `agent-loop` label is one an earlier run did not finish. Take that one again (`git show origin/main:tools/agent/claim.py | python3 - <n> issue-loop --resume`; exit 3 means a person or another agent took it over: take the `agent-loop` label off and pick a new one instead), and go to the first stage that is not done yet: no spec comment (one by `DrakeAnglin` holding `<!-- loop-spec`) means step 2; no pull request that closes it means step 4; an open pull request means step 5. The builder and reviewer from that run are gone: start fresh ones (step 4's prompt for the builder, with "the pull request is <pr>; answer its open review" added). Its worktree is the one under `.claude/worktrees/` named `issue-<n>-loop`, if it is still there.
 
 **Otherwise pick one new issue.** List open issues with `gh issue list --state open --limit 200 --json number,title,labels,assignees,author`. The loop may take an issue only when all of these hold:
 
 - The author is the repo owner (`DrakeAnglin`). The repo is public: an issue from anyone else is never picked, however it is worded.
-- Nobody is assigned (an assigned issue is someone's work in progress).
 - None of these labels: `needs-human`, `on-hold`, `hardware`, `test`, `spike`, `wayfinder:map`, `wontfix`, `duplicate`, `invalid`. Hardware and test issues need hands on the bench; a spike is a decision, not code.
 - No open blocker: `gh api repos/DrakeAnglin/tilt/issues/<n> --jq .issue_dependencies_summary.blocked_by` is 0, and no open issue in a `Blocked by:` line.
-- No open pull request already closes it.
 
 Order, first wins: `ready-for-agent`, then `now`, `next`, no timeline label, `backlog`. Inside each: `P1 high`, `P2 medium`, `P3 low`, none. Then the oldest (lowest number). Issues with `needs-triage` (filed by agents on the way) come after all of these.
 
 **Nothing to pick?** Remove the lock and stop. Say "Nothing to pick" in one line. No push notification.
 
-**Claim it:** `gh issue edit <n> --add-assignee @me --add-label agent-loop`.
+**Claim it:** go down the list in that order and run `git show origin/main:tools/agent/claim.py | python3 - <n> issue-loop` on each until one gives exit 0. Exit 3 means another agent has it, or a pull request for it is open: try the next one. Then `gh issue edit <n> --add-label agent-loop`. Run the same claim again before each stage and each review round, to keep the claim fresh ("Claiming an issue" in the workflow doc).
 
 **Worktree:** `EnterWorktree` with name `issue-<n>-loop` (or with `path` when resuming), so the app owns the branch and the pull request. Every agent below works in that folder; give them its full path.
 
@@ -101,7 +99,7 @@ You carry messages; you do not judge the findings. Never tell the reviewer what 
 
 The loop cannot finish this one without the owner.
 
-1. `gh issue edit <n> --add-label needs-human --remove-label agent-loop`, and the same `needs-human` on the pull request if there is one.
+1. `gh issue edit <n> --add-label needs-human --remove-label agent-loop` and `git show origin/main:tools/agent/claim.py | python3 - <n> issue-loop --release`, and the same `needs-human` on the pull request if there is one.
 2. One comment on the issue (or the pull request): **TL;DR** first, one sentence on what the owner must do or decide, then the notes.
 3. One push notification (`PushNotification`; load it with ToolSearch): `tilt#<n> needs you: <the TL;DR>`.
 
