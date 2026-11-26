@@ -21,18 +21,18 @@ B = adsk.fusion.BooleanTypes
 
 S = {
     'hole': 15.875,       # 5/8 in drill
-    'cap_r': 12.5,        # 25 mm cap: covers about 3.8 mm round the hole (inside the bevel)
-    'cap_t': 1.6,         # cap thickness (how far it stands off the wall)
-    'bevel': 0.8,         # 45 degree bevel round the face edge
-    'shank_r': 7.7,       # shank radius: 0.24 under the hole
+    'hole_loose': 17.0,   # the same bit in drywall: holes come out loose and ragged (owner's test, 2026-11-26)
+    'cap_r': 11.0,        # 22 mm cap: a narrow ring past the hole
+    'cap_t': 1.2,         # cap thickness (how far it stands off the wall)
+    'bevel': 0.7,         # 45 degree bevel round the face edge
+    'shank_r': 7.9,       # shank radius: about the drill's own size
     'shank_h': 6.0,       # shank length into the hole
-    'bore_r': 5.4,        # hollow shank: a 2.3 mm ring that springs in
-    'rib_n': 8,           # crush ribs round the shank; the U slot cuts 2 away, so the print has 6
-    'rib_r': 0.6,         # rib radius
-    'rib_reach': 8.2,     # ribs reach this far out: 0.26 into the hole's wall
-    'lead': 1.0,          # lead-in at the shank's tip
+    'bore_r': 5.6,        # hollow shank: a 2.3 mm ring
+    'rib_n': 12,          # ribs round the shank; the U slot cuts 2 away, so the print has 10
+    'rib_sq': 1.6,        # each rib is a 1.6 mm square turned 45 degrees: a pointed ridge that digs into the gypsum
+    'lead': 1.5,          # lead-in at the shank's tip, so the ribs start in the hole
     'slot_w': 7.2,        # U slot width: a flat RJ12 cord is about 6.6 wide
-    'slot_d': 8.5,        # slot depth in from the shank's side: two flat cords stacked (2 x 3.3) clear its round end
+    'slot_d': 8.7,        # slot depth in from the shank's side: two flat cords stacked (2 x 3.3) clear its round end
     'cord_w': 6.6,
     'cord_t': 3.3,
 }
@@ -73,11 +73,15 @@ plug = cone(0, S['cap_r'] - S['bevel'], S['bevel'], S['cap_r'])
 op(plug, cone(S['bevel'], S['cap_r'], S['cap_t'], S['cap_r']), B.UnionBooleanType)
 # shank with ribs, then the lead-in cone trims the tip of both
 shank = cone(S['cap_t'] - 0.01, S['shank_r'], S['top'], S['shank_r'])
-rc = S['rib_reach'] - S['rib_r']
+S['rib_reach'] = S['shank_r'] + S['rib_sq'] / math.sqrt(2)     # rib tips
 for i in range(S['rib_n']):
     a = 2 * math.pi * (i + 0.5) / S['rib_n']
-    op(shank, cone(S['cap_t'] - 0.01, S['rib_r'], S['top'], S['rib_r'], rc * math.cos(a), rc * math.sin(a)),
-       B.UnionBooleanType)
+    u = (math.cos(a + math.pi / 4), math.sin(a + math.pi / 4), 0)
+    w = (-u[1], u[0], 0)
+    c = (S['shank_r'] * math.cos(a), S['shank_r'] * math.sin(a), (S['cap_t'] + S['top']) / 2)
+    obb = adsk.core.OrientedBoundingBox3D.create(P3(*c), adsk.core.Vector3D.create(*u), adsk.core.Vector3D.create(*w),
+                                                 S['rib_sq'] / 10, S['rib_sq'] / 10, (S['shank_h'] + 0.02) / 10)
+    op(shank, tbm.createBox(obb), B.UnionBooleanType)
 tip_r = S['shank_r'] - S['lead']
 lead = cone(S['cap_t'] - 0.01, 30, S['top'] - S['lead'], 30)
 op(lead, cone(S['top'] - S['lead'] - 0.01, S['rib_reach'] + 0.01, S['top'], tip_r), B.UnionBooleanType)
@@ -102,14 +106,20 @@ for k, c in enumerate(cords):
     if v > 0.01:
         failures.append('cord %d runs into the plug: %.2f mm3' % (k + 1, v))
 # the shank (not the ribs) clears the hole; the ribs grip it
-hole_wall = cone(S['cap_t'], 20, S['top'] + 1, 20)
-op(hole_wall, cone(S['cap_t'] - 0.01, S['hole'] / 2, S['top'] + 2, S['hole'] / 2), B.DifferenceBooleanType)
-grip = vol(plug, hole_wall)
-if grip < 0.2:
-    failures.append('the ribs do not grip the hole (%.2f mm3)' % grip)
+def grip_in(d):
+    wall = cone(S['cap_t'], 20, S['top'] + 1, 20)
+    op(wall, cone(S['cap_t'] - 0.01, d / 2, S['top'] + 2, d / 2), B.DifferenceBooleanType)
+    return vol(plug, wall)
+
+
+grip = {'5/8 in hole': grip_in(S['hole']), 'loose %.1f mm hole' % S['hole_loose']: grip_in(S['hole_loose'])}
+for k, v in grip.items():
+    if v < 0.5:
+        failures.append('the ribs do not grip a %s (%.2f mm3)' % (k, v))
 walls = {
     'shank ring': S['shank_r'] - S['bore_r'],
-    'cap overlap past the hole': S['cap_r'] - S['bevel'] - S['hole'] / 2,
+    'cap overlap past a loose hole': S['cap_r'] - S['bevel'] - S['hole_loose'] / 2,
+    'rib tip past the shank': S['rib_reach'] - S['shank_r'],
 }
 for k, v in walls.items():
     if v < 0.9:
@@ -133,5 +143,6 @@ q = body.boundingBox
 result = {'ok': not failures, 'failures': failures,
           'plug (mm)': 'D %.1f x H %.1f, %.1f g PLA' % ((q.maxPoint.x - q.minPoint.x) * 10, (q.maxPoint.z - q.minPoint.z) * 10,
                                                       body.volume * 1.24),
-          'rib grip (mm3)': round(grip, 2), 'walls (mm)': {k: round(v, 2) for k, v in walls.items()},
+          'rib grip (mm3)': {k: round(v, 2) for k, v in grip.items()},
+          'rib tips (mm across)': round(2 * S['rib_reach'], 2), 'walls (mm)': {k: round(v, 2) for k, v in walls.items()},
           'slot (mm)': '%.1f wide, %.1f in from the shank side' % (S['slot_w'], S['slot_d']), 'exported': path}

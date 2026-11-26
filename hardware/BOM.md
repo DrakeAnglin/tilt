@@ -87,7 +87,7 @@ Each tilter needs one cord; pick the length by how far its blind is from the con
 use: pin 1 must beep to pin 1 ([tilter wiring](../docs/tilter-wiring.md)).
 
 **Optional, a cord through a wall:** a 5/8 in hole and one printed [wall plug](../docs/wall-plug.md) on each side
-(white PLA, about 1.3 g each).
+(white PLA, about 1.1 g each).
 
 ## One controller
 

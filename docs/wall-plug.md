@@ -19,16 +19,17 @@ The slot holds **two flat RJ12 cords** (about 6.6 × 3.3 mm each), one on top of
 long, so a plug fits on each side of a single sheet of 1/2 in drywall. To take a plug out, pull it out by the cap.
 
 ## Size
-- Cap: 25 mm across and 1.6 mm thick, with a 45 degree bevel round the face. It covers about 3.8 mm round the hole.
-- Shank: 15.4 mm across, hollow, with 6 crush ribs (8 drawn, the slot cuts 2 away) that grip a 5/8 in hole.
-  Fit checked on a test print.
+- Cap: 22 mm across and 1.2 mm thick, with a 45 degree bevel round the face. It still covers a hole that came out
+  17 mm across.
+- Shank: 15.8 mm across (the drill's size), hollow, with 10 pointed ribs (12 drawn, the slot cuts 2 away). The rib
+  tips reach 18 mm across, so they dig into the gypsum even where the bit left the hole loose and ragged.
 - U slot: 7.2 mm wide, the whole height of the plug.
 
 ## Print
 - White PLA (or very light gray), cap face down on the bed. No supports: the face bevel is 45 degrees.
-- About 1.3 g each.
+- About 1.1 g each.
 
 ## Built by
 `python3 hardware/mechanical/fusion/fusion.py exec tools/fusion_plug.py`. It checks that two flat cords fit in the
-slot without touching the plug, that the ribs grip the hole, and that the plug is one piece, then exports the STL.
-Sizes are in the `S` table at the top of the script.
+slot without touching the plug, that the ribs grip both a true 5/8 in hole and a loose 17 mm one, and that the plug
+is one piece, then exports the STL. Sizes are in the `S` table at the top of the script.
