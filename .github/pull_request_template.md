@@ -4,6 +4,8 @@ Closes #
 
 <!-- The smallest view that makes the change clear: a few lines, a sketch, or a file tree. -->
 
+**Choices made:** <!-- each choice the issue left open, what you picked, and the requirement, ADR or CONTEXT.md line it follows. "None" if the issue settled everything. -->
+
 ## Evidence
 
 - **Before:** <!-- failing test or wrong output -->

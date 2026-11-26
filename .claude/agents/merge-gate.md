@@ -22,6 +22,8 @@ Go down the "Who merges" list one line at a time and write yes or no for each. C
 - A line clearly no: **human**.
 - Not sure about a line: look harder (the diff, the CI log, the author's Evidence) and decide. Say what you were unsure about in the notes. Hand over only when a person can judge something the tests and the review cannot.
 
+A choice the issue left open, a rule in the code, a trade-off or a hardware run is never a reason for **human** (see the policy's "never a reason" list). If the author did not write its choices under **Choices made**, or a choice goes against the requirements or ADRs, the verdict is **not yet** (back to the author), not human.
+
 Firmware that only runs on the ESP is not a reason to hand over when the author's Evidence shows both firmware builds passing on the reviewed commit and the pull request has `bench-check`: bench checks happen when the release is staged, after merge. Never send a pull request to the owner for a bench check, and never put one under Human Review. If the build is not shown, the verdict is **not yet**, not human: say so in your reply, so the author builds it and runs the gate again. Post no verdict comment and set no label for not yet.
 
 A review whose `sha` is not the current head is out of date: **not yet**, not human. Say so in your reply so the author runs the reviewer again. Post no verdict comment and set no label.
@@ -43,22 +45,26 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 ### Notes
 1. Blast radius small or medium: yes/no
 2. CI green on the reviewed commit: yes/no
-3. Nothing left to fix: yes/no
+3. Author and reviewer agree (must-fix 0, stuck 0): yes/no
 4. Tested, or docs only: yes/no
 5. Does the issue and nothing else: yes/no
-6. No human-only path: yes/no <name the paths when no>
+6. No human-only path (a test-script change beyond adding tests): yes/no <name the paths when no>
 
 ### Human Review
 <merge: "Not needed." human: fill in both lines below>
-**Why:** <why a person, and not an agent, has to decide this. The real reason, not "touches a human-only path": say what a person can judge here that tests and agents cannot.>
+**Why:** <which reason in the policy's "Who merges", and what exactly a person must look at>
 **Confirm:**
-- [ ] <one thing to check, with the file to open>
+- [ ] <one thing only a person can do. Never a code read, a design opinion, a trade-off or a hardware run>
 - [ ] <three at most>
 
 <!-- factory-gate sha=<full head sha> verdict=<merge|human> -->
 ```
 
 More than ten `factory-review` comments on the pull request: **human**, "too many rounds of review".
+
+A review with `stuck` above 0: **human**. The **Why** is that two agents read the same code and cannot agree; the **Confirm** lines are the stuck findings, each with both sides in a few words.
+
+A review with must-fix above 0 and stuck 0: **not yet**, not human. The author still has to fix or answer them.
 
 Then the label: `gh pr edit <pr> --add-label auto-merge-ok` for merge; for human, `--add-label needs-human` and take `auto-merge-ok` off. Never take `needs-human` off: only the owner does. If it is already on, the verdict is **human**, and you say what the owner still has to confirm. Never add `needs-human` without this comment.
 
