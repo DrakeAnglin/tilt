@@ -12,7 +12,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 
 ## How work gets into main
 
-Every change goes: issue, own branch in its own worktree, pull request, CI, independent review, merge gate. Nothing is pushed to `main`. To do a task start to finish, use the `/work-issue` skill. Every hour a scheduled session runs `/issue-loop`: it picks one issue and takes it to merged, with a separate agent for the spec, the code and the review. See `docs/agents/workflow.md` and `docs/agents/review-policy.md`.
+Every change goes: issue, own branch in its own worktree, pull request, CI, independent review, merge gate. Nothing is pushed to `main`. To do a task start to finish, use the `/work-issue` skill. Every hour a scheduled session runs `/issue-loop`: it picks one issue and takes it to merged, with a separate agent for the spec, the code and the review. Once a day `/architecture-scan` has two Fable agents look for architecture friction and files only what is really needed into `backlog`, two issues at most. See `docs/agents/workflow.md` and `docs/agents/review-policy.md`.
 
 - Tests: `tools/agent/check.sh` (the same tests run in GitHub on every pull request).
 - Review: the `pr-reviewer` agent, started fresh with only the pull request number. It names the door (one-way or two-way, one label only) and the blast radius. The blast radius and the review decide the merge, not the door.
