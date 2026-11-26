@@ -12,7 +12,7 @@ _Avoid_: shade, window, slat set
 
 **Reference blind**:
 The blind model the tilter is drawn for (its headrail and tilt rod sizes are in `hardware/mechanical/README.md`). Other blinds are measured and the CAD adjusted.
-_Avoid_: the owner's blinds (Owner means the first phone paired with a controller)
+_Avoid_: the owner's blinds (an Owner is a phone with full rights on a controller)
 
 **Tilter**:
 The motor unit on one blind's tilt rod: gearbox, N20 motor, and sensor module with its RJ12 jack. A blind has exactly one.
@@ -69,10 +69,11 @@ _Avoid_: state, position, stuck
 ### People and access
 
 **Owner**:
-The first phone to pair with a controller. Can invite, revoke and reset.
+A phone with full rights on a controller or the Tilt Hub. The first phone to pair is an Owner, and an Owner can make another phone an Owner, so there can be more than one. Can change settings, run Setup, make Schedules, and let in, remove or change the role of other phones.
 
 **Guest**:
-A phone invited by the Owner. Can move blinds but cannot manage access.
+A phone an Owner let in without owner rights. Can move blinds and make or change Scenes; cannot change settings, run Setup, make Schedules or manage access.
+_Avoid_: user, member
 
 **Matter user**:
 Someone using the blinds through Apple Home or Alexa. Never holds an app key, so is neither Owner nor Guest.

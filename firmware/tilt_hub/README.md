@@ -14,7 +14,7 @@ The first part of this page is what a builder needs. [For developers](#for-devel
   (one check-in a second). They push their status to the hub only when something changes, and every 10 minutes.
 - **The Tilt app** finds each controller as before: the hub announces it as `_tilt._tcp` with
   `ip=<hub address>/c/<controller id>` and passes the app's sealed commands along. It cannot read them.
-- **The hub's own key:** it asks to join each controller as "Tilt Hub"; the app lets it in by itself (as a user) and
+- **The hub's own key:** it asks to join each controller as "Tilt Hub"; the app lets it in by itself (as a Guest) and
   tells the controller which key is the hub's.
 
 - **New controllers are found by themselves.** A controller nobody owns says "Tilt new" over Bluetooth for its first
