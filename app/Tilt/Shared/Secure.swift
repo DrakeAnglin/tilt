@@ -29,7 +29,13 @@ struct Paired {
     var blindName = ""
     /// The 4 digits both phones show for a request to join.
     var code: String { String(format: "%04d", Data(HMAC<SHA256>.authenticationCode(for: Data("code".utf8), using: key)).prefix(2).reduce(0) { $0 << 8 | Int($1) } % 10000) }
+    /// This key's request to join, nil when it is in.
+    var request: JoinRequest? { waiting ? JoinRequest(code: code) : nil }
 }
+
+/// A phone's ask to be let in that an owner has not answered yet; `code` is the 4 digits both phones show.
+/// Not Codable: the record that holds it decides how it is saved (HubRecord, Shared/Store.swift).
+struct JoinRequest: Equatable { var code: String }
 
 /// Why a sealed command was turned away.
 enum LinkProblem: LocalizedError {

@@ -159,7 +159,7 @@ struct HubCard: View {
                 Button { run { try await hub.askToJoin() } } label: { busyLabel("Ask to Join") }.buttonStyle(.glassProminent).disabled(busy)
             }
         case .waiting:
-            card("Waiting for the hub's owner", "Your request to join the Tilt Hub is with its owner. Their app shows the code \(hub.record?.code ?? "") — it should match.") {
+            card("Waiting for the hub's owner", "Your request to join the Tilt Hub is with its owner. Their app shows the code \(hub.record?.request?.code ?? "") — it should match.") {
                 Button("Take the Request Back") { run { try await hub.leave() } }.buttonStyle(.glass)
             }
         case .connected:

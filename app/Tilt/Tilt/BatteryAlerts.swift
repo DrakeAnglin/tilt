@@ -68,7 +68,7 @@ enum BatteryAlerts {
     /// alerts itself, and none of them is woken); the others are asked directly. And: is the hub still there?
     static func backgroundCheck() async {
         scheduleRefresh()
-        if let r = HubWatch.loadRecord(), !r.waiting {
+        if let r = HubWatch.loadRecord(), r.request == nil {
             var info = await HubWatch.fetchInfo()
             if info == nil { try? await Task.sleep(for: .seconds(20)); info = await HubWatch.fetchInfo() }   // not a restart of a moment
             if info != nil { await HubOffline.answered() } else if r.owner { await HubOffline.missed(since: nil) }
