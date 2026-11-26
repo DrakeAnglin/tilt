@@ -148,24 +148,26 @@ class BambuPacking(unittest.TestCase):
 
 
 class BambuProject(unittest.TestCase):
-    """tools/bambu_project.py: one plate per part, whole-set plates, per-part brims and supports."""
+    """tools/bambu_project.py: a bulk project, a one-part-per-plate project, per-part brims and supports."""
+    EVERY = sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX))
+    PLATES = bambu_project.BULK + bambu_project.SINGLE
 
     def test_every_part_has_its_own_plate(self):
-        single = [p for p in bambu_project.PLATES[3:]]
-        printed = sorted(n for _, rows in single for r in rows for n in r)
-        every = sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX))
-        self.assertEqual(printed, every)
+        printed = [n for _, rows in bambu_project.SINGLE for r in rows for n in r]
+        self.assertEqual(sorted(printed), self.EVERY)
 
-    def test_whole_set_plates_hold_one_tilter_and_the_box(self):
-        sets = sorted(n for _, rows in bambu_project.PLATES[:3] for r in rows for n in r)
-        self.assertEqual(sets, sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX)))
+    def test_bulk_prints_one_tilter_and_the_box_one_material_per_plate(self):
+        sets = [n for _, rows in bambu_project.BULK for r in rows for n in r]
+        self.assertEqual(sorted(sets), self.EVERY)
+        for title, rows in bambu_project.BULK:
+            self.assertEqual(len({bambu_project.material(n) for r in rows for n in r}), 1, title)
 
     def test_plate_names_are_allowed_in_bambu_studio(self):
-        for title, _ in bambu_project.PLATES:
+        for title, _ in self.PLATES:
             self.assertFalse(set(title) & set('<>:/\\|?*"'), title)
 
     def test_plates_fit_without_overlap(self):
-        for title, rows in bambu_project.PLATES:
+        for title, rows in self.PLATES:
             boxes = []
             for n, (x, y) in bambu_project.pack(rows).items():
                 w, d = bambu_project.size(n)
@@ -179,7 +181,7 @@ class BambuProject(unittest.TestCase):
                     self.assertTrue(apart, (title, a[0], b[0]))
 
     def test_supports_only_where_the_owner_said(self):
-        on = {n for _, rows in bambu_project.PLATES for r in rows for n in r
+        on = {n for _, rows in self.PLATES for r in rows for n in r
               if bambu_project.object_settings(n).get('enable_support') == '1'}
         self.assertEqual(on, {'tray_lid', 'worm', 'worm_wheel'})
         self.assertEqual(bambu_project.TWEAKS['enable_support'], '0')
