@@ -23,7 +23,7 @@ Connect, and how firmware is published, for the next release.
 
 ## Listing status (filled in App Store Connect, 2026-11-21)
 - Version page: promotional text, description, keywords, support and marketing URLs, copyright, App Review notes,
-  sign-in not required (it was wrongly ticked for build 3; unticked 2026-11-25), manual release, App Review contact, screenshots, build 3 (build 4 for the resubmission).
+  sign-in not required, manual release, App Review contact, screenshots, build 3 (build 4 for the resubmission).
 - App Information: subtitle "Smart tilt for your blinds", Lifestyle / Utilities, no third-party content, rated 4+.
 - Pricing: free. Availability: 174 countries or regions, all except China mainland (it needs a security assessment
   and an AI-content filing).
@@ -64,7 +64,7 @@ about 3 minutes; trim in Photos.
 >
 > 3. HOW TO REVIEW (no login, no hardware needed): on the first screen tap "No controller yet? Try the Demo" (also under
 > + then Try the Demo). The demo room, "Living Room (Demo)", acts like a real one: tap Open or Close, press and hold
-> them for a gentle move, tap the room to move one blind or use Move to Position, run the Morning or Movie scene, add a
+> them for a gentle move, tap the room to move one blind, press and hold a blind for Set Tilt…, run the Morning or Movie scene, add a
 > schedule in Automations, and change room and blind settings in Settings. Bluetooth setup, Apple Home, the Tilt Hub and sharing with family need the hardware; they are shown in the
 > recording. Sign in with Apple is optional and only fills in the display name that people you share with see. There is
 > no account and nothing to log in to.
