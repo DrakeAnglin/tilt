@@ -377,7 +377,7 @@ check(HubApi.allowUpload(controller: "a1") == "/api/upload?id=a1" && HubApi.allo
 check(HubApi.base("10.0.0.2") == "10.0.0.2/hub" && HubApi.controller("a1", hubHost: "10.0.0.2") == "10.0.0.2/c/a1", "the hub's addresses")
 check(Api.hubKey(cid: "0011") == "/api/hubkey?cid=0011", "tell a controller the hub's key")
 
-// /api/info, from the shared fixture (in the shape of the hub's builder, firmware/tilt_hub/main/hub.cpp infoJson)
+// /api/info, from the shared fixture (in the shape of the hub's builder, firmware/tilt_hub/main/hub_api.h infoJson)
 let hubInfoData = try Data(contentsOf: wireDir.appendingPathComponent("hub_info.json"))
 let hi = try? JSONDecoder().decode(HubInfo.self, from: hubInfoData)
 check(hi?.fw == "0.3.5" && hi?.ip == "192.168.1.40" && hi?.ch == 15 && hi?.home == 1 && hi?.homes?.first?.vendor == 4937, "hub_info.json: the hub's own fields")
@@ -596,8 +596,8 @@ check(AlertWords.title(kind: "stall", room: "Den", detail: "Left") == "Den: Left
 check(AlertWords.body(kind: "batt-low", room: "Den", detail: "15").hasPrefix("The battery is at 15%."), "the battery alert gives the percent")
 let rules = (try? String(contentsOfFile: "../../firmware/tilt_hub/main/alert_rules.h", encoding: .utf8)) ?? ""
 check(rules.contains("ALERT_LOW_PCT = \(ControllerState.Battery.lowPercent),") && rules.contains("ALERT_CRIT_PCT = \(ControllerState.Battery.criticalPercent),"), "the hub's battery lines are the app's (alert_rules.h)")
-let hubSrc = rules + ((try? String(contentsOfFile: "../../firmware/tilt_hub/main/hub.cpp", encoding: .utf8)) ?? "")
-for k in hubKinds { check(hubSrc.contains("\"\(k)\""), "the hub sends alert \(k) (as \"\(k)\" in alert_rules.h or hub.cpp)") }
+let hubSrc = rules + ["hub_alerts.h", "hub_api.h"].map { (try? String(contentsOfFile: "../../firmware/tilt_hub/main/\($0)", encoding: .utf8)) ?? "" }.joined()
+for k in hubKinds { check(hubSrc.contains("\"\(k)\""), "the hub sends alert \(k) (as \"\(k)\" in alert_rules.h, hub_alerts.h or hub_api.h)") }
 
 // ---- blind setup (Shared/BlindSetup.swift)
 func blind(hid: Int = 0, pres: Int = 1, seen: Int = 1, cal: Int = 1, mov: Int = 0, q: Int = 0, last: String = "") -> BlindState {

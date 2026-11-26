@@ -1,5 +1,5 @@
 // The Tilt Hub's checks on an update file: signed with the Tilt release key, the right kind, and not older. They read
-// the file through a ByteReader, so the same checks run on the flash partition (hub.cpp) and on a file in memory (the
+// the file through a ByteReader, so the same checks run on the flash partition (hub_update.h) and on a file in memory (the
 // Mac tests: firmware/tilt_hub/test/hub_test.cpp). The file format is made by tools/release_firmware.py:
 //   full file   image | signature (64: r | s) | "TILTSIG1"
 //   patch       header (starts 10 de cd fc) | patch | new image's signature | signature (64) | "TILTDLT1"
@@ -50,7 +50,7 @@ inline bool checkSignedFile(ByteReader &rd, uint32_t size, const char magic[8], 
 }
 
 // The parts of an image's app description (esp_app_desc_t) the checks read. It sits after the image header (24 bytes)
-// and the first segment header (8): magic word at +0, version at +16, project name at +48 (hub.cpp checks these
+// and the first segment header (8): magic word at +0, version at +16, project name at +48 (hub_update.h checks these
 // offsets against ESP-IDF's struct).
 const uint32_t APP_DESC_AT = 32, APP_DESC_MAGIC = 0xABCD5432;
 struct AppDesc { bool ok; char version[32]; char project[32]; };

@@ -1,5 +1,5 @@
 // The Tilt Hub's people: who is in, who waits, who owns it, and what each may do. Plain state with an injected clock
-// and a save hook, so the rules run on the Mac (firmware/tilt_hub/test/hub_test.cpp). hub.cpp holds the lock, does the
+// and a save hook, so the rules run on the Mac (firmware/tilt_hub/test/hub_test.cpp). hub_pair.h holds the lock, does the
 // crypto and the logging, keeps the flash copy (the save hook) and asks these rules.
 //
 // The same scheme as a controller's (blinds_matter/main/sec.h), so the app pairs with the hub the same way (its address

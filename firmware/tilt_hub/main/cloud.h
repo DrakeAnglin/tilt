@@ -120,7 +120,7 @@ static bool ckSign(const std::string &date, const std::string &body, const std::
 // coming in or going out, Wi-Fi and Matter could run short, so the alert waits (-2) until the hub is calmer.
 static const size_t CK_NEED_HEAP = 50000;
 static size_t ckMemBefore, ckMemLow, ckMemWorst = SIZE_MAX;   // the last send: free before and at its lowest; the lowest of any send
-static bool cloudBusy();                         // hub.cpp: an update is on
+static bool cloudBusy();                         // hub_update.h: an update is on
 static int ckPost(const char *env, const char *op, const std::string &body, std::string &resp) {
   static const char HOST[] = "api.apple-cloudkit.com";
   size_t freeBefore = esp_get_free_heap_size();

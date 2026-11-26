@@ -50,8 +50,8 @@ provider, and Matter certification.
 
 ## 6. Logs and secrets on the bench
 
-- The hub's USB log prints the Thread dataset and the Apple Home setup code (`hub.cpp`). Remove those lines, or show
-  them only in a debug build.
+- The hub's USB log prints the Thread dataset and the Apple Home setup code (`hub.cpp` threadBegin, `hub_matter.h`
+  homeCodeBegin). Remove those lines, or show them only in a debug build.
 - `main/secrets.h` (Wi-Fi, bench only) and `main/setup_pin.h` (the hub's setup code) stay out of Git. Each hub
   needs its own setup code: run a clean build per hub (delete `setup_pin.h`) and print the label from it.
 
