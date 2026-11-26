@@ -13,9 +13,7 @@ struct WaitingCard: View {
                 Label("The owner declined your request.", systemImage: "xmark.circle").foregroundStyle(Palette.warning)
                 Button("Remove") { model.remove(controller) }.buttonStyle(.bordered)
             } else {
-                HStack(spacing: 10) { SlatLoader(size: 20); Text("Waiting for an owner to approve").foregroundStyle(.secondary) }
-                Text("Your code: \(controller.record.code ?? "")").font(.title2.weight(.semibold).monospacedDigit())
-                Text("The owner opens Tilt and approves you. Their phone shows the same code.").font(.footnote).foregroundStyle(.secondary)
+                JoinWaitingLines(code: controller.record.code ?? "")
                 HStack {
                     Button("Cancel Request", role: .destructive) { model.remove(controller) }.buttonStyle(.bordered)
                     Spacer()
@@ -25,6 +23,18 @@ struct WaitingCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(20).card()
         .sheet(isPresented: $recovering) { RecoverSheet(id: controller.id, host: controller.record.host, name: controller.record.name).presentationDetents([.height(520)]) }
+    }
+}
+
+/// The waiting lines of a request to join: the same words and code on the Blinds card and in the Add a New Device sheet.
+struct JoinWaitingLines: View {
+    let code: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) { SlatLoader(size: 20); Text("Waiting for an owner to approve").foregroundStyle(.secondary) }
+            Text("Your code: \(code)").font(.title2.weight(.semibold).monospacedDigit())
+            Text("The owner opens Tilt and approves you. Their phone shows the same code.").font(.footnote).foregroundStyle(.secondary)
+        }
     }
 }
 

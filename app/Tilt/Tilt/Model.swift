@@ -224,6 +224,10 @@ final class AppModel {
         Task { await SceneStore.shared.load(controllers) }      // the demo room keeps two sample Scenes, like a controller would
     }
     var hasDemo: Bool { controllers.contains { $0.id == Demo.id } }
+    /// Where this phone's request to join controller `id` stands.
+    func joinProgress(_ id: String) -> JoinProgress {
+        JoinProgress.of(id: id, joined: controllers.map(\.record), waiting: waiting.map(\.record), denied: Set(waiting.filter(\.denied).map(\.id)))
+    }
     /// No owner is left to approve: start getting in by turning a blind's wand. Returns the blind to turn.
     func recover(host: String) async throws -> String {
         let h = try await Secure.hello(host)
