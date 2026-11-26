@@ -3,7 +3,7 @@
 A white tray and an end cap that hold **three 6 V 0.8 W panels** (70 × 70 mm) in a row, wired in parallel, and stick
 flat on the window.
 
-- **Size:** 240.1 × 82.2 × 7.0 mm together. Tray about 58 g, cap about 10 g of PLA.
+- **Size:** 240.1 × 82.2 × 7.0 mm together. Tray about 90 g, cap about 10 g of PLA if solid (less with normal infill). The back is solid, so the panel backs and their labels do not show.
 - **Print:** `hardware/mechanical/stl/solar/solar_tray.stl` and `solar_cap.stl` (wires out the right end), or
   `solar_tray_wires_left.stl` and `solar_cap_wires_left.stl` (the mirror image: wires out the left end). Each as it
   lies, back on the bed. No supports: the lips are 45 degrees, and nothing bridges. Keep the slicer's elephant-foot
