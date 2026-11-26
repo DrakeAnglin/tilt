@@ -58,6 +58,8 @@ enum Api {
     static func rename(cid: String, to name: String) -> String { "/api/keyname?cid=\(cid)&name=\(name.urlQuery)" }
     /// Take back a request to join (the only command a waiting phone may send).
     static let leave = "/api/leave"
+    /// Tell a controller which key is the Tilt Hub's (owner): from then on it trusts only messages proven with it.
+    static func hubKey(cid: String) -> String { "/api/hubkey?cid=\(cid)" }
 
     // ---- first setup
 
