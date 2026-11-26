@@ -38,7 +38,8 @@ S = {
     'chan_y0': 10.0,      # channel from 10 to 20 mm below the panels' top edge (bumps measured 11 to 19)
     'chan_y1': 20.0,
     'exit_w': 4.4,        # wire exit in the cap: two 1.8 wires side by side + room
-    'ledge': 5.0,         # floor under each panel's edges; the back is open inside it (saves weight)
+    'open_back': False,   # True: a window through the back under each panel (lighter, but the panel backs show)
+    'ledge': 5.0,         # with open_back: floor kept under each panel's edges
     'win_gap': 3.0,       # floor kept beside the channel
     'corner': 3.0,        # outside corner radius (the four outer corners only)
     'tab_y': 37.45,       # puzzle tab center line (|Y|)
@@ -132,7 +133,7 @@ op(body, slot(X_END), B.DifferenceBooleanType)
 # the wire channel under the whole row, open at the right end
 op(body, bx(S['x0'], X_END, S['cy0'], S['cy1'], S['back'], S['z_floor'] + 0.01), B.DifferenceBooleanType)
 # a square window through the back under each panel, inside its ledge and clear of the channel
-for i in range(S['n']):
+for i in range(S['n'] if S['open_back'] else 0):
     xa = S['x0'] + i * S['panel']
     op(body, bx(xa + S['ledge'], xa + S['panel'] - S['ledge'], -S['panel'] / 2 + S['ledge'], S['cy0'] - S['win_gap'],
                 -1, S['z_floor'] + 0.01), B.DifferenceBooleanType)
