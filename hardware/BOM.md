@@ -86,6 +86,9 @@ rubber: rubber still passes the vibration on. Where they go: [tilter build, step
 Each tilter needs one cord; pick the length by how far its blind is from the controller. Check every cord before
 use: pin 1 must beep to pin 1 ([tilter wiring](../docs/tilter-wiring.md)).
 
+**Optional, a cord through a wall:** a 5/8 in hole and one printed [wall plug](../docs/wall-plug.md) on each side
+(white PLA, about 1.3 g each).
+
 ## One controller
 
 ### Boards and battery
@@ -169,7 +172,8 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 
 ## Tools
 Soldering iron (also presses the heat-set inserts), multimeter with beep mode, flush cutters, a USB-C cable to flash
-the ESP. Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC)) for charge and motor current.
+the ESP. Only for a cord through a wall: a drill and a 5/8 in bit.
+Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC)) for charge and motor current.
 
 ## Check on arrival
 - **AS5600:** switch it to PWM output once with the bench tool before it goes in a tilter
