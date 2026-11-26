@@ -337,7 +337,7 @@ static OtaReply hubOtaBegin(const std::string &in) {
   if (dot == std::string::npos || !hubMacOk(proofText(Proof::HubOta, bootId, in.substr(0, dot)), in.substr(dot + 1)))
     return {"403", "{\"err\":\"not from the Tilt Hub\"}"};
   bool allowed;
-  { QuietLock l; allowed = openApi || (int32_t)(otaWindow - millis()) > 0; }   // both are set by handlers
+  { QuietLock l; allowed = otaWindowOpen(otaWindow, millis()); }   // set by the owner's /api/otaopen
   return hubOtaRx.begin(in.substr(0, dot), (long)time(nullptr), allowed, millis());
 }
 static void hubTask(void *) {

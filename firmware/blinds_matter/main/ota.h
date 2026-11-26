@@ -59,7 +59,7 @@ class OtaReceiver {
   OtaReceiver(OtaSink &s, const char *running) : sink(s), runningVersion(running) {}
 
   // 'B'. spec: what came before the proof ("size", ",d", "@epoch"). epochNow: this controller's clock (seconds);
-  // allowed: an owner opened the window (or the developer switch is on).
+  // allowed: an owner opened the window.
   OtaReply begin(const std::string &spec, long epochNow, bool allowed, uint32_t nowMs) {
     // The begin carries the hub's time ("@epoch"): each one must be newer than the last, so a recorded one does nothing.
     // (A hub from before this sends none: still accepted, owner-allowed window only.)

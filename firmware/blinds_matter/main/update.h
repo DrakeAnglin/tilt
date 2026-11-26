@@ -10,7 +10,7 @@
 #include <mbedtls/ecdsa.h>
 #include "fwkey.h"                               // FW_SIGN_PUB
 #include "motion.h"                              // stopAll, event, stats
-#include "sec.h"                                 // owned, openApi
+#include "sec.h"                                 // owned
 #include "api.h"                                 // Lock, ok, fail, restartSoon
 
 uint32_t otaWindow = 0;                          // millis until which a firmware upload is accepted

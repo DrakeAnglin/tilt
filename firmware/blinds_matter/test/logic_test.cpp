@@ -572,7 +572,7 @@ int main() {
   }
   for (const char *p : {"/api/s", "/api/cfg", "/api/go", "/api/stop", "/api/home", "/api/backup", "/api/keys", "/api/scenes", "/api/scene"})
     CHECK(rule(p, false, "") == nullptr, "a guest may see and move, and make Scenes");
-  for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen", "/api/openapi", "/api/hubkey", "/api/reboot", "/api/reset"})
+  for (const char *p : {"/api/set", "/api/sched", "/api/mark", "/api/approve", "/api/revoke", "/api/makeowner", "/api/otaopen", "/api/hubjoin", "/api/hubnet", "/api/restore", "/api/factory", "/api/swapfw", "/api/homeopen", "/api/hubkey", "/api/reboot", "/api/reset"})
     CHECK(rule(p, false, "") != nullptr, "a guest is refused an owner command");
   {
     int guestOk = 0;
@@ -584,6 +584,18 @@ int main() {
   CHECK(rule("/api/keyname", false, "") != nullptr, "rename with no id refused");
   CHECK(rule("/api/keyname", true, them) == nullptr, "an owner may rename anyone");
   CHECK(routeRule("/api/nothing") == nullptr && routeRule("/") == nullptr && routeRule("/x/pair") == nullptr, "an unknown command is not a route");
+  CHECK(routeRule("/api/openapi") == nullptr, "the old open-API switch is gone: refused like any unknown command");
+
+  // ---- the owner's firmware update window (web.h hOtaOpen sets it; hub_link.h hubOtaBegin asks this)
+  {
+    const uint32_t now = 1000, end = now + 300000;
+    CHECK(!otaWindowOpen(0, now), "no window ever opened: an update is refused");
+    CHECK(otaWindowOpen(end, now) && otaWindowOpen(end, end - 1), "inside the window: an update may start");
+    CHECK(!otaWindowOpen(end, end) && !otaWindowOpen(end, end + 1), "at or after the end: refused");
+    const uint32_t late = UINT32_MAX - 1000, wrapEnd = late + 300000;   // the end wraps past the 32-bit millisecond count
+    CHECK(wrapEnd < late && otaWindowOpen(wrapEnd, late) && otaWindowOpen(wrapEnd, wrapEnd - 1), "a window across the millis wrap is open before its end");
+    CHECK(!otaWindowOpen(wrapEnd, wrapEnd) && !otaWindowOpen(wrapEnd, wrapEnd + 1), "a window across the millis wrap is shut after its end");
+  }
 
   // ---- which slot a new key takes (sec.h pairDo)
   {

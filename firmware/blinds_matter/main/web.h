@@ -268,7 +268,7 @@ esp_err_t hKeep(httpd_req_t *r) {
   return ok(r);
 }
 
-// ---- who may use this controller (the rules and openApi: sec.h)
+// ---- who may use this controller (the rules: sec.h)
 std::string ctrlId() { uint8_t m[6] = {0}; esp_read_mac(m, ESP_MAC_WIFI_STA); return hexOf(m, 6); }
 bool hubOk();                                    // hub_link.h
 void hubTick();
@@ -279,10 +279,9 @@ std::string helloJson() {                       // from the hub task and Bluetoo
   if (img.empty()) { uint8_t h[32]; if (esp_partition_get_sha256(esp_ota_get_running_partition(), h) == ESP_OK) img = hexOf(h, 32); }
   std::string name;
   bool own;
-  uint8_t open;
-  { QuietLock l; name = jq(cfg.name); own = owned(); open = openApi; }
-  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"open\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d,\"proto\":%d}", ctrlId().c_str(),
-     name.c_str(), img.c_str(), hexOf(bootId, 4).c_str(), own ? 1 : 0, open, homesPaired() ? 1 : 0, hubOk() ? 1 : 0, LINK_PROTO);
+  { QuietLock l; name = jq(cfg.name); own = owned(); }
+  ap(j, "{\"id\":\"%s\",\"name\":%s,\"fw\":\"" FW_VERSION "\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":%d,\"home\":%d,\"net\":\"thread\",\"hub\":%d,\"proto\":%d}", ctrlId().c_str(),
+     name.c_str(), img.c_str(), hexOf(bootId, 4).c_str(), own ? 1 : 0, homesPaired() ? 1 : 0, hubOk() ? 1 : 0, LINK_PROTO);
   return j;
 }
 void openHomeWindow();                           // app_main.cpp
@@ -292,7 +291,6 @@ esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) ad
   return sendJson(r, homeCodeJson());
 }
 esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = millis() + 300000; event("firmware updates allowed for 5 minutes"); return ok(r); }
-esp_err_t hOpenApi(httpd_req_t *r) { Lock l; openApi = argi(r, "v") ? 1 : 0; nvs.putUChar("plainopen", openApi); return ok(r); }
 esp_err_t hHome(httpd_req_t *r);                // hub_link.h
 esp_err_t hHubJoin(httpd_req_t *r);
 esp_err_t hSwapFw(httpd_req_t *r);

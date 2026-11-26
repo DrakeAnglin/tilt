@@ -60,7 +60,6 @@ uint32_t askAt[MAX_KEYS];
 // A controller nobody owns takes its first owner only in its first 15 minutes after power-on (unplug it to pair again).
 const uint32_t FIRST_PAIR_MS = 15 * 60 * 1000;
 bool firstPairOpen() { return esp_timer_get_time() / 1000 < FIRST_PAIR_MS; }
-uint8_t openApi = 0;                           // 1: the plain /api answers even once a phone is paired (owner's choice, off by default)
 static int secRng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
 void hubLinkRefresh();
 void keysSave() { nvs.putBytes("keys", keys, sizeof keys); hubLinkRefresh(); }
@@ -72,7 +71,6 @@ void secBegin() {
   memset(askAt, 0, sizeof askAt);
   hubKeySet = nvs.getBytes("hubkey", hubKeyId, sizeof hubKeyId) == sizeof hubKeyId;
   hubLinkRefresh();
-  openApi = nvs.getUChar("plainopen", 0);     // new key: the old "openapi" defaulted to open, so it is ignored
   secMx = xSemaphoreCreateMutex();
 }
 bool owned() { for (auto &k : keys) if (k.used == 1) return true; return false; }

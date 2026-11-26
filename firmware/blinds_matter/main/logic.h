@@ -227,3 +227,7 @@ inline const char *permitRule(Who who, bool owner, const std::string &cidArg, co
   if (who == SELF && !cidArg.empty() && cidArg == ownCid) return nullptr;
   return "only the owner can do that";
 }
+
+// ---- the owner's firmware update window (web.h hOtaOpen sets until; hub_link.h hubOtaBegin asks)
+// until: millis() when the window shuts (0: never opened). Safe across the 32-bit millis wrap.
+inline bool otaWindowOpen(uint32_t until, uint32_t now) { return (int32_t)(until - now) > 0; }

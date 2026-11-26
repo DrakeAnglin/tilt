@@ -19,7 +19,7 @@ enum Who { OWNER, GUEST, SELF };
   R("/api/reset", hReset, OWNER) R("/api/reboot", hReboot, OWNER) R("/api/awake", hAwake, OWNER) R("/api/keep", hKeep, OWNER) \
   R("/api/watch", hWatch, OWNER) R("/api/trace", hTrace, OWNER) R("/api/homeopen", hHomeOpen, OWNER) \
   R("/api/revoke", hRevoke, OWNER) R("/api/approve", hApprove, OWNER) R("/api/makeowner", hMakeOwner, OWNER) \
-  R("/api/openapi", hOpenApi, OWNER) R("/api/otaopen", hOtaOpen, OWNER) R("/api/hubjoin", hHubJoin, OWNER) \
+  R("/api/otaopen", hOtaOpen, OWNER) R("/api/hubjoin", hHubJoin, OWNER) \
   R("/api/swapfw", hSwapFw, OWNER) R("/api/hubkey", hHubKey, OWNER) R("/api/hubnet", hHubNet, OWNER) \
   R("/api/factory", hFactory, OWNER) R("/api/restore", hRestore, OWNER) \
   TILT_DEV_ROUTES(R)
