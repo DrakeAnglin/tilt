@@ -11,8 +11,8 @@ checked there, and exported as STLs. One version of each part is kept; older one
 Print files: `python3 tools/orient.py && python3 tools/bambu.py` writes `stl/tilter/print/` and the Bambu Studio projects.
 
 ## The headrail
-Measured on the owner's cordless blinds (2026-10-25 and 26). Everything slides into the channel; nothing clamps its
-thin plastic walls.
+Measured on the reference blinds: the cordless blind model the tilter is drawn for. Everything slides into the
+channel; nothing clamps its thin plastic walls.
 
 | What | Value |
 |---|---|
@@ -32,7 +32,7 @@ In [`docs/reference/`](../../docs/reference/):
 | [headrail-end-profile](../../docs/reference/headrail-end-profile.jpg) | U-channel profile with inward lips |
 | [headrail-square-tilt-rod](../../docs/reference/headrail-square-tilt-rod.jpg) | Square rod running the full length |
 | [tilt-drum-ladder-cords](../../docs/reference/tilt-drum-ladder-cords.jpg) | Tilt drum with its ladder cords |
-| [printed-tilt-drum-front](../../docs/reference/printed-tilt-drum-front.jpg), [angle](../../docs/reference/printed-tilt-drum-angle.jpg) | The owner's printed copy of a tilt drum |
+| [printed-tilt-drum-front](../../docs/reference/printed-tilt-drum-front.jpg), [angle](../../docs/reference/printed-tilt-drum-angle.jpg) | A printed copy of a tilt drum, from the reference build |
 | [tilter-side](../../docs/reference/tilter-side.jpg), [top](../../docs/reference/tilter-top-ruler.jpg), [face](../../docs/reference/tilter-face-ruler.jpg), [back face](../../docs/reference/tilter-back-face-ruler.jpg) | The blind's factory tilter, with a ruler |
 | [tilter-opened-overview](../../docs/reference/tilter-opened-overview.jpg), [gear](../../docs/reference/tilter-opened-gear.jpg), [worm](../../docs/reference/tilter-opened-worm.jpg), [worm gear](../../docs/reference/tilter-worm-gear.jpg) | Factory tilter opened: worm and 16T wheel (16:1), wand loop through the corner notch |
 

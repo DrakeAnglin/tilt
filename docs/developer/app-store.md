@@ -21,7 +21,7 @@ once approved.
    - Questions and problems: issues on `DrakeAnglin/tilt`
 4. **Firmware hosting:** the app reads `https://github.com/DrakeAnglin/tilt/releases/latest/download/firmware.json`.
    A release is a version tag on `main` (`fw-v2.3.0`, `hub-v0.3.4`): a GitHub Action builds, signs and publishes it.
-   See `docs/firmware-release.md`. Use releases on this repo for firmware only, so "latest" is always the newest firmware.
+   See `docs/developer/firmware-release.md`. Use releases on this repo for firmware only, so "latest" is always the newest firmware.
 5. **Release-day clean-up on the controller:** remove the "Duo Test" user, and the "Mac owner" key once the app can do
    every update (the Mac tools need that key today).
 

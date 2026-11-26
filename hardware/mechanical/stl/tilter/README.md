@@ -49,7 +49,7 @@ PETG is for the parts that rub or mesh against PLA all the time.
 | Super Lube 21030 | a little | worm, wheel, every gear, the carrier's hub, the sleeve's nose |
 | Felt pad, about 8 mm, 1.5 to 2 mm tall | 6 | 4 under the floor, 1 on each long side wall (step 9) |
 
-Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter-8).
+Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter).
 
 ## Before you start
 1. **Wire the sensor module on the bench:** [tilter wiring](../../../../docs/tilter-wiring.md). The AS5600 is already

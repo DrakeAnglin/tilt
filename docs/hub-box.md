@@ -10,7 +10,7 @@ into it. The plug sticks out the front: push the hub into any USB-C charger or c
 - Generator: [`Hub.py`](../hardware/mechanical/fusion/Hub/Hub.py), built by `tools/fusion_hub.py`.
 - Print files: [`hub_box.stl`](../hardware/mechanical/stl/hub/hub_box.stl) for one color, already in print orientation
   (pinhole face on the bed); `hub_box_multicolor.3mf` for a [two-color mark](#two-color-mark-optional).
-- Parts: [bill of materials](../hardware/BOM.md#tilt-hub-1).
+- Parts: [bill of materials](../hardware/BOM.md#one-tilt-hub).
 
 The ESP and the adapter are both measured (sizes and notes at the top of `Hub.py`).
 

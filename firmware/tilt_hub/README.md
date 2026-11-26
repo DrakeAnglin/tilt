@@ -1,7 +1,12 @@
 # Tilt Hub
 
-An ESP32-C6 on a USB wall plug that lets the controllers sleep. Bench version: one C6 runs both radios (Wi-Fi and
-Thread share its antenna), and the firmware is updated over USB.
+An ESP32-C6 on a USB wall plug that lets the controllers sleep. Every home needs one, one hub serves every
+controller, and it stays plugged in. Current version: one C6 runs both radios (Wi-Fi and Thread share its
+antenna).
+
+The first part of this page is what a builder needs. [For developers](#for-developers) has the rest.
+
+## What the hub does
 
 - **Apple Home** adds the hub once (Matter over Wi-Fi). It shows **one tile per controller**, or one per blind
   when the controller's "separate tiles" setting (`hksep`) is on. Battery and "not responding" come with each tile.
@@ -44,21 +49,47 @@ Thread share its antenna), and the firmware is updated over USB.
 
 The protocol between hub and controller is described at the top of `../blinds_matter/main/hub_link.h`.
 
-## The hub's HTTP API
+## Build and flash
+
+```bash
+./build.sh -p <USB port> flash
+```
+
+Wi-Fi comes from `main/secrets.h` (copy `main/secrets.h.example`) until Apple Home gives the hub its network. The USB log prints
+`HUB DATASET <hex>` (the Thread network) and `HUB SETUP CODE` (for Apple Home). Both stay on the USB log only. A
+plain `flash` keeps what the hub has learned (Thread network, people, tiles, backups); only `erase-flash` clears it.
+
+## Setup code
+
+`build.sh` makes an 8-digit code once (`main/setup_pin.h`, not in Git) and prints it: put it on a
+label on the hub. The first owner (a new hub, or after its people are reset) types it in the app; it goes into the
+key, never over the network. Five wrong codes close connecting for 5 minutes.
+
+## Add a controller
+
+Use the app: plug the controller in (it can be set up in its first 15 minutes after power-on), then Add a New Device.
+Setup pairs over Bluetooth, hands over the hub's Thread network, lets the hub in and tells the controller which key
+is the hub's. Its blinds then show up in Apple Home through the hub by themselves.
+
+## For developers
+
+Not needed to build a hub: the API, push alerts, updates from the Mac and the known limits.
+
+### The hub's HTTP API
 
 | Path | What |
 |---|---|
 | `GET /hub` | the hub's id and whether it has an owner (nothing else) |
 | `/hub/x/hello`, `/hub/x/pair`, `/hub/x/ask`, `POST /hub/x` | a phone's key on the hub, and its sealed commands: `/api/info`, `/api/keys`, `/api/net`, `/api/homecode`, `/api/backups`, `/api/upload?id=`, `/api/testalert` (owner) and the people commands |
 | `GET /c/<id>/x/hello`, `POST /c/<id>/x/ask`, `POST /c/<id>/x/recover`, `GET /c/<id>/x/recstate`, `POST /c/<id>/x` | passed to the controller over Thread: its hello, asking to join, getting back in when no owner is left, and the app's sealed commands. A new controller takes its first owner over Bluetooth only, so there is no `/x/pair` here |
-| `POST /c/<id>/api/update` | a signed firmware file for that controller, only in the 5 minutes after the owner's `/api/upload?id=<id>` |
+| `POST /c/<id>/api/update` | a signed firmware file for that controller, only in the 5 minutes after an owner's `/api/upload?id=<id>` |
 
-## Push alerts
+### Push alerts
 
 The hub is always on and knows each controller's check-ins, battery and stalls, so it is the one that tells the owners.
 It writes an **Alert** record to the app's iCloud container (`iCloud.app.tilt.blinds`, CloudKit public database) with
 CloudKit's server-to-server key; each owner's Tilt app has a subscription on that controller's topic (and the hub's
-own, for the hub's alerts), so iCloud sends the push. No server of our own, no other push service.
+own, for the hub's alerts), so iCloud sends the push. No Tilt server, no other push service.
 
 | Alert | When | Sent |
 |---|---|---|
@@ -91,7 +122,7 @@ as when the hub last answered) that can't reach the hub for 3 minutes shows it, 
 - **Both iCloud environments:** the app built from Xcode listens in "development", the App Store app in
   "production"; the hub writes to both. `/api/info` has `cloud` (key there, alerts waiting, last status and error).
 
-### The iCloud key (once, by the owner)
+#### The iCloud key (once, by the developer)
 
 The key stays out of Git, like `secrets.h`: it lives in `~/.tilt/` and in `main/cloud_key.h` (ignored), and is copied
 into the hub's flash at its next start. A public release build carries no key; each hub keeps its own in flash.
@@ -104,33 +135,21 @@ into the hub's flash at its next start. A public release build carries no key; e
 3. `tools/cloudkit_key.py header <Development Key ID> <Production Key ID>`, then update the hub:
    `tools/flash_hub.sh`.
 4. Try it: `tools/cloudkit_key.py test <topic>` from the Mac, or `/api/testalert` on the hub.
-5. Done once already (2026-11-24) in Development: record type **Alert** with fields `topic`, `kind`, `name`,
+5. Once, by hand, in Development: record type **Alert** with fields `topic`, `kind`, `name`,
    `detail` (String), `port`, `n` (Int(64)), `at` (Date/Time), and a **Queryable** index on `topic` (the phones'
    subscriptions need it). A server key can't make these itself. **Deploy Schema Changes** copies them to Production,
    so App Store phones get alerts too.
 
+### Security
 
-- **Setup code.** `build.sh` makes an 8-digit code once (`main/setup_pin.h`, not in Git) and prints it: put it on a
-  label on the hub. The first owner (a new hub, or after its people are reset) types it in the app; it goes into the
-  key, never over the network. Five wrong codes close connecting for 5 minutes.
 - **Controllers' port (UDP 49100) is on Thread only.** Nothing on the Wi-Fi can reach it.
 - **Proofs.** Once a controller has let the hub in and the app has marked the hub's key there (`/api/hubkey`), every
   status push, goodbye, time and firmware start between them carries an HMAC made from that key. Nothing else on the
   Thread network can pose as either side.
 - **Firmware** is checked on the hub too (Tilt signature, not older than what the controller runs) before it is sent.
-- Hardening still to do (flash encryption, secure boot, ...): `docs/security-hardening.md`.
+- Hardening still to do (flash encryption, secure boot, ...): [docs/developer/security-hardening.md](../../docs/developer/security-hardening.md).
 
-## Build and flash
-
-```bash
-./build.sh -p /dev/cu.usbmodem21101 flash
-```
-
-Wi-Fi comes from `main/secrets.h` (copy `main/secrets.h.example`) until Apple Home gives the hub its network. The USB log prints
-`HUB DATASET <hex>` (the Thread network) and `HUB SETUP CODE` (for Apple Home). Both stay on the USB log only. A
-plain `flash` keeps what the hub has learned (Thread network, people, tiles, backups); only `erase-flash` clears it.
-
-## Update the hub (no cable)
+### Update the hub from the Mac (no cable)
 
 ```bash
 tools/flash_hub.sh
@@ -142,13 +161,7 @@ and Apple Home have worked for a minute, otherwise it goes back by itself. About
 also where a controller's update waits while the hub sends it. The setup code lives in the hub's flash (copied there
 from `main/setup_pin.h` at its first USB flash), so update files carry no code.
 
-## Add a controller
-
-Use the app: plug the controller in (it can be set up in its first 15 minutes after power-on), then Add a New Device.
-Setup pairs over Bluetooth, hands over the hub's Thread network, lets the hub in and tells the controller which key
-is the hub's. Its blinds then show up in Apple Home through the hub by themselves.
-
-## Update a controller from the bench
+### Update a controller from the Mac
 
 ```bash
 tools/flash.sh <controller id>
@@ -159,7 +172,7 @@ minute), else the whole file (`FULL=1` forces that; about 7 minutes). The tool n
 `blinds_client.py --ip <hub>/hub --as hub-owner ask` and `blinds_client.py --ip <hub>/c/<id> --as <name> ask`, each
 let in as an owner from the app; then `TILT_AS=<name> tools/flash.sh <id>`.
 
-## Known limits (bench)
+### Known limits
 
 - One C6 for both radios: Espressif rates Wi-Fi plus a Thread network on one chip as "supported but unstable".
   The plan is to stay with one chip. A second chip (ESP32-S3 + ESP32-H2, `docs/research/thread-border-router-chips.md`

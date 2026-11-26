@@ -1,5 +1,7 @@
 # System architecture
 
+Most smart blinds need one device per blind; Tilt uses one controller for up to three blinds, and each blind still
+has its own name in Apple Home and Alexa, its own Schedule and its own tilt.
 How the parts fit together today: the tilter on each blind, the controller that drives up to 3 of them, and the phone.
 Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md](../CONTEXT.md).
 
@@ -132,4 +134,4 @@ A reversed cord would put battery + on IN2, so the continuity check matters.
   [firmware/tilt_hub/README.md](../firmware/tilt_hub/README.md#push-alerts).
 - **Firmware updates**: signed release files on this repo's GitHub releases; the app hands them to the hub,
   which feeds them to the controller over Thread
-  ([app-store.md](app-store.md)).
+  ([app-store.md](developer/app-store.md)).

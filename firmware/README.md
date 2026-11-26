@@ -18,20 +18,23 @@ Flash the ESP32-C6 before it goes on the PCB: in the box there is no room for a 
 and esp-matter in `~/esp/esp-matter`. No secrets are built in: set it up from the app over Bluetooth.
 
 ```bash
-firmware/blinds_matter/build.sh -p /dev/cu.usbmodemXXXX flash monitor
+firmware/blinds_matter/build.sh -p <USB port> flash monitor
 ```
 
 ### Updates
-- **From the app:** a room's settings show "Update to …" when a newer firmware is published. Release files are signed and live on this
-  repo's GitHub releases; how to publish one: [docs/app-store.md](../docs/app-store.md).
-- **From the Mac** (developer): build, sign and send through the hub. A firmware that cannot reach the hub rolls back
-  by itself.
+From the app: a room's settings show "Update to …" when a newer firmware is published. Release files are signed and
+live on this repo's GitHub releases.
 
-```bash
-tools/flash.sh <controller id>
-```
+### For developers
+- **Publish a release:** [docs/developer/firmware-release.md](../docs/developer/firmware-release.md).
+- **Update from the Mac:** build, sign and send through the hub. A firmware that cannot reach the hub rolls back by
+  itself.
 
-Test from the Mac with `tools/blinds_client.py`. Mac tests of the pure logic: `tools/firmware_tests.sh`.
+  ```bash
+  tools/flash.sh <controller id>
+  ```
+- **Test tools:** talk to a controller from the Mac with `tools/blinds_client.py`. Mac tests of the pure logic:
+  `tools/firmware_tests.sh`.
 
 ## [tilt_hub](tilt_hub): the Tilt Hub
 ESP32-C6 on a USB wall plug: Matter bridge on Wi-Fi for Apple Home, its own Thread network for the controllers,

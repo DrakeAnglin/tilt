@@ -296,7 +296,7 @@ wire in **both** slots joins them, so the battery feeds the board directly.
 5. **Check before the battery goes in** (meter on beep, battery and USB unplugged, plug in the board): charger **G**
    to the **GND** test pad beeps, charger **BAT** to **BAT+** beeps, charger **VIN** to **PWR** beeps, and charger
    **BAT** to **GND** does **not** beep.
-6. **Tug-test every crimp.** On the first board the PWR crimp lost contact twice: TP4 read 4.8 V while the module's
+6. **Tug-test every crimp.** On a v2 board the PWR crimp lost contact twice: TP4 read 4.8 V while the module's
    input read 0 V.
 
 **The lights:** orange **C** on = charging, off = full. Red **F** = a fault: unplug and check the wiring. The chip stops
@@ -307,8 +307,8 @@ its lead and J3 are no longer used; D1 just sits idle. Two things to know:
 
 - **The ESP can still tell USB is plugged in.** With USB in the 6092, its VIN pad (and so the PCB's PWR line and GPIO0)
   reads about **4.35 V**, about 0.6 V under USB, so the module joins USB to VIN, most likely through a diode (measured
-  on the first board, 2026-11-08).
-- **Don't plug in USB-C and the solar panel at the same time** until we've confirmed that diode, so the panel can't
+  on a v2 board).
+- **Don't plug in USB-C and the solar panel at the same time**: that diode is not tested yet, so the panel might
   push back into the USB charger.
 
 ### 11c: Battery
