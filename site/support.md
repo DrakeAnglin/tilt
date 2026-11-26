@@ -15,7 +15,7 @@ to the controllers over Thread. Check that your iPhone is on the same Wi-Fi as t
 and that the controller's battery is charged.
 
 **Someone else needs to control the blinds.** On your Wi-Fi, they open Tilt, tap Add, and ask to join. You approve
-them in the room's settings, as a User (open and close only) or as an Owner.
+them in the room's settings, as a Guest (can open and close the blinds, but not change settings) or as an Owner.
 
 **No owner can approve me anymore.** On the waiting card, tap "No owner left?" and turn the blind's wand as the app
 shows. That phone becomes an owner.

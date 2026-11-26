@@ -40,7 +40,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | A-3 | Must | Calibration wizard (jog, set limits, test) |
 | A-4 | Should | Manual control per blind, status (tilt, Battery level, firmware version) |
 | A-5 | Must | Native iPhone and iPad app (**Tilt**, App Store), finds the controllers through the Tilt Hub |
-| A-6 | Should | Share a controller with the people you live with (Owner invites Guests) |
+| A-6 | Should | Share a controller with the people you live with (an Owner lets in Guests) |
 | A-7 | Could | Android |
 
 ## Mechanical

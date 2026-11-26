@@ -63,5 +63,5 @@ one to each controller.
 
 ## Smaller items left from the 2026-11 review
 
-- A user (not an owner) can read a controller's backup, which includes the home's latitude and longitude. Users are
+- A Guest can read a controller's backup, which includes the home's latitude and longitude. Guests are
   trusted; strip the location if that changes.
