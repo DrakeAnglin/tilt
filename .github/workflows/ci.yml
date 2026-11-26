@@ -1,6 +1,7 @@
 name: CI
 
-# Runs the same tests as tools/agent/check.sh on every pull request and on main.
+# Runs the same tests as tools/agent/check.sh on every pull request and on main, plus the Tilt Hub build
+# (ESP-IDF, release kind) when its code changed.
 on:
   pull_request:
   push:
@@ -18,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.find.outputs.app }}
+      hub: ${{ steps.find.outputs.hub }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,8 +35,16 @@ jobs:
             else
               echo "app=false" >> "$GITHUB_OUTPUT"
             fi
+            # The Tilt Hub build takes about 10 minutes on a 20 GB image: only for its code, the controller headers it
+            # includes (firmware/blinds_matter/main/), its script or a workflow.
+            if echo "$FILES" | grep -qE '^(firmware/tilt_hub/|firmware/blinds_matter/main/|tools/firmware_build_ci\.sh|\.github/workflows/)'; then
+              echo "hub=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "hub=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "hub=true" >> "$GITHUB_OUTPUT"
           fi
 
   firmware:
@@ -63,10 +73,30 @@ jobs:
       - uses: actions/checkout@v4
       - run: tools/app_tests.sh
 
+  hub-build:
+    name: Tilt Hub build
+    needs: changes
+    if: needs.changes.outputs.hub == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make room
+        # The esp-matter image is about 20 GB unpacked; a fresh runner has about 14 GB free.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+      - name: Build the Tilt Hub (release kind)
+        # The same pinned image as release.yml, so CI and a release build with the same toolchain.
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w --entrypoint /bin/bash \
+            espressif/esp-matter:release-v1.5_idf_v5.5.5@sha256:51e890d6e913be195d273384eb93785bc9e64c35751a13fdd02c79ff06c07273 \
+            -c '. "$IDF_PATH/export.sh" >/dev/null && tools/firmware_build_ci.sh hub'
+
   # One check to look at: green only when every job passed or was skipped on purpose.
   ci:
     if: always()
-    needs: [changes, firmware, tools, app]
+    needs: [changes, firmware, tools, app, hub-build]
     runs-on: ubuntu-latest
     steps:
       - env:
