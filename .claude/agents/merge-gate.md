@@ -30,7 +30,7 @@ A review whose `sha` is not the current head is out of date: **not yet**, not hu
 
 CI that is red, still running or never started (a GitHub outage, a billing refusal, a runner that did not come) is **not yet**, never human. No person can judge code by a CI run that did not happen. Say what is wrong with CI in your reply.
 
-**Builds after a merge from main.** The ESP builds in Evidence may be for an older commit when every commit since is a merge of `origin/main` and those merges changed nothing under `firmware/`: `git diff --name-only <built sha> <head> -- firmware/` is empty. Then the old builds still count. Otherwise the author builds again (**not yet**): a header main changed can break this change's code, and CI does not build firmware.
+**Builds after a merge from main.** The ESP builds in Evidence may be for an older commit when every commit since is a merge of `origin/main` and those merges changed nothing under `firmware/`: `git diff --name-only <built sha> <head> -- firmware/` is empty. Then the old builds still count. Otherwise the author builds again (**not yet**): a header main changed can break this change's code, and CI builds only the release kind of the firmware.
 
 ## Post
 
