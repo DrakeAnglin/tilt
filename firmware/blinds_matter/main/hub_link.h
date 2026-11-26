@@ -149,10 +149,10 @@ esp_err_t hRestore(httpd_req_t *r) {
   Tune t; memcpy(&t, p, sizeof t); p += sizeof t;
   memcpy(&sx, p, sizeof sx); p += sizeof sx;
   if (c.magic != CFG_MAGIC) return fail(r, "not a Tilt backup");
-  // The backup comes through the hub: end every string, and clean the names as if they were typed in the app.
+  // The backup comes through the hub: end every string, and keep the names as if they were typed in the app (keptName).
   c.tz[sizeof c.tz - 1] = 0; c.tzName[sizeof c.tzName - 1] = 0;
-  { std::string n(c.name, strnlen(c.name, sizeof c.name)); cleanText(c.name, sizeof c.name, n); }
-  for (int i = 0; i < PORTS; i++) { std::string n(c.b[i].name, strnlen(c.b[i].name, sizeof c.b[i].name)); cleanText(c.b[i].name, sizeof c.b[i].name, n); }
+  { std::string n(c.name, strnlen(c.name, sizeof c.name)); strlcpy(c.name, keptName(n, sizeof c.name - 1).c_str(), sizeof c.name); }
+  for (int i = 0; i < PORTS; i++) { std::string n(c.b[i].name, strnlen(c.b[i].name, sizeof c.b[i].name)); strlcpy(c.b[i].name, keptName(n, sizeof c.b[i].name - 1).c_str(), sizeof c.b[i].name); }
   cfgApply(c); tune = t;                         // a move on a blind whose Marks change is stopped first (motion.h)
   syncMode = p[0]; parMode = p[1]; hkSeparate = p[2]; pwmSaved = p[3];
   tuneSave(); sxSave(); syncSave(); nvs.putUChar("hksep", hkSeparate); nvs.putUChar("pwm", pwmSaved); nvs.putUChar("angv", 2);

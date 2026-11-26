@@ -32,7 +32,13 @@ struct ControllerSettingsView: View {
             if let cfg {
               if controller.record.owner {       // settings, setup and Apple Home are the owners'
                 Section {
-                    TextField("Name", text: $name).onSubmit { let n = name; change { try await $0.setName(n) } }.submitLabel(.done)
+                    TextField("Name", text: $name).submitLabel(.done)
+                        .onChange(of: name) { let n = NameRule.limit(name, bytes: NameRule.controllerBytes); if n != name { name = n } }   // stops at what the controller keeps
+                        .onSubmit {
+                            let n = NameRule.fit(name, bytes: NameRule.controllerBytes)
+                            if n.isEmpty { name = cfg.name; return }                // an empty name is not sent
+                            name = n; change { try await $0.setName(n) }
+                        }
                     Picker("\u{201C}Close\u{201D} tilts the slats", selection: Binding(get: { cfg.closeUp }, set: { v in change { try await $0.setCloseUp(v == 1) } })) {
                         Text("Up").tag(1); Text("Down").tag(0)
                     }
@@ -291,7 +297,9 @@ struct BlindSettingsView: View {
         Form {
             Group {
             Section("Name") {
-                TextField("Name", text: $name).onSubmit { let n = name; change { try await $0.setBlindName(blind: index, n) } }.submitLabel(.done)
+                TextField("Name", text: $name).submitLabel(.done)
+                    .onChange(of: name) { let n = NameRule.limit(name, bytes: NameRule.blindBytes); if n != name { name = n } }   // stops at what the controller keeps
+                    .onSubmit { let n = NameRule.fit(name, bytes: NameRule.blindBytes); name = n; change { try await $0.setBlindName(blind: index, n) } }
             }
             Section {
                 Toggle("Show this blind", isOn: Binding(get: { blind.hid == 0 }, set: { shown in blind.hid = shown ? 0 : 1; change { try await $0.setHidden(blind: index, !shown) } }))

@@ -94,22 +94,36 @@ inline std::string scenesJson(const WireScene *s, int n, int max, int ports) {
   j += "]}";
   return j;
 }
-// A Scene's name as the controller keeps it: UTF-8 as typed (quotes, accents, emoji), without control characters, at
-// most `maxBytes` bytes, never cut inside a character, no trailing spaces. The app limits names the same way
-// (ScenePlan.fitName), so what was typed is what every phone reads back.
-inline std::string sceneName(const std::string &in, size_t maxBytes) {
+// A name as the controller keeps it (a Scene, a blind, the controller): UTF-8 as typed (quotes, accents, emoji), without
+// control characters or bytes that are not valid UTF-8, at most `maxBytes` bytes, never cut inside a character, no
+// trailing spaces. The app's twin is NameRule.fit (app/Tilt/Shared/NameRule.swift), so what was typed is what every
+// phone, the Tilt Hub and Apple Home read back. Both firmwares use it.
+inline size_t utf8Len(const std::string &s, size_t i) {          // bytes in the valid character at s[i], or 0
+  unsigned char c = s[i];
+  if (c < 0x80) return 1;
+  size_t n = c >= 0xC2 && c <= 0xDF ? 2 : c >= 0xE0 && c <= 0xEF ? 3 : c >= 0xF0 && c <= 0xF4 ? 4 : 0;
+  if (!n || i + n > s.size()) return 0;
+  for (size_t k = 1; k < n; k++) if (((unsigned char)s[i + k] & 0xC0) != 0x80) return 0;
+  unsigned char d = s[i + 1];
+  if ((c == 0xE0 && d < 0xA0) || (c == 0xED && d >= 0xA0) || (c == 0xF0 && d < 0x90) || (c == 0xF4 && d >= 0x90)) return 0;   // overlong, surrogate, past U+10FFFF
+  return n;
+}
+inline std::string keptName(const std::string &in, size_t maxBytes) {
   std::string o;
-  for (unsigned char c : in) if (c >= 32 && c != 127) o += (char)c;
-  if (o.size() > maxBytes) {
-    size_t n = maxBytes;
-    while (n > 0 && ((unsigned char)o[n] & 0xC0) == 0x80) n--;      // back to the start of the character that does not fit
-    o.resize(n);
+  for (size_t i = 0; i < in.size();) {
+    size_t n = utf8Len(in, i);
+    if (!n) { i++; continue; }                                    // not valid UTF-8: dropped
+    unsigned char c = in[i];
+    if (n == 1 && (c < 32 || c == 127)) { i++; continue; }        // a control character
+    if (o.size() + n > maxBytes) break;                           // never cut inside a character
+    o.append(in, i, n);
+    i += n;
   }
   while (!o.empty() && o.back() == ' ') o.pop_back();
   return o;
 }
 // A Scene write, from the query. Out-of-range values are brought into range; the icon keeps only a-z, 0-9 and dots
-// (an SF Symbol name). The name is kept as typed (sceneName, by the caller).
+// (an SF Symbol name). The name is kept as typed (keptName, by the caller).
 template <class Arg> WireScene sceneOfArgs(Arg arg, int ports) {
   WireScene s{};
   s.gid = strtoul(arg("gid").c_str(), nullptr, 10);

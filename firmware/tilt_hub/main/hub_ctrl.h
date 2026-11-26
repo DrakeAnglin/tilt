@@ -186,7 +186,7 @@ static void udpTask(void *) {
             const uint8_t *a = (const uint8_t *)&from.sin6_addr;
             ctrls[c].rloc = (a[11] == 0xff && a[12] == 0xfe) ? (a[14] << 8 | a[15]) : 0;
             const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
-            if (nm) cleanName(ctrls[c].name, sizeof ctrls[c].name, nm);
+            if (nm) strlcpy(ctrls[c].name, keptName(nm, sizeof ctrls[c].name - 1).c_str(), sizeof ctrls[c].name);   // as typed (wire.h)
             ESP_LOGI(TAG, "controller %s (%s) answered on Thread", id, ctrls[c].name);
             ctrls[c].announced = false;
           }
@@ -304,8 +304,8 @@ static void udpTask(void *) {
     bool moved = !k.addrOk || memcmp(&k.addr.sin6_addr, &from.sin6_addr, 16);
     k.addr = from; k.addrOk = true; k.seen = ms() ? ms() : 1;
     const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
-    char clean[33];
-    if (nm) cleanName(clean, sizeof clean, nm);
+    char clean[33];                              // the name as typed (wire.h keptName), quotes too
+    if (nm) strlcpy(clean, keptName(nm, sizeof clean - 1).c_str(), sizeof clean);
     if (nm && strcmp(clean, k.name)) { strlcpy(k.name, clean, sizeof k.name); k.announced = false; }
     k.pct = cJSON_GetNumberValue(cJSON_GetObjectItem(j, "pct"));
     k.low = cJSON_GetNumberValue(cJSON_GetObjectItem(j, "low"));
@@ -333,7 +333,7 @@ static void udpTask(void *) {
       if (!b) break;
       Ctrl::B &x = k.b[p];
       const char *bn = cJSON_GetStringValue(cJSON_GetObjectItem(b, "n"));
-      cleanName(x.name, sizeof x.name, bn ? bn : "");
+      strlcpy(x.name, keptName(bn ? bn : "", sizeof x.name - 1).c_str(), sizeof x.name);
       x.hid = cJSON_GetNumberValue(cJSON_GetObjectItem(b, "h"));
       x.ok = cJSON_GetNumberValue(cJSON_GetObjectItem(b, "ok"));
       cJSON *tv = cJSON_GetObjectItem(b, "t"), *gv = cJSON_GetObjectItem(b, "g");

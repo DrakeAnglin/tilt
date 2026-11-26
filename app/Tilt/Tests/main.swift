@@ -138,6 +138,7 @@ check(await sentBy { try await $0.setLocation(latitude: 41.88, longitude: -87.63
 check(await sentBy { try await $0.setTimeZone("CST6CDT,M3.2.0,M11.1.0", name: "America/Chicago") } == "/api/set?k=tz&v=CST6CDT%2CM3%2E2%2E0%2CM11%2E1%2E0&n=America%2FChicago", "time zone")
 check(await sentBy { try await $0.setTuning(.stall, 900) } == "/api/set?k=tune.stall&v=900", "stall tuning")
 check(await sentBy { try await $0.setBlindName(blind: 1, "Left") } == "/api/set?k=b1.name&v=Left", "a blind's name")
+check(await sentBy { try await $0.setBlindName(blind: 1, "Mom\u{2019}s") } == "/api/set?k=b1.name&v=Mom%E2%80%99s", "a blind's name with a curly apostrophe")
 check(await sentBy { try await $0.setHidden(blind: 2, true) } == "/api/set?k=b2.hid&v=1", "hide a blind")
 check(await sentBy { try await $0.setSpeed(blind: 0, 80) } == "/api/set?k=b0.speed&v=80", "a blind's speed")
 check(await sentBy { try await $0.setFavorite(blind: 1, -50) } == "/api/set?k=b1.fav&v=%2D50", "a blind's favorite")
@@ -150,6 +151,7 @@ let cfgData = try Data(contentsOf: wireDir.appendingPathComponent("cfg.json"))
 let wcfg = try JSONDecoder().decode(ControllerConfig.self, from: cfgData)
 let wsched = try JSONDecoder().decode(SchedConfig.self, from: cfgData)
 check(wcfg.limits == ControllerLimits(ports: 3, slots: 8) && wsched.limits == wcfg.limits, "the limits are read from /api/cfg")
+check(wcfg.b[0].name == "Mom\u{2019}s caf\u{E9}", "a blind name as typed, from /api/cfg")
 check(wcfg.name == "Den \"East\"" && wcfg.b.count == wcfg.limits.ports && wcfg.b[2].hid == 1 && wcfg.b[1].fav == -50 && wcfg.par == 0 && wcfg.tzn == "America/Chicago", "the config decodes")
 check(wsched.sched.count == wsched.limits.slots && wsched.sched[2].gid == 4_000_000_000 && wsched.sched[2].off == -15 && wsched.lat == 41.88, "the Schedule slots decode")
 let slotWrite = try String(contentsOf: wireDir.appendingPathComponent("slot_write.txt"), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -265,10 +267,28 @@ let away = ScenePlan.scenes(read: ["den": homeScenes["den"]!], kept: [movie])
 check(away[0].tilts[atHall(1)] == 0 && away[0].tilts[atDen(2)] == -50, "a controller that did not answer: its part comes from the phone's copy")
 check((try? ScenePlan.writes(movie, read: ["den": []])) == nil, "saving a Scene with blinds on a controller that did not answer is refused")
 check((try? ScenePlan.writes(movie, read: ["den": []], localOnly: ["hall"]))?.count == 1, "old firmware: its part stays on the phone, the rest is saved")
-// Names: kept as typed (quotes, curly apostrophe, accents, emoji), cut like the controller cuts them (wire.h sceneName).
+// Names: kept as typed (quotes, curly apostrophe, accents, emoji), cut like the controller cuts them (wire.h keptName).
 check(ScenePlan.fitName("Mom\u{2019}s caf\u{E9} \u{1F3AC}") == "Mom\u{2019}s caf\u{E9} \u{1F3AC}" && ScenePlan.fitName("Movie \"night\"") == "Movie \"night\"", "a Scene name is kept as typed")
 check(ScenePlan.fitName(String(repeating: "x", count: 46) + "\u{1F3AC}") == String(repeating: "x", count: 46), "a name that does not fit is cut before the character, at 47 bytes")
 check(ScenePlan.fitName("a\nb ") == "ab" && ScenePlan.limitName("ab ") == "ab ", "control characters dropped; trailing spaces only trimmed on save")
+// Blind and controller names: the same rule (NameRule, the twin of firmware wire.h keptName).
+check(NameRule.blindBytes == 19 && NameRule.controllerBytes == 23, "the name sizes the controller keeps (store.h name[20], name[24])")
+check(NameRule.fit("Mom\u{2019}s caf\u{E9}", bytes: NameRule.blindBytes) == "Mom\u{2019}s caf\u{E9}", "a blind name with a curly apostrophe and an accent is kept")
+check(NameRule.fit(String(repeating: "x", count: 16) + "\u{1F3AC}", bytes: 19) == String(repeating: "x", count: 16), "a name one emoji too long is cut before the emoji")
+check(NameRule.limit("Den ", bytes: 23) == "Den " && NameRule.fit("Den ", bytes: 23) == "Den", "limit keeps a trailing space while typing, fit drops it")
+check(NameRule.fit("a\u{7}b\tc", bytes: 23) == "abc", "control characters dropped")
+// The same list as firmware/blinds_matter/test/logic_test.cpp (keptName): both sides keep the same bytes.
+let nameCases: [(String, Int, String)] = [
+    ("Left", 19, "Left"),
+    ("Mom\u{2019}s caf\u{E9}", 19, "Mom\u{2019}s caf\u{E9}"),
+    ("Cr\u{E8}me br\u{FB}l\u{E9}e", 19, "Cr\u{E8}me br\u{FB}l\u{E9}e"),
+    ("Living Room Left \u{1F3AC}", 19, "Living Room Left"),
+    (String(repeating: "a", count: 30), 19, String(repeating: "a", count: 19)),
+    ("Den \"Caf\u{E9}\"", 23, "Den \"Caf\u{E9}\""),
+    ("Master Bedroom East \u{1F3AC}", 23, "Master Bedroom East"),
+    (String(repeating: "b", count: 30), 23, String(repeating: "b", count: 23)),
+]
+for (typed, bytes, kept) in nameCases { check(Array(NameRule.fit(typed, bytes: bytes).utf8) == Array(kept.utf8), "\(typed): kept as the controller keeps it") }
 // Made while its controller could not keep Scenes yet (old firmware): after the update it is kept, not taken for deleted.
 let onPhone = BlindScene(name: "Read", symbol: "book", tilts: [atHall(0): 40], gid: 77, ver: 300)
 let afterUpdate = ScenePlan.scenes(read: ["den": [], "hall": []], kept: [onPhone])
@@ -381,6 +401,7 @@ check(Api.hubKey(cid: "0011") == "/api/hubkey?cid=0011", "tell a controller the 
 let hubInfoData = try Data(contentsOf: wireDir.appendingPathComponent("hub_info.json"))
 let hi = try? JSONDecoder().decode(HubInfo.self, from: hubInfoData)
 check(hi?.fw == "0.3.5" && hi?.ip == "192.168.1.40" && hi?.ch == 15 && hi?.home == 1 && hi?.homes?.first?.vendor == 4937, "hub_info.json: the hub's own fields")
+check(hi?.c[0].name == "Den \"Caf\u{E9}\"", "hub_info.json: a controller name with quotes and an accent")
 check(hi?.c.count == 2 && hi?.c[0].hubCid == "0011223344556677" && hi?.c[0].own == 1 && hi?.c[0].signal == -61, "hub_info.json: a controller on the hub")
 check(hi?.c[0].chg == 0 && hi?.c[1].chg == nil, "hub_info.json: on the cable or not, and nothing said by an older controller")
 check(hi?.c[1].notResponding == true && hi?.c[1].signal == nil && hi?.c[1].ota == 4 && hi?.c[1].otaErr == "the controller stopped answering", "hub_info.json: a silent controller whose update failed")
