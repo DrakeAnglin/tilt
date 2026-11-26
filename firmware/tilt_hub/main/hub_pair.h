@@ -3,6 +3,8 @@
 #pragma once
 static std::string hubCommand(int slot, const std::string &cmd);  // hub_api.h
 // ---- the hub's people (hub_people.h: the rules, tested on the Mac). keyMx guards people.
+// keyMx is a leaf lock: nothing that holds it takes another lock (the Matter stack lock, stateMx), because the Matter
+// task takes keyMx (hubOwned() in announceHub()) while it holds the Matter stack lock.
 static HubPeople people;
 static uint8_t hboot[4];
 static SemaphoreHandle_t keyMx;
@@ -27,7 +29,14 @@ static void pinBegin() {
   if (setupPin[0]) { nvs_set_str(nv, "pin", setupPin); nvs_commit(nv); }
   else ESP_LOGE(TAG, "no setup code: build once over USB with main/setup_pin.h");
 }
-static bool hubOwned() { return people.owned(); }
+// Whether the hub has an owner. It takes keyMx itself, so never call it (or announceHub(), helloJson()) while
+// holding keyMx: the mutex is not recursive, and that would hang the hub.
+static bool hubOwned() {
+  xSemaphoreTake(keyMx, portMAX_DELAY);
+  bool owned = people.owned();
+  xSemaphoreGive(keyMx);
+  return owned;
+}
 // The hub's id: made from its chip's MAC the first time, then kept in its saved data. So a new hub that takes over an
 // old one's saved data (copied from the old chip) is the same hub to the app. A factory reset forgets it too.
 static std::string hubIdKept;
