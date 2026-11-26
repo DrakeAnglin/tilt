@@ -27,6 +27,8 @@ B = adsk.fusion.BooleanTypes
 S = {
     'panel': 70.0,        # panel side (measured 70 x 70)
     'panel_t': 1.8,       # panel thickness (measured)
+    'panel_len': 70.3,    # real length along the row: three panels in a row came out 0.9 longer than 3 x 70
+    'pitch': 70.5,        # slot length per panel along the row: 0.2 room per panel (1.5 more for three than 3 x 70)
     'fit': 0.1,           # clearance each side across the row: 0.2 in all (top to bottom)
     'play': -0.05,        # the lip's 45 degree underside meets the wall 0.05 under the panel face, so a centered
                           # panel has only fit + play = 0.05 room under the lip (front to back): snug, no rocking
@@ -64,7 +66,7 @@ S['top'] = S['z_lip'] + S['lip'] + S['lip_tip']          # window face
 S['yt'] = S['panel'] / 2                                 # panels' top edge (Y)
 S['cy0'], S['cy1'] = S['yt'] - S['chan_y1'], S['yt'] - S['chan_y0']
 assert S['cy0'] - S['win_gap'] > -S['panel'] / 2 + S['ledge'] + 10
-# panels per section for each count: no section over 3 panels (about 231 mm, fits the H2D bed with room)
+# panels per section for each count: no section over 3 panels (about 232 mm, fits the H2D bed with room)
 PIECES = {1: [1], 2: [2], 3: [3], 4: [2, 2], 5: [3, 2], 6: [3, 3]}
 SHOW = 6                                                 # the count left visible in the document
 
@@ -154,7 +156,7 @@ def tab(xj, sg, grow):
 def build(n):
     """The housing for n panels: (sections [(piece name, body)], cap, mock parts, failures)."""
     sizes = PIECES[n]
-    xj = S['x0'] + n * S['panel'] + S['fit']             # last section's end = cap face
+    xj = S['x0'] + n * S['pitch']             # last section's end = cap face
     xr = xj + S['pad']
     x_end = xr + 1
     outline = rbox(S['xl'], xr, -W2, W2, 0, S['top'], S['corner'])
@@ -163,14 +165,14 @@ def build(n):
     # the wire channel under the whole row, open at the right end
     op(body, bx(S['x0'], x_end, S['cy0'], S['cy1'], S['back'], S['z_floor'] + 0.01), B.DifferenceBooleanType)
     for i in range(n if S['open_back'] else 0):           # optional window through the back under each panel
-        xa = S['x0'] + i * S['panel']
-        op(body, bx(xa + S['ledge'], xa + S['panel'] - S['ledge'], -S['panel'] / 2 + S['ledge'], S['cy0'] - S['win_gap'],
+        xa = S['x0'] + i * S['pitch']
+        op(body, bx(xa + S['ledge'], xa + S['pitch'] - S['ledge'], -S['panel'] / 2 + S['ledge'], S['cy0'] - S['win_gap'],
                     -1, S['z_floor'] + 0.01), B.DifferenceBooleanType)
     # split into sections at the panel joints, then the cap
     cuts, k = [], 0
     for m in sizes:
         k += m
-        cuts.append(xj if k == n else S['x0'] + k * S['panel'])
+        cuts.append(xj if k == n else S['x0'] + k * S['pitch'])
     sections, xa = [], S['xl'] - 1
     for i, (m, xb) in enumerate(zip(sizes, cuts)):
         sec = op(tbm.copy(body), bx(xa, xb, -W2 - 1, W2 + 1, -1, S['top'] + 1), B.IntersectionBooleanType)
@@ -194,9 +196,9 @@ def build(n):
     # mock-ups: the panels, a solder bump on each, the red and black wires along the channel and out of the cap
     parts = []
     for i in range(n):
-        xa = S['x0'] + i * S['panel']
-        parts.append(('Panel %d' % (i + 1), bx(xa, xa + S['panel'], -S['panel'] / 2, S['panel'] / 2, S['z_floor'], S['z_pt'])))
-        xc = xa + S['panel'] / 2
+        xa = S['x0'] + i * S['panel_len']              # the real panels, butted end to end
+        parts.append(('Panel %d' % (i + 1), bx(xa, xa + S['panel_len'], -S['panel'] / 2, S['panel'] / 2, S['z_floor'], S['z_pt'])))
+        xc = xa + S['panel_len'] / 2
         parts.append(('Bump %d' % (i + 1), bx(xc - 6, xc + 6, S['yt'] - 19, S['yt'] - 11, S['z_floor'] - S['bump_h'], S['z_floor'])))
     zw = S['back'] + S['wire_d'] / 2 + 0.05
     for nm, yy in (('Wire red', ey + 1.1), ('Wire black', ey - 1.1)):
@@ -232,9 +234,9 @@ def build(n):
             f.append('the tabs do not hold %s on %s' % (solids[i][0], solids[i - 1][0]))
     # the lips hold every panel down (0.4 mm lift hits), with no rocking (0.1 mm lift already touches)
     for i in range(n):
-        xa = S['x0'] + i * S['panel'] + 3                # clear of the lead-ins at the joints
+        xa = S['x0'] + i * S['pitch'] + 3                # clear of the lead-ins at the joints
         for lift, need, msg in ((0.4, 1.0, 'the lips do not hold panel %d down'), (0.1, 1e-6, 'panel %d can rock')):
-            probe = bx(xa, xa + S['panel'] - 6, -S['panel'] / 2, S['panel'] / 2, S['z_floor'] + lift, S['z_pt'] + lift)
+            probe = bx(xa, xa + S['pitch'] - 6, -S['panel'] / 2, S['panel'] / 2, S['z_floor'] + lift, S['z_pt'] + lift)
             if sum(vol(solid, probe) for _, solid in sections) < need:
                 f.append(msg % (i + 1))
     f += KIT.stays_inside(tbm, solids + parts, outline, allow=('Wire',))
@@ -332,7 +334,7 @@ for nm, b in sorted(pieces.items()) + [('cap', cap)]:
                                                           (q.maxPoint.z - q.minPoint.z) * 10, round(b.volume * 1.24))
 KIT.hide_helpers(design)
 result = {'ok': not failures, 'failures': failures,
-          'lengths (mm)': {n: round(n * S['panel'] + S['fit'] + 2 * S['pad'], 1) for n in PIECES},
+          'lengths (mm)': {n: round(n * S['pitch'] + 2 * S['pad'], 1) for n in PIECES},
           'width x height (mm)': '%.1f x %.2f' % (S['W'], S['top']),
           'pieces per count': {n: ['start_%d' % v[0]] + ['add_%d' % m for m in v[1:]] + ['cap'] for n, v in PIECES.items()},
           'piece sizes': info,
