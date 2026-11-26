@@ -149,10 +149,10 @@ struct BluetoothSetupView: View {
     @State private var hello: Hello?
     @State private var paired: Paired?
     @State private var problem: String?
-    @State private var moved = false                        // it took the hub's network and left Bluetooth
-    @State private var client: ControllerClient?            // sealed commands over Bluetooth, once paired
+    @State private var transport: (any ControllerTransport)?   // sealed commands over Bluetooth, once paired
+    @State private var onboarding: ControllerOnboarding?      // kept across tries: a second one after it left Bluetooth only waits
     @State private var hubStatus = ""
-    @State private var backups: [HubWatch.Backup] = []
+    @State private var backups: [HubBackup] = []
     @State private var restoreFrom = ""                       // "" = start fresh
 
     var body: some View {
@@ -222,7 +222,7 @@ struct BluetoothSetupView: View {
                 Pending.save(h.id, p)
             }
             guard let boot = Data(hex: h.boot), boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }
-            hello = h; paired = p; client = wire.client(p, boot: boot)
+            hello = h; paired = p; transport = wire.client(p, boot: boot).transport; onboarding = nil
             await lookForHub()
             step = .choose
         } catch { problem = error.localizedDescription }
@@ -233,60 +233,46 @@ struct BluetoothSetupView: View {
         guard hub.isOwner, let h = hello else { return }
         let mine = Set(model.controllers.map(\.id))
         // This controller's own backup (it was reset), or one of a controller that is gone (it is replaced).
-        backups = await hub.backups().filter { $0.id == h.id || !mine.contains($0.id) }
+        backups = (await (try? hub.client())?.backups() ?? []).filter { $0.id == h.id || !mine.contains($0.id) }
         if backups.contains(where: { $0.id == h.id }) { restoreFrom = h.id }
     }
-    /// Onto the Tilt Hub: give the controller the hub's network (and, if asked, an old controller's settings), wait for
-    /// it on the hub, then let the hub in (it asks to join the controller as "Tilt Hub", like a phone would).
+    /// Onto the Tilt Hub: the steps are ControllerOnboarding's (Shared/ControllerOnboarding.swift); this shows them.
     private func joinHub() {
-        guard let h = hello, let p = paired, hub.isOwner, let hubHost = hub.host else {
+        guard let h = hello, let p = paired, hub.isOwner, let hubHost = hub.host, let hubClient = try? hub.client() else {
             problem = hub.isOwner ? "The Tilt Hub is not on your Wi-Fi right now. Check it is plugged in, then try again." : "Only the Tilt Hub's owner can add controllers to it."
             return
         }
         problem = nil; step = .hubJoining
         Task {
             do {
-                let onThread = h.net == "thread"           // older controllers started on Wi-Fi firmware and switch over
-                if !moved {                                 // a second try after it left Bluetooth only waits for it again
-                    guard let client else { throw TiltError("The Bluetooth link to the controller was lost. Start the setup again.") }
-                    hubStatus = "Getting the hub's network…"
-                    let network = try await hub.network()
-                    if !restoreFrom.isEmpty {
-                        hubStatus = "Restoring its settings…"
-                        try await client.restore(backup: try await hub.backup(restoreFrom))
-                    }
-                    hubStatus = "Joining the hub…"
-                    try await client.moveToHub(network: network, onThread: onThread)
-                    if onThread && !restoreFrom.isEmpty { try? await client.restart() }   // the restored settings take effect
-                    ble.stop()
-                    moved = true
+                if onboarding == nil {
+                    guard let transport else { throw TiltError("The Bluetooth link to the controller was lost. Start the setup again.") }
+                    let ble = ble
+                    onboarding = ControllerOnboarding(transport: transport, store: AppControllers(model: model), hello: h, paired: p,
+                                                      leftBluetooth: { await ble.stop() })
                 }
-                hubStatus = "Waiting for it on the hub…"
-                let host = "\(hubHost)/c/\(h.id)"
-                var there = false
-                for _ in 0..<60 where !there {
-                    try? await Task.sleep(for: .seconds(2))
-                    if let n = try? await Secure.hello(host), n.net == "thread", n.boot != h.boot || onThread { there = true }
-                }
-                guard there else { throw TiltError("It did not reach the hub. Check that it is within reach of the hub, unplug it and plug it back in, and try again.") }
-                model.adopt(h, host: host, paired: p)
-                Pending.clear(h.id)
-                hubStatus = "Letting the hub in…"
-                if let c = model.controllers.first(where: { $0.id == h.id }) {
-                    for _ in 0..<30 {                     // the hub asks within a few seconds; it says which request is its own
-                        if let hubCid = await hub.hubCid(for: h.id), let ask = try? await c.client.people().first(where: { $0.wait == 1 && $0.cid == hubCid }) {
-                            try? await c.client.approve(cid: ask.cid, true, owner: false)
-                            try? await c.client.markHubKey(cid: hubCid)
-                            break
-                        }
-                        try? await Task.sleep(for: .seconds(2))
+                for try await s in onboarding!.run(restore: restoreFrom.isEmpty ? nil : restoreFrom, hub: hubClient, hubHost: hubHost) {
+                    switch s {
+                    case .gettingNetwork: hubStatus = "Getting the hub's network…"
+                    case .restoring: hubStatus = "Restoring its settings…"
+                    case .joining: hubStatus = "Joining the hub…"
+                    case .waitingOnHub: hubStatus = "Waiting for it on the hub…"
+                    case .lettingHubIn: hubStatus = "Letting the hub in…"
+                    case .done: hub.justAdded(); step = .done
                     }
                 }
-                if !restoreFrom.isEmpty && restoreFrom != h.id { await hub.replace(old: restoreFrom, new: h.id) }
-                hub.justAdded()
-                step = .done
             } catch { problem = error.localizedDescription; step = .choose }
         }
+    }
+}
+
+/// The app's model as the place an onboarded controller is kept.
+struct AppControllers: ControllerStore {
+    let model: AppModel
+    @MainActor func adopt(_ h: Hello, host: String, paired p: Paired) async -> ControllerClient {
+        model.adopt(h, host: host, paired: p)
+        Pending.clear(h.id)
+        return model.controllers.first { $0.id == h.id }?.client ?? ControllerClient(transport: Link(host: host, cid: p.cid, key: p.key))
     }
 }
 

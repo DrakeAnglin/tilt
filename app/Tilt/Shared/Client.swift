@@ -173,7 +173,7 @@ struct ControllerClient: Sendable {
         return (h.code, h.qr)
     }
     /// Tell the controller which key is the Tilt Hub's (owner): from then on it trusts only messages proven with it.
-    func markHubKey(cid: String) async throws { try await send("/api/hubkey?cid=\(cid)") }
+    func markHubKey(cid: String) async throws { try await send(Api.hubKey(cid: cid)) }
     /// Give a new controller the hub's network, then switch it to its Thread firmware (it restarts and joins the hub).
     /// A controller that already runs its Thread firmware joins at once (no restart needed).
     func moveToHub(network: String, onThread: Bool = false) async throws {

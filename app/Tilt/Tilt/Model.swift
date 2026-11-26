@@ -68,7 +68,8 @@ final class Controller: Identifiable {
                     // Set up before the controller knew which key is the hub's: tell it (once per start of the app).
                     if self.record.owner, self.record.onHub, s.hkey == 0, !self.hubKeyTold {
                         self.hubKeyTold = true
-                        if let hc = await HubWatch.shared.hubCid(for: self.id) { try? await self.client.markHubKey(cid: hc) }
+                        // May run alongside a setup's own admitHub: harmless, a request already let in is not let in again.
+                        if let hub = try? HubWatch.shared.client() { _ = await hub.admitHub(on: self.client, controllerId: self.id) }
                     }
                 } catch LinkProblem.waiting {
                     self.online = true
@@ -102,9 +103,9 @@ final class Controller: Identifiable {
         asked = asks.count
         // The Tilt Hub asks to join each of its controllers (to move the blinds for Apple Home). The hub tells this
         // app which request is its own (by its key, not its name): an owner lets exactly that one in, unseen.
-        if record.onHub, !asks.isEmpty, let hubCid = await HubWatch.shared.hubCid(for: id), let own = asks.first(where: { $0.cid == hubCid }) {
-            if record.owner, (try? await client.approve(cid: own.cid, true, owner: false)) != nil { try? await client.markHubKey(cid: hubCid) }
-            asks.removeAll { $0.cid == hubCid }
+        if record.onHub, !asks.isEmpty, let hub = try? HubWatch.shared.client() {
+            let hubCid = record.owner ? await hub.admitHub(on: client, controllerId: id).hubCid : await hub.hubCid(for: id)
+            if let hubCid { asks.removeAll { $0.cid == hubCid } }
         }
         requests = asks
     }
