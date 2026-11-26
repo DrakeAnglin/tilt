@@ -194,4 +194,6 @@ let in as an owner from the app; then `TILT_AS=<name> tools/flash.sh <id>`.
 - One C6 for both radios: Espressif rates Wi-Fi plus a Thread network on one chip as "supported but unstable".
   The plan is to stay with one chip. A second chip (ESP32-S3 + ESP32-H2, `docs/research/thread-border-router-chips.md`
   on its research branch) is only the fallback if response times through the hub fall short.
-- The app is only 3 % short of the 2 MB firmware slot: keep an eye on the size.
+- Firmware slot space: about 68 KB is free in the 0x1F0000 app slot at 0.3.18. The 4 MB flash is fully used by the
+  two slots (0x20000 + 2 x 0x1F0000), so the slots cannot grow. CI's hub build fails when under 32 KB is free
+  (`tools/firmware_size.py`); the way to make room is a trim, which is settings in `sdkconfig.defaults` (see #144).
