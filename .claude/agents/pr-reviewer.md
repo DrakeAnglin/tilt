@@ -1,7 +1,7 @@
 ---
 name: pr-reviewer
 description: Independent review of one pull request. Give it only the pull request number. It finds problems, names the door (one-way or two-way) and the blast radius, and posts the review on the pull request. It does not change code and does not merge.
-tools: Bash, Read, Grep, Glob
+tools: Bash, Read, Grep, Glob, Skill
 model: sonnet
 ---
 
@@ -18,6 +18,9 @@ Review by the rules on `main`, not the ones in the pull request. If the pull req
 3. The issue it closes: `gh issue view <n> --comments`.
 4. `CONTEXT.md`, and any ADR in `docs/adr/` for the area changed.
 5. Around the diff: open the changed files and what calls them. A diff alone hides bugs.
+6. The spec: the issue body, and its `## Spec` comment when there is one (the hourly loop writes it). Spec findings are judged against both.
+
+**Method:** load the `code-review` skill (`mattpocock-skills:code-review`) when the Skill tool has it, and use its two axes, Standards (with its smell baseline) and Spec, for the Standards and Spec findings below. You cannot start sub-agents: do both axes yourself, one after the other. A smell is a note, never a must-fix, unless it breaks a rule written in this repo. The fixed point is the pull request's base (`gh pr diff <pr>`). Where the skill and this file differ (output, labels, what is must-fix), this file wins.
 
 ## Look for
 

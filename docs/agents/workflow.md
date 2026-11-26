@@ -1,6 +1,6 @@
 # Agent workflow
 
-How one agent takes one issue from request to `main`, without a person in the loop unless the review asks for one. The `/work-issue` skill runs these steps.
+How one agent takes one issue from request to `main`, without a person in the loop unless the review asks for one. The `/work-issue` skill runs these steps. The hourly loop (`/issue-loop`) runs the same steps with a separate agent for each part: a Fable agent writes the spec, an Opus agent builds, a fresh `pr-reviewer` reviews.
 
 ## Rules
 
@@ -94,7 +94,8 @@ Say what was seen, where (file and line), and how to see it again. Do not fix it
 
 | Label | Meaning |
 | --- | --- |
-| `ready-for-agent` | The owner says an agent may pick this issue up on its own |
+| `ready-for-agent` | The owner says an agent may pick this issue up on its own; the hourly loop takes these first |
+| `agent-loop` | The hourly loop (`/issue-loop`) is working this issue. A run that is cut off finishes it next hour |
 | `needs-triage` | Filed by an agent; the owner has not looked yet |
 | `two-way-door` / `one-way-door` | The reviewer's door for a pull request: exactly one. It says how easy going back is; it does not stop a merge |
 | `bench-check` | On the staging list: check it on real hardware when the next release is staged. Never blocks a merge |
