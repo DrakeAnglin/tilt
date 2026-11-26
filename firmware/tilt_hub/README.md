@@ -87,7 +87,7 @@ hold). The pure rules beside them are tested on the Mac (`test/`).
 - `hub_alerts.h`: when the hub tells owners (on `alert_rules.h`; `cloud.h` sends them).
 - `hub_care.h`: settings backups, the care task, new controllers nearby on Bluetooth.
 - `hub_update.h`: firmware for a controller through the hub, and the hub's own (on `hub_file.h`).
-- `hub_pair.h`: the hub's people: keys, setup code, the hub's id, pairing (on `hub_people.h`).
+- `hub_pair.h`: the hub's people: keys, setup code, the hub's id, pairing (on `hub_people.h`; the key exchange is the controller's `tilt_pair.h`).
 - `hub_api.h`: what the app asks the hub: the relay to a controller, the hub's commands, the HTTP handlers, and
   the one-time code for another home app (last, after its one caller, so the binary stays the same).
 - `cloud.h`, `lights.h`: push alerts through iCloud, and the color light.

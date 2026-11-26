@@ -6,7 +6,8 @@
 // hub the path, which the hub turns into the letter):
 //   H  GET  /x/hello     who am I: id, name, firmware, this start's number ("boot"), is there an owner yet
 //   P                    make a key. JSON {"pub": base64 P-256 public key, "name": "..."}. Bluetooth only: only for
-//                        the first phone (it becomes an owner). Both sides do ECDH; the key is HKDF-SHA256 of the result.
+//                        the first phone (it becomes an owner). Both sides do ECDH; the key is HKDF-SHA256 of the result
+//                        (tilt_pair.h, shared with the Tilt Hub).
 //   A  POST /x/ask       ask to join a controller that has an owner. Same JSON as P. The key is made but does nothing
 //                        until an owner approves it in the app (/api/approve). Both phones show the same 4-digit code,
 //                        made from the key, so the owner can tell it is the right phone.
@@ -19,12 +20,8 @@
 //
 // A captured command cannot be replayed: the counter must rise, and after a restart the boot number is new.
 #pragma once
-#include <mbedtls/ecdh.h>
-#include <mbedtls/ecp.h>
 #include <mbedtls/gcm.h>
-#include <mbedtls/hkdf.h>
 #include <mbedtls/md.h>
-#include <mbedtls/base64.h>
 #include <esp_random.h>
 #include <esp_http_server.h>
 #include "ardu.h"
@@ -33,6 +30,7 @@
 #include "lock.h"                                // mx
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm (shared with the Tilt Hub)
 #include "tilt_link.h"                           // linkKey, proofs, the hub link's layouts (shared with the Tilt Hub)
+#include "tilt_pair.h"                           // the key exchange in Pairing, the 4-digit code, the answer (shared with the Tilt Hub)
 
 const int MAX_KEYS = 8;
 struct ClientKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // used 1 = paired, 2 = asked to join, waiting for an owner; role 1 = owner
@@ -124,10 +122,8 @@ bool hubMacOk(const std::string &what, const std::string &mac) {
 // Returns the HTTP-style status ("200 OK", ...) and fills out with the JSON answer. Over Bluetooth ('P', 'A') and through
 // the hub ('A'); recoverDo (people.h) starts with an ask too.
 const char *pairDo(const std::string &b, std::string &out, bool ask = false, bool recovering = false) {
-  std::string pubB64 = jsonStr(b, "pub");
   uint8_t cpub[65];
-  size_t n = 0;
-  if (mbedtls_base64_decode(cpub, sizeof cpub, &n, (const uint8_t *)pubB64.c_str(), pubB64.length()) != 0 || n != 65) { out = "{\"err\":\"bad key\"}"; return "400 Bad Request"; }
+  if (!pairPub(jsonStr(b, "pub"), cpub)) { out = "{\"err\":\"bad key\"}"; return "400 Bad Request"; }
   bool first;
   {
   KeysLock kl;
@@ -141,20 +137,8 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false, boo
   else if (!firstPairOpen()) { out = "{\"err\":\"setup is closed: unplug the controller, plug it back in, and set it up within 15 minutes\"}"; return "403 Forbidden"; }
   }
 
-  mbedtls_ecp_group grp; mbedtls_mpi d, z; mbedtls_ecp_point Q, Qp;
-  mbedtls_ecp_group_init(&grp); mbedtls_mpi_init(&d); mbedtls_mpi_init(&z); mbedtls_ecp_point_init(&Q); mbedtls_ecp_point_init(&Qp);
-  uint8_t dpub[65], shared[32], okm[32], info[9 + 130];
-  size_t dn = 0;
-  bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_ecdh_gen_public(&grp, &d, &Q, secRng, nullptr) == 0 &&
-            mbedtls_ecp_point_read_binary(&grp, &Qp, cpub, 65) == 0 && mbedtls_ecp_check_pubkey(&grp, &Qp) == 0 &&
-            mbedtls_ecdh_compute_shared(&grp, &z, &Qp, &d, secRng, nullptr) == 0 && mbedtls_mpi_write_binary(&z, shared, 32) == 0 &&
-            mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &dn, dpub, sizeof dpub) == 0 && dn == 65;
-  if (ok) {
-    memcpy(info, "blinds-v1", 9); memcpy(info + 9, cpub, 65); memcpy(info + 74, dpub, 65);
-    ok = mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), nullptr, 0, shared, 32, info, sizeof info, okm, 32) == 0;
-  }
-  mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&d); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&Q); mbedtls_ecp_point_free(&Qp);
-  if (!ok) { out = "{\"err\":\"key exchange failed\"}"; return "400 Bad Request"; }
+  PairKeys pk;                                   // the slow part, with no lock held
+  if (!pairExchange(cpub, "", secRng, pk)) { out = "{\"err\":\"key exchange failed\"}"; return "400 Bad Request"; }
 
   KeysLock kl;                                 // the key is ready: claim a slot now (the slow part ran unlocked)
   if (!first != owned()) { out = "{\"err\":\"another phone paired at the same moment. Try again.\"}"; return "409 Conflict"; }
@@ -169,26 +153,15 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false, boo
   memset(&k, 0, sizeof k);
   k.used = ask ? 2 : 1; k.role = first ? 1 : 0;
   esp_fill_random(k.id, 8);
-  memcpy(k.key, okm, 32);
+  memcpy(k.key, pk.key, 32);
   cleanText(k.name, sizeof k.name, jsonStr(b, "name"));
   if (!k.name[0]) strlcpy(k.name, "iPhone", sizeof k.name);
   keysSave();
   lastCtr[slot] = 0;
   askAt[slot] = ask ? (millis() ? millis() : 1) : 0;
   event(ask ? "%s asked to join%s" : "%s paired%s", k.name, first ? " (owner)" : "");
-  uint8_t chk[32], pb[100];
-  hmac256(okm, 32, (const uint8_t *)"confirm", 7, chk);
-  size_t pn = 0;
-  mbedtls_base64_encode(pb, sizeof pb, &pn, dpub, 65);
-  out = std::string("{\"pub\":\"") + std::string((char *)pb, pn) + "\",\"cid\":\"" + hexOf(k.id, 8) + "\",\"check\":\"" + hexOf(chk, 8) + "\",\"owner\":" + (first ? "1" : "0") + ",\"wait\":" + (ask ? "1" : "0") + ",\"topic\":\"" + hexOf(cloudTopic, 16) + "\"}";
+  out = pairAnswer(pk, k.id, first, ask, cloudTopic, nullptr);
   return "200 OK";
-}
-// The 4 digits both phones show for a request to join.
-std::string askCode(const ClientKey &k) {
-  uint8_t h[32]; char c[6];
-  hmac256(k.key, 32, (const uint8_t *)"code", 4, h);
-  snprintf(c, sizeof c, "%04u", (unsigned)(((h[0] << 8) | h[1]) % 10000));
-  return c;
 }
 
 

@@ -11,7 +11,7 @@ esp_err_t hKeys(httpd_req_t *r) {
   bool any = false;
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used) {
     ap(j, "%s{\"cid\":\"%s\",\"name\":%s,\"owner\":%d,\"me\":%d,\"wait\":%d,\"code\":\"%s\"}", any ? "," : "", hexOf(keys[i].id, 8).c_str(), jq(keys[i].name).c_str(), keys[i].role,
-       i == secClient ? 1 : 0, keys[i].used == 2 ? 1 : 0, keys[i].used == 2 && (secClient < 0 || keys[secClient].role) ? askCode(keys[i]).c_str() : "");   // the code: owners only
+       i == secClient ? 1 : 0, keys[i].used == 2 ? 1 : 0, keys[i].used == 2 && (secClient < 0 || keys[secClient].role) ? askCode(keys[i].key).c_str() : "");   // the code: owners only
     any = true;
   }
   j += "]}";

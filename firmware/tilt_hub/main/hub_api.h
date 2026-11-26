@@ -208,7 +208,7 @@ static std::string hubCommand(int slot, const std::string &cmd) {
       HubKey &k = people.keys[i];
       if (!k.used) continue;
       j += std::string(first ? "" : ",") + "{\"cid\":\"" + hexOf(k.id, 8) + "\",\"name\":\"" + k.name + "\",\"owner\":" + (k.role ? "1" : "0") + ",\"me\":" + (i == slot ? "1" : "0") +
-           ",\"wait\":" + (k.used == 2 ? "1" : "0") + ",\"code\":\"" + (k.used == 2 && owner ? askCode(k) : std::string()) + "\"}";   // the code: owners only
+           ",\"wait\":" + (k.used == 2 ? "1" : "0") + ",\"code\":\"" + (k.used == 2 && owner ? askCode(k.key) : std::string()) + "\"}";   // the code: owners only
       first = false;
     }
     xSemaphoreGive(keyMx);
