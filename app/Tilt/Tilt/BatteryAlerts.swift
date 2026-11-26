@@ -45,8 +45,8 @@ enum BatteryAlerts {
     static func forget(id: String) { UserDefaults.standard.removeObject(forKey: BatteryNotices.key(id: id)) }
     static func askPermission() { UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in } }
 
-    static func check(id: String, name: String, battery: ControllerState.Battery) {
-        BatteryNotices.check(id: id, name: name, reading: battery.reading, via: PhoneNotifier())
+    static func check(id: String, name: String, reading: BatteryReading) {
+        BatteryNotices.check(id: id, name: name, reading: reading, via: PhoneNotifier())
     }
 
     /// For trying it out: the same notice, 5 seconds from now (leave the app to see it).
@@ -75,7 +75,7 @@ enum BatteryAlerts {
         }
         for (rec, client) in TiltActions.clients() where !rec.onHub {
             guard let s = try? await client.state() else { continue }
-            check(id: rec.id, name: s.name, battery: s.batt)
+            check(id: rec.id, name: s.name, reading: s.batt.reading)
             if rec.owner, (s.asks ?? 0) > 0 { JoinAlerts.notify(cid: "any.\(rec.id)", who: "Someone", room: s.name) }
         }
     }
