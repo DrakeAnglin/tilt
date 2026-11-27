@@ -52,6 +52,204 @@ class ReleaseFirmware(unittest.TestCase):
         self.assertEqual(l['stable']['version'], '2.3.0')        # a beta never touches stable
 
 
+def openssl_key(d):
+    """A throwaway P-256 key pair in folder d: (private key file, public key file)."""
+    import subprocess
+    key, pub = os.path.join(d, 'k.pem'), os.path.join(d, 'p.pem')
+    subprocess.run(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', key], check=True)
+    subprocess.run(['openssl', 'ec', '-in', key, '-pubout', '-out', pub], check=True, capture_output=True)
+    return key, pub
+
+
+def openssl_verifies(pub, data, raw_sig):
+    """openssl's own check of an r | s signature over data."""
+    import subprocess
+    with tempfile.NamedTemporaryFile() as s:
+        s.write(release_ci.raw_to_der(raw_sig))
+        s.flush()
+        return subprocess.run(['openssl', 'dgst', '-sha256', '-verify', pub, '-signature', s.name], input=data,
+                              capture_output=True).returncode == 0
+
+
+def esp_image(seed, size=3000):
+    """Bytes shaped like an ESP-IDF image: anything, then its SHA-256 (esptool appends it)."""
+    import hashlib, random
+    body = bytes(random.Random(seed).randrange(256) for _ in range(size - 32))
+    return body + hashlib.sha256(body).digest()
+
+
+class ReleaseFirmwareBuild(unittest.TestCase):
+    """release_firmware.py end to end, in a temp folder: a test key, a fake build, the detools stand-in."""
+
+    def setUp(self):
+        import shutil, types
+        from unittest import mock
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+        self.key, self.pub = openssl_key(self.d)
+        root = os.path.join(self.d, 'repo')
+        self.fw, self.hub, self.out = (os.path.join(root, 'firmware', x) for x in ('blinds_matter', 'tilt_hub', 'releases'))
+        for f in (self.fw, self.hub):
+            os.makedirs(os.path.join(f, 'main'))
+        with open(os.path.join(self.fw, 'main', 'web.h'), 'w') as f:
+            f.write('#define FW_VERSION "2.4.0-beta1"\n')
+        with open(os.path.join(self.hub, 'CMakeLists.txt'), 'w') as f:
+            f.write('set(PROJECT_VER "0.3.9")\n')
+        # The stand-in for detools that firmware/blinds_matter/test/make_ota_files.py uses: the "patch" is the new image.
+        detools = types.ModuleType('detools')
+        detools.create_patch = lambda base, new, out, compression=None: out.write(new.read())
+        patches = [mock.patch.object(release_firmware, t, v) for t, v in
+                   [('KEY', self.key), ('ROOT', root), ('FW', self.fw), ('OUT', self.out)]]
+        patches.append(mock.patch.dict(sys.modules, {'detools': detools}))
+        self.builds, self.build_fails, self.image = [], False, esp_image(1)
+        real_run = release_firmware.subprocess.run
+
+        def run(cmd, **kw):                      # build.sh writes the image; openssl is the real one
+            if not cmd[0].endswith('build.sh'):
+                return real_run(cmd, **kw)
+            self.builds.append((cmd, kw['cwd'], kw['env'].get('BUILD_DIR')))
+            if not self.build_fails:
+                name = 'tilt_hub.bin' if kw['cwd'] == self.hub else 'blinds_matter.bin'
+                os.makedirs(os.path.join(kw['cwd'], 'build-release'), exist_ok=True)
+                with open(os.path.join(kw['cwd'], 'build-release', name), 'wb') as f:
+                    f.write(self.image)
+            return types.SimpleNamespace(returncode=1 if self.build_fails else 0)
+        patches.append(mock.patch.object(release_firmware.subprocess, 'run', run))
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def main(self, *args):
+        import contextlib, io
+        from unittest import mock
+        with mock.patch.object(sys, 'argv', ['release_firmware.py', *args]), \
+                contextlib.redirect_stdout(io.StringIO()) as said:
+            release_firmware.main()
+        return said.getvalue()
+
+    def write(self, path, data):
+        with open(path, 'wb' if isinstance(data, bytes) else 'w') as f:
+            f.write(data)
+
+    def listing(self):
+        import json
+        with open(os.path.join(self.out, 'firmware.json')) as f:
+            return json.load(f)
+
+    def test_a_signed_file_is_image_signature_and_tag_and_openssl_accepts_it(self):
+        signed = self.image + release_firmware.sign(self.image) + b'TILTSIG1'
+        self.assertEqual(len(signed), len(self.image) + 72)
+        self.assertTrue(openssl_verifies(self.pub, self.image, signed[-72:-8]))
+        self.assertFalse(openssl_verifies(self.pub, self.image + b'x', signed[-72:-8]))
+        self.assertEqual(release_firmware.image_of(signed), self.image)
+        self.assertEqual(release_firmware.image_of(self.image), self.image)
+
+    def test_a_patch_names_its_base_and_carries_both_signatures(self):
+        base, new = esp_image(2), esp_image(3)
+        p = release_firmware.make_patch(base, new)
+        self.assertEqual(p[:4], (0xfccdde10).to_bytes(4, 'little'))
+        self.assertEqual(p[4:36], base[-32:])
+        self.assertEqual(p[36:64], bytes(28))
+        self.assertTrue(p.endswith(b'TILTDLT1'))
+        body, sig = release_ci.signed_part(p)
+        self.assertTrue(openssl_verifies(self.pub, body, sig))
+        self.assertEqual(body[64:-64], new)                           # what the stand-in detools wrote
+        self.assertTrue(openssl_verifies(self.pub, new, body[-64:]))   # the new image's own signature
+
+    def test_a_secret_in_the_image_stops_the_release(self):
+        self.write(os.path.join(self.fw, 'main', 'secrets.h'), '#define WIFI_PASS "hunter22"\n#define X "ab"\n')
+        release_firmware.check_no_secrets(b'nothing here, ab')          # values under 4 characters do not count
+        with self.assertRaises(SystemExit) as e:
+            release_firmware.check_no_secrets(b'...hunter22...')
+        self.assertIn('secrets.h', str(e.exception.code))
+        self.image = esp_image(4) + b'hunter22'
+        with self.assertRaises(SystemExit):
+            self.main('beta')
+        self.assertFalse(os.path.exists(os.path.join(self.out, 'firmware.json')))
+
+    def test_sign_writes_the_signed_file_and_with_a_base_the_patch(self):
+        bin_ = os.path.join(self.d, 'b.bin')
+        self.write(bin_, self.image)
+        self.main('--sign', bin_)
+        with open(bin_ + '.signed', 'rb') as f:
+            signed = f.read()
+        self.assertEqual(signed[:-72], self.image)
+        self.assertTrue(openssl_verifies(self.pub, self.image, signed[-72:-8]))
+        self.assertFalse(os.path.exists(bin_ + '.patch'))
+        base = esp_image(5)
+        bare, signed_base = os.path.join(self.d, 'base.bin'), os.path.join(self.d, 'base.signed')
+        self.write(bare, base)
+        self.write(signed_base, base + release_firmware.sign(base) + b'TILTSIG1')
+        self.assertIn('patch:', self.main('--sign', bin_, '--patch-from', bare))
+        with open(bin_ + '.patch', 'rb') as f:
+            from_bare = f.read()
+        self.main('--sign', bin_, '--patch-from', signed_base)
+        with open(bin_ + '.patch', 'rb') as f:
+            from_signed = f.read()
+        self.assertEqual(from_signed[:-136], from_bare[:-136])          # the same patch (signatures differ each time)
+        self.assertEqual(from_signed[4:36], base[-32:])
+        self.assertEqual(self.builds, [])
+
+    def test_hub_release_is_listed_as_hub(self):
+        import hashlib, json
+        os.makedirs(self.out)
+        self.write(os.path.join(self.out, 'firmware.json'), json.dumps({'stable': {'version': '2.3.0', 'file': 'tilt-2.3.0.bin'}}))
+        self.assertIn('hub 0.3.9', self.main('--hub', '--notes', 'faster'))
+        with open(os.path.join(self.out, 'tilt-hub-0.3.9.bin'), 'rb') as f:
+            data = f.read()
+        self.assertEqual(self.listing()['hub'], {'version': '0.3.9', 'file': 'tilt-hub-0.3.9.bin', 'size': len(data),
+                                                 'sha256': hashlib.sha256(data).hexdigest(), 'notes': 'faster'})
+        self.assertTrue(openssl_verifies(self.pub, self.image, data[-72:-8]))
+        self.assertEqual(self.listing()['stable']['version'], '2.3.0')
+        self.assertEqual(self.builds[0][1:], (self.hub, 'build-release'))
+        self.assertIn('-DTILT_RELEASE=1', self.builds[0][0])
+
+    def test_a_failed_build_names_its_log(self):
+        self.build_fails = True
+        with self.assertRaises(SystemExit) as e:
+            self.main('--hub')
+        self.assertIn('firmware/tilt_hub/build-release.log', str(e.exception.code))
+        with self.assertRaises(SystemExit) as e:
+            self.main('beta')
+        self.assertIn('firmware/blinds_matter/build-release.log', str(e.exception.code))
+
+    def test_a_controller_release_has_a_patch_from_each_older_image(self):
+        import hashlib, json
+        os.makedirs(self.out)
+        olds = {'tilt-2.2.0.bin': esp_image(6), 'tilt-2.3.0.bin': esp_image(7)}
+        for t, (name, img) in enumerate(olds.items()):
+            path = os.path.join(self.out, name)
+            self.write(path, img + release_firmware.sign(img) + b'TILTSIG1')
+            os.utime(path, (1000 + t, 1000 + t))
+        self.write(os.path.join(self.out, 'notes.txt'), 'not an image')
+        stable = {'version': '2.3.0', 'file': 'tilt-2.3.0.bin'}
+        self.write(os.path.join(self.out, 'firmware.json'), json.dumps({'stable': stable}))
+        self.assertIn('beta 2.4.0-beta1', self.main('beta', '--notes', 'try it'))
+        listing = self.listing()
+        self.assertEqual(listing['stable'], stable)
+        beta = listing['beta']
+        with open(os.path.join(self.out, 'tilt-2.4.0-beta1.bin'), 'rb') as f:
+            data = f.read()
+        self.assertEqual((beta['file'], beta['size'], beta['sha256'], beta['notes']),
+                         ('tilt-2.4.0-beta1.bin', len(data), hashlib.sha256(data).hexdigest(), 'try it'))
+        self.assertEqual([p['from'] for p in beta['patches']], [img[-32:].hex() for img in olds.values()])
+        self.assertEqual([p['file'] for p in beta['patches']],
+                         ['tilt-2.4.0-beta1-from-2.2.0.patch', 'tilt-2.4.0-beta1-from-2.3.0.patch'])
+        for p in beta['patches']:
+            with open(os.path.join(self.out, p['file']), 'rb') as f:
+                patch = f.read()
+            self.assertEqual((p['size'], p['sha256']), (len(patch), hashlib.sha256(patch).hexdigest()))
+        self.assertEqual(self.builds[0][2], 'build-release')
+
+    def test_no_signing_key_says_where_it_should_be(self):
+        from unittest import mock
+        missing = os.path.join(self.d, 'none.pem')
+        with mock.patch.object(release_firmware, 'KEY', missing):
+            with self.assertRaises(SystemExit) as e:
+                self.main('beta')
+        self.assertEqual(e.exception.code, 'no signing key at ' + missing)
+
+
 class ReleaseCI(unittest.TestCase):
     def test_parse_tag(self):
         self.assertEqual(release_ci.parse_tag('fw-v2.3.0'), ('controller', '2.3.0', 'stable'))
@@ -109,6 +307,91 @@ class ReleaseCI(unittest.TestCase):
                    'beta': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
                    'hub': {'file': 'tilt-hub-0.3.4.bin'}}
         self.assertEqual(release_ci.listed_files(listing), ['tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin'])
+
+    def test_get_sends_the_token_only_to_the_github_api(self):
+        from unittest import mock
+        seen = []
+
+        class Answer:
+            def read(self):
+                return b'body'
+
+        def urlopen(req, timeout):
+            seen.append((req.full_url, {k.lower(): v for k, v in req.header_items()}, timeout))
+            return Answer()
+        with mock.patch.object(release_ci.urllib.request, 'urlopen', urlopen), \
+                mock.patch.dict(os.environ, {'GITHUB_TOKEN': 'tok'}):
+            self.assertEqual(release_ci._get('https://api.github.com/repos/x/releases'), b'body')
+            release_ci._get('https://github.com/x/releases/download/a.bin')
+        with mock.patch.object(release_ci.urllib.request, 'urlopen', urlopen), mock.patch.dict(os.environ):
+            os.environ.pop('GITHUB_TOKEN', None)
+            release_ci._get('https://api.github.com/repos/x/releases')
+        self.assertEqual(seen[0][1]['authorization'], 'Bearer tok')
+        self.assertEqual(seen[0][1]['user-agent'], 'tilt-release')
+        self.assertEqual(seen[0][2], 60)
+        self.assertNotIn('authorization', seen[1][1])
+        self.assertNotIn('authorization', seen[2][1])
+
+    def run_main(self, *args):
+        import contextlib, io
+        from unittest import mock
+        with mock.patch.object(sys, 'argv', ['release_ci.py', *args]), contextlib.redirect_stdout(io.StringIO()) as said:
+            release_ci.main()
+        return said.getvalue()
+
+    def test_check_tag(self):
+        version = release_ci.code_version('controller')
+        kind = 'beta' if '-' in version else 'stable'
+        self.assertEqual(self.run_main('check-tag', 'fw-v' + version), 'kind=controller\nversion=%s\nchannel=%s\n' % (version, kind))
+        hub = release_ci.code_version('hub')
+        self.assertEqual(self.run_main('check-tag', 'hub-v' + hub), 'kind=hub\nversion=%s\nchannel=hub\n' % hub)
+        with self.assertRaises(SystemExit) as e:
+            self.run_main('check-tag', 'fw-v9.9.9')
+        self.assertIn('the tag says 9.9.9, the code says %s' % version, e.exception.code)
+
+    def test_fetch_and_verify_from_the_command_line(self):
+        from unittest import mock
+        calls = []
+        with mock.patch.object(release_ci, 'fetch', lambda: calls.append('fetch')), \
+                mock.patch.object(release_ci, 'verify', lambda pub: calls.append(('verify', pub))):
+            self.run_main('fetch')
+            self.run_main('verify', 'p.pem')
+        self.assertEqual(calls, ['fetch', ('verify', 'p.pem')])
+
+    def test_fetch_with_nothing_published(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(release_ci, '_get', lambda url: b'[]'):
+            import contextlib, io
+            with contextlib.redirect_stdout(io.StringIO()) as said:
+                release_ci.fetch(d)
+            self.assertIn('nothing published yet', said.getvalue())
+            self.assertEqual(release_ci.fetched_names(d), [])
+
+    def test_files_names_firmware_json_and_every_file_it_lists(self):
+        import json
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(release_ci, 'OUT', d):
+            listing = {'stable': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                       'hub': {'file': 'tilt-hub-0.3.4.bin'}}
+            with open(os.path.join(d, 'firmware.json'), 'w') as f:
+                json.dump(listing, f)
+            for name in ('tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin'):
+                open(os.path.join(d, name), 'w').close()
+            self.assertEqual(self.run_main('files').split(), [os.path.join(d, n) for n in
+                             ('firmware.json', 'tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin')])
+            os.unlink(os.path.join(d, 'tilt-2.3.0-from-2.2.0.patch'))
+            with self.assertRaises(SystemExit) as e:
+                self.run_main('files')
+            self.assertEqual(e.exception.code, 'missing ' + os.path.join(d, 'tilt-2.3.0-from-2.2.0.patch'))
+
+    def test_no_command_prints_the_usage(self):
+        with self.assertRaises(SystemExit) as e:
+            self.run_main()
+        self.assertIn('check-tag', e.exception.code)
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'release_ci.py'), 'nonsense'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('check-tag', r.stderr)
 
 
 class Orient(unittest.TestCase):
