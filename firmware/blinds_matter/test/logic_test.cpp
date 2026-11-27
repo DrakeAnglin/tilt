@@ -862,6 +862,19 @@ int main() {
   CHECK(routeRule("/api/nothing") == nullptr && routeRule("/") == nullptr && routeRule("/x/pair") == nullptr, "an unknown command is not a route");
   CHECK(routeRule("/api/openapi") == nullptr, "the old open-API switch is gone: refused like any unknown command");
 
+  // ---- the role word in the event log: the glossary's Guest, never "user" (CONTEXT.md)
+  CHECK(!strcmp(roleWord(true), "owner"), "log role word: owner");
+  CHECK(!strcmp(roleWord(false), "guest"), "log role word: guest");
+  for (const char *path : {"../main/people.h", "../main/hub_link.h"}) {
+    std::string s = readFile(path);
+    for (char &c : s) c = (char)tolower((unsigned char)c);
+    auto wordChar = [](char c) { return isalnum((unsigned char)c) || c == '_'; };
+    bool found = false;
+    for (size_t at = s.find("user"); at != std::string::npos; at = s.find("user", at + 1))
+      if ((at == 0 || !wordChar(s[at - 1])) && (at + 4 >= s.size() || !wordChar(s[at + 4]))) found = true;
+    CHECK(!s.empty() && !found, "people.h and hub_link.h never say \"user\": a Guest");
+  }
+
   // ---- the owner's firmware update window (web.h hOtaOpen sets it; hub_link.h hubOtaBegin asks this)
   {
     const uint64_t B31 = 1ULL << 31, B32 = 1ULL << 32;

@@ -58,7 +58,7 @@ esp_err_t hApprove(httpd_req_t *r) {             // owner: answer a phone that a
   uint8_t id[8];
   if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) {
-    if (arg(r, "ok") == "1") { keys[i].used = 1; keys[i].role = arg(r, "owner") == "1" ? 1 : 0; lastCtr[i] = 0; event("%s approved (%s)", keys[i].name, keys[i].role ? "owner" : "user"); }
+    if (arg(r, "ok") == "1") { keys[i].used = 1; keys[i].role = arg(r, "owner") == "1" ? 1 : 0; lastCtr[i] = 0; event("%s approved (%s)", keys[i].name, roleWord(keys[i].role)); }
     else { event("%s turned down", keys[i].name); memset(&keys[i], 0, sizeof keys[i]); }
     keysSave();
     return ok(r);
@@ -80,7 +80,7 @@ void recoverTick() {                             // from webTick, once a second
     return;
   }
   // The turning has to be by hand. If a motor runs at all (a paired phone could send a blind to these positions), the
-  // attempt is over: otherwise a user could make themself an owner without touching the blind.
+  // attempt is over: otherwise a Guest could make themself an owner without touching the blind.
   if (moving() || movesEver() != recover.moves) {
     memset(&k, 0, sizeof k); keysSave(); recover.slot = -1;
     event("recovery stopped: a motor ran");
@@ -139,10 +139,10 @@ esp_err_t hMakeOwner(httpd_req_t *r) {           // owner: give another phone th
   Lock l;
   uint8_t id[8];
   if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
-  bool on = arg(r, "on") != "0";                 // on=0: back to a user
+  bool on = arg(r, "on") != "0";                 // on=0: back to a Guest
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && !memcmp(keys[i].id, id, 8)) {
     if (!on && i == secClient) return fail(r, "you cannot change yourself");
-    keys[i].role = on ? 1 : 0; keysSave(); event("%s is now %s", keys[i].name, on ? "an owner" : "a user"); return ok(r);
+    keys[i].role = on ? 1 : 0; keysSave(); event("%s is now %s %s", keys[i].name, on ? "an" : "a", roleWord(on)); return ok(r);
   }
   return fail(r, "no such phone");
 }
