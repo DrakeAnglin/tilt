@@ -104,9 +104,15 @@ writes them into the hub before its first start, and keeps them in `~/.tilt/devi
 label there as a PNG and a PDF (it prints the path): a QR and the 11 digits for Apple Home, the setup code for the
 Tilt app, and the hub's short ID.
 
-- The default label is 40 x 20 mm at 300 dpi, a face of the hub box. Another size: `--label-size 50x25` (mm). A size
-  too small for a QR a phone can read is refused, with the smallest that works.
-- Print it again any time: `tools/device_identity.py labels <short ID>` (or `--all`).
+- **Once per Mac:** the label needs Pillow in the ESP-IDF Python the tool runs with:
+  `~/.espressif/python_env/idf5.5_py3.9_env/bin/python -m pip install pillow qrcode`. Without it the flash and the
+  record still work, and the tool prints the command for the label.
+- The default label is a 1 x 1 in (25 x 25 mm) square at 300 dpi. Another size: `--label-size 40x20` (mm). A size
+  too small for a QR a phone can read is refused before anything is flashed, with the smallest that works.
+- Print it again any time, with the same Python:
+  `~/.espressif/python_env/idf5.5_py3.9_env/bin/python tools/device_identity.py labels <short ID>` (or `--all`).
+- If a flash stops partway (a cable, the port), run the same command again: the codes are saved on the Mac before
+  anything is written to the hub, and the rerun finishes with the same codes. Unplug and replug the hub after a stop.
 - A reflash or an update keeps the codes, so the label keeps working. A hub erased over USB gets the same codes back
   from this Mac. Only the developer flag `--new-identity` makes new ones, after you type the hub's short ID.
 - A new hub can be scanned into Apple Home from its label in its first 15 minutes after power-on. Later, use **Add**

@@ -132,9 +132,12 @@ def has_code(nvs_dump):
 
 def plan(record, nvs_dump, new_identity):
     """new: make one and write it. restore: write the saved one back. firmware: firmware only. own: firmware only, the
-    device made its own code. replace: wipe and make a new one (--new-identity, asked first)."""
+    device made its own code. replace: wipe and make a new one (--new-identity, asked first). resume: a run that made
+    a code did not finish (its record is still marked pending): wipe and write that code, then finish."""
     if new_identity:
         return 'replace'
+    if record and record.get('pending'):
+        return 'resume'
     if has_code(nvs_dump):
         return 'firmware' if record else 'own'
     return 'restore' if record else 'new'
@@ -190,7 +193,7 @@ def find(key):
 
 
 # ---- the setup label (Pillow + qrcode)
-DEFAULT_SIZE = (40.0, 20.0)                      # mm: fits a face of the 46.9 x 21.8 mm hub box
+DEFAULT_SIZE = (25.0, 25.0)                      # mm: a 1 x 1 in square label (the issue's default)
 DPI = 300
 MIN_MODULE_PX = 3                                # the smallest QR module a phone still reads at 300 dpi
 
@@ -198,7 +201,7 @@ MIN_MODULE_PX = 3                                # the smallest QR module a phon
 def parse_size(text):
     m = re.fullmatch(r'\s*(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*', text)
     if not m or float(m.group(1)) <= 0 or float(m.group(2)) <= 0:
-        raise ValueError('label size is W x H in mm, for example 40x20')
+        raise ValueError('label size is W x H in mm, for example 25x25')
     return float(m.group(1)), float(m.group(2))
 
 
@@ -215,7 +218,7 @@ def _font(size):
 
 
 def _text(draw, box, lines):
-    """Lines in the box (x0, y0, x1, y1), as large as fits, the code lines larger than their headings."""
+    """Lines in the box (x0, y0, x1, y1), all at one size, as large as fits."""
     x0, y0, x1, y1 = box
     size = int((y1 - y0) / (len(lines) * 1.15))
     while size > 6:
@@ -245,20 +248,27 @@ def label_image(record, size_mm=DEFAULT_SIZE, dpi=DPI):
     q.make(fit=True)
     matrix = q.get_matrix()                       # with its 4-module quiet zone
     n = len(matrix)
-    side = min(h, w // 2)
+    wide = w >= 1.6 * h                          # wide: the QR on the left; square or tall: the QR above the text
+    side = min(h, w // 2) if wide else min(w, int(h * 0.55))
     px = side // n
     if px < MIN_MODULE_PX:
         need = MIN_MODULE_PX * n
         mm = lambda p: -(-p * 254 // (dpi * 10))  # px to whole mm, rounded up
         raise ValueError('a %g x %g mm label is too small for a QR that scans: the smallest that works is %d x %d mm'
                          % (size_mm[0], size_mm[1], mm(2 * need), mm(need)))
-    x0, y0 = (side - px * n) // 2, (h - px * n) // 2
+    if wide:
+        x0, y0 = (side - px * n) // 2, (h - px * n) // 2
+        box = (side + pad, pad, w - pad, h - pad)
+        lines = ['Apple Home', dashed(record['manual_code']), 'Tilt app', dashed(record['setup_code']), 'ID ' + record['short']]
+    else:
+        x0, y0 = (w - px * n) // 2, 0
+        box = (pad, px * n, w - pad, h - pad)
+        lines = ['Apple Home ' + dashed(record['manual_code']), 'Tilt app ' + dashed(record['setup_code']), 'ID ' + record['short']]
     for r, row in enumerate(matrix):
         for c, dark in enumerate(row):
             if dark:
                 draw.rectangle([x0 + c * px, y0 + r * px, x0 + (c + 1) * px - 1, y0 + (r + 1) * px - 1], fill=0)
-    _text(draw, (side + pad, pad, w - pad, h - pad),
-          ['Apple Home', dashed(record['manual_code']), 'Tilt app', dashed(record['setup_code']), 'ID ' + record['short']])
+    _text(draw, box, lines)
     return img, (x0, y0, px)
 
 
@@ -325,14 +335,33 @@ def _today():
     return datetime.date.today().isoformat()
 
 
+def no_label_libraries(short):
+    """What to run when Pillow or qrcode is missing: with this same Python, which also has esptool."""
+    me = os.path.abspath(__file__)
+    return ('no label: this Python has no Pillow or qrcode. Once: %s -m pip install pillow qrcode\n'
+            'then: %s %s labels %s' % (sys.executable, sys.executable, me, short))
+
+
 def _write_label(rec, size_mm, out):
     try:
         png, _ = label(rec, size_mm)
     except ImportError:
-        print('record saved; for its label: %s -m pip install pillow qrcode, then tools/device_identity.py labels %s'
-              % (sys.executable, rec['short']), file=out)
+        print('record saved. ' + no_label_libraries(rec['short']), file=out)
         return
     print('label: %s (and .pdf)' % png, file=out)
+
+
+def _check_size(kind, size_mm):
+    """Refuse a label size before anything touches the device (a dummy code of the real length)."""
+    dummy = {'kind': kind, 'id': 'hub000000000000', 'short': '0000', 'manual_code': '0' * 11, 'setup_code': '0' * 8,
+             'qr': qr_payload(0xFFF, 99999998, 0xFFFF, 0xFFFF)}
+    try:
+        label_image(dummy, size_mm)
+    except ImportError:
+        pass
+
+
+UNPLUG = 'Unplug the device and plug it back in to start it.'
 
 
 def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_ask, out=None, fw_dir=None):
@@ -344,6 +373,11 @@ def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_a
     if new_identity and kind != 'hub':
         print('refused: a controller has no code from the Mac (reset it from the app)', file=out)
         return 1
+    try:
+        _check_size(kind, size_mm)
+    except ValueError as e:
+        print('refused: %s' % e, file=out)
+        return 1
     typed = None
     if new_identity:
         typed = ask('This wipes the hub\'s saved data and gives it a new code: the old label stops working.\n'
@@ -352,12 +386,13 @@ def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_a
             print('refused: --new-identity asks first, and there is no terminal to ask on', file=out)
             return 1
     tmp = tempfile.mkdtemp(prefix='tilt-nvs-')    # 0700; the device's saved data and the NVS image never stay
+    record = None
     try:
         mac = parse_mac(run(esptool + ['read_mac']))
         dev_id = ('hub' if kind == 'hub' else '') + mac
         short = dev_id[-4:]
         if typed is not None and typed.strip().lower() != short:
-            print('refused: that is not this hub\'s short ID; nothing was changed', file=out)
+            print('refused: that is not this hub\'s short ID; nothing was changed. ' + UNPLUG, file=out)
             return 1
         from release_ci import code_version
         record = load(dev_id)
@@ -373,17 +408,25 @@ def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_a
         dump = os.path.join(tmp, 'nvs-read.bin')
         run(esptool + ['read_flash', offset, size, dump])
         with open(dump, 'rb') as f:
-            action = plan(record, f.read(), new_identity)
+            saved = f.read()
+        action = plan(record, saved, new_identity)
+        # NVS keeps a blob's bytes in a row, so the record's 144 bytes are in the dump when the hub has its code.
+        mismatch = action == 'firmware' and 'salt' in record and home_code_blob(record) not in saved
         run([build], cwd=fw_dir)
         if action in ('new', 'replace'):
             vid, pid = vendor_product(fw_dir)
             ident = _make_identity()
-            record = dict(ident, kind='hub', id=dev_id, short=short, flashed=_today(), firmware=code_version('hub'),
-                          manual_code=manual_code(ident['discriminator'], ident['passcode']),
-                          qr=qr_payload(ident['discriminator'], ident['passcode'], vid, pid))
-            if action == 'replace':
-                run(esptool + ['erase_region', offset, size])
-        if action in ('new', 'restore', 'replace'):
+            fresh = dict(ident, kind='hub', id=dev_id, short=short, flashed=_today(), firmware=code_version('hub'),
+                         manual_code=manual_code(ident['discriminator'], ident['passcode']),
+                         qr=qr_payload(ident['discriminator'], ident['passcode'], vid, pid), pending=True)
+            old = _path(dev_id)
+            if action == 'replace' and os.path.exists(old):
+                os.replace(old, old[:-5] + '.replaced-%s.json' % datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
+            record = fresh
+            save(record)                          # before anything is written to the hub: a code is never lost
+        if action in ('replace', 'resume'):
+            run(esptool + ['erase_region', offset, size])
+        if action in ('new', 'restore', 'replace', 'resume'):
             csv_path, image = os.path.join(tmp, 'nvs.csv'), os.path.join(tmp, 'nvs.bin')
             fd = os.open(csv_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, 'w') as f:
@@ -391,21 +434,26 @@ def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_a
             run([sys.executable, '-m', 'esp_idf_nvs_partition_gen', 'generate', csv_path, image, size])
             run(esptool + ['write_flash', offset, image])
         run([build, '-p', port, 'flash'], cwd=fw_dir)
-        if action in ('new', 'replace'):
-            old = _path(dev_id)
-            if action == 'replace' and os.path.exists(old):
-                os.replace(old, old[:-5] + '.replaced-%s.json' % datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
+        if action in ('new', 'replace', 'resume'):
+            record.pop('pending', None)
             print('record: %s' % save(record), file=out)
             _write_label(record, size_mm, out)
         elif action == 'restore':
             print('wrote its saved code back: the old label still works', file=out)
         elif action == 'own':
             print('this hub made its own code before (the app shows it); no record or label made', file=out)
+        elif mismatch:
+            print('firmware only. Warning: the code on this hub is not the one saved on this Mac, so its label from '
+                  'this Mac does not match it (the app shows the hub\'s own code)', file=out)
         else:
             print('firmware only: its code is unchanged', file=out)
         return 0
     except RuntimeError as e:
         print(str(e), file=out)
+        if record and record.get('pending'):
+            print('Its new code is saved on this Mac: run the same command again, without --new-identity, to finish.',
+                  file=out)
+        print(UNPLUG, file=out)
         return 1
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -419,11 +467,11 @@ def main(argv=None):
     f.add_argument('--port', required=True)
     f.add_argument('--new-identity', action='store_true',
                    help='developer flag: wipe the hub\'s saved data and make a new code (asks first)')
-    f.add_argument('--label-size', type=parse_size, default=DEFAULT_SIZE, metavar='WxH', help='mm (default 40x20)')
+    f.add_argument('--label-size', type=parse_size, default=DEFAULT_SIZE, metavar='WxH', help='mm (default 25x25)')
     lb = sub.add_parser('labels', help='write a saved device\'s label again')
     lb.add_argument('device', nargs='?', help='full or short ID')
     lb.add_argument('--all', action='store_true')
-    lb.add_argument('--label-size', type=parse_size, default=DEFAULT_SIZE, metavar='WxH', help='mm (default 40x20)')
+    lb.add_argument('--label-size', type=parse_size, default=DEFAULT_SIZE, metavar='WxH', help='mm (default 25x25)')
     a = p.parse_args(argv)
     if a.cmd == 'flash':
         return flash(a.kind, a.port, a.new_identity, a.label_size)
@@ -433,6 +481,9 @@ def main(argv=None):
             print('label: %s (and .pdf)' % label(r, a.label_size)[0])
     except (LookupError, ValueError) as e:
         print(e)
+        return 1
+    except ImportError:
+        print(no_label_libraries(a.device or '--all'))
         return 1
     return 0
 

@@ -564,6 +564,9 @@ class DeviceIdentity(unittest.TestCase):
         for r in (None, rec):
             for dump in (self.EMPTY, self.WITH_CODE):
                 self.assertEqual(self.di.plan(r, dump, True), 'replace')
+        pending = dict(rec, pending=True)                                       # a run that made a code did not finish
+        for dump in (self.EMPTY, self.WITH_CODE):
+            self.assertEqual(self.di.plan(pending, dump, False), 'resume')
 
     def records(self):
         d = tempfile.mkdtemp()
@@ -610,27 +613,30 @@ class DeviceIdentity(unittest.TestCase):
         from PIL import Image
         self.records()
         rec = self.hub_record()
-        png, pdf = self.di.label(rec)
-        self.assertEqual(os.path.dirname(png), self.di.devices_dir())
-        img = Image.open(png).convert('L')
-        self.assertEqual(img.size, (472, 236))                    # 40 x 20 mm at 300 dpi
         q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=4)
         q.add_data(rec['qr'])
         q.make(fit=True)
         matrix = q.get_matrix()
-        _, (x0, y0, px) = self.di.label_image(rec, (40, 20), 300)
-        self.assertGreaterEqual(px, 3)
-        for r, row in enumerate(matrix):
-            for c, dark in enumerate(row):
-                self.assertEqual(img.getpixel((x0 + c * px + px // 2, y0 + r * px + px // 2)) < 128, dark, (r, c))
-        with open(pdf, 'rb') as f:
-            body = f.read()
-        self.assertTrue(body.startswith(b'%PDF'))
-        import re
-        box = [float(v) for v in re.search(rb'/MediaBox \[\s*([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)', body).groups()]
-        self.assertAlmostEqual((box[2] - box[0]) * 25.4 / 72, 40, delta=0.1)
-        self.assertAlmostEqual((box[3] - box[1]) * 25.4 / 72, 20, delta=0.1)
-        self.assertEqual(os.stat(png).st_mode & 0o777, 0o600)
+        # The default: a 1 x 1 in (25 x 25 mm) square at 300 dpi, the issue's size. And a wide one.
+        for size_mm, px_size in (((25, 25), (295, 295)), ((40, 20), (472, 236))):
+            png, pdf = self.di.label(rec) if size_mm == (25, 25) else self.di.label(rec, size_mm)
+            self.assertEqual(os.path.dirname(png), self.di.devices_dir())
+            img = Image.open(png).convert('L')
+            self.assertEqual(img.size, px_size)
+            _, (x0, y0, px) = self.di.label_image(rec, size_mm, 300)
+            self.assertGreaterEqual(px, 3)
+            for r, row in enumerate(matrix):
+                for c, dark in enumerate(row):
+                    self.assertEqual(img.getpixel((x0 + c * px + px // 2, y0 + r * px + px // 2)) < 128, dark, (r, c))
+            with open(pdf, 'rb') as f:
+                body = f.read()
+            self.assertTrue(body.startswith(b'%PDF'))
+            import re
+            box = [float(v) for v in re.search(rb'/MediaBox \[\s*([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)', body).groups()]
+            self.assertAlmostEqual((box[2] - box[0]) * 25.4 / 72, size_mm[0], delta=0.1)
+            self.assertAlmostEqual((box[3] - box[1]) * 25.4 / 72, size_mm[1], delta=0.1)
+            self.assertEqual(os.stat(png).st_mode & 0o777, 0o600)
+        self.assertEqual(self.di.DEFAULT_SIZE, (25.0, 25.0))
 
     @unittest.skipUnless(_has('qrcode', 'PIL'), 'needs qrcode and pillow')
     def test_label_too_small_for_the_qr_is_refused_with_the_smallest_size(self):
@@ -646,17 +652,23 @@ class DeviceIdentity(unittest.TestCase):
     def test_controller_label_has_no_qr(self):
         self.records()
         rec = {'kind': 'controller', 'id': '404ccaffab12', 'short': 'ab12', 'flashed': '2026-11-26', 'firmware': '2.4.0'}
-        img, qr_box = self.di.label_image(rec, (40, 20), 300)
+        img, qr_box = self.di.label_image(rec)
         self.assertIsNone(qr_box)
-        self.assertEqual(img.size, (472, 236))
+        self.assertEqual(img.size, (295, 295))
 
     class FakeDevice:
         """Stands in for esptool, the NVS image tool and build.sh: keeps what each command was, and the device's NVS."""
         def __init__(self, nvs):
-            self.nvs, self.cmds, self.csvs, self.paths = nvs, [], [], []
+            self.nvs, self.cmds, self.csvs, self.paths, self.fail = nvs, [], [], [], None
 
         def __call__(self, cmd, cwd=None):
             line = ' '.join(cmd)
+            step = ('wipe' if 'erase_region' in cmd else 'write' if 'write_flash' in cmd else
+                    'nvs_image' if 'esp_idf_nvs_partition_gen' in line else
+                    'flash' if cmd[0].endswith('build.sh') and 'flash' in cmd else None)
+            if step and step == self.fail:
+                self.cmds.append(step + ' failed')
+                raise RuntimeError('%s failed: the cable came out' % step)
             self.paths += [a for a in cmd if 'tilt-nvs-' in a]             # the tool's own temp folder
             if 'read_mac' in cmd:
                 self.cmds.append('read_mac')
@@ -676,7 +688,8 @@ class DeviceIdentity(unittest.TestCase):
                 self.cmds.append('nvs_image')
             elif 'write_flash' in cmd:
                 self.cmds.append('write')
-                self.nvs = b'homecode\0'
+                blob = self.csvs[-1].split('homecode,data,hex2bin,')[1].split(',')[0].split('\n')[0]
+                self.nvs = b'homecode\0' + bytes.fromhex(blob)        # NVS keeps a blob's bytes in a row
             elif cmd[0].endswith('build.sh'):
                 self.cmds.append('flash' if 'flash' in cmd else 'build')
             return 'ok\n'
@@ -739,6 +752,82 @@ class DeviceIdentity(unittest.TestCase):
         self.assertEqual((code, dev.cmds), (0, ['read_mac', 'read_flash', 'build', 'flash']))
         self.assertIn('made its own', out)
         self.assertEqual(self.di.records(), [])
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_a_failed_step_never_loses_a_new_code(self):
+        for fail in ('nvs_image', 'write', 'flash'):
+            self.records()
+            dev = self.FakeDevice(self.EMPTY)
+            dev.fail = fail
+            code, out = self.flash('hub', dev)
+            self.assertEqual(code, 1, fail)
+            self.assertIn('Unplug', out)
+            rec = self.di.load('hub404ccaee1234')                     # saved before anything was written
+            self.assertTrue(rec['pending'], fail)
+            dev.fail, dev.cmds = None, []
+            self.assertEqual(self.flash('hub', dev)[0], 0)              # the rerun finishes it with the same code
+            self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'wipe', 'nvs_image', 'write', 'flash'])
+            done = self.di.load('hub404ccaee1234')
+            self.assertNotIn('pending', done)
+            self.assertEqual(done['salt'], rec['salt'])
+            self.assertIn(self.di.home_code_blob(done), dev.nvs)
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_a_failed_new_identity_keeps_the_new_code_and_the_old_record(self):
+        for fail in ('wipe', 'write', 'flash'):
+            self.records()
+            dev = self.FakeDevice(self.EMPTY)
+            self.flash('hub', dev)
+            first = self.di.load('hub404ccaee1234')
+            dev.fail, dev.cmds = fail, []
+            code, out = self.flash('hub', dev, new_identity=True, ask=lambda p: '1234')
+            self.assertEqual(code, 1, fail)
+            self.assertIn('run the same command again', out)
+            new = self.di.load('hub404ccaee1234')
+            self.assertTrue(new['pending'])
+            self.assertNotEqual(new['salt'], first['salt'])
+            old = [n for n in os.listdir(self.di.devices_dir()) if '.replaced-' in n]
+            self.assertEqual(len(old), 1)
+            dev.fail = None
+            code, out = self.flash('hub', dev)
+            self.assertEqual(code, 0)
+            self.assertEqual(self.di.load('hub404ccaee1234')['salt'], new['salt'])
+            self.assertIn(self.di.home_code_blob(new), dev.nvs)
+            self.assertNotIn('Warning', out)
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_firmware_only_warns_when_the_hub_has_another_code(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        self.flash('hub', dev)
+        dev.nvs = self.WITH_CODE                                       # set up from another Mac, say
+        code, out = self.flash('hub', dev)
+        self.assertEqual(code, 0)
+        self.assertIn('not the one saved on this Mac', out)
+
+    @unittest.skipUnless(_has('qrcode', 'PIL'), 'needs qrcode and pillow')
+    def test_label_size_is_checked_before_the_device_is_touched(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        code, out = self.flash('hub', dev, size_mm=(10, 10))
+        self.assertEqual((code, dev.cmds), (1, []))
+        self.assertIn('17 x 9 mm', out)
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_without_the_label_libraries_the_flash_still_saves_and_says_what_to_run(self):
+        import io, sys as _sys
+        from unittest import mock
+        self.records()
+        with mock.patch.dict(_sys.modules, {'PIL': None, 'qrcode': None}):
+            code, out = self.flash('hub', self.FakeDevice(self.EMPTY))
+            self.assertEqual(code, 0)
+            self.assertTrue(self.di.load('hub404ccaee1234'))
+            self.assertIn(_sys.executable + ' -m pip install pillow qrcode', out)
+            self.assertIn('%s %s labels 1234' % (_sys.executable, self.di.__file__), out)
+            buf = io.StringIO()
+            with mock.patch('sys.stdout', buf):
+                self.assertEqual(self.di.main(['labels', '1234']), 1)       # no traceback
+            self.assertIn('pip install pillow qrcode', buf.getvalue())
 
     @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
     def test_new_identity_asks_for_the_short_id(self):

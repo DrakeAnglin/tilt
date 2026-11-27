@@ -14,7 +14,7 @@ Build the Tilt Hub firmware and install it.
   tools/flash_hub.sh [hub address]     over Wi-Fi: an update (the hub keeps its codes)
   tools/flash_hub.sh --usb <port> [--label-size WxH] [--new-identity]
                                        the first flash, over USB: a new hub gets its Apple Home code and setup code,
-                                       saved in ~/.tilt/devices on this Mac, and a setup label (PNG and PDF, 40x20 mm)
+                                       saved in ~/.tilt/devices on this Mac, and a setup label (PNG and PDF, 25x25 mm)
   --new-identity   developer flag: wipe the hub's saved data and make new codes; asks for its short ID first
 More: tools/device_identity.py --help
 EOF
