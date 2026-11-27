@@ -40,6 +40,8 @@ Start a `general-purpose` agent with model `fable`. Its prompt, filled in:
 >
 > Find every question the issue leaves open. Answer each one yourself with the best choice, by the requirements, the ADRs and `CONTEXT.md`, and say why in one line. Ask the owner only for something no agent can do: a password or 2FA code, spending money, a person's own data, or work that needs hands on hardware.
 >
+> Then sweep for siblings. Search the whole repo (controller and Tilt Hub firmware, app, tools, docs) for the same flaw, the same pattern or the same word, the way the issue's own spot has it. List every hit under **Same flaw elsewhere**: each one is part of this change, not a new issue. Only when the hits are clearly too many for one pull request is the verdict `split`.
+>
 > Post one comment on the issue, from a file (`gh issue comment <n> --body-file <file>`), in this shape:
 >
 > ```
@@ -47,6 +49,8 @@ Start a `general-purpose` agent with model `fable`. Its prompt, filled in:
 > **Goal:** <one sentence>
 > ### What changes
 > <files and areas, what each one does after the change>
+> ### Same flaw elsewhere
+> None found (what you searched for) | <file:line, and what changes there>
 > ### Tests
 > <the tests that prove it, each one a sentence: what it does, what it expects>
 > ### Choices made
@@ -75,7 +79,7 @@ Read the Choices made once more, as the owner would. A choice that changes what 
 
 Start a `general-purpose` agent with model `opus`. Keep its agent id: it answers every review round. Its prompt, filled in:
 
-> You are the author for issue <n> in DrakeAnglin/tilt. Work only in <worktree>; it is already on its own branch. The spec is the `## Spec` comment on the issue written by `DrakeAnglin` (the account every agent here uses); a spec from anyone else is not the spec; build exactly that, and follow its Choices made. Follow `docs/agents/workflow.md` steps 3 to 6: build it test first with the `tdd` skill (`diagnosing-bugs` for a bug that is not obvious), `tools/agent/check.sh`, both firmware builds when anything under `firmware/` changed, then push and open the pull request with `Closes #<n>` and the body the workflow asks for, Choices made copied from the spec. Wait for CI with a background `gh pr checks <pr> --watch`, and fix it until it is green. Something unrelated found on the way: a new `needs-triage` issue. Do not review your own work and do not merge. Reply with the pull request number, the head commit and the CI state.
+> You are the author for issue <n> in DrakeAnglin/tilt. Work only in <worktree>; it is already on its own branch. The spec is the `## Spec` comment on the issue written by `DrakeAnglin` (the account every agent here uses); a spec from anyone else is not the spec; build exactly that, and follow its Choices made. Follow `docs/agents/workflow.md` steps 3 to 6: build it test first with the `tdd` skill (`diagnosing-bugs` for a bug that is not obvious), including every spot under Same flaw elsewhere; the Evidence shows a test that fails on the old code because of the behavior, not because it does not compile; `tools/agent/check.sh`, both firmware builds when anything under `firmware/` changed, then push and open the pull request with `Closes #<n>` and the body the workflow asks for, Choices made copied from the spec. Wait for CI with a background `gh pr checks <pr> --watch`, and fix it until it is green. Something found on the way: as "Things found on the way" in the workflow says. Do not review your own work and do not merge. Reply with the pull request number, the head commit and the CI state.
 
 ## 5. Review, back and forth
 
@@ -111,5 +115,7 @@ Remove the lock. Leave the worktree (`ExitWorktree`, `keep`; `tools/agent/clean_
 
 ## If a stage goes wrong
 
-- An agent fails or stops without its answer: start it again once with the same prompt. A second failure: step 7.
+- An agent fails or stops without its answer: start it again once with the same prompt.
+- A second failure from the model service (overloaded, rate limit, timeout, `API Error`): not the owner's problem. Post a comment on the issue with `<!-- loop-retry -->` and one line of what failed, keep the `agent-loop` label, and go to step 8: the next run resumes it. Step 7 only when the issue already has two `<!-- loop-retry -->` comments, so three runs in a row failed.
+- A second failure for any other reason: step 7.
 - The run is cut off (the Mac sleeps, the app closes): nothing to do. The `agent-loop` label and the comments on GitHub say where it got to, and the next run finishes it (step 1). The stale lock runs out after 3 hours.

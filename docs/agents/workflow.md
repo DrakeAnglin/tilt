@@ -107,11 +107,13 @@ One line, under 200 characters, the thing to act on first. One per hand-over. No
 
 ## Things found on the way
 
-A bug, a smell, a missing test that is not this issue: file it and move on.
+**Same flaw, fix it here.** The same bug, pattern or wrong word in another spot (the other firmware, the app, a doc), and wording or comments in the lines you touch: fix them in this branch and say so in the pull request. Search for them before you open the pull request. Five pull requests for one word cost more than one that sweeps.
+
+**A different problem that matters:** a bug, a risk or a missing test that is not this issue's flaw: file it and move on.
 
 `gh issue create --label needs-triage --label <area> --title "..." --body "Found while working on #<n>. ..."`
 
-Say what was seen, where (file and line), and how to see it again. Do not fix it in this branch.
+Say what was seen, where (file and line), and how to see it again. Do not fix it in this branch. A small nit that is not worth an hour of the loop (a comment in a file you did not touch, a style choice) is a note in the pull request, not an issue.
 
 ## Labels
 
