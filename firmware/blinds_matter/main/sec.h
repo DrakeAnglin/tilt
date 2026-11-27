@@ -173,14 +173,10 @@ struct Caller {
   bool owner;                                    // the phone is an Owner (else a Guest)
   const uint8_t *id;                             // the phone's 8-byte id
 };
-std::string qarg(const std::string &query, const char *key) {
-  char v[80] = "";
-  return httpd_query_key_value(query.c_str(), key, v, sizeof v) == ESP_OK ? std::string(v) : std::string();
-}
 // nullptr: allowed. Otherwise the reason it is refused. Rules about the target (you cannot remove yourself, the last
 // owner stays) live in the handlers; who the caller is and what that lets them do is decided only here.
 const char *permit(const Route &rt, const std::string &query, const Caller &c) {
-  return permitRule(rt.who, c.owner, qarg(query, "cid"), hexOf(c.id, 8));
+  return permitQuery(rt.who, c.owner, query, hexOf(c.id, 8));   // the cid as the handler reads it (api.h arg)
 }
 // The answer is sealed bytes when the status is "200 OK", plain JSON otherwise.
 const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool *fromHub = nullptr) {

@@ -794,6 +794,17 @@ int main() {
     const RouteRule *r = routeRule(path);
     return r ? permitRule(r->who, owner, cid, me) : "not a command";
   };
+  // permit() reads the cid from the whole query with the parser the handlers use (wire.h queryValue), so a Guest
+  // cannot show one cid to the rule and another to the handler (#173 review M2).
+  {
+    const RouteRule *kn = routeRule("/api/keyname");
+    CHECK(kn && !permitQuery(kn->who, false, "cid=" + me + "&name=x", me), "a Guest renames itself");
+    CHECK(kn && permitQuery(kn->who, false, "cid=" + them + "&name=x", me), "a Guest may not rename another phone");
+    CHECK(kn && permitQuery(kn->who, false, "CID=" + me + "&cid=" + them + "&name=x", me), "a cid in other case is not this phone's: refused");
+    CHECK(kn && permitQuery(kn->who, false, "z&cid=" + them + "&cid=" + me + "&name=x", me), "a key with no value cannot hide the cid the handler reads: refused");
+    CHECK(kn && queryValue("z&cid=" + them + "&cid=" + me, "cid") == them, "the handler reads the same first cid the rule refused");
+    CHECK(kn && !permitQuery(kn->who, true, "cid=" + them + "&name=x", me), "an Owner renames any phone");
+  }
   {
     bool roles = routeRuleCount > 30, paths = true, once = true;
     for (int i = 0; i < routeRuleCount; i++) {
