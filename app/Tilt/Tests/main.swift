@@ -1055,6 +1055,7 @@ check(await thrown { try await Secure.hello("[") } == "That address is not valid
 let upAnswer = try await HTTPUploader(session: stubSession).upload(Data("firmware".utf8), to: "10.0.0.2/hub/api/update", timeout: 5)
 check(upAnswer == Data("answer".utf8) && StubHTTP.seen.last?.method == "POST" && StubHTTP.seen.last?.url == "http://10.0.0.2/hub/api/update" && StubHTTP.seen.last?.body == Data("firmware".utf8) && StubHTTP.seen.last?.type == "application/octet-stream", "an upload posts the file and returns the answer")
 check(await thrown { try await HTTPUploader(session: stubSession).upload(Data(), to: "[", timeout: 5) } == "The address is not valid.", "an upload to a bad address throws")
+check(HTTPUploader().session === URLSession.shared, "the app's uploads go on the shared session")
 
 // ---- the secured link (Shared/Secure.swift Link), against a fake controller that opens and seals like sec.h
 final class SealedSide: @unchecked Sendable {
@@ -1104,6 +1105,198 @@ await linkMove.move(to: "h2"); _ = try await linkMove.call("/api/s")
 let movedHost = await linkMove.host
 check(sideMove.log.filter { $0.hasSuffix("hello") } == ["h1 hello", "h2 hello"] && sideMove.log.last == "h2 /api/s @a1b2c3d4" && movedHost == "h2","Link: a new address asks hello again; the same one does not")
 check(LinkProblem.waiting.localizedDescription == "Waiting for an owner to approve this phone." && LinkProblem.notPaired.localizedDescription == "This phone is no longer paired with the controller.", "the two link problems' words")
+
+// ---- the controller list and the Siri / widget actions (Shared/Store.swift), on an in-memory Keychain
+// (the system Keychain is never called here: an unsigned program could stop on a prompt)
+let batt0 = ControllerState.Battery(v: 3.9, pct: 80, st: "battery", low: 0)
+func blindAt(_ t: Double) -> BlindState { BlindState(name: "B", hid: 0, pres: 1, seen: 1, cal: 1, tilt: t, tgt: nil, mov: 0, q: 0, fav: 0, ang: nil, last: "") }
+Keychain.store = MemoryKeychain.self
+let widgetReloads = Cell(0)
+TiltActions.reloadWidgets = { widgetReloads.value += 1 }
+UserDefaults.standard.removeObject(forKey: Prefs.controllers)
+check(TiltActions.records().isEmpty, "nothing published and nothing saved: no controllers")
+let demoRecord = ControllerRecord(id: Demo.id, name: "Living Room (Demo)", host: Demo.host, cid: "00", owner: true, waiting: nil, code: nil)
+UserDefaults.standard.set(try JSONEncoder().encode([demoRecord]), forKey: Prefs.controllers)
+check(TiltActions.records() == [demoRecord], "nothing published: the list the app saved in its settings")
+UserDefaults.standard.removeObject(forKey: Prefs.controllers)
+check(await thrown { try await TiltActions.all { try await $0.goAll(to: "open") } } == "Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?", "no controller: it says so")
+check(widgetReloads.value == 0, "no controller reached: the widget is not reloaded")
+let askingRecord = ControllerRecord(id: "w1", name: "Hall", host: "10.0.0.8", cid: "01", owner: false, waiting: true, code: "1234")
+let keylessRecord = ControllerRecord(id: "k1", name: "Office", host: "10.0.0.9", cid: "02", owner: true, waiting: nil, code: nil)
+TiltActions.publish([demoRecord, askingRecord, keylessRecord])
+Keychain.save(Demo.id, Data(repeating: 7, count: 32)); Keychain.save("w1", Data(repeating: 8, count: 32))
+check(TiltActions.records() == [demoRecord, askingRecord, keylessRecord], "a published list reads back the same")
+check(TiltActions.clients().map(\.0.id) == [Demo.id], "clients: not one waiting for an Owner, not one with no key")
+try await TiltActions.all { try await $0.stop() }
+check(widgetReloads.value == 1, "the demo room reached: the widget is reloaded once")
+_ = try await OpenBlindsIntent().perform()
+check(try await demo.state().b.allSatisfy { $0.tgt == 0 }, "Open Blinds: the demo room's blinds go to 0")
+_ = try await CloseBlindsIntent().perform()
+check(try await demo.state().b.allSatisfy { $0.tgt == 100 }, "Close Blinds: the demo room's blinds go to closed")
+Keychain.delete("w1")
+check(Keychain.load("w1") == nil && Keychain.load(Demo.id) == Data(repeating: 7, count: 32), "a deleted key is gone, the others stay")
+check(demoRecord.onHub == false && ControllerRecord(id: "a", name: "a", host: "10.0.0.2/c/a1", cid: "", owner: true, waiting: nil, code: nil).onHub, "on a hub: the address is <hub>/c/<id>")
+check(blind(mov: 0, q: 0, last: "blocked: no turn").stuck && !blind(mov: 1, last: "blocked: no turn").stuck && !blind(q: 1, last: "blocked: no turn").stuck && !blind(last: "reached open").stuck, "stuck: the last move was blocked, and it is not moving or waiting its turn")
+let wordsState = ControllerState(v: "2.3.0", name: "Den", batt: batt0, closeUp: 1, sync: 0, mv: -1, hk: nil, asks: nil, hkey: nil, me: nil, gentle: nil, topic: nil, b: [blindAt(100), blindAt(96)])
+check(TiltActions.words(wordsState) == "Closed", "the widget's line for a room")
+
+// ---- the rest of the controller commands (Shared/Client.swift), against a scripted controller
+let clog = Recorder()
+let cdev = ControllerClient(transport: ScriptedDevice(name: "c", log: clog, address: "10.0.0.7") { c in
+    switch cmdPath(c) {
+    case Api.config: String(decoding: cfgData, as: UTF8.self)
+    case Api.homeOpen: #"{"ok":1,"code":"34970112332","qr":"MT:X"}"#
+    case Api.dev: #"{"fw":"2.3.0","p":[]}"#
+    case Api.log: #"{"seq":3,"lines":["started","moved"]}"#
+    case Api.scenes: #"{"ok":0,"err":"busy"}"#
+    default: #"{"ok":1}"#
+    }
+})
+func sentTo(_ what: (ControllerClient) async throws -> Void) async -> String? { try? await what(cdev); return clog.all.last.map { String($0.dropFirst(2)) } }
+let cdevName = try await cdev.config().name
+check(await sentTo { _ = try await $0.config() } == "/api/cfg" && cdevName == wcfg.name, "config")
+check(await sentTo { _ = try await $0.schedules() } == "/api/cfg", "Schedules")
+check(await sentTo { try await $0.go(blind: 1, to: "fav") } == "/api/go?b=1&to=fav", "one blind by word")
+check(await sentTo { try await $0.goAll(to: "close", gently: 5) } == "/api/go?b=all&to=close&ramp=5", "all, gently")
+check(await sentTo { try await $0.goAll(to: "open") } == "/api/go?b=all&to=open", "all, not gently")
+check(await sentTo { try await $0.stop() } == "/api/stop", "stop")
+check(await sentTo { await $0.jog(blind: 0, dir: -1, percent: 30) } == "/api/jog?b=0&d=-1&p=30&ms=450", "jog")
+check(await sentTo { try await $0.restart() } == "/api/reboot", "restart")
+check(await sentTo { await $0.watch(blind: 2) } == "/api/watch?b=2", "watch a blind's sensor")
+check(await sentTo { _ = try await $0.mark(blind: 1, "up") } == "/api/mark?b=1&w=up", "mark")
+check(await sentTo { try await $0.revokeAll() } == "/api/revoke?cid=all", "remove everyone")
+check(await sentTo { try await $0.makeOwner(cid: "bb", true) } == "/api/makeowner?cid=bb&on=1", "make an Owner")
+check(await sentTo { try await $0.rename(cid: "bb", to: "Sam") } == "/api/keyname?cid=bb&name=Sam", "rename a phone")
+check(await sentTo { await $0.leave() } == "/api/leave", "take back a Join request")
+check(await sentTo { _ = try await $0.homeSetupCode() } == "/api/homeopen", "Apple Home's code")
+let homeOpen = try await cdev.homeSetupCode()
+check(homeOpen.code == "34970112332" && homeOpen.qr == "MT:X", "Apple Home's code decodes")
+let cdevInfo = await cdev.developerInfo(), cdevLog = await cdev.log()
+check(cdevInfo["fw"] as? String == "2.3.0" && cdevLog == ["started", "moved"], "the developer info and the event log decode")
+let silentCtrl = ControllerClient(transport: Scripted([:]))
+let silentInfo = await silentCtrl.developerInfo(), silentLog = await silentCtrl.log()
+check(silentInfo.isEmpty && silentLog.isEmpty, "no answer: empty developer info and log")
+check(await thrown { try await cdev.scenes() } == "That did not work.", "a Scenes answer that is neither a list nor unknown command")
+check(ppl[0].id == "aa", "a phone's id is its cid")
+let linkHost = await ControllerClient.make(record: keylessRecord, key: SymmetricKey(size: .bits256)).transport.host
+let demoHost = await ControllerClient.make(record: demoRecord, key: SymmetricKey(size: .bits256)).transport.host
+check(linkHost == "10.0.0.9" && demoHost == Demo.host, "a saved controller gets the secured link, the demo room the demo")
+check(Prefs.lastSeen("aa") == "seen.aa", "when a controller was last seen, by its id")
+check(!developerBuild, "a build made without DEBUG (these tests) is no developer build")
+
+// ---- the rest of the Tilt Hub commands (Shared/HubClient.swift)
+let hlog2b = Recorder(), hubHome = Cell(#"{"ok":1,"code":"34970112332","qr":"MT:Y","home":1}"#), hubBackups = Cell(#"{"ok":1,"b":[{"id":"a1","name":"Den","when":5}]}"#)
+let hc2 = HubClient(transport: ScriptedDevice(name: "hub", log: hlog2b, address: "10.0.0.2/hub") { c in
+    switch cmdPath(c) {
+    case HubApi.homeCode: hubHome.value
+    case HubApi.backups: hubBackups.value
+    default: #"{"ok":1}"#
+    }
+})
+try await hc2.makeOwner(cid: "bb", false); try await hc2.rename(to: "Sam"); try await hc2.leave(); await hc2.takeBackRequest(); try await hc2.resetPeople()
+check(hlog2b.all == ["hub /api/makeowner?cid=bb&on=0", "hub /api/keyname?name=Sam", "hub /api/leave", "hub /api/leave", "hub /api/resetpeople"], "hub people commands (\(hlog2b.all))")
+let hubBk = await hc2.backups()
+check(hubBk.map(\.id) == ["a1"] && hubBk[0].name == "Den" && hlog2b.all.last == "hub /api/backups", "the hub's backups")
+hubBackups.value = #"{"ok":0,"err":"busy"}"#
+check(await hc2.backups().isEmpty, "the hub cannot say: no backups")
+let withHome = try await hc2.homeCode()
+hubHome.value = #"{"ok":1,"code":"34970112332","qr":"MT:Y"}"#
+let noHome = try await hc2.homeCode()
+check(withHome.code == "34970112332" && withHome.qr == "MT:Y" && withHome.home == 1 && noHome.home == 0, "Apple Home's code from the hub, with and without home")
+let waitingInfo = try JSONDecoder().decode(HubInfo.self, from: Data(hubInfoJSON("x", hubCid: nil).utf8))
+let inInfo = try JSONDecoder().decode(HubInfo.self, from: Data(hubInfoJSON("x", hubCid: nil).replacingOccurrences(of: #""key":1"#, with: #""key":2"#).utf8))
+check(waitingInfo.c[0].hubWaiting && !inInfo.c[0].hubWaiting, "the hub waits on a controller while its key is 1")
+
+// ---- Bluetooth setup's wire (Shared/Bluetooth.swift)
+let bwHello = try await BluetoothWire { d in d == Data("H".utf8) ? Data("2".utf8) + Data(helloJSON.utf8) : Data("4".utf8) }.hello()
+check(bwHello.id == "aa11" && bwHello.boot == "a1b2c3d4", "a hello over Bluetooth decodes")
+check(await thrown { try await BluetoothWire { _ in Data("x{}".utf8) }.hello() } == "The controller gave a bad answer.", "a first byte that is not a digit")
+check(await thrown { try await BluetoothWire { _ in Data() }.hello() } == "The controller gave a bad answer.", "no answer at all")
+check(await thrown { try await BluetoothWire { _ in Data("4{}".utf8) }.hello() } == "That is not a Tilt controller.", "a refused hello")
+let bleSide = PairingSide(extra: ["owner": 1]), bleSent = Cell(Data())
+let blePair = try await BluetoothWire { d in bleSent.value = d; return Data("2".utf8) + bleSide.answer(Data(d.dropFirst())).1 }.pair(phoneName: "Sam")
+check(bleSent.value.first == UInt8(ascii: "P") && bytes(blePair.key) == bleSide.key && blePair.owner, "Pairing over Bluetooth: 'P' and the request, the same key")
+let refusing = BluetoothWire { _ in Data("4".utf8) }.client(bp, boot: fboot)
+check(await thrown { try await refusing.go(blind: 0, tilt: 0) } == "The controller refused the command.", "a sealed command over Bluetooth that is refused")
+await refusing.transport.move(to: "elsewhere")
+check(await refusing.transport.host == "bluetooth", "over Bluetooth the address never changes")
+
+// ---- the demo room, more of it (Shared/Demo.swift)
+check(Demo.shared.host == Demo.host, "the demo room's address")
+await Demo.shared.move(to: "x")
+try await demo.go(blind: 0, tilt: 50); try await demo.stop()
+let held = try await demo.state()
+check(held.mv == -1 && held.b.allSatisfy { $0.tgt == $0.tilt && $0.mov == 0 }, "stop holds each blind where it is")
+let heldTilt = held.b[0].tilt ?? 0
+await demo.jog(blind: 0, dir: -1, percent: 10)
+check(try await demo.state().b[0].tgt == heldTilt - 8, "one jog moves a blind by 8")
+let slot3 = SchedSlot(on: 1, days: 62, mask: 3, min: 450, tilt: -100, kind: 0, off: 0, ramp: 5, gid: 99)
+try await demo.setSchedule(slot: 3, slot3)
+var demoSched = try await demo.schedules()
+check(demoSched.sched[3] == SchedSlot(on: 1, days: 62, mask: 3, min: 450, tilt: -100, kind: 0, off: 0, ramp: 5, gid: 99, fat: 0, fwhy: 0), "a Schedule written to the demo room reads back")
+let lastFire = demoSched.sched[0].fat ?? 0
+var sameSlot0 = demoSched.sched[0]; sameSlot0.ramp = 3
+try await demo.setSchedule(slot: 0, sameSlot0)
+demoSched = try await demo.schedules()
+check(lastFire > 0 && demoSched.sched[0].fat == lastFire && demoSched.sched[0].ramp == 3, "the same Schedule edited: its last run stays")
+var otherSlot0 = sameSlot0; otherSlot0.gid = 7
+try await demo.setSchedule(slot: 0, otherSlot0)
+check(try await demo.schedules().sched[0].fat == 0, "a new Schedule in a slot: its last run is cleared")
+let demoScene = SceneSlot(gid: 31, ver: 2, name: "Read", sym: "book", mask: 1, t: [40, 0, 0])
+try await demo.setScene(demoScene)
+check(try await demo.scenes()?.contains(demoScene) == true, "a Scene written to the demo room reads back")
+try await demo.setScene(SceneSlot(gid: 31, ver: 3, name: "", sym: "", mask: 0, t: []))
+check(try await demo.scenes()?.contains { $0.gid == 31 } == false, "a Scene written with mask 0 is removed")
+try await demo.setName("Den"); try await demo.setCloseUp(false); try await demo.setFollow(true); try await demo.setSameTime(false); try await demo.setHomeSeparate(true)
+try await demo.setBlindName(blind: 1, "Center"); try await demo.setHidden(blind: 2, true); try await demo.setHidden(blind: 0, false)
+let demoSet = try await demo.config()
+check(demoSet.name == "Den" && demoSet.closeUp == 0 && demoSet.sync == 1 && demoSet.par == 0 && demoSet.hksep == 1, "each demo room setting reads back")
+check(demoSet.b.map(\.name) == ["Left", "Center", "Right"] && demoSet.b.map(\.hid) == [0, 0, 1], "a blind's name and hidden read back")
+try await demo.goAll(to: "close")
+check(try await demo.state().b.map(\.tgt) == [-100, -100, held.b[2].tilt], "close with slats down, a hidden blind left where it is")
+let demoPeople = try await demo.people()
+check(demoPeople.count == 1 && demoPeople[0].me == 1 && demoPeople[0].owner == 1, "the demo room's People: this phone, an Owner")
+check(await demo.developerInfo().isEmpty, "the demo room has no developer info")
+try await demo.setName("Living Room (Demo)"); try await demo.setCloseUp(true); try await demo.setFollow(false); try await demo.setSameTime(true); try await demo.setHomeSeparate(false)
+try await demo.setBlindName(blind: 1, "Middle"); try await demo.setHidden(blind: 2, false)
+
+// ---- the demo hub, more of it (Shared/DemoHub.swift)
+check(DemoHub.shared.host == Demo.host, "the demo hub's address")
+await DemoHub.shared.move(to: "x")
+let approveGone = await thrown { try await dh.approve(cid: "zz", true) }, approveIn = await thrown { try await dh.approve(cid: "demo", true, owner: true) }
+check(approveGone == "No such phone" && approveIn == "No such phone", "approving a phone that is not there, or not waiting: no such phone")
+try await dh.rename(to: "Sam")
+check(try await dh.people().first?.name == "Sam", "this phone's new name on the demo hub")
+check(await thrown { try await dh.rename(to: "") } == "A name is needed", "an empty name is refused")
+check(await thrown { try await dh.revoke(cid: "demo") } == "You cannot remove yourself", "you cannot remove yourself")
+try await dh.revoke(cid: "zz")
+check(try await dh.people().count == 1, "removing a phone that is not there removes nobody")
+let demoBackups = await dh.backups(), demoBackup = await thrown { try await dh.backup("a1") }
+check(demoBackups.isEmpty && demoBackup == "No backup of that controller", "the demo hub has no backups")
+check(await thrown { try await dh.shareCode() } == "Apple Home is not available in the demo.", "no home code in the demo")
+let demoLeave = await thrown { try await dh.leave() }, demoReset = await thrown { try await dh.resetPeople() }
+check(demoLeave == "The demo hub keeps its owner" && demoReset == "The demo hub keeps its owner", "leave and reset are refused")
+
+// ---- words (Shared/Words.swift, Shared/SchedulePlan.swift)
+func blindState(tilt: Double? = 0, tgt: Double? = nil, pres: Int = 1, seen: Int = 1, cal: Int = 1, mov: Int = 0, q: Int = 0, last: String = "") -> BlindState {
+    BlindState(name: "B", hid: 0, pres: pres, seen: seen, cal: cal, tilt: tilt, tgt: tgt, mov: mov, q: q, fav: 0, ang: nil, last: last)
+}
+check(TiltWords.status(blindState(pres: 0)) == "Not connected" && TiltWords.status(blindState(cal: 0)) == "Setup required", "status: not connected, setup required")
+check(TiltWords.status(blindState(tgt: 100, mov: 1)) == "Moving to closed, slats up" && TiltWords.status(blindState(q: 1)) == "Waiting its turn", "status: moving, waiting its turn")
+check(TiltWords.status(blindState(last: "blocked: no turn")) == "Did not move" && TiltWords.status(blindState(tilt: -50)) == "50% toward down", "status: did not move, the tilt")
+func roomOf(_ b: [BlindState], mv: Int = -1) -> ControllerState {
+    ControllerState(v: "2.3.0", name: "Den", batt: batt0, closeUp: 1, sync: 0, mv: mv, hk: nil, asks: nil, hkey: nil, me: nil, gentle: nil, topic: nil, b: b)
+}
+check(TiltWords.room(roomOf([blindState(cal: 0)])) == "Needs setup" && TiltWords.room(roomOf([blindState()], mv: 0)) == "Moving", "room: needs setup, moving")
+check(TiltWords.room(roomOf([blindState(tilt: 50), blindState(tilt: 55)])) == "50% toward up" && TiltWords.room(roomOf([blindState(tilt: 0), blindState(tilt: 60)])) == "Mixed tilts", "room: one tilt, mixed tilts")
+check(TiltWords.room(roomOf([blindState(tilt: nil)])) == "1 blind" && TiltWords.room(roomOf([blindState(tilt: nil), blindState(tilt: nil)])) == "2 blinds", "room: no tilts read yet")
+check(TiltWords.short(roomOf([blindState(cal: 0)])) == "Needs setup" && TiltWords.short(roomOf([blindState()], mv: 1)) == "Moving", "short: needs setup, moving")
+check(TiltWords.short(roomOf([blindState(tilt: 3), blindState(tilt: -5)])) == "Open" && TiltWords.short(roomOf([blindState(tilt: 100), blindState(tilt: -95)])) == "Closed", "short: open, closed")
+check(TiltWords.short(roomOf([blindState(tilt: 50), blindState(tilt: -30)])) == "40% closed", "short: how far closed on average")
+check(TiltWords.lightTrigger(3).contains("get light, within 90 minutes of sunrise") && TiltWords.lightTrigger(4).contains("get dark, within 90 minutes of sunset"), "the light triggers' explanation")
+check(TiltWords.action(50) == "50% toward up" && Schedule(tilt: -100).actionText == "Close down", "a Schedule's action")
+check([127, 62, 65, 0].map { Schedule(days: $0).daysText } == ["Every day", "Weekdays", "Weekends", "Never"] && Schedule(days: 0b1010).daysText == "Mon Wed", "a Schedule's days")
+check(Schedule.clock(7 * 60 + 30).contains("7:30") && Schedule(kind: 0, minute: 7 * 60 + 30).whenText == Schedule.clock(450), "a clock time")
 
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)
