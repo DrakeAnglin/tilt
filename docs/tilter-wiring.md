@@ -10,6 +10,8 @@ before the [mechanical build](tilter-assembly.md).
 
 ![tilter wiring](renders/tilter-wiring.png)
 
+The 10 µF capacitor in the picture is an [optional fix](#2-wire-it), not part of the normal build.
+
 ## Parts for one tilter
 | Part | Qty |
 |---|---|
@@ -17,7 +19,6 @@ before the [mechanical build](tilter-assembly.md).
 | DRV8833 motor driver board (Suuoo) | 1 |
 | AS5600 board, **already switched to PWM output** (its Ø4 × 2 magnet goes in the magnet gear) | 1 |
 | N20 motor (screwed to the motor shell at assembly) | 1 |
-| Ceramic capacitor 10 µF (106) | 1 |
 | **22 AWG** stranded: 1 red, 1 black, ~6 cm each (battery +, GND to the driver) | 2 |
 | **30 AWG** silicone, ~6 cm each: green, yellow, blue ×2, white, black | 6 |
 | 22 AWG two-conductor pair, ~8 cm (motor leads; any color, the build used red and black) | 1 |
@@ -75,12 +76,15 @@ the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch
 | 6 | RJ12 **pin 5** (EN) | AS5600 **VCC** | **blue**, 30 AWG (second wire on the same pad) |
 | 7 | RJ12 **pin 4** (angle) | AS5600 **OUT** | **white**, 30 AWG |
 | 8 | RJ12 **pin 3** (GND) | AS5600 **GND** | **black**, 30 AWG (second wire on the same pad) |
-| 9 | 10 µF capacitor | DRV8833 **VCC** and **GND** | its own legs, right on those two pins (any way round) |
-| 10 | DRV8833 **OUT1** and **OUT2** | N20 motor tabs | red and black 22 AWG pair, ~8 cm. **Leave the motor ends loose** until final assembly |
+| 9 | DRV8833 **OUT1** and **OUT2** | N20 motor tabs | red and black 22 AWG pair, ~8 cm. **Leave the motor ends loose** until final assembly |
 
 Why two wires from pins 3 and 5: GND is split so the motor's current returns on its own wire, not through the
 sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Leave **IN3, IN4, OUT3, OUT4, ULT** on
 the driver and **SCL, SDA** on the sensor empty.
+
+**Optional fix, if a blind's angle jumps when its motor starts:** solder a 10 µF ceramic capacitor ("106", from the
+controller's capacitor kit) right on the DRV8833's **VCC** and **GND** pins, either way round. The reference tilters
+work without it.
 
 📷 **Photo S3:** the RJ12 breakout with its eight leads, pins readable.
 

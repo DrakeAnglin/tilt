@@ -43,14 +43,13 @@ PETG is for the parts that rub or mesh against PLA all the time.
 | M3 heat-set insert | 6 | bearing shell 4 (2 case bolts, 2 tray bolts), tray 2 (sensor bolt, lid corner) |
 | M3 × 25 flat-head | 1 | sensor bolt (through the lid's column and the AS5600) |
 | M3 × 20 flat-head | 4 | 2 case bolts (M3 × 25 also fit), 2 tray bolts; the room-side tray bolt is also the cluster gear's axle |
-| M3 × 16 flat-head | 2, optional | hold the motor shell on while the sensor module is not ready; reusable |
 | M3 × 8 flat-head | 1 | lid's corner bolt |
 | M1.6 × 4 | 2 | N20 to the motor shell |
 | Ø2 × 6 dowel pin | 5 | 4 planet axles in the carrier, 1 in the worm's thread end (turns in a pocket in the case) |
 | Super Lube 21030 | a little | worm, wheel, every gear, the carrier's hub, the sleeve's nose |
 | Foam pad, 3/8 in (about 10 mm) across, 2 mm thick | 6 | 4 under the floor, 1 on each long side wall (step D6) |
 
-Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter).
+Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout): [BOM](../../../BOM.md#one-tilter).
 
 ## Assembly
 Two subassemblies, each step by step with photos:

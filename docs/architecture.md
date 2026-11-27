@@ -101,7 +101,7 @@ Cords must be **straight-wired**: pin 1 to pin 1. Check every cord.
 
 | Pin | Net | At the tilter |
 |---|---|---|
-| 1 | battery + (3.0–4.2 V) | DRV8833 VCC, 10 µF to GND |
+| 1 | battery + (3.0–4.2 V) | DRV8833 VCC |
 | 2 | IN1 (PWM) | DRV8833 IN1 |
 | 3 | GND | DRV8833 GND, AS5600 GND |
 | 4 | angle | AS5600 OUT |
