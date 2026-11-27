@@ -4,7 +4,8 @@
 set -e
 cd "$(dirname "$0")/../.."
 git config core.hooksPath .githooks
-python3 -c 'import coverage' 2>/dev/null || python3 -m pip install --user -q 'coverage>=7.10'
+# The same Python packages as CI's tools job, so the coverage this Mac measures is CI's (tools/agent/check.sh).
+python3 -m pip install --user -q 'coverage>=7.10' cryptography qrcode pillow
 echo "coverage: $(python3 -m coverage --version | head -1)"
 label() { gh label create "$1" --color "$2" --description "$3" --force >/dev/null && echo "label: $1"; }
 label ready-for-agent 0E8A16 "An agent may pick this up on its own"

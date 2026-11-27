@@ -46,8 +46,10 @@ compiled() {
     for B in "$W"/bin/*; do
       [ -f "$B" ] || continue
       # shellcheck disable=SC2086
-      $COV export -format=lcov -instr-profile="$W/all.profdata" "$B" >>"$OUTDIR/$AREA.lcov" 2>>"$W/llvm-cov.err" ||
+      $COV export -format=lcov -instr-profile="$W/all.profdata" "$B" >>"$OUTDIR/$AREA.lcov" 2>>"$W/llvm-cov.err" || {
         echo "coverage: llvm-cov could not read $(basename "$B"): $(cat "$W/llvm-cov.err")" >&2
+        echo 1 >"$W/rc"
+      }
     done
   else
     echo "coverage: no counts were written (did the tests start?)" >&2

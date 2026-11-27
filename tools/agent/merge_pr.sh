@@ -100,7 +100,7 @@ printf '%s' "$CHECKS" | jq -e 'type == "array"' >/dev/null 2>&1 || CHECKS='[]'
 COV=$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.name == "coverage") | .bucket] | first // "missing"')
 case "$COV" in
   pass) ;;
-  fail|cancel) wait_for "the coverage check failed, not yet: read the coverage comment on the pull request, add the tests it asks for, push" ;;
+  fail|cancel) wait_for "the coverage check failed, not yet: read the coverage comment on the pull request (a red test job fails it too: fix that first), add the tests it asks for, push" ;;
   missing) wait_for "no coverage check, not yet: merge from main to get one (the coverage comment then says what it found)" ;;
   *) wait_for "the coverage check is still running, not yet (the coverage comment shows the result)" ;;
 esac

@@ -230,7 +230,7 @@ def repo_files():
 def changed_since(base):
     """Lines changed since this branch left <base>, the working tree included."""
     start = git('merge-base', base, 'HEAD').strip()
-    changed = diff_lines(git('diff', '-U0', '-M', '--no-color', '--no-ext-diff', start))
+    changed = diff_lines(git('diff', '-U0', '-M', '--no-color', '--no-ext-diff', '--src-prefix=a/', '--dst-prefix=b/', start))
     for path in git('ls-files', '--others', '--exclude-standard').splitlines():
         if os.path.isfile(os.path.join(ROOT, path)):
             changed[path] = set(range(1, len(read(path).splitlines()) + 1))

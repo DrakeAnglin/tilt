@@ -6,8 +6,10 @@
 set -e
 cd "$(dirname "$0")/../.."
 # The gate needs the coverage package: fail now, not after the tests (a skipped gate would hide a failure).
-python3 -c 'import coverage' 2>/dev/null || {
-  echo "check: the coverage package is missing. Install it: python3 -m pip install --user 'coverage>=7.10'" >&2
+# The tools' packages too: without them their tests are skipped and the tools measure under CI's number.
+python3 -c 'import coverage, sys; sys.exit(tuple(map(int, coverage.__version__.split(".")[:2])) < (7, 10))' 2>/dev/null &&
+  python3 -c 'import cryptography, qrcode, PIL' 2>/dev/null || {
+  echo "check: Python packages missing (coverage 7.10 or newer, cryptography, qrcode, pillow). Run tools/agent/setup.sh" >&2
   exit 1
 }
 tools/firmware_tests.sh
