@@ -48,7 +48,7 @@ PETG is for the parts that rub or mesh against PLA all the time.
 | M1.6 × 4 | 2 | N20 to the motor shell |
 | Ø2 × 6 dowel pin | 5 | 4 planet axles in the carrier, 1 in the worm's thread end (turns in a pocket in the case) |
 | Super Lube 21030 | a little | worm, wheel, every gear, the carrier's hub, the sleeve's nose |
-| Foam pad, about 10 mm across, 2 mm thick | 6 | 4 under the floor, 1 on each long side wall (step D6) |
+| Foam pad, 3/8 in (about 10 mm) across, 2 mm thick | 6 | 4 under the floor, 1 on each long side wall (step D6) |
 
 Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter).
 

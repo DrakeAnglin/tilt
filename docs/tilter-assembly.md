@@ -214,9 +214,9 @@ Tighten them down.
 ![lid on, jack side](photos/tilter/d5-lid-on.jpg)
 
 ### D6. Foam pads
-Stick-on foam pads, about 10 mm across and 2 mm thick: 4 under the floor (one each corner), 1 on the middle of
+Stick-on foam pads, 3/8 in (about 10 mm) across and 2 mm thick: 4 under the floor (one each corner), 1 on the middle of
 each long side wall. They keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use
-soft foam (or felt), not hard rubber: hard rubber passes the vibration on. If the rod binds once the tilter is in,
+soft foam pads, not hard rubber: hard rubber passes the vibration on. If the rod binds once the tilter is in,
 leave the side pads off.
 
 📷 **Photo D6:** coming soon: where the pads go.

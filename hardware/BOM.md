@@ -73,10 +73,10 @@ If a faster motor overshoots (the log shows "turn-backs"), raise the stop-early 
 | M1.6 × 4 socket screw (holds the N20 to the motor shell) | 2 | in the M1.6 kit ([Buy once](#buy-once)) | |
 | Ø2 × 6 mm stainless dowel pin (4 planet axles, 1 worm top pin) | 5 | pack of 50 | [HARFINGTON 2 × 6 mm](https://www.amazon.com/s?k=HARFINGTON+50pcs+Dowel+Pins+M2+2mm+x+6mm+304+Stainless+Steel) |
 | PTFE grease, Super Lube 21030 | a little | [Buy once](#buy-once) | |
-| Stick-on **foam** pad, about 10 mm (3/8 in) across and 2 mm thick (the same pack as the box's feet) | 6 (4 under, 1 on each side) | [Buy once](#buy-once) | |
+| Stick-on **foam** pad, 3/8 in (about 10 mm) across and 2 mm thick (the same set as the box's feet) | 6 (4 under, 1 on each side) | [Buy once](#buy-once) | |
 
-The foam pads keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use soft foam (or
-felt), not hard rubber: hard rubber passes the vibration on. Where they go: [tilter assembly, step D6](../docs/tilter-assembly.md#d6-foam-pads).
+The foam pads keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use soft foam
+pads, not hard rubber: hard rubber passes the vibration on. Where they go: [tilter assembly, step D6](../docs/tilter-assembly.md#d6-foam-pads).
 
 ### Cord to the controller
 | Part | Per tilter | Sold as | Link |
@@ -129,7 +129,7 @@ J3 (a 6-way socket for a separate USB-C board) is not used: USB plugs into the 6
 | M3 heat-set insert | 3 | from the tilters' pack of 100 | |
 | M3 × 10 flat-head screw | 3 | in the M3 kit ([Buy once](#buy-once)) | |
 | M2 × 6 self-tapping screw (charger) | 2 | small pack | search "M2 x 6 self tapping screw" |
-| **Stick-on foam pad, about 10 mm across and 2 mm thick** | **4** | [Buy once](#buy-once) | |
+| **Stick-on foam pad, 3/8 in (about 10 mm) across and 2 mm thick** | **4** | [Buy once](#buy-once) | |
 
 The pads lift the box off the rail floor so it does not pinch the blind's lift cord, which runs down the middle of the
 rail: one pad in each corner, none in the middle. Where they go:
@@ -168,7 +168,7 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 | 2-conductor 22 AWG (motor leads; any color, the build used red and black) | about 8 cm per tilter | roll (30 ft) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
 | Heat-shrink kit | a few pieces per tilter and controller | kit | [B01MFA3OFA](https://www.amazon.com/dp/B01MFA3OFA) |
 | PTFE grease, Super Lube 21030 | a little per tilter | tube | [B000XBH9HI](https://www.amazon.com/dp/B000XBH9HI) |
-| Stick-on foam pad, 3/8 in (about 10 mm) across, 2 mm thick, black | 6 per tilter, 4 per box | pack of 261 to 504, about $6 | [B0HKVXW9MW](https://www.amazon.com/dp/B0HKVXW9MW) |
+| Stick-on foam pad, 3/8 in (about 10 mm) across, 2 mm thick, black | 6 per tilter, 4 per box | 504-piece set | [B0HKVXW9MW](https://www.amazon.com/dp/B0HKVXW9MW) |
 | White PLA and white PETG filament | the tilters, the boxes and the hub box | spool each | |
 
 ## Tools
