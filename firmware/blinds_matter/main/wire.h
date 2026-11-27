@@ -36,25 +36,29 @@ inline int wireClamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi :
 
 // ---- what /api/cfg reports
 struct WireBlind { const char *name; int hid, speed, fav; };
-struct WireSlot { int on, days, mask, min, tilt, kind, off, ramp; uint32_t gid; };
+// kind: 0 clock, 1 sunrise, 2 sunset, 3 when it gets light, 4 when it gets dark (logic.h). fat: when a light slot last
+// fired (epoch, 0 never); fwhy: why (1 by light, 2 fell back, 3 sun time: no panel seen; 0 never).
+struct WireSlot { int on, days, mask, min, tilt, kind, off, ramp; uint32_t gid, fat; int fwhy; };
 struct WireCfg {
   const char *name; int closeUp, sync, par, tx; const char *tz, *tzn; int hksep;
   const WireBlind *b; int ports;              // one per Port
   const WireSlot *s; int slots;               // one per Schedule slot
   float lat, lon; uint32_t rise, set;
+  int panel;                                  // 1: a solar panel seen (logic.h panelSeenRule)
 };
 // "ports" and "slots" are the controller's limits (added in 2.2.1; an app that does not know them ignores them).
+// "panel", "fat" and "fwhy" came with the Light trigger (2.3.0): older apps ignore them, older firmware never sends them.
 inline std::string cfgJson(const WireCfg &c) {
   std::string j;
   j.reserve(1400);
-  ap(j, "{\"name\":%s,\"ports\":%d,\"slots\":%d,\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"battMode\":1,\"checkin\":0,\"tx\":%d",
-     jq(c.name).c_str(), c.ports, c.slots, c.closeUp, c.sync, c.par, c.tx);
+  ap(j, "{\"name\":%s,\"ports\":%d,\"slots\":%d,\"panel\":%d,\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"battMode\":1,\"checkin\":0,\"tx\":%d",
+     jq(c.name).c_str(), c.ports, c.slots, c.panel, c.closeUp, c.sync, c.par, c.tx);
   ap(j, ",\"tz\":%s,\"tzn\":%s,\"hksep\":%d,\"b\":[", jq(c.tz).c_str(), jq(c.tzn).c_str(), c.hksep);      // two parts: each must fit ap's buffer
   for (int i = 0; i < c.ports; i++) ap(j, "%s{\"name\":%s,\"hid\":%d,\"speed\":%d,\"fav\":%d}", i ? "," : "", jq(c.b[i].name).c_str(), c.b[i].hid, c.b[i].speed, c.b[i].fav);
   j += "],\"sched\":[";
   for (int i = 0; i < c.slots; i++) {
     const WireSlot &s = c.s[i];
-    ap(j, "%s{\"on\":%d,\"days\":%d,\"mask\":%d,\"min\":%d,\"tilt\":%d,\"kind\":%d,\"off\":%d,\"ramp\":%d,\"gid\":%lu}", i ? "," : "", s.on, s.days, s.mask, s.min, s.tilt, s.kind, s.off, s.ramp, (unsigned long)s.gid);
+    ap(j, "%s{\"on\":%d,\"days\":%d,\"mask\":%d,\"min\":%d,\"tilt\":%d,\"kind\":%d,\"off\":%d,\"ramp\":%d,\"gid\":%lu,\"fat\":%lu,\"fwhy\":%d}", i ? "," : "", s.on, s.days, s.mask, s.min, s.tilt, s.kind, s.off, s.ramp, (unsigned long)s.gid, (unsigned long)s.fat, s.fwhy);
   }
   ap(j, "],\"lat\":%s,\"lon\":%s,\"sun\":[%lu,%lu]}", jn(c.lat, 3).c_str(), jn(c.lon, 3).c_str(), (unsigned long)c.rise, (unsigned long)c.set);
   return j;
@@ -64,13 +68,13 @@ inline std::string cfgJson(const WireCfg &c) {
 // `arg(key)` gives one value of the query ("" when missing). Out-of-range values are brought into range.
 template <class Arg> WireSlot slotOfArgs(Arg arg, int ports) {
   auto n = [&](const char *k) { return atoi(arg(k).c_str()); };
-  WireSlot s;
+  WireSlot s{};
   s.on = n("on") ? 1 : 0;
   s.days = n("days") & 0x7F;
   s.mask = n("mask") & ((1 << ports) - 1);
   s.min = wireClamp(n("min"), 0, 1439);
   s.tilt = wireClamp(n("tilt"), -100, 100);
-  s.kind = wireClamp(n("kind"), 0, 2);
+  s.kind = wireClamp(n("kind"), 0, 4);                // logic.h SCHED_KIND_MAX
   s.off = wireClamp(n("off"), -180, 180);
   s.ramp = wireClamp(n("ramp"), 0, 60);
   s.gid = strtoul(arg("gid").c_str(), nullptr, 10);

@@ -30,11 +30,11 @@ static std::string readFile(const char *path) {               // the whole file,
 
 // The known controller state behind the shared fixture test/wire/cfg.json (the app's tests decode the same file).
 static const WireBlind FIX_B[3] = {{"Mom\xE2\x80\x99s caf\xC3\xA9", 0, 100, 0}, {"Middle", 0, 80, -50}, {"Right", 1, 50, 100}};
-static const WireSlot FIX_EMPTY = {0, 127, 0, 480, 0, 0, 0, 0, 0};
-static const WireSlot FIX_S[8] = {{1, 62, 7, 420, 0, 0, 0, 0, 1}, FIX_EMPTY, {1, 127, 5, 480, -100, 2, -15, 10, 4000000000u},
+static const WireSlot FIX_EMPTY = {0, 127, 0, 480, 0, 0, 0, 0, 0, 0, 0};
+static const WireSlot FIX_S[8] = {{1, 62, 7, 420, 0, 0, 0, 0, 1, 0, 0}, FIX_EMPTY, {1, 127, 5, 480, -100, 4, -15, 10, 4000000000u, 1795385700u, 1},
                                   FIX_EMPTY, FIX_EMPTY, FIX_EMPTY, FIX_EMPTY, FIX_EMPTY};
 static const WireCfg FIX = {"Den \"East\"", 1, 1, 0, 20, "CST6CDT,M3.2.0,M11.1.0", "America/Chicago", 0, FIX_B, 3, FIX_S, 8,
-                            41.88f, -87.63f, 1795351560u, 1795386240u};
+                            41.88f, -87.63f, 1795351560u, 1795386240u, 1};
 
 // A controller that only writes down what a Move request asked of it.
 struct RecMoves : MoveSeam {
@@ -941,6 +941,9 @@ int main() {
   got = slotOfArgs(arg, 3);
   CHECK(got.mask == 7 && got.tilt == -100 && got.min == 1439, "out-of-range values are brought into range (mask to 3 Ports)");
   CHECK(slotOfArgs(arg, 2).mask == 3, "the mask follows the number of Ports");
+  q["kind"] = "3"; CHECK(slotOfArgs(arg, 3).kind == 3, "kind 3 (when it gets light) is kept");
+  q["kind"] = "4"; CHECK(slotOfArgs(arg, 3).kind == 4, "kind 4 (when it gets dark) is kept");
+  q["kind"] = "5"; CHECK(slotOfArgs(arg, 3).kind == 4, "a kind past 4 is brought to 4");
 
   // ---- Scenes on the wire: the same fixture the app's tests read and write
   {

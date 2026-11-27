@@ -159,6 +159,8 @@ final class AutomationStore {
     var sun: (rise: Date, set: Date)?
     var hasPlace = false
     var loading = false
+    /// Per controller: it has seen a solar panel (SchedConfig.panelSeen), so it can run the Light trigger.
+    var panels: [String: Bool] = [:]
     private var slots: [String: [SchedSlot]] = [:]          // per controller, as last read
     private var limits: [String: ControllerLimits] = [:]    // per controller, as it reported them
 
@@ -173,6 +175,7 @@ final class AutomationStore {
             guard let cfg = try? await c.client.schedules() else { continue }
             slots[c.id] = cfg.sched
             limits[c.id] = cfg.limits
+            panels[c.id] = cfg.panelSeen
             if let s = cfg.sun, s.count == 2, s[0] > 0 { sun = (Date(timeIntervalSince1970: s[0]), Date(timeIntervalSince1970: s[1])); hasPlace = true; Sky.remember(rise: sun!.rise, set: sun!.set) }
         }
         schedules = SchedulePlan.schedules(controllers.compactMap { c in slots[c.id].map { (c.id, $0) } })
@@ -217,9 +220,10 @@ struct AutomationsTab: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack(spacing: 6) {
                                         Text(s.whenText).font(.headline)
-                                        if s.ramp > 0 { Image(systemName: s.kind == 2 ? "sunset" : "sunrise").font(.footnote).foregroundStyle(Palette.warning) }
+                                        if s.ramp > 0 { Image(systemName: Schedule.onSunrise(s.kind) ? "sunrise" : "sunset").font(.footnote).foregroundStyle(Palette.warning) }
                                     }
                                     Text("\(s.actionText) · \(s.daysText) · \(blindNames(s))").font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                                    ForEach(lastRunLines(s), id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())      // the whole row opens it, not just the words
                             }
@@ -244,7 +248,7 @@ struct AutomationsTab: View {
             .navigationTitle("Automations")
             .task { await store.load(model.controllers) }
             .refreshable { await store.load(model.controllers) }
-            .sheet(item: $editing) { item in ScheduleEditor(schedule: item, isNew: !store.schedules.contains { $0.id == item.id }, everyBlind: store.everyBlind(model.controllers)) { s, del in save(s, delete: del) } }
+            .sheet(item: $editing) { item in ScheduleEditor(schedule: item, isNew: !store.schedules.contains { $0.id == item.id }, everyBlind: store.everyBlind(model.controllers), panels: store.panels) { s, del in save(s, delete: del) } }
         }
     }
 
@@ -258,6 +262,19 @@ struct AutomationsTab: View {
         if !all.isEmpty && s.targets.isSuperset(of: all) { return "All blinds" }
         let names = s.targets.sorted { ($0.controller, $0.blind) < ($1.controller, $1.blind) }.compactMap { t in model.controllers.first { $0.id == t.controller }?.state?.b[safe: t.blind]?.name }
         return names.isEmpty ? "No blinds" : names.joined(separator: ", ")
+    }
+    /// When a light Schedule last ran: one line, or one per controller (named) when it covers more than one.
+    private func lastRunLines(_ s: Schedule) -> [String] {
+        guard s.isLight else { return [] }
+        let many = Set(s.targets.map(\.controller)).count > 1
+        return s.lastRun.keys.sorted().compactMap { c in
+            let r = s.lastRun[c]!
+            let time = Calendar.current.isDateInToday(r.at) ? r.at.formatted(date: .omitted, time: .shortened)
+                                                            : r.at.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+            guard let line = TiltWords.lastRun(why: r.why, kind: s.kind, time: time) else { return nil }
+            let name = model.controllers.first { $0.id == c }?.state?.name ?? "A controller"
+            return many ? "\(name): \(line)" : line
+        }
     }
     /// Do what the schedule does, right now.
     private func runNow(_ s: Schedule) {
@@ -286,16 +303,23 @@ struct ScheduleEditor: View {
     let isNew: Bool
     /// Every Port of every controller: what "All blinds" saves.
     let everyBlind: Set<BlindTarget>
+    /// Per controller: a solar panel seen (AutomationStore.panels), for the Light trigger.
+    let panels: [String: Bool]
     let done: (Schedule, Bool) -> Void
     @State private var custom = false
     @State private var all = true
+    /// The light triggers are offered when a controller this Schedule covers has seen a solar panel (SchedulePlan).
+    private var offersLight: Bool { SchedulePlan.offersLight(kind: schedule.kind, targets: all ? everyBlind : schedule.targets, panels: panels) }
 
     var body: some View {
         NavigationStack {
             Form {
             Group {
-                Section("When") {
-                    Picker("Starts", selection: $schedule.kind) { Text("At a time").tag(0); Text("At sunrise").tag(1); Text("At sunset").tag(2) }
+                Section {
+                    Picker("Starts", selection: $schedule.kind) {
+                        Text("At a time").tag(0); Text("At sunrise").tag(1); Text("At sunset").tag(2)
+                        if offersLight { Text("When it gets light").tag(3); Text("When it gets dark").tag(4) }
+                    }
                     if schedule.kind == 0 {
                         DatePicker("Time", selection: Binding(get: { Calendar.current.date(bySettingHour: schedule.minute / 60, minute: schedule.minute % 60, second: 0, of: .now) ?? .now },
                                                               set: { let c = Calendar.current.dateComponents([.hour, .minute], from: $0); schedule.minute = (c.hour ?? 0) * 60 + (c.minute ?? 0) }), displayedComponents: .hourAndMinute)
@@ -313,7 +337,7 @@ struct ScheduleEditor: View {
                                 .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
                         }
                     }
-                }
+                } header: { Text("When") } footer: { if schedule.isLight { Text(TiltWords.lightTrigger(schedule.kind)) } }
                 Section("Do this") {
                     Picker("Tilt", selection: Binding(get: { custom ? 1 : schedule.tilt }, set: { if $0 == 1 { custom = true; schedule.tilt = 50 } else { custom = false; schedule.tilt = $0 } })) {
                         Text("Open").tag(0); Text("Close up").tag(100); Text("Close down").tag(-100); Text("Other").tag(1)

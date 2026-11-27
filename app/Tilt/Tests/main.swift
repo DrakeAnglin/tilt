@@ -172,6 +172,14 @@ let oldCfg = Data(#"{"name":"Den","closeUp":1,"sync":0,"tzn":"","b":[],"sched":[
 check((try? JSONDecoder().decode(ControllerConfig.self, from: oldCfg))?.limits == .fallback && (try? JSONDecoder().decode(SchedConfig.self, from: oldCfg))?.limits == .fallback,
       "older firmware without limits: 3 Ports and 8 slots")
 check(Schedule.everyPort([("den", 2), ("hall", 3)]).count == 5, "every Port follows each controller's limits")
+// the Light trigger on the wire: a panel seen, and when a light slot last ran and why
+check(wsched.panelSeen && wsched.sched[2].kind == 4 && wsched.sched[2].fat == 1_795_385_700 && wsched.sched[2].fwhy == 1, "the fixture's panel and last fire decode")
+check(wsched.sched[0].fat == 0 && wsched.sched[0].fwhy == 0, "a slot that never fired: 0 and 0")
+check((try? JSONDecoder().decode(SchedConfig.self, from: oldCfg)).map { !$0.panelSeen } == true, "older firmware (no panel field): no panel seen")
+let oldSlot = Data(#"{"on":1,"days":127,"mask":1,"min":0,"tilt":0,"kind":2,"off":0,"ramp":0,"gid":5}"#.utf8)
+check((try? JSONDecoder().decode(SchedSlot.self, from: oldSlot)).map { $0.fat == nil && $0.fwhy == nil } == true, "older firmware's slot (no fat, fwhy) decodes")
+let fromFixture = SchedulePlan.schedules([("den", wsched.sched)]).first { $0.id == 4_000_000_000 }
+check(fromFixture?.kind == 4 && fromFixture?.lastRun["den"] == LastRun(at: Date(timeIntervalSince1970: 1_795_385_700), why: 1), "a Schedule carries each controller's last run")
 
 // ---- the hub link's vectors (firmware/blinds_matter/test/wire/link.json, made by tools/link_vectors.py and checked by
 // the firmware's link_test.cpp): this app seals, opens and derives keys the same way
@@ -231,6 +239,33 @@ check((try? SchedulePlan.writes(wake, slots: full))?.first { $0.controller == "h
 // a controller with 2 Ports: a target on a third Port is left out of its mask
 let twoPorts = try SchedulePlan.writes(wake, slots: ["den": emptySlots(), "hall": emptySlots()], ports: ["den": 2])
 check(twoPorts.first { $0.controller == "den" }?.value.mask == 0b001, "the mask follows the controller's Ports")
+
+// ---- the Light trigger: kinds 3 (when it gets light) and 4 (when it gets dark)
+for kind in [3, 4] {
+    var lit: [String: [SchedSlot]] = ["den": emptySlots(), "hall": emptySlots()]
+    let s = Schedule(id: 77, days: 127, kind: kind, minute: 0, offset: -15, tilt: kind == 4 ? -100 : 0, ramp: 0,
+                     targets: [BlindTarget(controller: "den", blind: 0), BlindTarget(controller: "hall", blind: 2)])
+    let ws = try SchedulePlan.writes(s, slots: lit)
+    check(ws.allSatisfy { $0.value.kind == kind && $0.value.off == -15 }, "kind \(kind) is written as it is")
+    apply(ws, to: &lit)
+    check(both(lit) == [s], "kind \(kind) round-trips through the slots")
+}
+check(Schedule(kind: 3, offset: 0).whenText == "When it gets light" && Schedule(kind: 4, offset: 0).whenText == "When it gets dark", "the light triggers' names")
+check(Schedule(kind: 4, offset: -15).whenText == "When it gets dark (15 min before sunset)", "a light trigger with an offset")
+check(Schedule(kind: 3, offset: 30).whenText == "When it gets light (30 min after sunrise)", "a light trigger after sunrise")
+check(Schedule(kind: 2, offset: -15).whenText == "15 min before sunset" && Schedule(kind: 1, offset: 0).whenText == "Sunrise", "sun times as before")
+check(TiltWords.lastRun(why: 1, kind: 4, time: "5:42 PM") == "Last ran by light at 5:42 PM", "last ran: by light")
+check(TiltWords.lastRun(why: 2, kind: 4, time: "6:30 PM") == "Last ran at 6:30 PM (no steady reading)", "last ran: fell back")
+check(TiltWords.lastRun(why: 3, kind: 4, time: "5:01 PM") == "Last ran at sunset (no solar panel seen)", "last ran: no panel, sunset")
+check(TiltWords.lastRun(why: 3, kind: 3, time: "7:01 AM") == "Last ran at sunrise (no solar panel seen)", "last ran: no panel, sunrise")
+check(TiltWords.lastRun(why: 0, kind: 4, time: "") == nil, "never ran: no line")
+let covers: Set<BlindTarget> = [BlindTarget(controller: "den", blind: 0), BlindTarget(controller: "hall", blind: 1)]
+check(SchedulePlan.offersLight(kind: 2, targets: covers, panels: ["den": false, "hall": true]), "a covered controller with a panel: offered")
+check(!SchedulePlan.offersLight(kind: 2, targets: covers, panels: ["den": false, "hall": false, "attic": true]), "only a controller it does not cover has one: not offered")
+check(!SchedulePlan.offersLight(kind: 0, targets: covers, panels: [:]), "older firmware (no panel field): not offered")
+check(SchedulePlan.offersLight(kind: 4, targets: covers, panels: [:]), "a Schedule that already is a light trigger: offered, so it can be changed back")
+let demoCfg = try JSONDecoder().decode(SchedConfig.self, from: await Demo.shared.answer(Api.config))
+check(demoCfg.panelSeen && demoCfg.sched.contains { $0.kind == 4 && $0.mask != 0 }, "the demo room has a panel and a light Schedule")
 
 // ---- Scenes on the controllers (Shared/ScenePlan.swift), and their shared wire fixture
 let scData = try Data(contentsOf: wireDir.appendingPathComponent("scenes.json"))

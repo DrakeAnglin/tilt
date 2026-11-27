@@ -16,7 +16,8 @@ actor Demo: ControllerTransport {
     private var blinds = [Blind(name: "Left", from: 0, to: 0), Blind(name: "Middle", from: 0, to: 0), Blind(name: "Right", from: 60, to: 60)]
     private var closeUp = 1, sync = 0, par = 1, hksep = 0
     private var slots: [[String: Any]] = (0..<8).map { i in
-        i == 0 ? ["on": 1, "days": 127, "mask": 7, "min": 0, "tilt": -100, "kind": 2, "off": 0, "ramp": 10, "gid": 1]
+        i == 0 ? ["on": 1, "days": 127, "mask": 7, "min": 0, "tilt": -100, "kind": 4, "off": 0, "ramp": 10, "gid": 1,   // when it gets dark
+                  "fat": Int(Calendar.current.startOfDay(for: .now).timeIntervalSince1970) - 86400 + 17 * 3600 + 42 * 60, "fwhy": 1]
                : ["on": 0, "days": 0, "mask": 0, "min": 0, "tilt": 0, "kind": 0, "off": 0, "ramp": 0, "gid": 0]
     }
     // Two sample Scenes, so the demo shows what Scenes are for (they go with the demo room).
@@ -59,7 +60,7 @@ actor Demo: ControllerTransport {
             let day = Calendar.current.startOfDay(for: now).timeIntervalSince1970
             out = ["name": name, "ports": blinds.count, "slots": slots.count, "closeUp": closeUp, "sync": sync, "par": par, "tzn": TimeZone.current.identifier, "hksep": hksep,
                    "b": blinds.map { ["name": $0.name, "hid": $0.hidden ? 1 : 0, "speed": 100, "fav": 0] },
-                   "sched": slots, "sun": [day + 7 * 3600, day + 17.5 * 3600]]
+                   "sched": slots, "sun": [day + 7 * 3600, day + 17.5 * 3600], "panel": 1]
         case Api.keys:
             out = ["keys": [["cid": "demo", "name": UserDefaults.standard.string(forKey: Prefs.myName) ?? "You", "owner": 1, "me": 1, "wait": 0, "code": ""]]]
         case "/api/go":
@@ -75,6 +76,8 @@ actor Demo: ControllerTransport {
             if blinds.indices.contains(i) { go(i, tilt(blinds[i], at: now) + d * 8) }
         case "/api/sched":
             if let i = Int(q["i"] ?? ""), slots.indices.contains(i) {
+                // as the controller: another Schedule in the slot (id or kind) has not run yet
+                if slots[i]["gid"] as? Int != Int(q["gid"] ?? "") || slots[i]["kind"] as? Int != Int(q["kind"] ?? "") { slots[i]["fat"] = 0; slots[i]["fwhy"] = 0 }
                 for k in ["on", "days", "mask", "min", "tilt", "kind", "off", "ramp", "gid"] { slots[i][k] = Int(q[k] ?? "") ?? 0 }
             }
         case Api.scenes:

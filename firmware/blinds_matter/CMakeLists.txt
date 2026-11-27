@@ -11,7 +11,8 @@ string(REGEX REPLACE ".*\"([^\"]+)\".*" "\\1" PROJECT_VER "${FW_VERSION_LINE}")
 # controller refuses the update as "not newer").
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/main/web.h")
 set(PROJECT_VER_NUMBER 4)
-# A dev build ("-devN") also keeps the hourly power log (main/store.h, /api/powerlog).
+# A dev build ("-devN") also keeps the hourly power log and the light log around sunrise and sunset (main/store.h,
+# /api/powerlog, /api/lightlog).
 if(PROJECT_VER MATCHES "-dev")
   add_compile_definitions(TILT_DEVLOG=1)
 endif()

@@ -24,6 +24,20 @@ enum TiltWords {
         default: return "Charging"
         }
     }
+    /// When a light Schedule last ran and why (SchedSlot.fwhy), `time` already formatted. nil: it has not run.
+    static func lastRun(why: Int, kind: Int, time: String) -> String? {
+        switch why {
+        case 1: return "Last ran by light at \(time)"
+        case 2: return "Last ran at \(time) (no steady reading)"
+        case 3: return "Last ran at \(Schedule.onSunrise(kind) ? "sunrise" : "sunset") (no solar panel seen)"
+        default: return nil
+        }
+    }
+    /// What a light trigger does, under the Starts picker.
+    static func lightTrigger(_ kind: Int) -> String {
+        let (what, when) = kind == 3 ? ("light", "sunrise") : ("dark", "sunset")
+        return "Runs when the controller's solar panel sees it get \(what), within 90 minutes of \(when), once a day. With no steady reading by then, it runs at the end of that time; with no solar panel, at \(when)."
+    }
     /// What a schedule or button does: "Open", "Close up", "Close down", or a position.
     static func action(_ tilt: Int) -> String {
         tilt == 0 ? "Open" : tilt == 100 ? "Close up" : tilt == -100 ? "Close down" : long(Double(tilt))
