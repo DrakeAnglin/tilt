@@ -531,6 +531,35 @@ static void zoneTests() {
   if (was) zoneUse(keep.c_str()); else { unsetenv("TZ"); tzset(); }
 }
 
+// ---- a settings backup the controller takes or refuses (issue #181); a refused one changes nothing
+// A made-up layout: settings 16 bytes (magic, then a 6-byte zone at 6), tune 4, schedule extras 8 (magic first).
+static const BackupLayout TEST_LAYOUT = {16, 4, 8, 0xB11D0003, 0x53580001, 6, 6};
+static std::string goodBackup() {
+  std::string b = "TB1";
+  uint16_t sz[3] = {16, 4, 8};
+  b.append((const char *)sz, sizeof sz);
+  std::string s(16, 0); uint32_t m = 0xB11D0003; memcpy(&s[0], &m, 4); memcpy(&s[6], "UTC0", 5);
+  std::string x(8, 0); uint32_t xm = 0x53580001; memcpy(&x[0], &xm, 4);
+  return b + s + std::string(4, 7) + x + std::string(4, 1);
+}
+static void backupTests() {
+  auto refusal = [](const std::string &b) {
+    std::string keep = b;
+    const char *why = backupRefusal((const uint8_t *)b.data(), b.size(), TEST_LAYOUT);
+    CHECK(b == keep, "backup: the rule only reads the blob");
+    return std::string(why ? why : "");
+  };
+  CHECK(refusal(goodBackup()).empty(), "backup: a well-formed one is taken");
+  CHECK(refusal(goodBackup().substr(0, 8)) == "not a Tilt backup", "backup: under 9 bytes");
+  { std::string b = goodBackup(); b[0] = 'X'; b[1] = 'Y'; b[2] = 'Z'; CHECK(refusal(b) == "not a Tilt backup", "backup: no TB1 at the start"); }
+  { std::string b = goodBackup(); b[5] = 5; CHECK(refusal(b) == "this backup is from a different firmware", "backup: a size differs"); }
+  CHECK(refusal(goodBackup() + "x") == "this backup is from a different firmware", "backup: one byte too many");
+  { std::string b = goodBackup(); memcpy(&b[9 + 6], "ab\0", 3); CHECK(refusal(b) == "bad time zone", "backup: a 2-character zone"); }
+  { std::string b = goodBackup(); memcpy(&b[9 + 6], "ABCDEF", 6); CHECK(refusal(b) == "bad time zone", "backup: a zone with no end in its field"); }
+  { std::string b = goodBackup(); b[9] ^= 1; CHECK(refusal(b) == "not a Tilt backup", "backup: right sizes, wrong settings magic (#181)"); }
+  { std::string b = goodBackup(); b[9 + 16 + 4] ^= 1; CHECK(refusal(b) == "not a Tilt backup", "backup: wrong schedule-extras magic"); }
+}
+
 // ---- the light trigger (issue #207): "when it gets dark / light", read from the solar panel's input
 // One slot, stepped once a minute from `from` to `to` (inclusive). v(t): the minute's mean input, the minute ending at t.
 struct LightSim {
@@ -719,6 +748,7 @@ int main() {
   handWatchTests();
   settingsChangeTests();
   zoneTests();
+  backupTests();
   lightTests();
 
   // ---- battery
