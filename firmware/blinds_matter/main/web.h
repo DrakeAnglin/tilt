@@ -321,7 +321,7 @@ esp_err_t hHomeOpen(httpd_req_t *r) {            // let Apple Home (or Alexa) ad
   openHomeWindow();
   return sendJson(r, homeCodeJson());
 }
-esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = millis() + 300000; event("firmware updates allowed for 5 minutes"); return ok(r); }
+esp_err_t hOtaOpen(httpd_req_t *r) { Lock l; otaWindow = uptimeMs() + OTA_WINDOW_MS; event("firmware updates allowed for 5 minutes"); return ok(r); }
 esp_err_t hHome(httpd_req_t *r);                // hub_link.h
 esp_err_t hHubJoin(httpd_req_t *r);
 esp_err_t hSwapFw(httpd_req_t *r);

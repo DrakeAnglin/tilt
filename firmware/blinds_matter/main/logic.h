@@ -389,5 +389,7 @@ inline const char *permitRule(Who who, bool owner, const std::string &cidArg, co
 }
 
 // ---- the owner's firmware update window (web.h hOtaOpen sets until; hub_link.h hubOtaBegin asks)
-// until: millis() when the window shuts (0: never opened). Safe across the 32-bit millis wrap.
-inline bool otaWindowOpen(uint32_t until, uint32_t now) { return (int32_t)(until - now) > 0; }
+// until: uptime in ms (64 bits, ardu.h uptimeMs) when the window shuts; 0 means never opened.
+// 64 bits never wrap, so a plain compare holds however long the controller has been up.
+const uint32_t OTA_WINDOW_MS = 300000;            // how long the window stays open: 5 minutes
+inline bool otaWindowOpen(uint64_t until, uint64_t now) { return now < until; }

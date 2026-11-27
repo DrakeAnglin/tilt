@@ -14,7 +14,7 @@
 #include "sec.h"                                 // owned
 #include "api.h"                                 // Lock, ok, fail, restartSoon
 
-uint32_t otaWindow = 0;                          // millis until which a firmware upload is accepted
+uint64_t otaWindow = 0;                          // uptimeMs until which a firmware upload is accepted (0: never opened)
 bool otaPending = false;                         // this firmware is on trial (kept or dropped by webTick, /api/keep)
 static uint32_t appSize = 0;                     // this firmware's size, for the developer page
 void updateBegin() {                             // is this firmware on trial? how big is it?

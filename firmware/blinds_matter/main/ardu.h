@@ -37,6 +37,7 @@ using std::max;
 #endif
 
 inline uint32_t millis() { return (uint32_t)(esp_timer_get_time() / 1000); }
+inline uint64_t uptimeMs() { return (uint64_t)(esp_timer_get_time() / 1000); }   // never wraps
 inline void delay(uint32_t ms) { vTaskDelay(pdMS_TO_TICKS(ms) ? pdMS_TO_TICKS(ms) : 1); }
 inline void delayMicroseconds(uint32_t us) { esp_rom_delay_us(us); }
 

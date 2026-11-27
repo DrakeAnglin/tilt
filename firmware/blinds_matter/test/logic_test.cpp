@@ -823,13 +823,22 @@ int main() {
 
   // ---- the owner's firmware update window (web.h hOtaOpen sets it; hub_link.h hubOtaBegin asks this)
   {
-    const uint32_t now = 1000, end = now + 300000;
-    CHECK(!otaWindowOpen(0, now), "no window ever opened: an update is refused");
+    const uint64_t B31 = 1ULL << 31, B32 = 1ULL << 32;
+    const uint64_t never[] = {1000, B31 - 1, B31, B31 + 1, B32 - 1, B32, B32 + 1, 1ULL << 40};
+    bool shut = true;
+    for (uint64_t t : never) shut = shut && !otaWindowOpen(0, t);
+    CHECK(shut, "no window ever opened: an update is refused, however long the uptime");
+    const uint64_t now = 1000, end = now + OTA_WINDOW_MS;
     CHECK(otaWindowOpen(end, now) && otaWindowOpen(end, end - 1), "inside the window: an update may start");
     CHECK(!otaWindowOpen(end, end) && !otaWindowOpen(end, end + 1), "at or after the end: refused");
-    const uint32_t late = UINT32_MAX - 1000, wrapEnd = late + 300000;   // the end wraps past the 32-bit millisecond count
-    CHECK(wrapEnd < late && otaWindowOpen(wrapEnd, late) && otaWindowOpen(wrapEnd, wrapEnd - 1), "a window across the millis wrap is open before its end");
-    CHECK(!otaWindowOpen(wrapEnd, wrapEnd) && !otaWindowOpen(wrapEnd, wrapEnd + 1), "a window across the millis wrap is shut after its end");
+    CHECK(!otaWindowOpen(end, end + B31) && !otaWindowOpen(end, end + B31 + 1) &&
+          !otaWindowOpen(end, end + B32) && !otaWindowOpen(end, end + B32 + 1), "a window that ran out stays shut");
+    const uint64_t late = (uint64_t)UINT32_MAX - 1000, lateEnd = late + OTA_WINDOW_MS;   // the old 32-bit count would wrap here
+    CHECK(lateEnd > late && otaWindowOpen(lateEnd, late) && otaWindowOpen(lateEnd, lateEnd - 1), "a window opened just before the old 32-bit wrap is open before its end");
+    CHECK(!otaWindowOpen(lateEnd, lateEnd) && !otaWindowOpen(lateEnd, lateEnd + 1), "a window opened just before the old 32-bit wrap is shut after its end");
+    const uint64_t veryLate = 1ULL << 33;
+    CHECK(otaWindowOpen(veryLate + OTA_WINDOW_MS, veryLate + OTA_WINDOW_MS - 1) &&
+          !otaWindowOpen(veryLate + OTA_WINDOW_MS, veryLate + OTA_WINDOW_MS), "a window opened after very long uptime");
   }
 
   // ---- which slot a new key takes (sec.h pairDo)
