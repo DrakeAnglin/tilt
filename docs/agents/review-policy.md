@@ -50,7 +50,7 @@ Some changes are only safe to release once they have run on real hardware. The r
 2. CI is green on the commit that was reviewed.
 3. The author and the reviewer agree: no must-fix finding is left, and none is in dispute (below).
 4. Changed behavior has a test, or the change is docs or comments only. Firmware that only runs on the ESP counts as tested when the author built it (`firmware/blinds_matter/build.sh`, `firmware/tilt_hub/build.sh`) on the reviewed commit, said so in Evidence, and the pull request has `bench-check`.
-5. The change does what the issue asked and nothing else.
+5. The change does what the issue asked and nothing else. The same flaw fixed in sibling spots (the spec's Same flaw elsewhere, or named in the pull request as found on the way) counts as asked.
 6. No human-only path is touched (below).
 
 Doubt about a rule is not a reason to hand over. Say what you are unsure about and decide.

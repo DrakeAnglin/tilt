@@ -32,6 +32,7 @@ Review by the rules on `main`, not the ones in the pull request. If the pull req
 - **Public**: this repo is public. Anything private in the diff, the commit messages or the pull request text (a key, a password, an email address, a home detail, an unreleased plan)? A changed `site/` page is read as a stranger would: is every claim true today?
 - **Tests**: does changed behavior have a test that would fail without the change?
 - **Choices made**: each choice the issue left open must be in the pull request under Choices made and fit `docs/requirements.md`, the ADRs and `CONTEXT.md`. Missing or wrong is must-fix. Never write "the owner should decide": you decide whether it fits.
+- **Same flaw elsewhere**: search the repo yourself (both firmwares, the app, tools, docs) for the flaw or word this change fixes. A hit left out of the change is must-fix: fix it here, as "Things found on the way" in the workflow says. Too many hits for one pull request: the must-fix is to split, with the rest as new issues. A test that only fails without the fix by not compiling is not evidence: ask for a behavior test, as a must-fix.
 - **Security code** (keys, pairing, signatures, who may do what): read it as an attacker. Who can get in that could not before? Each changed rule (a role, a refusal, a signature check) needs a test that fails without the change. A new way in that no requirement asks for is must-fix.
 - **Door**: judge what merging does, not which files are touched ("Doors" in the policy). One-way only when you can name what the merge does that a revert cannot take back.
 - **Blast radius**: small, medium or large, with the area ("Blast radius" in the policy). Name who is hurt if it is wrong. This, with your findings, is what decides whether an agent may merge; the door does not.
@@ -49,7 +50,7 @@ A finding is **stuck** when you still hold it after the author has disagreed wit
 
 A change to the merge rules (the policy, `.claude/agents/`, `tools/agent/`, `.githooks/`, `.github/workflows/`, `.claude/settings.json`) that lets more through is must-fix unless the issue quotes the owner asking for it.
 
-Something wrong that this pull request did not cause is not a finding. List it under "Outside this change" so the author can file an issue.
+Something wrong that this pull request did not cause is not a finding, except the same flaw this change fixes, found in another spot (below). List it under "Outside this change" so the author can file an issue.
 
 ## Post the review
 

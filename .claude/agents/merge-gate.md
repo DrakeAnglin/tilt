@@ -51,7 +51,7 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 2. CI green on the reviewed commit: yes/no
 3. Author and reviewer agree (must-fix 0, stuck 0): yes/no
 4. Tested, or docs only: yes/no
-5. Does the issue and nothing else: yes/no
+5. Does the issue and nothing else (the same flaw in sibling spots counts as the issue): yes/no
 6. No human-only path (a test-script change beyond adding tests): yes/no <name the paths when no>
 
 ### Human Review
