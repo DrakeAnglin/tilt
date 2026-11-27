@@ -33,8 +33,8 @@ live on this repo's GitHub releases.
   ```bash
   tools/flash.sh <controller id>
   ```
-- **Test tools:** talk to a controller from the Mac with `tools/blinds_client.py`. Mac tests of the pure logic:
-  `tools/firmware_tests.sh`.
+- **Test tools:** talk to a controller from the Mac with `tools/blinds_client.py`. Mac tests of the logic and, on a
+  stand-in board, of the controller's own code: `tools/firmware_tests.sh`.
 
 ## [tilt_hub](tilt_hub): the Tilt Hub
 ESP32-C6 on a USB wall plug: Matter bridge on Wi-Fi for Apple Home, its own Thread network for the controllers,

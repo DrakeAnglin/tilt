@@ -7,6 +7,7 @@
 #   firmware/blinds_matter/test/link_test.cpp    the hub link both firmwares share
 #   firmware/tilt_hub/test/ctrl_link_test.cpp    the hub's link to one controller
 #   firmware/blinds_matter/test/pair_test.cpp    the key exchange in Pairing both firmwares share (needs mbedtls)
+#   firmware/blinds_matter/test/controller_test.cpp  the controller's own code on a stand-in board (test/host_esp)
 #   (the two link tests use firmware/blinds_matter/test/host_mbedtls, a stand-in for mbedtls)
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -50,3 +51,6 @@ c++ -std=c++17 -Wall -Wextra -O1 $HUB_INC -o "$OUT/hub_test" hub_test.cpp $MBED
 "$OUT/hub_test"
 c++ -std=c++17 -Wall -Wextra -O1 $HUB_INC -o "$OUT/pair_test" ../../blinds_matter/test/pair_test.cpp $MBED
 "$OUT/pair_test" ../../blinds_matter/test/wire/link.json
+# shellcheck disable=SC2086
+c++ -std=c++17 -Wall -Wextra -O1 -pthread -DTILT_DEVLOG=1 -I ../../blinds_matter/test/host_esp -I ../../blinds_matter/main -I ../main -o "$OUT/controller_test" ../../blinds_matter/test/controller_test.cpp $MBED
+"$OUT/controller_test"
