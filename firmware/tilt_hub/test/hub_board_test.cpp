@@ -251,6 +251,15 @@ static void testFindCtrl() {
   CHECK(findCtrl("deadbeef0000") == -1, "findCtrl: -1 for an id left in a place no longer in use");
 }
 
+static void testHomeBeingAdded() {
+  start();
+  CHECK(!homeBeingAdded(), "homeBeingAdded: no home app adding the hub");
+  hubhost::setFailSafe(true);
+  CHECK(homeBeingAdded(), "homeBeingAdded: a home app is adding the hub (the fail-safe is armed)");
+  start();
+  CHECK(!homeBeingAdded(), "homeBeingAdded: off after a restart");
+}
+
 static void testHelpers() {
   CHECK(constrain_u(5, 0, 10) == 5 && constrain_u(0, 0, 10) == 0 && constrain_u(10, 0, 10) == 10, "constrain_u: in range and at its ends");
   CHECK(constrain_u(-3, 0, 10) == 0 && constrain_u(12, 0, 10) == 10, "constrain_u: under and over its ends");
@@ -548,6 +557,7 @@ static void testLinkVector(const char *path) {
   CHECK(sec(strOf(s("frame")), resp, "secDo (vector): the lock is free") == 200, "the vector's frame: 200");
   CHECK(cmdGot == s("cmd") && cmdSlot == 0, "hubCommand gets the vector's command");
   CHECK(hexOf((const uint8_t *)resp.data(), (int)resp.size()) == s("reply"), "the answer is the vector's reply, byte for byte");
+  CHECK(hubhost::randomQueued() == 0, "the reply took the vector's random bytes");
   cJSON_Delete(v);
 }
 
@@ -599,6 +609,7 @@ int main(int argc, char **argv) {
   testProofs();
   testFindCtrl();
   testHelpers();
+  testHomeBeingAdded();
   testPeopleFromFlash();
   testSetupCode();
   testHubId();

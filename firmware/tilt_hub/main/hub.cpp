@@ -95,12 +95,12 @@ using namespace chip::app::Clusters;
 // The parts, in order: each one uses what the ones before it hold (firmware/tilt_hub/README.md, "Code").
 #include "wire.h"                                // keptName, jq: names as the controller keeps them
 #include "hub_store.h"                           // what it keeps about each controller
-#include "hub_pair.h"                            // the hub's people
 #include "hub_matter.h"                          // Apple Home (Matter)
 #include "hub_ctrl.h"                            // the link to the controllers
 #include "hub_alerts.h"                          // push alerts to the owners
 #include "hub_care.h"                            // backups, the care task, new controllers
 #include "hub_update.h"                          // firmware updates
+#include "hub_pair.h"                            // the hub's people
 #include "hub_api.h"                             // what the app asks the hub
 
 // ---- Thread: the hub's own network, made once and kept

@@ -16,7 +16,6 @@ static std::string hubCommand(int slot, const std::string &cmd);  // hub_api.h
 // task takes keyMx (hubOwned() in announceHub()) while it holds the Matter stack lock.
 static HubPeople people;
 static uint8_t hboot[4];
-static uint8_t htopic[16];                       // the hub's own alert topic (hub_alerts.h)
 static SemaphoreHandle_t keyMx;
 static void keysSave(const HubPeople &p) { nvs_set_blob(nv, "hkeys", p.keys, sizeof p.keys); nvs_commit(nv); }
 static void pinBegin();

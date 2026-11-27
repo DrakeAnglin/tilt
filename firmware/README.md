@@ -39,6 +39,8 @@ live on this repo's GitHub releases.
 ## [tilt_hub](tilt_hub): the Tilt Hub
 ESP32-C6 on a USB wall plug: Matter bridge on Wi-Fi for Apple Home, its own Thread network for the controllers,
 firmware updates, backups and finding new controllers. See its [README](tilt_hub/README.md).
+Mac tests of its rules and, on the same stand-in board, of its own code (`test/hub_board_test.cpp`: storage, Pairing
+and sealed commands so far): `tools/firmware_tests.sh`.
 
 ## [as5600_setup](as5600_setup): sensor bench tool
 Switches a new AS5600 from analog to PWM output, burned once over I2C, before it goes into a tilter. Runs on a spare
