@@ -15,6 +15,7 @@ struct BlindState: Decodable, Equatable {
     /// 1: its sensor sends analog, never burned to PWM with the sensor bench tool (nil: PWM, an empty port, or firmware
     /// older than #256). The firmware's side is wire.h blindStateJson.
     var an: Int? = nil
+    var analogSensor: Bool { an == 1 }
     /// Shown in the app: not hidden, and not an empty port.
     var listed: Bool { hid == 0 && !(seen == 1 && pres == 0) }
     var ready: Bool { listed && cal == 1 }
