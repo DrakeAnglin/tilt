@@ -116,7 +116,7 @@ struct JoinSheet: View {
             Text("Their phone must show this same code. If it does not match, decline.")
                 .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             Picker("Role", selection: $owner) { Text("Guest").tag(false); Text("Owner").tag(true) }.pickerStyle(.segmented)
-            Text(owner ? "An owner can also change settings, run blind setup, make schedules, and approve or remove people." : "A guest can open and close the blinds. Nothing else.")
+            Text(TiltWords.role(owner: owner))
                 .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(minHeight: 34)
             HStack(spacing: 12) {
                 Button(role: .destructive) { answer(false) } label: { Text("Decline").frame(maxWidth: .infinity) }.buttonStyle(.bordered)
