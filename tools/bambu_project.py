@@ -16,6 +16,7 @@ Settings are set per part, so nothing is changed by hand: a brim on the parts th
 lift (BRIM), supports only on the tray lid, the worm and the worm wheel (SUPPORT). Everything else has no brim and no
 support. H2D, 0.4 nozzle, 0.12 mm Fine, white PLA on filament 1, white PETG on filament 2 (as tools/bambu.py).
 """
+import html
 import json
 import os
 import re
@@ -82,6 +83,47 @@ CONTROLLER = [('1 Controller box (PLA)', [[BOX[0]], [BOX[1]]]),
               ('2 %s' % NAMES[BOX[0]], [[BOX[0]]]),
               ('3 %s' % NAMES[BOX[1]], [[BOX[1]]])]
 PROJECTS = {'tilt_bulk_H2D.3mf': BULK, 'tilt_parts_H2D.3mf': SINGLE, 'tilt_controller_box_H2D.3mf': CONTROLLER}
+
+# What Bambu Studio's Project tab shows, and what MakerWorld fills its forms with: the model, then this print profile.
+SETTINGS = ('H2D, 0.4 nozzle, 0.12 mm Fine, 4 walls, 40% infill. Filament 1 white PLA, filament 2 white PETG; '
+            'PLA and PETG never share a plate.')
+PRINTS = 'Supports only on the tray lid, worm and worm wheel. Brims on the worm, sensor sleeve, worm wheel, carrier, ' \
+         'magnet gear and planets.'
+MODEL = {'Title': 'Tilt blind tilter + controller box (H2D project)', 'Designer': 'leMoth',
+         'License': 'Standard Digital File License',
+         'Description': 'Print projects for the Tilt blind tilter and its controller box. Three print profiles: '
+                        'Tilter - bulk (a whole tilter on 3 plates), Tilter - one part per plate (16 plates, to '
+                        'reprint a part that failed), Controller box. ' + SETTINGS}
+PROFILE = {
+    'tilt_bulk_H2D.3mf': ('Tilter - bulk (3 plates)', 'A whole tilter at once. Plate 1: tilter boxes (PLA). Plate 2: '
+                          'tilter gears (PLA). Plate 3: tilter gears (PETG). ' + PRINTS + ' Reprint a single failed '
+                          'part from the Tilter - one part per plate profile.'),
+    'tilt_parts_H2D.3mf': ('Tilter - one part per plate (16 plates)', 'One tilter part per plate, in assembly order, '
+                           'for reprinting a part that failed on a bulk plate. PETG: carrier, cluster gear, sensor '
+                           'sleeve, magnet gear. ' + PRINTS),
+    'tilt_controller_box_H2D.3mf': ('Controller box (3 plates)', 'The controller box on its own, white PLA, no '
+                                    'supports, no brim. Plate 1: tray and lid together. Plate 2: tray only. '
+                                    'Plate 3: lid only (top face down).')}
+
+
+def project_info(name):
+    """The 3MF metadata for one project. Studio keeps the description as HTML."""
+    title, about = PROFILE[name]
+    info = dict(MODEL, ProfileTitle=title, ProfileDescription='<p>%s</p>' % (about + ' ' + SETTINGS))
+    info['Description'] = '<p>%s</p>' % info['Description']
+    return info
+
+
+def set_metadata(model, info):
+    """Fill (or add) <metadata name="..."> lines in 3D/3dmodel.model."""
+    for key, value in info.items():
+        line = '<metadata name="%s">%s</metadata>' % (key, html.escape(html.escape(value, False), False))
+        pat = r'<metadata name="%s">[^<]*</metadata>' % key
+        if re.search(pat, model):
+            model = re.sub(pat, lambda _: line, model)
+        else:
+            model = model.replace('<resources>', line + '\n <resources>', 1)
+    return model
 
 H2D = (350.0, 320.0)                # bed
 GAP = 7.0                           # between parts on a plate (owner: keep parts close together)
@@ -180,6 +222,7 @@ def build(out, PLATES):
         dx, dy = offset.get(m.group(2), (0, 0))
         return '%stransform="1 0 0 0 1 0 0 0 1 %.2f %.2f %s"' % (m.group(1), x - dx, y - dy, z)
     model = re.sub(r'(<item objectid="(\d+)"[^>]*?)transform="([^"]+)"', move, model)
+    model = set_metadata(model, project_info(os.path.basename(out)))
 
     def obj(m):
         """Name the object after its part, pick its filament, add its own settings."""
