@@ -52,8 +52,13 @@ provider, and Matter certification.
 
 - The hub's USB log prints the Thread dataset and the Apple Home setup code (`hub.cpp` threadBegin, `hub_matter.h`
   homeCodeBegin). Remove those lines, or show them only in a debug build.
-- `main/secrets.h` (Wi-Fi, bench only) and `main/setup_pin.h` (the hub's setup code) stay out of Git. Each hub
-  needs its own setup code: run a clean build per hub (delete `setup_pin.h`) and print the label from it.
+- `main/secrets.h` (Wi-Fi, bench only) and `main/setup_pin.h` (a fallback setup code for a plain `build.sh` flash)
+  stay out of Git. Each hub gets its own codes from the Mac: `tools/flash_hub.sh --usb <port>` makes the Apple Home
+  code and the setup code per hub, writes them into its saved data before its first start, keeps them in
+  `~/.tilt/devices/` and prints the label from them, with no clean build per hub.
+- That tool decides whether a hub already has a code by reading its saved data back over USB (the `homecode` key).
+  Once NVS encryption (section 2) is on, that read sees only ciphertext: the check has to move into the firmware, or
+  the tool has to write an encrypted NVS image, before encryption is turned on.
 
 ## 7. Network key changes
 

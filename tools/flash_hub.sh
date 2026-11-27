@@ -5,11 +5,25 @@
 # allows it (this tool's "hub-owner" key: see firmware/tilt_hub/README.md), checks the signature and that it is not
 # older, and starts it on trial: kept once Wi-Fi and Apple Home have worked for a minute, otherwise it goes back.
 # Raise PROJECT_VER in firmware/tilt_hub/CMakeLists.txt for each update. A hub with the old one-slot layout needs one
-# USB flash first (./build.sh -p <port> flash in firmware/tilt_hub).
+# USB flash first (./build.sh -p <port> flash in firmware/tilt_hub, or --usb below).
 set -eo pipefail
+PY=${PY:-$HOME/.espressif/python_env/idf5.5_py3.9_env/bin/python}
+case ${1:-} in
+  -h|--help) cat <<'EOF'
+Build the Tilt Hub firmware and install it.
+  tools/flash_hub.sh [hub address]     over Wi-Fi: an update (the hub keeps its codes)
+  tools/flash_hub.sh --usb <port> [--label-size WxH] [--new-identity]
+                                       the first flash, over USB: a new hub gets its Apple Home code and setup code,
+                                       saved in ~/.tilt/devices on this Mac, and a setup label (PNG and PDF, 40x20 mm)
+  --new-identity   developer flag: wipe the hub's saved data and make new codes; asks for its short ID first
+More: tools/device_identity.py --help
+EOF
+    exit 0;;
+  --usb) P=${2:?usage: tools/flash_hub.sh --usb <port>}; shift 2
+    exec "$PY" "$(dirname "$0")/device_identity.py" flash hub --port "$P" "$@";;
+esac
 HUB=${1:-${TILT_HUB:-192.168.50.122}}
 cd "$(dirname "$0")/../firmware/tilt_hub"
-PY=${PY:-$HOME/.espressif/python_env/idf5.5_py3.9_env/bin/python}
 fw() { "$PY" ../../tools/blinds_client.py --ip "$HUB/hub" hello 2>/dev/null | sed -n 's/.*"fw":"\([^"]*\)".*/\1/p'; }
 
 echo "building"

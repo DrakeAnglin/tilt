@@ -190,7 +190,7 @@ static void statusTask(void *) {
 }
 
 // ---- factory reset: hold the BOOT button (GPIO9) for 10 seconds. Everything is forgotten (Apple Home, the Thread
-// network, the controllers, the backups) except the hub's own setup code, as if it were printed on a label.
+// network, the controllers, the backups) except the two codes on its label: the Apple Home code and the setup code.
 static void resetTask(void *) {
   gpio_config_t io = {};
   io.pin_bit_mask = 1ULL << 9;
@@ -209,11 +209,17 @@ static void resetTask(void *) {
     vTaskDelay(pdMS_TO_TICKS(1200));
     ESP_LOGW(TAG, "factory reset");
     HomeCode keep = homeCode;
+    char pin[sizeof setupPin];
+    strlcpy(pin, setupPin, sizeof pin);          // release firmware has no built-in code: the reset must not lose it
     nvs_close(nv);
     nvs_flash_deinit();
     nvs_flash_erase();
     nvs_flash_init();
-    if (nvs_open("hub", NVS_READWRITE, &nv) == ESP_OK) { nvs_set_blob(nv, "homecode", &keep, sizeof keep); nvs_commit(nv); }
+    if (nvs_open("hub", NVS_READWRITE, &nv) == ESP_OK) {
+      nvs_set_blob(nv, "homecode", &keep, sizeof keep);
+      if (pin[0]) nvs_set_str(nv, "pin", pin);
+      nvs_commit(nv);
+    }
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
   }

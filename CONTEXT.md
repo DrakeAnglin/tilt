@@ -81,7 +81,21 @@ Someone using the blinds through Apple Home or Alexa. Never holds an app key, so
 ### Joining the system
 
 **Commissioning**:
-Adding a controller to a Matter fabric (Apple Home, Alexa).
+Adding the **Tilt Hub** to a Matter fabric (Apple Home, Alexa). Every blind shows up through it; a controller is
+never commissioned on its own ([ADR 0003](docs/adr/0003-thread-only-tilt-hub.md)).
+
+**Apple Home code**:
+The Tilt Hub's Matter code: 11 digits, or the same code as a QR. Apple Home or Alexa scans or takes it to commission
+the hub.
+
+**Setup code**:
+The Tilt Hub's 8 digits the first Owner types in the app to connect to it.
+_Avoid_: PIN, pairing code
+
+**Setup label**:
+The sticker on a Tilt Hub with its Apple Home code (QR and 11 digits) and its Setup code, made on the Mac at its first
+USB flash.
+_Avoid_: pairing label (Pairing is a phone getting its key)
 
 **Pairing**:
 A phone gaining its own secret key for one controller or for the Tilt Hub, over the app's secured channel.

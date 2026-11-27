@@ -25,6 +25,8 @@ firmware/**/setup_pin.h
 firmware/bin/
 firmware/build/
 tools/.blinds_client.json
+# Device records and setup labels (tools/device_identity.py keeps them in ~/.tilt/devices; this is only a guard)
+tools/devices/
 
 # Xcode / iOS app
 build-phone/

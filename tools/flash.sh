@@ -4,12 +4,26 @@
 # The build is signed with ~/.tilt/firmware-signing-key.pem (tools/release_firmware.py --sign). The hub keeps the file
 # and feeds it to the controller over Thread; the new firmware runs on trial and goes back by itself if it cannot
 # reach the hub. (A controller with no firmware yet, or a broken one: ./build.sh -p <USB port> flash in
-# firmware/blinds_matter.)
+# firmware/blinds_matter, or --usb below.)
 set -eo pipefail
+PY=${PY:-$HOME/.espressif/python_env/idf5.5_py3.9_env/bin/python}
+case ${1:-} in
+  -h|--help) cat <<'EOF'
+Build the controller firmware and install it.
+  tools/flash.sh <controller id> [hub address]     through the Tilt Hub, over Thread: an update
+  tools/flash.sh --usb <port> [--label-size WxH]   the first flash, over USB: saves the controller's record in
+                                                   ~/.tilt/devices on this Mac and writes an ID label
+  --new-identity   developer flag for a Tilt Hub only (tools/flash_hub.sh --usb); refused for a controller, which
+                   has no code from the Mac: reset it from the app
+More: tools/device_identity.py --help
+EOF
+    exit 0;;
+  --usb) P=${2:?usage: tools/flash.sh --usb <port>}; shift 2
+    exec "$PY" "$(dirname "$0")/device_identity.py" flash controller --port "$P" "$@";;
+esac
 ID=${1:?usage: tools/flash.sh <controller id> [hub address]}
 HUB=${2:-${TILT_HUB:-192.168.50.122}}
 cd "$(dirname "$0")/../firmware/blinds_matter"
-PY=${PY:-$HOME/.espressif/python_env/idf5.5_py3.9_env/bin/python}
 ask() { "$PY" ../../tools/blinds_client.py --ip "$HUB/c/$ID" --as "${TILT_AS:-dining-owner}" get "$1"; }
 # Progress from the hub's own list (sealed: the public /hub page shows no controllers).
 member() { "$PY" ../../tools/blinds_client.py --ip "$HUB/hub" --as hub-owner get /api/info 2>/dev/null | "$PY" -c "import sys,json; m=[c for c in json.load(sys.stdin)['c'] if c['id']=='$ID']; print(*(m and [m[0].get('ota',0), m[0].get('otaPct',0), m[0].get('otaErr','')] or ['?']))"; }

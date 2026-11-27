@@ -476,5 +476,344 @@ class HubPeopleLock(unittest.TestCase):
         self.assertGreaterEqual(calls, 6)        # helloJson, hInfo, announceHub's own read, three announceHub calls
 
 
+def _has(*mods):
+    import importlib.util
+    return all(importlib.util.find_spec(m) for m in mods)
+
+
+def dashed_manual(code):
+    return code[:4] + '-' + code[4:7] + '-' + code[7:]
+
+
+class DeviceIdentity(unittest.TestCase):
+    """tools/device_identity.py: a hub's Apple Home code and setup code, made on the Mac at its first USB flash."""
+    # The Matter SDK's public test code (connectedhomeip src/include/platform/CHIPDeviceConfig.h): passcode 20202021,
+    # salt "SPAKE2P Key Salt", 1000 iterations, and the verifier "spake2p gen-verifier" made for them.
+    SDK_SALT = b'SPAKE2P Key Salt'
+    SDK_VERIFIER = ('uWFwqugDNGiEck/po7KHwwMwwqZgN10XuyBajPGuyzUEV/iree4lOrao5GuwnlQ65CJzbeUB49s31EH+NEkg0JVI5MGCQGMMT/SRPFNRODm3wH/'
+                    'MBiehuFc6FJ/NH6Rmzw==')
+    # What the SDK's src/setup_payload/python/SetupPayload.py gives (BLE, standard flow, vendor 0xFFF1, product 0x8000).
+    SDK_CODES = [(3840, 20202021, '34970112332', 'MT:Y.K9042C00KA0648G00'),
+                 (0, 1, '00000100007', 'MT:Y.K9042C00ID0000000'),
+                 (0xABC, 51234567, '23456731273', 'MT:Y.K90-C7141FPH45310')]
+
+    def setUp(self):
+        import device_identity
+        self.di = device_identity
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_verifier_matches_the_sdk_test_verifier(self):
+        import base64
+        self.assertEqual(self.di.verifier(20202021, self.SDK_SALT, 1000), base64.b64decode(self.SDK_VERIFIER))
+
+    def test_manual_code_and_qr_text_match_the_sdk(self):
+        for disc, pin, manual, qr in self.SDK_CODES:
+            self.assertEqual(self.di.manual_code(disc, pin), manual)
+            self.assertEqual(self.di.qr_payload(disc, pin, 0xFFF1, 0x8000), qr)
+            self.assertTrue(self.di.verhoeff_ok(manual), manual)
+        self.assertFalse(self.di.verhoeff_ok('34970112333'))
+
+    # The same hex is in firmware/blinds_matter/test/logic_test.cpp, which reads it as a HomeCode.
+    BLOB = ('0100434825423401e8030000000f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f'
+            'b96170aae803346884724fe9a3b287c30330c2a660375d17bb205a8cf1aecb350457f8ab79ee253ab6a8e46bb09e54'
+            '3ae422736de501e3db37d441fe344920d09548e4c18240630c4ff4913c53513839b7c07fcc0627a1b8573a149fcd1fa4'
+            '66cf00')
+
+    def sdk_identity(self, **kw):
+        import base64
+        ident = {'passcode': 20202021, 'discriminator': 3840, 'iterations': 1000, 'salt': bytes(range(32)).hex(),
+                 'verifier': base64.b64decode(self.SDK_VERIFIER).hex(), 'setup_code': '24681357'}
+        ident.update(kw)
+        return ident
+
+    def test_home_code_blob_is_the_firmwares_struct(self):
+        self.assertEqual(self.di.home_code_blob(self.sdk_identity()).hex(), self.BLOB)
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_new_identity_is_random_and_valid(self):
+        made = [self.di.new_identity() for _ in range(200)]
+        for m in made:
+            self.assertTrue(self.di.pin_valid(m['passcode']))
+            self.assertLess(m['discriminator'], 4096)
+            self.assertEqual(len(bytes.fromhex(m['salt'])), 32)
+            self.assertEqual(bytes.fromhex(m['verifier']), self.di.verifier(m['passcode'], bytes.fromhex(m['salt']), 1000))
+            self.assertRegex(m['setup_code'], r'^\d{8}$')
+            self.assertEqual(len(self.di.home_code_blob(m)), 144)
+        self.assertEqual(len({m['passcode'] for m in made}), 200)
+        self.assertEqual(len({m['salt'] for m in made}), 200)
+
+    def test_nvs_csv_holds_only_the_two_codes(self):
+        import csv, io
+        rows = list(csv.reader(io.StringIO(self.di.nvs_csv(self.sdk_identity()))))
+        self.assertEqual(rows[0], ['key', 'type', 'encoding', 'value'])
+        self.assertEqual(rows[1], ['hub', 'namespace', '', ''])
+        self.assertEqual(rows[2], ['homecode', 'data', 'hex2bin', self.BLOB])
+        self.assertEqual(rows[3], ['pin', 'data', 'string', '24681357'])
+        self.assertEqual(len(rows), 4)
+
+    # A hub's saved data read back over USB: erased (all 0xFF), or holding the key "homecode" (16-byte NVS key field).
+    EMPTY = b'\xff' * 0xC000
+    WITH_CODE = b'\xff' * 100 + b'homecode' + b'\0' * 8 + b'\xff' * 100
+
+    def test_plan_follows_the_table(self):
+        rec = {'kind': 'hub', 'id': 'hub404ccaffee1234'}
+        self.assertEqual(self.di.plan(None, self.EMPTY, False), 'new')           # nothing anywhere: a new identity
+        self.assertEqual(self.di.plan(rec, self.EMPTY, False), 'restore')        # erased: the same one back
+        self.assertEqual(self.di.plan(rec, self.WITH_CODE, False), 'firmware')   # firmware only
+        self.assertEqual(self.di.plan(None, self.WITH_CODE, False), 'own')       # made its own: firmware only
+        for r in (None, rec):
+            for dump in (self.EMPTY, self.WITH_CODE):
+                self.assertEqual(self.di.plan(r, dump, True), 'replace')
+
+    def records(self):
+        d = tempfile.mkdtemp()
+        os.environ['TILT_DEVICES'] = os.path.join(d, 'devices')
+        self.addCleanup(os.environ.pop, 'TILT_DEVICES', None)
+        return os.environ['TILT_DEVICES']
+
+    def test_records_are_private_and_found_by_full_or_short_id(self):
+        d = self.records()
+        self.di.save({'kind': 'hub', 'id': 'hub404ccaffee1234', 'short': '1234'})
+        self.di.save({'kind': 'controller', 'id': '404ccaffab12', 'short': 'ab12'})
+        self.assertEqual(os.stat(d).st_mode & 0o777, 0o700)
+        self.assertEqual(os.stat(os.path.join(d, 'hub404ccaffee1234.json')).st_mode & 0o777, 0o600)
+        self.assertEqual(self.di.find('hub404ccaffee1234')['short'], '1234')
+        self.assertEqual(self.di.find('AB12')['id'], '404ccaffab12')
+        self.assertEqual(self.di.load('nope'), None)
+        with self.assertRaises(LookupError):
+            self.di.find('9999')
+
+    def test_two_devices_with_the_same_short_id_is_an_error_naming_both(self):
+        self.records()
+        self.di.save({'kind': 'hub', 'id': 'hub404ccaffee1234', 'short': '1234'})
+        self.di.save({'kind': 'controller', 'id': '404ccaff1234', 'short': '1234'})
+        with self.assertRaises(LookupError) as e:
+            self.di.find('1234')
+        self.assertIn('hub404ccaffee1234', str(e.exception))
+        self.assertIn('404ccaff1234', str(e.exception))
+
+    def test_record_folder_is_outside_the_repo_and_tools_devices_is_ignored(self):
+        os.environ.pop('TILT_DEVICES', None)
+        repo = os.path.realpath(os.path.join(HERE, '..'))
+        self.assertFalse(os.path.realpath(self.di.devices_dir()).startswith(repo + os.sep))
+        with open(os.path.join(repo, '.gitignore')) as f:
+            self.assertIn('tools/devices/', f.read().split())
+
+    def hub_record(self):
+        ident = self.sdk_identity()
+        return dict(ident, kind='hub', id='hub404ccaffee1234', short='1234', flashed='2026-11-26', firmware='0.3.19',
+                    manual_code='34970112332', qr='MT:Y.K9042C00KA0648G00')
+
+    @unittest.skipUnless(_has('qrcode', 'PIL'), 'needs qrcode and pillow')
+    def test_hub_label_draws_the_qr_exactly(self):
+        import qrcode
+        from PIL import Image
+        self.records()
+        rec = self.hub_record()
+        png, pdf = self.di.label(rec)
+        self.assertEqual(os.path.dirname(png), self.di.devices_dir())
+        img = Image.open(png).convert('L')
+        self.assertEqual(img.size, (472, 236))                    # 40 x 20 mm at 300 dpi
+        q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=4)
+        q.add_data(rec['qr'])
+        q.make(fit=True)
+        matrix = q.get_matrix()
+        _, (x0, y0, px) = self.di.label_image(rec, (40, 20), 300)
+        self.assertGreaterEqual(px, 3)
+        for r, row in enumerate(matrix):
+            for c, dark in enumerate(row):
+                self.assertEqual(img.getpixel((x0 + c * px + px // 2, y0 + r * px + px // 2)) < 128, dark, (r, c))
+        with open(pdf, 'rb') as f:
+            body = f.read()
+        self.assertTrue(body.startswith(b'%PDF'))
+        import re
+        box = [float(v) for v in re.search(rb'/MediaBox \[\s*([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)', body).groups()]
+        self.assertAlmostEqual((box[2] - box[0]) * 25.4 / 72, 40, delta=0.1)
+        self.assertAlmostEqual((box[3] - box[1]) * 25.4 / 72, 20, delta=0.1)
+        self.assertEqual(os.stat(png).st_mode & 0o777, 0o600)
+
+    @unittest.skipUnless(_has('qrcode', 'PIL'), 'needs qrcode and pillow')
+    def test_label_too_small_for_the_qr_is_refused_with_the_smallest_size(self):
+        self.records()
+        with self.assertRaises(ValueError) as e:
+            self.di.label(self.hub_record(), (10, 10))
+        self.assertIn('17 x 9 mm', str(e.exception))
+        self.assertEqual(self.di.parse_size('25x25'), (25.0, 25.0))
+        with self.assertRaises(ValueError):
+            self.di.parse_size('big')
+
+    @unittest.skipUnless(_has('qrcode', 'PIL'), 'needs qrcode and pillow')
+    def test_controller_label_has_no_qr(self):
+        self.records()
+        rec = {'kind': 'controller', 'id': '404ccaffab12', 'short': 'ab12', 'flashed': '2026-11-26', 'firmware': '2.4.0'}
+        img, qr_box = self.di.label_image(rec, (40, 20), 300)
+        self.assertIsNone(qr_box)
+        self.assertEqual(img.size, (472, 236))
+
+    class FakeDevice:
+        """Stands in for esptool, the NVS image tool and build.sh: keeps what each command was, and the device's NVS."""
+        def __init__(self, nvs):
+            self.nvs, self.cmds, self.csvs, self.paths = nvs, [], [], []
+
+        def __call__(self, cmd, cwd=None):
+            line = ' '.join(cmd)
+            self.paths += [a for a in cmd if 'tilt-nvs-' in a]             # the tool's own temp folder
+            if 'read_mac' in cmd:
+                self.cmds.append('read_mac')
+                return 'Chip is ESP32-C6\nMAC: 40:4c:ca:ff:fe:ee:12:34\nBASE MAC: 40:4c:ca:ee:12:34\nMAC_EXT: ff:fe\n'
+            if 'read_flash' in cmd:
+                self.cmds.append('read_flash')
+                with open(cmd[-1], 'wb') as f:
+                    f.write(self.nvs)
+            elif 'erase_region' in cmd:
+                self.cmds.append('wipe')
+                self.nvs = b'\xff' * 0xC000
+            elif 'esp_idf_nvs_partition_gen' in line:
+                with open(cmd[-3]) as f:
+                    self.csvs.append(f.read())
+                with open(cmd[-2], 'wb') as f:
+                    f.write(b'image')
+                self.cmds.append('nvs_image')
+            elif 'write_flash' in cmd:
+                self.cmds.append('write')
+                self.nvs = b'homecode\0'
+            elif cmd[0].endswith('build.sh'):
+                self.cmds.append('flash' if 'flash' in cmd else 'build')
+            return 'ok\n'
+
+    def flash(self, kind, dev, **kw):
+        import io
+        fw = tempfile.mkdtemp()
+        with open(os.path.join(fw, 'sdkconfig'), 'w') as f:
+            f.write('CONFIG_DEVICE_VENDOR_ID=0xFFF1\nCONFIG_DEVICE_PRODUCT_ID=0x8000\n')
+        with open(os.path.join(fw, 'partitions.csv'), 'w') as f:
+            f.write('# Name, Type, SubType, Offset, Size\nnvs,      data, nvs,     0x10000,   0xC000,\n')
+        out = io.StringIO()
+        code = self.di.flash(kind, '/dev/cu.test', run=dev, out=out, fw_dir=fw, **kw)
+        return code, out.getvalue()
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_flash_a_fresh_hub_saves_a_private_record_and_prints_no_code(self):
+        d = self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        code, out = self.flash('hub', dev)
+        self.assertEqual(code, 0)
+        self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'nvs_image', 'write', 'flash'])
+        path = os.path.join(d, 'hub404ccaee1234.json')
+        self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+        rec = self.di.load('hub404ccaee1234')
+        self.assertEqual((rec['kind'], rec['short']), ('hub', '1234'))
+        self.assertEqual(rec['manual_code'], self.di.manual_code(rec['discriminator'], rec['passcode']))
+        self.assertEqual(rec['qr'], self.di.qr_payload(rec['discriminator'], rec['passcode'], 0xFFF1, 0x8000))
+        for p in dev.paths:
+            self.assertFalse(os.path.exists(p), p + ' left behind')
+        self.assertTrue(dev.paths)
+        for secret in (str(rec['passcode']), rec['manual_code'], dashed_manual(rec['manual_code']), rec['qr'],
+                       rec['setup_code'], rec['setup_code'][:4] + '-' + rec['setup_code'][4:]):
+            self.assertNotIn(secret, out)
+            self.assertNotIn(secret, ' '.join(dev.cmds))
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_erased_hub_gets_the_same_code_back(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        self.flash('hub', dev)
+        dev.nvs, dev.cmds = self.EMPTY, []
+        self.assertEqual(self.flash('hub', dev)[0], 0)
+        self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'nvs_image', 'write', 'flash'])
+        self.assertEqual(dev.csvs[0], dev.csvs[1])            # the same homecode and pin, byte for byte
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_hub_with_a_code_gets_firmware_only(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        self.flash('hub', dev)
+        before = self.di.load('hub404ccaee1234')
+        dev.cmds = []
+        self.assertEqual(self.flash('hub', dev)[0], 0)                       # record and code: firmware only
+        self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'flash'])
+        self.assertEqual(self.di.load('hub404ccaee1234'), before)
+        self.records()
+        dev = self.FakeDevice(self.WITH_CODE)
+        code, out = self.flash('hub', dev)                                   # its own code, no record here
+        self.assertEqual((code, dev.cmds), (0, ['read_mac', 'read_flash', 'build', 'flash']))
+        self.assertIn('made its own', out)
+        self.assertEqual(self.di.records(), [])
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_new_identity_asks_for_the_short_id(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        self.flash('hub', dev)
+        first = self.di.load('hub404ccaee1234')
+        dev.cmds = []
+        self.assertEqual(self.flash('hub', dev, new_identity=True, ask=None)[0], 1)    # no terminal: refused
+        self.assertEqual(dev.cmds, [])
+        self.assertEqual(self.flash('hub', dev, new_identity=True, ask=lambda p: '9999')[0], 1)
+        self.assertEqual(dev.cmds, ['read_mac'])                                      # nothing changed
+        self.assertEqual(self.di.load('hub404ccaee1234'), first)
+        dev.cmds = []
+        self.assertEqual(self.flash('hub', dev, new_identity=True, ask=lambda p: '1234')[0], 0)
+        self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'wipe', 'nvs_image', 'write', 'flash'])
+        self.assertNotEqual(self.di.load('hub404ccaee1234')['salt'], first['salt'])
+        old = [n for n in os.listdir(self.di.devices_dir()) if '.replaced-' in n]
+        self.assertEqual(len(old), 1)
+        import json
+        with open(os.path.join(self.di.devices_dir(), old[0])) as f:
+            self.assertEqual(json.load(f)['salt'], first['salt'])
+        self.assertEqual([r['id'] for r in self.di.records()], ['hub404ccaee1234'])
+
+    def test_controller_gets_a_record_and_no_new_identity(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        self.assertEqual(self.flash('controller', dev)[0], 0)
+        self.assertEqual(dev.cmds, ['read_mac', 'build', 'flash'])
+        rec = self.di.load('404ccaee1234')
+        self.assertEqual((rec['kind'], rec['short']), ('controller', '1234'))
+        self.assertNotIn('passcode', rec)
+        dev.cmds = []
+        self.assertEqual(self.flash('controller', dev, new_identity=True, ask=lambda p: '1234')[0], 1)
+        self.assertEqual(dev.cmds, [])
+
+    @unittest.skipUnless(_has('qrcode', 'PIL', 'cryptography'), 'needs qrcode, pillow and cryptography')
+    def test_labels_command_writes_the_same_png_as_the_flash(self):
+        self.records()
+        self.flash('hub', self.FakeDevice(self.EMPTY))
+        png = os.path.join(self.di.devices_dir(), 'hub404ccaee1234.png')
+        with open(png, 'rb') as f:
+            first = f.read()
+        os.remove(png)
+        self.assertEqual(self.di.main(['labels', '1234']), 0)
+        with open(png, 'rb') as f:
+            self.assertEqual(f.read(), first)
+        self.assertEqual(self.di.main(['labels', '--all', '--label-size', '50x25']), 0)
+        self.assertEqual(self.di.main(['labels', '9999']), 1)
+
+    def test_flash_scripts_help_mentions_usb_and_the_developer_flag(self):
+        import subprocess
+        for script in ('flash.sh', 'flash_hub.sh'):
+            r = subprocess.run(['bash', os.path.join(HERE, script), '--help'], capture_output=True, text=True,
+                               env=dict(os.environ, PY='/nonexistent'))
+            self.assertEqual(r.returncode, 0, script)
+            self.assertIn('--usb', r.stdout)
+            self.assertIn('--new-identity', r.stdout)
+            self.assertNotIn('building', r.stdout)
+
+    def test_hub_factory_reset_keeps_both_codes_on_the_label(self):
+        import re
+        with open(os.path.join(HERE, '..', 'firmware', 'tilt_hub', 'main', 'hub.cpp')) as f:
+            text = f.read()
+        reset = text[text.index('static void resetTask'):text.index('extern "C" void app_main')]
+        after_erase = reset[reset.index('nvs_flash_erase()'):]
+        self.assertRegex(after_erase, r'nvs_set_blob\(nv, "homecode"')
+        self.assertRegex(after_erase, r'nvs_set_str\(nv, "pin"')
+
+    def test_passcode_rule_is_the_firmwares(self):
+        for ok in (1, 99999998, 24681357):
+            self.assertTrue(self.di.pin_valid(ok), ok)
+        for bad in (0, 99999999, 33333333, 11111111, 12345678, 87654321, 100000000):
+            self.assertFalse(self.di.pin_valid(bad), bad)
+
+
 if __name__ == '__main__':
     unittest.main()

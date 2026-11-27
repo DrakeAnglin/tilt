@@ -62,6 +62,8 @@ For people working on Tilt itself. You do not need any of this to build one.
 | `tools/orient.py`, `tools/bambu.py` | Turn the STLs to print orientation; build the Bambu Studio projects (PLA plate + PETG plate) |
 | `tools/fusion_controller.py` | Builds the controller box in Fusion |
 | `tools/flash.sh` | Builds the controller firmware and installs it through the Tilt Hub |
+| `tools/flash_hub.sh` | Builds the Tilt Hub firmware and installs it over Wi-Fi; `--usb <port>` for its first flash |
+| `tools/device_identity.py` | A first USB flash (`flash_hub.sh --usb`, `flash.sh --usb`): a hub's Apple Home code and setup code, made on the Mac, saved in `~/.tilt/devices/`, and its setup label (`labels` prints one again) |
 | `tools/release_firmware.py` | Builds and signs a public firmware release (a version tag runs it in GitHub Actions: `docs/developer/firmware-release.md`) |
 | `tools/blinds_client.py` | Talks to a controller over its secured channel (testing) |
 | `tools/pcb_guide.py` | Generates the PCB build guide and its pictures |

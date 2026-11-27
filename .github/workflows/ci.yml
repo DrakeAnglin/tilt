@@ -70,7 +70,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install cryptography
+      - run: pip install cryptography qrcode pillow
       - run: python3 -m unittest tools/test_tools.py
       - run: python3 -m unittest tools/agent/test_agent.py
 
