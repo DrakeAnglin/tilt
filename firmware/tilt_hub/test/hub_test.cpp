@@ -1,8 +1,10 @@
-// Tests for the Tilt Hub's people rules (main/hub_people.h) and update-file checks (main/hub_file.h), run on the Mac:
+// Tests for the Tilt Hub's people rules (main/hub_people.h), update-file checks (main/hub_file.h) and its rule for new
+// firmware on trial (blinds_matter/main/trial.h, as main/hub_care.h runs it), run on the Mac:
 // tools/firmware_tests.sh. No hardware, no ESP-IDF. The update files in files/ were made by tools/release_firmware.py
 // with a test key (make_files.sh).
 #include "../main/hub_people.h"
 #include "../main/hub_file.h"
+#include "trial.h"                               // the trial rule both firmwares share (blinds_matter/main)
 #include "../../blinds_matter/main/fwkey.h"     // FW_SIGN_PUB: the release key, here only as "another key"
 #include <cstdio>
 #include <fstream>
@@ -236,6 +238,50 @@ static void fileTests() {
     CHECK(hubFile(t, "0.3.4", err, ver) == 403 && same(err, "the file's signature is not valid"), "hub file: truncated"); }
 }
 
+// ---- new hub firmware on trial, as the care task runs it (hub_care.h): its first pass 20 s after the start, then every
+// 5 s until 90 s, then every 15 s; the link is Wi-Fi and Apple Home; a hub always counts as joined.
+struct TrialPass { uint32_t t; TrialVerdict v; };
+// up(t): whether Wi-Fi and Apple Home are up at t. refuse: the bootloader refuses every rollback asked for. It stops at
+// the first TRIAL_KEEP (the hub is then no longer on trial) or after an hour.
+template <class Up> static std::vector<TrialPass> trialRun(Up up, bool refuse) {
+  std::vector<TrialPass> out;
+  Trial tr;
+  for (uint32_t t = 20000; t <= 3600000; t += t < 90000 ? 5000 : 15000) {
+    TrialVerdict v = tr.tick(t, up(t), true);
+    out.push_back({t, v});
+    if (v == TRIAL_ROLLBACK && refuse) tr.rollbackRefused();
+    if (v == TRIAL_KEEP) break;
+  }
+  return out;
+}
+static int countOf(const std::vector<TrialPass> &r, TrialVerdict v) { int n = 0; for (auto &p : r) if (p.v == v) n++; return n; }
+static uint32_t firstOf(const std::vector<TrialPass> &r, TrialVerdict v) { for (auto &p : r) if (p.v == v) return p.t; return 0; }
+
+static void hubTrialTests() {
+  { auto r = trialRun([](uint32_t) { return false; }, true);
+    bool waitAfter = true;
+    for (auto &p : r) if (p.t > 315000 && p.v != TRIAL_WAIT) waitAfter = false;
+    CHECK(countOf(r, TRIAL_ROLLBACK) == 1 && firstOf(r, TRIAL_ROLLBACK) == 315000 && waitAfter && r.back().t == 3600000,
+          "hub trial: never up, rollback refused: asked once, on the first pass after 5 minutes, then wait for good"); }
+  { auto r = trialRun([](uint32_t t) { return t >= 600000; }, true);
+    CHECK(countOf(r, TRIAL_ROLLBACK) == 1 && firstOf(r, TRIAL_ROLLBACK) == 315000 && countOf(r, TRIAL_KEEP) == 1 && r.back().t == 675000,
+          "hub trial: rollback refused, then up from 10 minutes: kept on the first pass more than a minute later"); }
+  { auto r = trialRun([](uint32_t) { return false; }, false);
+    bool every = true;
+    for (auto &p : r) if (p.t > 300000 && p.v != TRIAL_ROLLBACK) every = false;
+    CHECK(every && firstOf(r, TRIAL_ROLLBACK) == 315000 && countOf(r, TRIAL_ROLLBACK) == (int)((3600000 - 315000) / 15000 + 1),
+          "hub trial: never up, never refused: rollback asked on every pass after 5 minutes"); }
+  { auto r = trialRun([](uint32_t t) { return t >= 20000; }, true);
+    CHECK(countOf(r, TRIAL_ROLLBACK) == 0 && r.back().v == TRIAL_KEEP && r.back().t == 85000,
+          "hub trial: up from 20 s: kept on the first pass after 80 s"); }
+  { auto r = trialRun([](uint32_t t) { return t >= 290000; }, true);   // first seen up on the 300 s pass
+    CHECK(countOf(r, TRIAL_ROLLBACK) == 0 && r.back().v == TRIAL_KEEP && r.back().t == 375000,
+          "hub trial: up late (290 s) and staying up: no rollback, kept once up for a minute"); }
+  { auto r = trialRun([](uint32_t t) { return t >= 20000 && t < 50000; }, false);
+    CHECK(countOf(r, TRIAL_KEEP) == 0 && firstOf(r, TRIAL_ROLLBACK) == 315000,
+          "hub trial: up at 20 s, down at 50 s for good: rollback on the first pass after 5 minutes"); }
+}
+
 int main() {
   permitTests();
   pairTests();
@@ -243,6 +289,7 @@ int main() {
   waitingTests();
   peopleOpTests();
   fileTests();
+  hubTrialTests();
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;
 }
