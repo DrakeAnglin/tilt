@@ -98,4 +98,4 @@ $K pcb export drill --format excellon --excellon-separate-th -o hardware/pcb/con
 ```
 
 ## Later (v3)
-On hold: [docs/pcb-v3-concept.md](../../docs/pcb-v3-concept.md). Its must-test list is checked on this board first.
+Design proposal: [docs/pcb-v3-concept.md](../../docs/pcb-v3-concept.md). Nothing is ordered yet.

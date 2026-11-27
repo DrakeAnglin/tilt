@@ -241,7 +241,7 @@ jacks, and check every lead is trimmed to 1.8 mm or less.
 ESP), and the charger just keeps it topped up. A charger's own load output can only supply about 1 A, not enough for
 three motors at once; an 18650 supplies 3 A or more. (The first build used a no-name MCP73871 module. It charged at
 only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on USB: see
-[the v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)
+[the v3 design](pcb-v3-concept.md#open-items-before-the-layout).)
 
 **Cut list (one box):**
 
@@ -382,7 +382,7 @@ If TP1 reads 0, check the J5 plug is in and both splice crimps (slots 2 and 4) a
 3. Plug it into J1 / J2: **chip up, its USB toward end B**, its 5V pin in J1's square pad. Push it fully down.
 4. Battery back in. **TP3 should read 3.3 V**, and the ESP boots. With the cell below about 3.8 V, TP3 sags toward
    3.0 V (D3 and the ESP's regulator each take a little) and the ESP resets whenever the radio transmits: charge the cell first.
-   (v3 fixes this with a 3.3 V converter: [v3 must-test list](pcb-v3-concept.md#must-test-on-the-v2-board-before-ordering-v3).)
+   (v3 fixes this with its own 3.3 V regulator: [v3 design](pcb-v3-concept.md#decisions-and-why).)
 
 Then it goes into the box: [box assembly](controller-box.md#assembly).
 
