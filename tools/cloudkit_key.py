@@ -73,9 +73,12 @@ def test(topic, kind="test", env="development"):
     print(*post(env, "modify", {"operations": [{"operationType": "forceReplace", "record": rec}]}))
 
 
-if __name__ == "__main__":
-    a = sys.argv[1:]
+def main(a):
     if a[:1] == ["new"]: new()
     elif a[:1] == ["header"] and len(a) == 3: header(a[1], a[2])
     elif a[:1] == ["test"] and len(a) >= 2: test(*a[1:4])
     else: print(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

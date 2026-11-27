@@ -578,6 +578,137 @@ class BlindsClient(unittest.TestCase):
                 blinds_client.STORE = old
 
 
+@unittest.skipUnless(blinds_client, "needs the 'cryptography' package")
+class CloudKitKey(unittest.TestCase):
+    """tools/cloudkit_key.py: the Tilt Hub's iCloud key, with every file in a temp folder and a fake CloudKit."""
+
+    def setUp(self):
+        import shutil
+        from unittest import mock
+        import cloudkit_key
+        self.ck = cloudkit_key
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+        for target, name in [('KEY', 'keys/cloudkit-key.pem'), ('IDF', 'ids.json'), ('HEADER', 'cloud_key.h')]:
+            p = mock.patch.object(cloudkit_key, target, os.path.join(self.d, name))
+            p.start()
+            self.addCleanup(p.stop)
+        self.sent = []
+
+    def quietly(self, f, *args):
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            f(*args)
+        return said.getvalue()
+
+    def fake_cloudkit(self, status=200, text='{"records":[]}'):
+        import io, urllib.error
+        from unittest import mock
+
+        class Answer:
+            def __init__(self):
+                self.status = status
+
+            def read(self):
+                return text.encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def urlopen(req, timeout):
+            self.sent.append(req)
+            if status != 200:
+                raise urllib.error.HTTPError(req.full_url, status, 'no', {}, io.BytesIO(text.encode()))
+            return Answer()
+        return mock.patch.object(self.ck.urllib.request, 'urlopen', urlopen)
+
+    def test_new_makes_a_private_key_once(self):
+        said = self.quietly(self.ck.new)
+        self.assertEqual(os.stat(self.ck.KEY).st_mode & 0o777, 0o600)
+        self.assertIn('-----BEGIN PUBLIC KEY-----', said)
+        with open(self.ck.KEY, 'rb') as f:
+            first = f.read()
+        with self.assertRaises(SystemExit) as e:
+            self.ck.new()
+        self.assertIn('already there', e.exception.code)
+        with open(self.ck.KEY, 'rb') as f:
+            self.assertEqual(f.read(), first)
+
+    def test_header_holds_both_ids_and_the_key(self):
+        import json, re
+        self.quietly(self.ck.new)
+        self.assertIn('wrote', self.quietly(self.ck.header, 'DEVID', 'PRODID'))
+        with open(self.ck.HEADER) as f:
+            h = f.read()
+        self.assertIn('#define CLOUD_KEY_ID "DEVID"', h)
+        self.assertIn('#define CLOUD_KEY_ID_PROD "PRODID"', h)
+        d = re.search(r'#define CLOUD_KEY_HEX "([0-9a-f]+)"', h).group(1)
+        self.assertEqual(len(d), 64)
+        self.assertEqual(int(d, 16), self.ck.load().private_numbers().private_value)
+        with open(self.ck.IDF) as f:
+            self.assertEqual(json.load(f), {'development': 'DEVID', 'production': 'PRODID'})
+
+    def test_post_signs_date_body_hash_and_path(self):
+        import base64, hashlib
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        self.quietly(self.ck.new)
+        self.quietly(self.ck.header, 'DEVID', 'PRODID')
+        with self.fake_cloudkit():
+            self.assertEqual(self.ck.post('production', 'modify', {'a': 1}), (200, '{"records":[]}'))
+        req = self.sent[0]
+        sub = '/database/1/iCloud.app.tilt.blinds/production/public/records/modify'
+        self.assertEqual(req.full_url, 'https://api.apple-cloudkit.com' + sub)
+        self.assertEqual(req.get_method(), 'POST')
+        self.assertEqual(req.data, b'{"a":1}')
+        headers = dict(req.header_items())
+        self.assertEqual(headers['X-apple-cloudkit-request-keyid'], 'PRODID')
+        date = headers['X-apple-cloudkit-request-iso8601date']
+        msg = ('%s:%s:%s' % (date, base64.b64encode(hashlib.sha256(b'{"a":1}').digest()).decode(), sub)).encode()
+        self.ck.load().public_key().verify(base64.b64decode(headers['X-apple-cloudkit-request-signaturev1']), msg,
+                                           ec.ECDSA(hashes.SHA256()))         # raises when it does not verify
+
+    def test_post_gives_an_http_error_back_as_its_status_and_text(self):
+        self.quietly(self.ck.new)
+        self.quietly(self.ck.header, 'DEVID', 'PRODID')
+        with self.fake_cloudkit(401, 'bad key'):
+            self.assertEqual(self.ck.post('development', 'modify', {}), (401, 'bad key'))
+
+    def test_test_sends_one_alert(self):
+        import json
+        self.quietly(self.ck.new)
+        self.quietly(self.ck.header, 'DEVID', 'PRODID')
+        with self.fake_cloudkit():
+            self.assertEqual(self.quietly(self.ck.test, 'abc', 'leak'), '200 {"records":[]}\n')
+        self.assertIn('/development/', self.sent[0].full_url)
+        ops = json.loads(self.sent[0].data)['operations']
+        self.assertEqual(len(ops), 1)
+        self.assertEqual(ops[0]['operationType'], 'forceReplace')
+        rec = ops[0]['record']
+        self.assertEqual((rec['recordType'], rec['recordName']), ('Alert', 'alert-abc-leak-9'))
+        self.assertEqual((rec['fields']['topic']['value'], rec['fields']['kind']['value']), ('abc', 'leak'))
+
+    def test_the_command_line(self):
+        from unittest import mock
+        calls = []
+        with mock.patch.object(self.ck, 'new', lambda: calls.append(('new',))), \
+                mock.patch.object(self.ck, 'header', lambda *a: calls.append(('header',) + a)), \
+                mock.patch.object(self.ck, 'test', lambda *a: calls.append(('test',) + a)):
+            self.ck.main(['new'])
+            self.ck.main(['header', 'D', 'P'])
+            self.ck.main(['test', 'topic', 'kind', 'production', 'extra'])
+            self.assertIn('cloudkit_key.py new', self.quietly(self.ck.main, ['header', 'D']))
+            self.assertIn('cloudkit_key.py new', self.quietly(self.ck.main, []))
+        self.assertEqual(calls, [('new',), ('header', 'D', 'P'), ('test', 'topic', 'kind', 'production')])
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'cloudkit_key.py'), 'help'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('cloudkit_key.py header DEV_ID PROD_ID', r.stdout)
+
+
 class CheckDocs(unittest.TestCase):
     def pages(self, files):
         d = tempfile.mkdtemp()
