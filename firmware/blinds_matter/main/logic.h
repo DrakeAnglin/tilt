@@ -192,6 +192,99 @@ inline uint32_t slotDayTime(time_t now, int dayOff, int minuteOfDay, uint8_t day
   return (uint32_t)t;
 }
 
+// ---- Schedule kinds (the kind byte of a slot): 0 at a clock time, 1 at sunrise, 2 at sunset, 3 when it gets light
+// (around sunrise), 4 when it gets dark (around sunset). 3 and 4 are the Light trigger (CONTEXT.md).
+const int LIGHT_KIND_LIGHT = 3, LIGHT_KIND_DARK = 4, SCHED_KIND_MAX = 4;
+inline bool isSunKind(int k) { return k >= 1 && k <= 4; }
+inline bool onSunrise(int k) { return k == 1 || k == 3; }
+inline bool isLightKind(int k) { return k == LIGHT_KIND_LIGHT || k == LIGHT_KIND_DARK; }
+
+// ---- the Light trigger: dark or light read from the solar panel's input, inside a window around the slot's base time
+// (that day's sunrise or sunset plus the offset), at most once a day, falling back to the window's end. Real levels and
+// minutes come from dusk and dawn data (#212); these are the starting ones (#207).
+const uint32_t LIGHT_WINDOW_S = 90 * 60;       // readings count only within this of the base time, either way
+const float LIGHT_DARK_V = 0.3f, LIGHT_LIT_V = 1.5f;   // dark: under; light: over. Between: neither, and a run is broken
+const int LIGHT_DARK_MIN = 15, LIGHT_LIT_MIN = 10;     // minutes in a row it takes
+const uint32_t LIGHT_GAP_S = 1800;             // a step gap over this (off, clock jump): nothing that passed is run late
+enum LightWhy { LIGHT_NONE = 0, LIGHT_BY_LIGHT = 1, LIGHT_FELL_BACK = 2, LIGHT_SUN_TIME = 3 };
+// One slot's memory. day: the key of the day it last fired (kept in flash, so a restart does not fire it again);
+// at/why: when and why; run: minutes in a row of the steady reading so far (not kept).
+struct LightLatch { uint32_t day, at; uint8_t why, run, pad[2]; };
+// A slot's base time and day key for the day nearest `now` (yesterday, today, tomorrow). The key is the local date of
+// the sun event's day, as yyyymmdd. {0, 0}: no base (not one of its days, no place, no sunrise or sunset).
+struct LightDay { uint32_t base, key; };
+inline LightDay lightDayOf(time_t now, int kind, int off, uint8_t days, double lat, double lon) {
+  LightDay best = {0, 0};
+  for (int d = -1; d <= 1; d++) {
+    uint32_t noon = slotDayTime(now, d, 720, days);
+    if (!noon) continue;
+    uint32_t e = sunEventAt(noon, lat, lon, onSunrise(kind));
+    if (!e) continue;
+    uint32_t base = e + off * 60;
+    if (best.base && llabs((long long)now - base) >= llabs((long long)now - best.base)) continue;
+    struct tm tm;
+    time_t n = noon;
+    localtime_r(&n, &tm);
+    best = {base, (uint32_t)((tm.tm_year + 1900) * 10000 + (tm.tm_mon + 1) * 100 + tm.tm_mday)};
+  }
+  return best;
+}
+// One step, once a minute, for one light slot. now / prev: this step and the one before; base, key: lightDayOf;
+// v: the minute's mean input voltage; panel: a panel seen (panelSeenRule). Answers whether the slot fires now, and why.
+inline LightWhy lightStep(LightLatch &l, int kind, uint32_t now, uint32_t prev, uint32_t base, uint32_t key, float v, bool panel) {
+  bool gap = prev >= now || now - prev > LIGHT_GAP_S;
+  if (gap) { l.run = 0; prev = now - 60; }                  // as schedRun: what passed while off is not run late
+  if (!base || l.day == key) { l.run = 0; return LIGHT_NONE; }
+  LightWhy why = LIGHT_NONE;
+  if (!panel) {
+    l.run = 0;
+    if (!gap && base > prev && base <= now) why = LIGHT_SUN_TIME;
+  } else if (now + LIGHT_WINDOW_S >= base && now <= base + LIGHT_WINDOW_S) {
+    bool steady = kind == LIGHT_KIND_DARK ? v < LIGHT_DARK_V : v > LIGHT_LIT_V;
+    l.run = steady ? (uint8_t)(l.run < 255 ? l.run + 1 : 255) : 0;
+    if (l.run >= (kind == LIGHT_KIND_DARK ? LIGHT_DARK_MIN : LIGHT_LIT_MIN)) why = LIGHT_BY_LIGHT;
+    else if (!gap && base + LIGHT_WINDOW_S > prev && base + LIGHT_WINDOW_S <= now) why = LIGHT_FELL_BACK;
+  } else {
+    l.run = 0;
+    if (!gap && base + LIGHT_WINDOW_S > prev && base + LIGHT_WINDOW_S <= now) why = LIGHT_FELL_BACK;   // a step past the end
+  }
+  if (why) { l.day = key; l.at = now; l.why = (uint8_t)why; l.run = 0; }
+  return why;
+}
+// A minute's mean of readings taken every second or so. add: true when a minute just ended, with its mean in *mean.
+struct MinuteMean {
+  uint32_t minute = 0; float sum = 0; int n = 0;
+  bool add(uint32_t now, float v, float *mean) {
+    bool done = false;
+    if (now / 60 != minute) {
+      if (n && minute) { *mean = sum / n; done = true; }
+      minute = now / 60; sum = 0; n = 0;
+    }
+    sum += v; n++;
+    return done;
+  }
+};
+// Solar panel seen: the input was dark for a steady run at night (sun down over an hour) and lit for a steady run by
+// day, both within 3 days. The v2.2 board cannot tell solar from USB by voltage (powerSourceOf), but a cable left in
+// never goes dark and nothing plugged in never goes lit. lastDark / lastLit: when each was last seen (0: never).
+const uint32_t PANEL_SEEN_S = 3 * 86400, PANEL_SAVE_S = 24 * 3600;
+inline bool panelSeenRule(uint32_t now, uint32_t lastDark, uint32_t lastLit) {
+  return lastDark && lastLit && lastDark <= now && lastLit <= now && now - lastDark <= PANEL_SEEN_S && now - lastLit <= PANEL_SEEN_S;
+}
+// The day and night watch behind it, once a minute. rise / set: today's (0 not known). A time is taken only when the
+// one held is a day old or more, so flash is written at most twice a day: true = it changed, save it.
+struct PanelWatch { uint32_t lastDark, lastLit; uint8_t darkRun, litRun, pad[2]; };
+inline bool panelStep(PanelWatch &w, uint32_t now, float v, uint32_t rise, uint32_t set) {
+  if (!rise || !set) { w.darkRun = w.litRun = 0; return false; }
+  bool night = now + SRC_NIGHT_MARGIN_S < rise || now > set + SRC_NIGHT_MARGIN_S, day = now > rise && now < set;
+  w.darkRun = night && v < LIGHT_DARK_V ? (uint8_t)(w.darkRun < 255 ? w.darkRun + 1 : 255) : 0;
+  w.litRun = day && v > LIGHT_LIT_V ? (uint8_t)(w.litRun < 255 ? w.litRun + 1 : 255) : 0;
+  bool changed = false;
+  if (w.darkRun >= LIGHT_DARK_MIN && (!w.lastDark || now - w.lastDark >= PANEL_SAVE_S)) { w.lastDark = now; changed = true; }
+  if (w.litRun >= LIGHT_LIT_MIN && (!w.lastLit || now - w.lastLit >= PANEL_SAVE_S)) { w.lastLit = now; changed = true; }
+  return changed;
+}
+
 // ---- stall: once the gear play is taken up, the angle has to change by minDeg every stallMs
 enum StallVerdict { STALL_WAIT, STALL_MOVED, STALL_YES };
 inline StallVerdict stallCheck(uint32_t elapsed, uint32_t grace, uint32_t sinceRef, uint32_t stallMs, float ang, float ref, float minDeg) {

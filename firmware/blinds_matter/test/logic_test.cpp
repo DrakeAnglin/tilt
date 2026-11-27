@@ -531,6 +531,141 @@ static void zoneTests() {
   if (was) zoneUse(keep.c_str()); else { unsetenv("TZ"); tzset(); }
 }
 
+// ---- the light trigger (issue #207): "when it gets dark / light", read from the solar panel's input
+// One slot, stepped once a minute from `from` to `to` (inclusive). v(t): the minute's mean input, the minute ending at t.
+struct LightSim {
+  LightLatch l{};
+  int kind = LIGHT_KIND_DARK;
+  uint32_t base = 0, key = 1;
+  bool panel = true;
+  std::vector<std::pair<uint32_t, LightWhy>> fires;
+  template <class V> void run(uint32_t from, uint32_t to, V v) {
+    for (uint32_t t = from; t <= to; t += 60) {
+      LightWhy w = lightStep(l, kind, t, t - 60, base, key, v(t), panel);
+      if (w) fires.push_back({t, w});
+    }
+  }
+};
+static void lightTests() {
+  const uint32_t SET = 1795386240u, M = 60, H = 3600;        // a sunset (the fixture's); a day of readings around it
+  CHECK(isSunKind(1) && isSunKind(2) && isSunKind(3) && isSunKind(4) && !isSunKind(0), "kinds 1-4 run on the sun");
+  CHECK(onSunrise(1) && onSunrise(3) && !onSunrise(2) && !onSunrise(4), "kinds 1 and 3 on sunrise");
+  CHECK(isLightKind(3) && isLightKind(4) && !isLightKind(1) && !isLightKind(2) && !isLightKind(0), "kinds 3 and 4 by light");
+  { LightSim s; s.base = SET;                                 // clear dusk: under 0.3 V from 20 min before the base and stays
+    uint32_t under = SET - 20 * M;
+    s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return t > under ? 0.05f : 4.5f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == under + 15 * M && s.fires[0].second == LIGHT_BY_LIGHT, "clear dusk: one fire by light, 15 min after it went dark");
+    CHECK(s.l.day == 1 && s.l.at == under + 15 * M && s.l.why == LIGHT_BY_LIGHT, "the latch holds the day, when and why"); }
+  { LightSim s; s.base = SET;                                 // overcast: near 1 V all afternoon, then dark 30 min after the base
+    uint32_t under = SET + 30 * M;
+    s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return t > under ? 0.1f : 1.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == under + 15 * M && s.fires[0].second == LIGHT_BY_LIGHT, "overcast dusk: one fire by light, not earlier"); }
+  { LightSim s; s.base = SET;                                 // a midday storm: 0 V for an hour at about 2 pm, sun after, dark at the base
+    s.run(SET - 9 * H, SET + 6 * H, [&](uint32_t t) { return (t > SET - 4 * H && t <= SET - 3 * H) || t > SET ? 0.0f : 3.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET + 15 * M, "midday storm: ignored; the real dusk fires"); }
+  { LightSim s; s.base = SET;                                 // a cloud at dusk: 10 dark minutes, 3 brighter, then dark
+    uint32_t a = SET - 30 * M, b = a + 10 * M, c = b + 3 * M;
+    s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return t <= a ? 3.0f : t <= b ? 0.1f : t <= c ? 0.8f : 0.1f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == c + 15 * M, "a cloud passing at dusk: one fire, 15 min after the second run began"); }
+  { LightSim s; s.kind = LIGHT_KIND_LIGHT; s.base = SET - 11 * H;          // a sunrise at about 7 am; headlights at 1 am
+    uint32_t h = s.base - 6 * H, up = s.base + 5 * M;
+    s.run(s.base - 8 * H, s.base + 4 * H, [&](uint32_t t) { return (t > h && t <= h + 12 * M) || t > up ? 3.0f : 0.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == up + 10 * M && s.fires[0].second == LIGHT_BY_LIGHT, "headlights at night: ignored; dawn fires 10 min after it got light"); }
+  { LightSim s; s.base = SET;                                 // USB plugged in (never dark), or the panel unplugged and gone high
+    s.run(SET - 6 * H, SET + 6 * H, [](uint32_t) { return 5.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET + LIGHT_WINDOW_S && s.fires[0].second == LIGHT_FELL_BACK, "never dark: one fire, fell back at the window's end"); }
+  { LightSim s; s.base = SET;                                 // a panel unplugged mid-day: 0 V from noon (dark before the window: no run counts)
+    s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return t > SET - 6 * H + M ? 0.0f : 3.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET - LIGHT_WINDOW_S + 14 * M, "dark already when the window opens: fires once the window has 15 dark minutes"); }
+  { LightSim s; s.base = SET; s.panel = false;               // no panel seen: a plain sunset slot
+    s.run(SET - 6 * H + 17, SET + 6 * H, [](uint32_t) { return 0.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET + 17 && s.fires[0].second == LIGHT_SUN_TIME, "no panel seen: one fire at the base time, why = sun time"); }
+  { LightSim s; s.base = SET;                                 // a manual move after the fire: more dark runs that day fire nothing
+    s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return (t > SET - 60 * M && t <= SET - 40 * M) || t > SET ? 0.0f : 3.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET - 45 * M, "more dark after the fire, same day: no second fire");
+    s.key = 2; s.base = SET + 86400; s.fires.clear();       // the next day
+    s.run(SET + 6 * H + M, SET + 30 * H, [&](uint32_t t) { return t > SET + 86400 ? 0.0f : 3.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET + 86400 + 15 * M, "the next day's key fires again"); }
+  { LightSim s; s.kind = LIGHT_KIND_LIGHT; s.base = SET - 11 * H;          // dawn: a reading between the levels fires nothing by light
+    s.run(s.base - 6 * H, s.base + 6 * H, [&](uint32_t t) { return t > s.base - 30 * M ? 1.0f : 0.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].second == LIGHT_FELL_BACK, "dawn between the levels: no fire by light, only the fallback"); }
+  { LightSim s; s.base = SET;                                 // a restart over the window's end: not run late
+    s.l = LightLatch{};
+    LightWhy w = lightStep(s.l, LIGHT_KIND_DARK, SET + LIGHT_WINDOW_S + 10 * M, SET + LIGHT_WINDOW_S - 40 * M, SET, 1, 5.0f, true);
+    CHECK(w == LIGHT_NONE && s.l.day == 0, "a step gap over 30 min across the window's end: nothing fires");
+    w = lightStep(s.l, LIGHT_KIND_DARK, SET + 10 * M, SET - 50 * M, SET, 1, 0.0f, false);
+    CHECK(w == LIGHT_NONE, "a gap over the base time with no panel: not run late either"); }
+  { LightSim s; s.base = SET; s.l.day = 1; s.l.why = LIGHT_BY_LIGHT;       // a latch from flash with today's key
+    s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return t > SET ? 0.0f : 3.0f; });
+    CHECK(s.fires.empty(), "a latch loaded with today's key blocks a re-fire (restart after the evening close)"); }
+  { LightSim s;                                               // no base today (not one of its days, no place)
+    s.run(SET - 6 * H, SET + 6 * H, [](uint32_t) { return 0.0f; });
+    CHECK(s.fires.empty(), "no base time: nothing"); }
+  // ---- a day's base and key, through time zones and DST: each slot fires once a day, only on its days
+  {
+    const char *was = getenv("TZ");
+    std::string keep = was ? was : "";
+    zoneUse("CST6CDT,M3.2.0,M11.1.0");
+    for (int k = 0; k < 2; k++) {                             // spring forward (Sun 8 Mar 2026), fall back (Sun 1 Nov 2026)
+      uint32_t day0 = k ? (uint32_t)utcAt(2026, 10, 30, 12, 0) : (uint32_t)utcAt(2026, 3, 6, 12, 0);
+      for (int kind : {LIGHT_KIND_LIGHT, LIGHT_KIND_DARK}) {
+        LightLatch l{};
+        std::map<uint32_t, int> perDay;
+        uint32_t prev = day0 - 60;
+        for (uint32_t t = day0; t < day0 + 4 * 86400; t += 60) {
+          LightDay d = lightDayOf(t, kind, 0, 0x7f, 41.88, -87.63);
+          struct tm lt; time_t tt = t; localtime_r(&tt, &lt);
+          bool dark = lt.tm_hour < 6 || lt.tm_hour >= 19;     // a plain day: dark at night
+          if (lightStep(l, kind, t, prev, d.base, d.key, dark ? 0.0f : 3.0f, true)) perDay[d.key]++;
+          prev = t;
+        }
+        bool once = perDay.size() >= 3;
+        for (auto &e : perDay) once &= e.second == 1;
+        CHECK(once, k ? "fall back day: each day fires once" : "spring forward day: each day fires once");
+      }
+    }
+    uint32_t thu = (uint32_t)utcAt(2026, 1, 15, 18, 0);       // a Thursday, noon in Chicago
+    LightDay off = lightDayOf(thu, LIGHT_KIND_DARK, 0, 0x7f & ~(1 << 4), 41.88, -87.63);
+    CHECK(off.key != 20260115 && llabs((long long)off.base - thu) > 12 * 3600, "not one of its days: that day has no base (the nearest is another day's)");
+    LightDay d = lightDayOf(thu, LIGHT_KIND_DARK, -15, 0x7f, 41.88, -87.63);
+    CHECK(d.base == sunEventAt(thu, 41.88, -87.63, false) - 15 * 60 && d.key == 20260115, "base = that day's sunset + offset; key = its local day");
+    CHECK(lightDayOf(thu, LIGHT_KIND_DARK, 0, 0x7f, NAN, NAN).base == 0, "no place: no base");
+    if (was) zoneUse(keep.c_str()); else { unsetenv("TZ"); tzset(); }
+  }
+  // ---- minute means
+  { MinuteMean m;
+    float got = -1;
+    for (uint32_t t = 600; t < 600 + 60; t++) CHECK(!m.add(t, t < 630 ? 1.0f : 3.0f, &got), "inside a minute: no mean yet");
+    CHECK(m.add(660, 0.0f, &got) && near(got, 2.0, 1e-4), "a new minute: the last one's mean");
+    CHECK(!m.add(661, 0.0f, &got), "then on again"); }
+  // ---- panel seen: dark at night and lit by day, within 3 days
+  {
+    const uint32_t D = 86400, T0 = 1795300000u;
+    CHECK(panelSeenRule(T0, T0 - D, T0 - 2 * D), "dark night + lit day inside 3 days: seen");
+    CHECK(!panelSeenRule(T0, 0, T0 - H), "always lit (a USB cable): not seen");
+    CHECK(!panelSeenRule(T0, T0 - H, 0), "always dark (nothing plugged in): not seen");
+    CHECK(!panelSeenRule(T0, T0 - 4 * D, T0 - H), "a dark night over 3 days ago: not seen");
+    uint32_t rise = T0 + 6 * H, set = T0 + 18 * H;          // a day: rise at 6, set at 18 (after T0)
+    PanelWatch w{};
+    int saves = 0;
+    for (uint32_t t = T0; t < T0 + D; t += 60) {
+      bool lit = t > rise + 30 * M && t < set - 30 * M;
+      if (panelStep(w, t, lit ? 3.0f : 0.0f, rise, set)) saves++;
+    }
+    CHECK(w.lastDark && w.lastLit && panelSeenRule(T0 + D, w.lastDark, w.lastLit), "a panel's day and night: seen");
+    CHECK(saves <= 2, "at most two writes a day");
+    PanelWatch u{};
+    for (uint32_t t = T0; t < T0 + D; t += 60) panelStep(u, t, 5.0f, rise, set);
+    CHECK(u.lastLit && !u.lastDark && !panelSeenRule(T0 + D, u.lastDark, u.lastLit), "a USB cable left in never goes dark: not seen");
+    PanelWatch z{};
+    for (uint32_t t = T0; t < T0 + D; t += 60) panelStep(z, t, 0.0f, rise, set);
+    CHECK(!z.lastLit && !panelSeenRule(T0 + D, z.lastDark, z.lastLit), "nothing plugged in never goes lit: not seen");
+    PanelWatch e{};
+    for (uint32_t t = T0 + 17 * H; t < T0 + 19 * H; t += 60) panelStep(e, t, 0.0f, rise, set);
+    CHECK(!e.lastDark, "dark just after sunset (under an hour): not yet night");
+  }
+}
+
 int main() {
   // ---- angles
   CHECK(near(angDiff(10, 350), 20, 1e-4), "angDiff crosses zero forward");
@@ -577,6 +712,7 @@ int main() {
   handWatchTests();
   settingsChangeTests();
   zoneTests();
+  lightTests();
 
   // ---- battery
   CHECK(battPercent(3.0f) == 0 && battPercent(3.2f) == 0, "empty");
