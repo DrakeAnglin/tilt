@@ -45,7 +45,7 @@ White PLA for the housing and most gears, white PETG for the four parts that rub
 ### Electronics
 | Part | Per tilter | Sold as | Link |
 |---|---|---|---|
-| N20 gear motor, 6 V **150 RPM**, metal gearbox, 3 mm D-shaft, no encoder; see [motor speed](#motor-speed) | 1 | 3-pack | [B0F83X6C77](https://www.amazon.com/dp/B0F83X6C77) |
+| N20 gear motor, 6 V **150 RPM**, metal gearbox, 3 mm D-shaft, no encoder; see [motor speed](#motor-speed) | 1 | 3-pack | [B0F83XS7PW](https://www.amazon.com/dp/B0F83XS7PW) |
 | AS5600 magnetic angle sensor board, with its Ø4 × 2 mm magnet | 1 | 5-pack | [B097QNG1CN](https://www.amazon.com/dp/B097QNG1CN) |
 | DRV8833 dual motor driver board, Suuoo | 1 | 10-pack | [B0GX9F695H](https://www.amazon.com/dp/B0GX9F695H) |
 | RJ11/RJ12 6P6C breakout board, risingsaplings | 1 | 4-pack | [B0B9BHX7T3](https://www.amazon.com/dp/B0B9BHX7T3) |
