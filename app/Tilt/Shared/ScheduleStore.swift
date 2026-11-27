@@ -28,7 +28,7 @@ final class AutomationStore {
     /// Told today's sunrise and sunset whenever a controller sends them (the app's sky colors).
     private let remember: (Date, Date) -> Void
 
-    init(remember: @escaping (Date, Date) -> Void = { _, _ in }) { self.remember = remember }
+    init(remember: @escaping (Date, Date) -> Void = { SunMemory.remember(rise: $0, set: $1) }) { self.remember = remember }
 
     private func limits(_ id: String) -> ControllerLimits { limits[id] ?? .fallback }
     /// Every Port of these controllers (a new Schedule starts with all of them).
@@ -73,6 +73,16 @@ final class AutomationStore {
         let missing = SchedulePlan.missingPlace(s, noPlace: noPlace)
         if s.on && !missing.isEmpty { out.append(ScheduleNote(text: TiltWords.noPlace(missing.map { names[$0] ?? "a controller" }), warn: true)) }
         return out
+    }
+}
+
+/// Today's sunrise and sunset, kept on the phone for the sky colors (Sky.sunTimes in Theme.swift reads these keys).
+enum SunMemory {
+    static let riseKey = "sun.rise", setKey = "sun.set"
+    /// Stores them as minutes after midnight, in this phone's time zone.
+    static func remember(rise: Date, set: Date, in d: UserDefaults = .standard, calendar: Calendar = .current) {
+        func m(_ t: Date) -> Double { let c = calendar.dateComponents([.hour, .minute], from: t); return Double((c.hour ?? 0) * 60 + (c.minute ?? 0)) }
+        d.set(m(rise), forKey: riseKey); d.set(m(set), forKey: setKey)
     }
 }
 

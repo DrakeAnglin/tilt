@@ -14,7 +14,7 @@ struct Schedule: Identifiable, Equatable {
     var id: UInt32 = UInt32.random(in: 1...UInt32.max)
     var on = true
     var days = 127                  // bit 0 = Sunday
-    var kind = 0                    // 0 clock time, 1 sunrise, 2 sunset, 3 when it gets light, 4 when it gets dark
+    var kind = 3                    // 0 clock time, 1 sunrise, 2 sunset, 3 when it gets light (a new one: ADR 0007), 4 when it gets dark
     var minute = 8 * 60
     var offset = 0                  // minutes after (+) or before (-) sunrise / sunset
     var tilt = 0

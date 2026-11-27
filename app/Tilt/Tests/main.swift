@@ -1420,6 +1420,15 @@ try await store.save(both2, controllers: [denC, dining])
 let newWrites = schedLog.all.dropFirst(sentNew).filter { $0.contains("/api/sched") }.sorted()
 check(newWrites.count == 2 && newWrites[0].hasPrefix("den /api/sched?i=0&") && newWrites[1].hasPrefix("dining /api/sched?i=1&") && newWrites.allSatisfy { $0.contains("kind=3") && $0.contains("gid=77") },
       "a light Schedule goes to the first free slot on each controller (Dining's slot 0 is taken) (got \(newWrites))")
+check(Schedule().kind == 3 && Schedule().isLight, "a new Schedule starts as a light one (ADR 0007)")
+// today's sunrise kept for the sky colors: minutes after midnight, in the phone's own time zone, under Theme's keys
+let sunDefaults = UserDefaults(suiteName: "tilt-tests-sun")!
+sunDefaults.removePersistentDomain(forName: "tilt-tests-sun")
+var chicago = Calendar(identifier: .gregorian); chicago.timeZone = TimeZone(identifier: "America/Chicago")!
+SunMemory.remember(rise: Date(timeIntervalSince1970: 1_795_784_400), set: Date(timeIntervalSince1970: 1_795_820_400), in: sunDefaults, calendar: chicago)   // 2026-11-27 7:00 and 17:00 CST
+check(sunDefaults.double(forKey: "sun.rise") == 7 * 60 && sunDefaults.double(forKey: "sun.set") == 17 * 60, "kept as local minutes after midnight (got \(sunDefaults.double(forKey: "sun.rise")), \(sunDefaults.double(forKey: "sun.set")))")
+let themeSource = (try? String(contentsOfFile: "Tilt/Theme.swift", encoding: .utf8)) ?? ""
+check(themeSource.contains("forKey: \"\(SunMemory.riseKey)\"") && themeSource.contains("forKey: \"\(SunMemory.setKey)\""), "the sky reads the same keys the store writes")
 // the editor's rules (ScheduleForm)
 let room = Schedule.everyPort([("den", 3), ("dining", 3)])
 let lit = ["den": 1, "dining": 0], dark = ["den": 0, "dining": 0]

@@ -34,10 +34,6 @@ enum Sky {
         let r = UserDefaults.standard.double(forKey: "sun.rise"), s = UserDefaults.standard.double(forKey: "sun.set")
         return r > 0 && s > r ? (r, s) : (390, 1110)
     }
-    static func remember(rise: Date, set: Date) {
-        func m(_ d: Date) -> Double { let c = Calendar.current.dateComponents([.hour, .minute], from: d); return Double((c.hour ?? 0) * 60 + (c.minute ?? 0)) }
-        UserDefaults.standard.set(m(rise), forKey: "sun.rise"); UserDefaults.standard.set(m(set), forKey: "sun.set")
-    }
 
     static func look(at date: Date = .now) -> SkyLook {
         let c = Calendar.current.dateComponents([.hour, .minute], from: date)

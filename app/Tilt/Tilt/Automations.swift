@@ -158,7 +158,7 @@ extension Controller: ScheduleHolder { var scheduleName: String { state?.name ??
 
 struct AutomationsTab: View {
     @Environment(AppModel.self) private var model
-    @State private var store = AutomationStore(remember: Sky.remember)
+    @State private var store = AutomationStore()
     @State private var editing: Schedule?
     @State private var problem: String?
     @State private var locator = Locator()
@@ -195,7 +195,7 @@ struct AutomationsTab: View {
                             Toggle("On", isOn: Binding(get: { s.on }, set: { on in var c = s; c.on = on; save(c) })).labelsHidden().disabled(!owner)
                         }
                     }
-                    if owner { Button("New Schedule", systemImage: "plus") { editing = Schedule(kind: 3, targets: store.everyBlind(model.controllers)) } }
+                    if owner { Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: store.everyBlind(model.controllers)) } }
                 } header: { Text("Schedules") } footer: {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(TiltWords.homeAutomations)
