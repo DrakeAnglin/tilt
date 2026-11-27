@@ -525,7 +525,7 @@ def splice_picture():
         o.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="4"/>' % (x0, y0, x0, sy + 90, c))
         o.append(text(x0, sy + 110, lab, 14, c, 'bold'))
     for k_, t in enumerate([
-            'Two pre-crimped JST leads (crimp ends in slots 2 and 4) and the wire to BAT, all 22 AWG, joined in one soldered splice.',
+            'Two short legs with XH crimp pins (in slots 2 and 4) and the wire to BAT, all 22 AWG, joined in one soldered splice.',
             'Keep the two crimped legs short (about 30 mm), so the motor current\'s loop through the plug is short.',
             'Push both crimps in until they click, then tug-test each one. A loose crimp here cuts power to the whole board.',
             'With the J5 plug out, the board has no power: the battery reaches it only through this plug.',
@@ -605,7 +605,7 @@ def md():
                                    ', '.join(r for r, _ in lst), ', '.join(sorted({str(k) for _, k in lst}))))
     a('| ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |')
     a('| Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |')
-    a('| Extra pre-crimped JST lead for the J5 battery splice (slot 4) + heat-shrink | 1 | J5 plug | 11 |')
+    a('| JST-XH crimp pins on 22 AWG wire (or the optional pre-crimped leads) for the J5 harness, + heat-shrink | 4 | J5 plug | 11 |')
     a('| 18650 cell with its JST-XH plug | 1 | J4 | 12 |')
     a('| Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |')
     a('')
@@ -809,15 +809,17 @@ def md():
     a('')
     a('| Lead | Wire | Cut | From → to |')
     a('|---|---|---|---|')
-    a('| Splice leg A | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 2 → the splice |')
-    a('| Splice leg B | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 4 → the splice |')
+    a('| Splice leg A | 22 AWG, XH crimp pin on the plug end | about 30 mm | J5 slot 2 → the splice |')
+    a('| Splice leg B | 22 AWG, XH crimp pin on the plug end | about 30 mm | J5 slot 4 → the splice |')
     a('| Charger BATT | 22 AWG | about 50 mm | the splice → **BAT** pad |')
-    a('| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |')
-    a('| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (solar in; USB shows here too) |')
+    a('| Charger GND | 22 AWG, XH crimp pin on the plug end | 76 mm | J5 pin 1 → **G** pad |')
+    a('| Charger PWR | 22 AWG, XH crimp pin on the plug end | 76 mm | J5 pin 6 → **VIN** pad (solar in; USB shows here too) |')
     a('| Battery | the cell\'s own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |')
     a('| Solar (optional) | the panel\'s flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |')
     a('')
-    a('The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.')
+    a('Cut the four plug wires, strip about 2 mm on one end and crimp a JST-XH pin (SXH-001T-P0.6) on it with an XH')
+    a('crimper. Tug each pin hard: it must not slide off. **No crimper?** Use the optional pre-crimped leads (152 mm, a')
+    a('crimp on both ends) instead: cut each one to the length above, keeping a crimp end for the J5 housing.')
     a('')
     a('### 11a: The battery splice in the J5 plug (slots 2 and 4)')
     a('')
@@ -826,7 +828,7 @@ def md():
     a('Nothing changes on the PCB. On the board, J5 pin 2 is the battery and pin 4 is the board supply; putting the battery')
     a('wire in **both** slots joins them, so the battery feeds the board directly.')
     a('')
-    a('1. Two pre-crimped leads, cut to about **30 mm**: their crimp ends go in **slot 2** and **slot 4**.')
+    a('1. The two splice legs, about **30 mm** each, with their crimp pins in **slot 2** and **slot 4**.')
     a('2. Strip the two bare ends and the wire to the 6092\'s **BAT** pad, twist all three together, solder, and slide')
     a('   heat-shrink over the joint.')
     a('3. If your J5 plug still has the old LOAD wire in slot 4, pull it out first (lift the plastic tab over its crimp with a')
