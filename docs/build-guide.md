@@ -112,7 +112,8 @@ Tilt app, and the hub's short ID.
 - Print it again any time, with the same Python:
   `~/.espressif/python_env/idf5.5_py3.9_env/bin/python tools/device_identity.py labels <short ID>` (or `--all`).
 - If a flash stops partway (a cable, the port), run the same command again: the codes are saved on the Mac before
-  anything is written to the hub, and the rerun finishes with the same codes. Unplug and replug the hub after a stop.
+  anything is written to the hub, and the rerun finishes with the same codes. If the hub has meanwhile been given
+  another code, the rerun asks for its short ID before it wipes anything. Unplug and replug the hub after a stop.
 - A reflash or an update keeps the codes, so the label keeps working. A hub erased over USB gets the same codes back
   from this Mac. Only the developer flag `--new-identity` makes new ones, after you type the hub's short ID.
 - A new hub can be scanned into Apple Home from its label in its first 15 minutes after power-on. Later, use **Add**

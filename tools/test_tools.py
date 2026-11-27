@@ -564,9 +564,12 @@ class DeviceIdentity(unittest.TestCase):
         for r in (None, rec):
             for dump in (self.EMPTY, self.WITH_CODE):
                 self.assertEqual(self.di.plan(r, dump, True), 'replace')
-        pending = dict(rec, pending=True)                                       # a run that made a code did not finish
-        for dump in (self.EMPTY, self.WITH_CODE):
-            self.assertEqual(self.di.plan(pending, dump, False), 'resume')
+        # A run that made a code did not finish: what the hub holds now decides.
+        pending = dict(self.sdk_identity(), kind='hub', id='hub404ccaffee1234', pending=True)
+        ours = b'\xff' * 64 + b'homecode\0' + self.di.home_code_blob(pending) + b'\xff' * 64
+        self.assertEqual(self.di.plan(pending, self.EMPTY, False), 'resume')             # no code: write it
+        self.assertEqual(self.di.plan(pending, ours, False), 'finish')                   # has it: firmware only
+        self.assertEqual(self.di.plan(pending, self.WITH_CODE, False), 'resume_replace')  # another: ask first
 
     def records(self):
         d = tempfile.mkdtemp()
@@ -766,7 +769,10 @@ class DeviceIdentity(unittest.TestCase):
             self.assertTrue(rec['pending'], fail)
             dev.fail, dev.cmds = None, []
             self.assertEqual(self.flash('hub', dev)[0], 0)              # the rerun finishes it with the same code
-            self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'wipe', 'nvs_image', 'write', 'flash'])
+            if fail == 'flash':                                        # the code was already on the hub: no write
+                self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'flash'])
+            else:                                                      # nothing on it yet: written, never wiped
+                self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'nvs_image', 'write', 'flash'])
             done = self.di.load('hub404ccaee1234')
             self.assertNotIn('pending', done)
             self.assertEqual(done['salt'], rec['salt'])
@@ -789,11 +795,48 @@ class DeviceIdentity(unittest.TestCase):
             old = [n for n in os.listdir(self.di.devices_dir()) if '.replaced-' in n]
             self.assertEqual(len(old), 1)
             dev.fail = None
-            code, out = self.flash('hub', dev)
+            # A wipe that failed leaves the old code on the hub: the rerun asks before it wipes.
+            code, out = self.flash('hub', dev, ask=lambda p: '1234')
             self.assertEqual(code, 0)
             self.assertEqual(self.di.load('hub404ccaee1234')['salt'], new['salt'])
             self.assertIn(self.di.home_code_blob(new), dev.nvs)
             self.assertNotIn('Warning', out)
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_unfinished_run_never_wipes_a_hub_with_another_code_without_asking(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        dev.fail = 'nvs_image'
+        self.flash('hub', dev)                                         # leaves a pending record, nothing on the hub
+        pending = self.di.load('hub404ccaee1234')
+        dev.fail, dev.nvs = None, self.WITH_CODE + b'thread and owners'  # since then set up another way, in a home
+        for ask in (None, lambda p: '9999'):                            # no terminal, or the wrong short ID
+            dev.cmds = []
+            code, out = self.flash('hub', dev, ask=ask)
+            self.assertEqual(code, 1)
+            self.assertEqual(dev.cmds, ['read_mac', 'read_flash'])       # no build, no wipe, no write
+            self.assertTrue(dev.nvs.endswith(b'thread and owners'))
+            self.assertNotIn('run the same command again', out)
+            self.assertEqual(self.di.load('hub404ccaee1234'), pending)
+        dev.cmds = []
+        self.assertEqual(self.flash('hub', dev, ask=lambda p: '1234')[0], 0)
+        self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'wipe', 'nvs_image', 'write', 'flash'])
+        self.assertIn(self.di.home_code_blob(pending), dev.nvs)
+        self.assertNotIn('pending', self.di.load('hub404ccaee1234'))
+
+    @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
+    def test_unfinished_run_with_the_code_already_on_the_hub_only_flashes(self):
+        self.records()
+        dev = self.FakeDevice(self.EMPTY)
+        dev.fail = 'flash'
+        self.flash('hub', dev)
+        dev.nvs += b'thread and owners'                                # finished another way, now in a home
+        dev.fail, dev.cmds = None, []
+        code, out = self.flash('hub', dev, ask=None)
+        self.assertEqual(code, 0)
+        self.assertEqual(dev.cmds, ['read_mac', 'read_flash', 'build', 'flash'])
+        self.assertTrue(dev.nvs.endswith(b'thread and owners'))
+        self.assertNotIn('pending', self.di.load('hub404ccaee1234'))
 
     @unittest.skipUnless(_has('cryptography'), 'needs cryptography')
     def test_firmware_only_warns_when_the_hub_has_another_code(self):

@@ -132,15 +132,26 @@ def has_code(nvs_dump):
 
 def plan(record, nvs_dump, new_identity):
     """new: make one and write it. restore: write the saved one back. firmware: firmware only. own: firmware only, the
-    device made its own code. replace: wipe and make a new one (--new-identity, asked first). resume: a run that made
-    a code did not finish (its record is still marked pending): wipe and write that code, then finish."""
+    device made its own code. replace: wipe and make a new one (--new-identity, asked first).
+    A run that made a code did not finish (its record is still marked pending):
+      finish: the hub already holds that code; firmware only, then the record is done.
+      resume: the hub holds no code; write the pending one.
+      resume_replace: the hub holds another code (it may be in a home); wipe and write only if the owner says so."""
     if new_identity:
         return 'replace'
     if record and record.get('pending'):
-        return 'resume'
+        if not has_code(nvs_dump):
+            return 'resume'
+        return 'finish' if holds(nvs_dump, record) else 'resume_replace'
     if has_code(nvs_dump):
         return 'firmware' if record else 'own'
     return 'restore' if record else 'new'
+
+
+def holds(nvs_dump, record):
+    """Whether the hub holds this record's Apple Home code: NVS keeps a blob's bytes in a row, so its 144 bytes are
+    in the dump."""
+    return 'salt' in record and home_code_blob(record) in nvs_dump
 
 
 # ---- records on this Mac only
@@ -337,9 +348,10 @@ def _today():
 
 def no_label_libraries(short):
     """What to run when Pillow or qrcode is missing: with this same Python, which also has esptool."""
-    me = os.path.abspath(__file__)
+    import shlex
+    py, me = shlex.quote(sys.executable), shlex.quote(os.path.abspath(__file__))
     return ('no label: this Python has no Pillow or qrcode. Once: %s -m pip install pillow qrcode\n'
-            'then: %s %s labels %s' % (sys.executable, sys.executable, me, short))
+            'then: %s %s labels %s' % (py, py, me, shlex.quote(short)))
 
 
 def _write_label(rec, size_mm, out):
@@ -410,8 +422,18 @@ def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_a
         with open(dump, 'rb') as f:
             saved = f.read()
         action = plan(record, saved, new_identity)
-        # NVS keeps a blob's bytes in a row, so the record's 144 bytes are in the dump when the hub has its code.
-        mismatch = action == 'firmware' and 'salt' in record and home_code_blob(record) not in saved
+        mismatch = action == 'firmware' and not holds(saved, record)
+        if action == 'resume_replace':
+            typed = ask('A run of this tool did not finish, and this hub now holds another code (it may be in a home).\n'
+                        'Writing the code saved on this Mac wipes its saved data. Type its short ID to go on: '
+                        ) if ask else None
+            if typed is None or typed.strip().lower() != short:
+                record = None                     # nothing pending was touched: no "run again" hint
+                print('refused: nothing was changed. To keep the hub as it is, delete %s; to give it the code '
+                      'saved on this Mac, run again on a terminal and type its short ID. %s' % (_path(dev_id), UNPLUG),
+                      file=out)
+                return 1
+        print('building the firmware (a few minutes)', file=out)
         run([build], cwd=fw_dir)
         if action in ('new', 'replace'):
             vid, pid = vendor_product(fw_dir)
@@ -424,9 +446,9 @@ def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_a
                 os.replace(old, old[:-5] + '.replaced-%s.json' % datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
             record = fresh
             save(record)                          # before anything is written to the hub: a code is never lost
-        if action in ('replace', 'resume'):
+        if action in ('replace', 'resume_replace'):
             run(esptool + ['erase_region', offset, size])
-        if action in ('new', 'restore', 'replace', 'resume'):
+        if action in ('new', 'restore', 'replace', 'resume', 'resume_replace'):
             csv_path, image = os.path.join(tmp, 'nvs.csv'), os.path.join(tmp, 'nvs.bin')
             fd = os.open(csv_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, 'w') as f:
@@ -434,7 +456,7 @@ def flash(kind, port, new_identity=False, size_mm=DEFAULT_SIZE, run=_run, ask=_a
             run([sys.executable, '-m', 'esp_idf_nvs_partition_gen', 'generate', csv_path, image, size])
             run(esptool + ['write_flash', offset, image])
         run([build, '-p', port, 'flash'], cwd=fw_dir)
-        if action in ('new', 'replace', 'resume'):
+        if action in ('new', 'replace', 'resume', 'resume_replace', 'finish'):
             record.pop('pending', None)
             print('record: %s' % save(record), file=out)
             _write_label(record, size_mm, out)
