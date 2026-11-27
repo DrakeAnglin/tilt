@@ -22,7 +22,8 @@ No `inventory.md` yet? Ask, one at a time:
    or at one end (the far blind needs 10 ft)?
 2. **Solar: yes or no.** Yes: how many panels per controller (1 to 6).
 3. **A JST-XH crimper: yes or no.** No: pre-crimped leads replace the crimp pins.
-4. **A Tilt Hub already?** One per home, so a second build usually has one.
+4. **A Tilt Hub already?** One per home, so a second build usually has one. No hub yet: is there a spare 5 V USB plug
+   in the house for it (a phone charger)? No: `--hub-plug` buys one.
 5. **Extras, only if they come up:** a cord through a wall (a printed wall plug each side, a drill and a 5/8 in bit).
 
 Then show the plan from `python3 tools/inventory.py order --set 3 --set 3:middle ...` and the plan table from `new`.
@@ -43,7 +44,7 @@ Done when every part the plan uses has a count, "kit" or "plenty".
 ## 3. Create the file
 
 ```
-python3 tools/inventory.py new --set ... [--hub 0] [--solar N] [--no-crimper] --have KEY=N ... --out inventory.md
+python3 tools/inventory.py new --set ... [--hub 0] [--hub-plug] [--solar N] [--no-crimper] --have KEY=N ... --out inventory.md
 ```
 
 Then fill in by hand: the stage columns from the stock check (loose counts in **In stock**), the bench tools
@@ -62,7 +63,7 @@ Each change: edit the file, then add one Log line, `- YYYY-MM-DD: what changed`,
 | "bagged a kit" | Move one unit's parts from **In stock** to **Issued**; Issued kits +1 in the Plan's unit table. |
 | "built one" | Its parts leave Issued; the unit's **Assembled** +1. |
 | "it's on the blind" | The unit moves from Assembled to **Used**. |
-| A plan change (a set added or removed, solar, crimper) | Update the Plan, then rerun `order`. |
+| A plan change (a set added or removed, solar, crimper, hub plug) | Update the Plan, then rerun `order`. |
 
 Rerun `order` whenever the plan, Have or On order changes, and replace the whole To order table with its output.
 Pass `--have` as In stock + Issued, `--on-order` from the On order rows, and plan only the units still to be built:
@@ -73,7 +74,7 @@ a finished unit counts as one unit, so its parts are no longer needed.
 - **One combined purchase.** Every part the plan still needs, from every store, in one table. Never split it into
   phases: each extra order costs shipping.
 - **Have** is only what is on hand. **Need** is one plain number. Rows the builder can cover drop out.
-- **Optional parts** (solar, pre-crimped leads, the wall plug, the M3 × 16 helper screws from
+- **Optional parts** (solar, pre-crimped leads, the hub's USB wall plug, the printed wall plug for a cord through a wall, the M3 × 16 helper screws from
   [tilter assembly, C5](../../../docs/tilter-assembly.md)) appear only when the plan chose them. The M3 × 16 come
   from the M3 kit.
 - A wrong number from the helper is a bug in `tools/inventory.py` or a change in the BOM's layout: say so to the

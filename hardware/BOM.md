@@ -141,14 +141,14 @@ rail: one pad in each corner, none in the middle. Where they go:
 [controller box, step 8](../docs/controller-box.md#assembly).
 
 ## One Tilt Hub
-Every home needs one. One hub serves every controller, and it stays plugged in.
+Every home needs one. One hub serves every controller, and it stays plugged in: any 5 V USB plug in the house works
+(a phone charger). Need one? See [Optional](#optional).
 
 | Part | Per hub | Sold as | Link |
 |---|---|---|---|
 | Printed box (white) | 1 | | [hub box](../docs/hub-box.md) |
 | ESP32-C6 SuperMini, **no pins soldered** | 1 | from the controllers' 5-pack | [B0GD19KJ4B](https://www.amazon.com/dp/B0GD19KJ4B) |
 | USB-C male-to-male adapter | 1 | each | [B0HFHVN7B6](https://www.amazon.com/dp/B0HFHVN7B6) |
-| 5 V USB-C wall plug (1 A is plenty) | 1 | each | any |
 
 ## Buy once
 Shared kits and supplies: many tilters, controllers and hubs draw from one of each. Buy them once, not per unit. The
@@ -183,6 +183,13 @@ none of this and leave J8 empty. With **yes**, the v2 board takes a panel on J8:
 | Solar housing: tray sections + end cap (1 to 6 panels in a row, printed) | 1 | | [docs/solar-housing.md](../docs/solar-housing.md) |
 | Double-sided tape, for the housing's ends on the window | about 20 cm | 1 roll | any |
 | JST-ZH 1.5 mm 2-pin plugs | 1 | pack of 20 + 20 | [B0D9SMKFNS](https://www.amazon.com/dp/B0D9SMKFNS) |
+
+### A wall plug for the hub
+Only if the house has no spare 5 V USB plug for it.
+
+| Part | Per hub | Sold as | Link |
+|---|---|---|---|
+| 5 V USB-C wall plug (1 A is plenty) | 1 | each | any |
 
 ### No JST crimper
 Pre-crimped JST-XH leads, 6", crimped both ends, **ASXHSXH22K152**: 2 per controller, cut in half for the 4 J5 plug

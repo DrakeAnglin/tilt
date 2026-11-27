@@ -1309,7 +1309,6 @@ class Inventory(unittest.TestCase):
 | Part | Per hub | Sold as | Link |
 |---|---|---|---|
 | ESP32-C6 SuperMini, **no pins soldered** | 1 | from the controllers' 5-pack | [E](https://www.amazon.com/dp/ESP1) |
-| Wall plug | 1 | each | any |
 ## Buy once
 | Part | Uses | Sold as | Link |
 |---|---|---|---|
@@ -1322,6 +1321,10 @@ class Inventory(unittest.TestCase):
 |---|---|---|---|
 | Solar panel | 1 to 6 | 3-pack | [P](https://www.amazon.com/dp/SUN1) |
 | Tape | about 20 cm | 1 roll | any |
+### A wall plug for the hub
+| Part | Per hub | Sold as | Link |
+|---|---|---|---|
+| Wall plug | 1 | each | any |
 ### No JST crimper
 Leads, **ASXH22**: 2 per controller, in place of the crimp pins. [DigiKey](https://www.digikey.com/x?k=ASXH).
 ## Tools
@@ -1388,11 +1391,20 @@ Soldering iron.
         self.assertNotIn('SXH-001T-P0.6', rows)
         self.assertIn('tape', ' '.join(rows))
 
+    def test_hub_plug_only_when_chosen(self):
+        self.assertEqual(self.parts['wall-plug'].optional, 'hub-plug')
+        self.assertNotIn('wall-plug', self.rows(inventory.Plan([(1, False)])))
+        self.assertEqual(self.rows(inventory.Plan([(1, False)], hub_plug=True))['wall-plug'][3], 1)
+        self.assertNotIn('wall-plug', self.rows(inventory.Plan([(1, False)], hub=0, hub_plug=True)))
+        self.assertIn('| Wall plug | yes | any |', inventory.optional_text(self.parts, inventory.Plan([(1, False)], hub_plug=True)))
+        self.assertIn('**Hub wall plug:** from the house', inventory.plan_text(inventory.Plan([(1, False)])))
+
     def test_output(self):
         plan = inventory.Plan([(3, True)])
         table = inventory.order_table(inventory.order(self.parts, plan))
         self.assertIn('| ☐ | [Motor](https://www.amazon.com/dp/MOTOR1) | Amazon | 1 | 3 | 0 | 3 | 0 |', table)
-        self.assertIn('| ☐ | Wall plug | any |', table)
+        self.assertNotIn('Wall plug', table)
+        self.assertIn('| ☐ | Wall plug | any |', inventory.order_table(inventory.order(self.parts, inventory.Plan([(3, True)], hub_plug=True))))
         self.assertEqual(inventory.order_table([]), '**Nothing left to order.**\n')
         stock = inventory.stock_tables(self.parts, plan)
         self.assertIn('6 (+3 per controller)', stock)

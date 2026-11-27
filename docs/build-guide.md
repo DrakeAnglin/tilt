@@ -85,7 +85,7 @@ over Thread and sleep, and Apple Home, Alexa and the app reach the blinds throug
 | ESP32-C6 SuperMini, no pins soldered | Wi-Fi, Thread and Bluetooth on one chip |
 | USB-C male-to-male adapter | the hub's plug ([BOM](../hardware/BOM.md#one-tilt-hub)) |
 | Printed box | printed round the ESP and the adapter ([hub box](hub-box.md)) |
-| A 5 V USB-C wall plug (1 A is plenty) | always on |
+| A 5 V USB plug (any phone charger from the house; 1 A is plenty) | always on |
 | A label | its setup label, printed in step 2 ([Print a setup label](#print-a-setup-label)) |
 
 1. Copy `firmware/tilt_hub/main/secrets.h.example` to `secrets.h` and fill in the Wi-Fi network.
