@@ -55,7 +55,9 @@ actor ControllerOnboarding {
             }
             step(.joining)
             try await controller.moveToHub(network: network, onThread: onThread)
-            if onThread && restore != nil { try? await controller.restart() }   // the restored settings take effect
+            // The restored Home layout takes effect only at a start. A controller already on its Thread firmware does
+            // not restart by itself when it joins (one on Wi-Fi firmware restarts anyway, in swapFirmware).
+            if onThread && restore != nil { try? await controller.restart() }
             await leftBluetooth()
             moved = true
         }

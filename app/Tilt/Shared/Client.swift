@@ -189,7 +189,9 @@ struct ControllerClient: Sendable {
         try await send(Api.hubJoin(network: network))
         if !onThread { try await send(Api.swapFirmware) }
     }
-    /// Put a backup (hex, from a Tilt Hub) on this controller. It takes effect at its next start.
+    /// Put a backup (hex, from a Tilt Hub) on this controller. As the controller's `hRestore` says: the settings and the
+    /// time zone take effect at once; only the Home layout (one tile for all blinds, or one per blind; `hksep`) waits
+    /// for the controller's next start.
     func restore(backup hex: String) async throws {
         let piece = 256
         var i = hex.startIndex
