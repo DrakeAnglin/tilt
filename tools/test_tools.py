@@ -453,7 +453,365 @@ class Orient(unittest.TestCase):
             self.assertEqual(len(said.getvalue().splitlines()), len(orient.PARTS))
 
 
-@unittest.skipUnless(os.path.isdir(bambu.PRINT), 'no oriented STLs (run tools/orient.py)')
+class BambuStudio:
+    """A stand-in for Bambu Studio's command line, for the four project builders (bambu*.py).
+
+    subprocess.run is replaced: a call to bambu.CLI writes a small raw.3mf at --export-3mf with the three files the
+    builders read (3D/3dmodel.model, Metadata/model_settings.config, Metadata/project_settings.config), one object per
+    STL it was given, plus a plate thumbnail and a filament sequence. bambu.SYSTEM points at a temp folder of presets,
+    each inheriting from a base preset. Anything else goes to the real subprocess.run."""
+
+    def __init__(self, test, drop=0):
+        import json, shutil, subprocess
+        from unittest import mock
+        self.calls, self.loaded, self.drop = [], [], drop
+        self.system = tempfile.mkdtemp()
+        test.addCleanup(shutil.rmtree, self.system)
+        for kind in ('machine', 'process', 'filament'):
+            os.makedirs(os.path.join(self.system, kind))
+            with open(os.path.join(self.system, kind, 'fdm_base.json'), 'w') as f:
+                json.dump({'name': 'fdm_base', 'from_base': '1', 'layer_height': '0.3'}, f)
+        import bambu_hub, bambu_solar
+        for kind, name in set(bambu.PRESETS + bambu_solar.PRESETS + bambu_hub.PRESETS):
+            with open(os.path.join(self.system, kind, name + '.json'), 'w') as f:
+                json.dump({'name': name, 'inherits': 'fdm_base', 'layer_height': '0.12', 'own': kind}, f)
+        real = subprocess.run
+
+        def run(cmd, **kw):
+            if cmd[0] != bambu.CLI:
+                return real(cmd, **kw)
+            self.calls.append(cmd)
+            self.loaded.append(self.presets(cmd))
+            self.studio(cmd)
+            return subprocess.CompletedProcess(cmd, 0)
+        for p in (mock.patch.object(subprocess, 'run', run), mock.patch.object(bambu, 'SYSTEM', self.system)):
+            p.start()
+            test.addCleanup(p.stop)
+
+    def presets(self, cmd):
+        import json
+        files = cmd[cmd.index('--load-settings') + 1].split(';') + cmd[cmd.index('--load-filaments') + 1].split(';')
+        out = []
+        for path in files:
+            with open(path) as f:
+                out.append(json.load(f))
+        return out
+
+    def studio(self, cmd):
+        import json, zipfile
+        raw = cmd[cmd.index('--export-3mf') + 1]
+        stls = cmd[cmd.index('--export-3mf') + 2:]
+        stls = stls[:len(stls) - self.drop]
+        for s in stls:
+            orient.read(s)                       # a real STL, or this fails
+        model = ['<?xml version="1.0"?>', '<model unit="millimeter">', ' <metadata name="Title"></metadata>', ' <resources>']
+        cfg = ['<?xml version="1.0"?>', '<config>']
+        items, inst = [], []
+        for k, s in enumerate(stls):
+            oid, name = 2 * k + 2, os.path.basename(s)
+            model += ['  <object id="%d" type="model">' % oid, '   <components>',
+                      '    <component p:path="/3D/Objects/o%d.model" objectid="%d" transform="1 0 0 0 1 0 0 0 1 %d 0 0"/>'
+                      % (k, oid - 1, k), '   </components>', '  </object>']
+            items.append('  <item objectid="%d" transform="0 1 0 -1 0 0 0 0 1 %d %d 2.5" printable="1"/>' % (oid, 30 * k, 40))
+            cfg += ['  <object id="%d">' % oid, '    <metadata key="name" value="%s"/>' % name,
+                    '    <metadata key="extruder" value="1"/>',
+                    '    <part id="%d" subtype="normal_part">' % (oid - 1), '      <metadata key="name" value="%s"/>' % name,
+                    '      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>', '    </part>', '  </object>']
+            inst += ['    <model_instance>', '      <metadata key="object_id" value="%d"/>' % oid,
+                     '      <metadata key="instance_id" value="0"/>', '    </model_instance>']
+        model += [' </resources>', ' <build>'] + items + [' </build>', '</model>']
+        cfg += ['  <plate>', '    <metadata key="plater_id" value="1"/>', '    <metadata key="plater_name" value=""/>',
+                '    <metadata key="thumbnail_file" value="Metadata/plate_1.png"/>'] + inst + ['  </plate>', '</config>']
+        p = self.loaded[-1]
+        settings = {'filament_colour': ['#000000'] * (len(p) - 2), 'layer_height': p[1]['layer_height'],
+                    'printer_model': p[0]['name']}
+        with zipfile.ZipFile(raw, 'w') as z:
+            z.writestr('3D/3dmodel.model', '\n'.join(model) + '\n')
+            z.writestr('Metadata/model_settings.config', '\n'.join(cfg) + '\n')
+            z.writestr('Metadata/project_settings.config', json.dumps(settings))
+            z.writestr('Metadata/filament_sequence.json', '{}')
+            z.writestr('Metadata/plate_1.png', b'png')
+            for k in range(len(stls)):
+                z.writestr('3D/Objects/o%d.model' % k, '<mesh/>')
+
+
+def project(path):
+    """A written 3MF: (3dmodel.model, model_settings.config, project_settings as a dict, every file name)."""
+    import json, zipfile
+    with zipfile.ZipFile(path) as z:
+        return (z.read('3D/3dmodel.model').decode(), z.read('Metadata/model_settings.config').decode(),
+                json.loads(z.read('Metadata/project_settings.config')), z.namelist())
+
+
+def objects(cfg):
+    """[(object name, extruder)] from a model_settings.config."""
+    import re
+    return sorted(re.findall(r'<object id="\d+">\s*<metadata key="name" value="([^"]+)"/>\s*<metadata key="extruder" '
+                           r'value="(\d+)"/>', cfg))
+
+
+def run_quietly(f, *args):
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()) as said:
+        f(*args)
+    return said.getvalue()
+
+
+def run_builder_script(name, tmp):
+    """A builder as its own process, with no Bambu Studio presets (HOME) and nothing in the temp folder (TMPDIR)."""
+    import subprocess
+    env = dict(os.environ, HOME=tmp, TMPDIR=tmp)
+    return subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True, env=env, cwd=tmp)
+
+
+class BambuBuilders(unittest.TestCase):
+    """The four Bambu project builders, run for real into a temp folder with the Bambu Studio stand-in."""
+
+    def setUp(self):
+        import shutil
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+
+    def test_flatten_takes_the_parents_values_and_its_own_win(self):
+        BambuStudio(self)
+        d = bambu.flatten('process', '0.12mm Fine @BBL H2D')
+        self.assertEqual((d['from_base'], d['layer_height'], d['own']), ('1', '0.12', 'process'))
+
+    def test_the_presets_go_to_studio_flattened(self):
+        studio = BambuStudio(self)
+        from unittest import mock
+        with mock.patch.dict(bambu.LAYOUT, bambu.pack(bambu.rows('PLA'))):
+            run_quietly(bambu.main, 'PLA', os.path.join(self.d, 'p.3mf'))
+        p = studio.loaded[0]
+        self.assertEqual([x['name'] for x in p], [n for _, n in bambu.PRESETS])
+        for x in p:
+            self.assertEqual((x['from'], x['instantiation'], x['from_base']), ('system', 'true', '1'))
+            self.assertNotIn('inherits', x)
+
+    def test_tilter_project_has_two_named_plates_and_petg_on_filament_2(self):
+        import re
+        from unittest import mock
+        studio = BambuStudio(self)
+        layout = dict(bambu.pack(bambu.rows('PLA')), **bambu.pack(bambu.rows('PETG')))
+        out = os.path.join(self.d, 'both.3mf')
+        with mock.patch.dict(bambu.LAYOUT, layout):
+            said = run_quietly(bambu.main, None, out)
+        self.assertIn('PETG: ', said)
+        self.assertEqual(len(studio.calls[0]) - studio.calls[0].index('--export-3mf') - 2, len(layout))
+        model, cfg, settings, names = project(out)
+        ext = dict(objects(cfg))
+        self.assertEqual(sorted(ext), sorted(n + '.stl' for n in layout))
+        for n in layout:
+            self.assertEqual(ext[n + '.stl'], '2' if n in bambu.PETG else '1', n)
+        self.assertEqual(re.findall(r'plater_name" value="([^"]*)"', cfg), ['PLA housing', 'PETG sensor gears'])
+        self.assertEqual(re.findall(r'plater_id" value="(\d+)"', cfg), ['1', '2'])
+        # every part square on its spot, a PETG part one plate over, its height kept
+        part_of = dict(re.findall(r'<object id="(\d+)">\s*<metadata key="name" value="([^"]+)\.stl"', cfg))
+        for oid, x, y, z in re.findall(r'<item objectid="(\d+)" transform="1 0 0 0 1 0 0 0 1 (\S+) (\S+) (\S+)"', model):
+            n = part_of[oid]
+            want = layout[n][0] + (bambu.PLATE_STEP if n in bambu.PETG else 0)
+            self.assertEqual((float(x), float(y), z), (want, layout[n][1], '2.5'), n)
+        self.assertEqual(model.count('transform="1 0 0 0 1 0 0 0 1 '), 2 * len(layout))   # items and components
+        self.assertFalse([n for n in names if n.endswith('.png')])
+        self.assertEqual((settings['wall_loops'], settings['printer_model']), ('4', 'Bambu Lab H2D 0.4 nozzle'))
+
+    def test_a_one_material_project_has_one_plate(self):
+        import json, re, zipfile
+        from unittest import mock
+        BambuStudio(self)
+        layout = dict(bambu.pack(bambu.rows('PLA')), **bambu.pack(bambu.rows('PETG')))
+        out = os.path.join(self.d, 'pla.3mf')
+        with mock.patch.dict(bambu.LAYOUT, layout):
+            run_quietly(bambu.main, 'PLA', out)
+        model, cfg, _, _ = project(out)
+        self.assertEqual(objects(cfg), sorted((n + '.stl', '1') for n in layout if n not in bambu.PETG))
+        self.assertEqual(re.findall(r'plater_id" value="(\d+)"', cfg), ['1'])
+        self.assertNotIn(' %g ' % (bambu.PLATE_STEP + 100), model)
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(list(json.loads(z.read('Metadata/filament_sequence.json'))), ['plate_1'])
+
+    def test_all_projects_writes_the_three_tilter_projects(self):
+        from unittest import mock
+        studio = BambuStudio(self)
+        out = os.path.join(self.d, 'tilter_H2D_PLA_PETG.3mf')
+        with mock.patch.dict(bambu.LAYOUT, {}), mock.patch.object(bambu, 'OUT', out):
+            run_quietly(bambu.all_projects)
+        self.assertEqual(sorted(os.listdir(self.d)), ['tilter_H2D_PETG_only.3mf', 'tilter_H2D_PLA_PETG.3mf',
+                                                      'tilter_H2D_PLA_only.3mf'])
+        self.assertEqual(len(studio.calls), 3)
+        self.assertEqual(objects(project(os.path.join(self.d, 'tilter_H2D_PETG_only.3mf'))[1]),
+                         sorted((n + '.stl', '2') for n in bambu.PETG))
+
+    def test_project_has_one_object_per_part_per_plate_on_its_spot(self):
+        import re
+        studio = BambuStudio(self)
+        plates = bambu_project.CONTROLLER
+        out = os.path.join(self.d, 'tilt_controller_box_H2D.3mf')
+        self.assertIn('3 plates, 4 objects', run_quietly(bambu_project.build, out, plates))
+        self.assertEqual(len(studio.calls), 1)
+        model, cfg, settings, names = project(out)
+        self.assertEqual(objects(cfg), [('controller_lid', '1')] * 2 + [('controller_tray', '1')] * 2)
+        self.assertEqual(re.findall(r'plater_name" value="([^"]*)"', cfg), [t for t, _ in plates])
+        self.assertIn('<metadata name="ProfileTitle">Controller box (3 plates)</metadata>', model)
+        cols, sx, sy = bambu_project.stride(len(plates))
+        want = []
+        for k, (_, rows) in enumerate(plates):
+            for n, (x, y) in sorted(bambu_project.pack(rows).items()):
+                want.append((k + 1, n, round(x + (k % cols) * sx, 2), round(y - (k // cols) * sy, 2)))
+        # Studio's component offset (the stand-in puts object k at x = k) comes off again
+        got = []
+        part_of = dict(re.findall(r'<object id="(\d+)">\s*<metadata key="name" value="([^"]+)"', cfg))
+        plate_of = {}
+        for k, plate in enumerate(re.findall(r'  <plate>.*?  </plate>\n', cfg, re.S)):
+            for oid in re.findall(r'object_id" value="(\d+)"', plate):
+                plate_of[oid] = k + 1
+        for oid, x, y in re.findall(r'<item objectid="(\d+)" transform="1 0 0 0 1 0 0 0 1 (\S+) (\S+) 2.5"', model):
+            got.append((plate_of[oid], part_of[oid], round(float(x) + (int(oid) - 2) // 2, 2), float(y)))
+        self.assertEqual(sorted(got), sorted(want))
+        self.assertEqual(settings['brim_type'], 'no_brim')
+        self.assertFalse([n for n in names if n.endswith('.png')])
+
+    def test_brims_and_supports_only_on_their_parts(self):
+        import re
+        BambuStudio(self)
+        plates = [('1 a', [['worm', 'carrier']]), ('2 b', [['case_left']])]
+        out = os.path.join(self.d, 'tilt_bulk_H2D.3mf')
+        run_quietly(bambu_project.build, out, plates)
+        _, cfg, _, _ = project(out)
+        blocks = {re.search(r'value="([^"]+)"', b).group(1): b for b in re.findall(r'  <object id.*?  </object>', cfg, re.S)}
+        self.assertEqual(objects(cfg), [('carrier', '2'), ('case_left', '1'), ('worm', '1')])
+        self.assertIn('key="enable_support" value="1"', blocks['worm'])
+        self.assertIn('key="brim_width" value="5"', blocks['worm'])
+        self.assertIn('key="brim_width" value="3"', blocks['carrier'])
+        self.assertNotIn('enable_support', blocks['carrier'])
+        self.assertNotIn('brim', blocks['case_left'])
+        self.assertNotIn('enable_support', blocks['case_left'])
+        self.assertNotIn('__', cfg)                       # the parts are named after the part, not the loaded file
+
+    def test_project_fails_when_studio_did_not_load_every_part(self):
+        BambuStudio(self, drop=1)
+        with self.assertRaises(AssertionError) as e:
+            run_quietly(bambu_project.build, os.path.join(self.d, 'x.3mf'), [('1 a', [['worm', 'carrier']])])
+        self.assertIn('did not load every part', str(e.exception))
+
+    def test_a_row_wider_than_the_bed_is_too_full(self):
+        with self.assertRaises(AssertionError) as e:
+            bambu_project.pack([['case_right', 'case_left', 'bearing_shell', 'motor_shell', 'tray', 'tray_lid'] * 2])
+        self.assertIn('plate too full', str(e.exception))
+
+    def test_hub_pause_is_one_layer_above_the_walls(self):
+        import re
+        import bambu_hub
+        top = float(re.search(r'top_z="([\d.]+)"', bambu_hub.pause_xml()).group(1))
+        self.assertAlmostEqual(top, round(bambu_hub.H['zp'] + bambu_hub.H['layer'], 2))
+        self.assertIn('type="1"', bambu_hub.pause_xml())
+        self.assertGreater(top, bambu_hub.H['zp'])
+
+    def hub(self, mark_age=0):
+        import shutil
+        from unittest import mock
+        import bambu_hub
+        box, mark, out = (os.path.join(self.d, n) for n in ('hub_box.stl', 'mark.stl', 'hub_box_multicolor.3mf'))
+        shutil.copy(bambu_hub.BOX, box)
+        orient.write(mark, Orient.TRIS)
+        os.utime(mark, (os.path.getmtime(box) - mark_age,) * 2)
+        for target, value in [('BOX', box), ('MARK', mark), ('OUT', out)]:
+            p = mock.patch.object(bambu_hub, target, value)
+            p.start()
+            self.addCleanup(p.stop)
+        return bambu_hub, out
+
+    def test_hub_mark_becomes_a_second_part_of_the_box(self):
+        import re, zipfile
+        BambuStudio(self)
+        bambu_hub, out = self.hub()
+        self.assertIn('pause before layer', run_quietly(bambu_hub.main))
+        model, cfg, settings, names = project(out)
+        self.assertEqual(objects(cfg), [('Tilt Hub box', '1')])
+        self.assertEqual(re.findall(r'<part .*?</part>', cfg, re.S)[1].count('key="extruder" value="2"'), 1)
+        self.assertIn('value="tilt mark"', cfg)
+        self.assertEqual(cfg.count('<model_instance>'), 1)
+        self.assertEqual(re.findall(r'<item objectid="(\d+)"', model), ['2'])
+        self.assertEqual(model.count('<component '), 2)                      # the box's and the mark's, one object
+        self.assertIn('transform="1 0 0 0 1 0 0 0 1 %g %g 0"' % (bambu_hub.BED[0] - bambu_hub.H['L'] / 2, bambu_hub.BED[1]),
+                      model)
+        self.assertEqual(settings['filament_colour'], ['#FFFFFF', '#1F6F8B'])
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(z.read('Metadata/custom_gcode_per_layer.xml').decode(), bambu_hub.pause_xml())
+        self.assertFalse([n for n in names if n.endswith('.png')])
+
+    def test_hub_without_a_fresh_inlay_says_to_run_fusion(self):
+        studio = BambuStudio(self)
+        bambu_hub, out = self.hub(mark_age=600)
+        with self.assertRaises(SystemExit) as e:
+            bambu_hub.main()
+        self.assertIn('run tools/fusion_hub.py first', e.exception.code)
+        os.unlink(bambu_hub.MARK)
+        with self.assertRaises(SystemExit):
+            bambu_hub.main()
+        self.assertEqual((studio.calls, os.path.exists(out)), ([], False))
+
+    def solar(self):
+        import shutil
+        from unittest import mock
+        import bambu_solar
+        stl = os.path.join(self.d, 'solar')
+        shutil.copytree(bambu_solar.STL, stl, ignore=shutil.ignore_patterns('*.3mf'))
+        p = mock.patch.object(bambu_solar, 'STL', stl)
+        p.start()
+        self.addCleanup(p.stop)
+        return bambu_solar, stl
+
+    def test_solar_asks_for_the_right_pieces(self):
+        studio = BambuStudio(self)
+        bambu_solar, stl = self.solar()
+        run_quietly(bambu_solar.run, ['3'])
+        run_quietly(bambu_solar.run, ['6', '--left'])
+        run_quietly(bambu_solar.run, [])
+        loaded = [[os.path.basename(s) for s in c[c.index('--export-3mf') + 2:]] for c in studio.calls]
+        self.assertEqual(loaded, [['solar_start_3.stl', 'solar_cap.stl'],
+                                  ['solar_start_3_wires_left.stl', 'solar_add_3_wires_left.stl', 'solar_cap_wires_left.stl'],
+                                  ['solar_start_3.stl', 'solar_cap.stl']])
+        self.assertEqual(sorted(f for f in os.listdir(stl) if f.endswith('.3mf')),
+                         ['solar_housing_3_H2D.3mf', 'solar_housing_6_wires_left_H2D.3mf'])
+        _, _, settings, _ = project(os.path.join(stl, 'solar_housing_3_H2D.3mf'))
+        self.assertEqual((settings['enable_support'], settings['layer_height']), ('0', '0.12'))
+
+    def test_solar_with_a_missing_stl_names_it(self):
+        studio = BambuStudio(self)
+        bambu_solar, stl = self.solar()
+        os.unlink(os.path.join(stl, 'solar_add_2.stl'))
+        with self.assertRaises(SystemExit) as e:
+            bambu_solar.main(5)
+        self.assertIn('solar_add_2.stl is missing', e.exception.code)
+        self.assertEqual(studio.calls, [])
+
+    def test_solar_pieces_agree_with_fusion_solar(self):
+        import ast, re
+        import bambu_solar
+        with open(os.path.join(HERE, 'fusion_solar.py')) as f:
+            fusion = ast.literal_eval(re.search(r'^PIECES = (\{.*\})', f.read(), re.M).group(1))
+        self.assertEqual(sorted(fusion), sorted(bambu_solar.PIECES))
+        for n, sections in fusion.items():
+            want = ['start_%d' % sections[0]] + ['add_%d' % s for s in sections[1:]]
+            self.assertEqual(bambu_solar.PIECES[n], want, n)
+            self.assertEqual(sum(sections), n)
+
+    def test_each_builder_stops_before_writing_without_studio(self):
+        import bambu_hub, bambu_solar
+        outs = [bambu.OUT, bambu_hub.OUT] + [os.path.join(bambu_project.STL, n) for n in bambu_project.PROJECTS] + \
+            [os.path.join(bambu_solar.STL, 'solar_housing_3_H2D.3mf')]
+        before = {p: os.path.getmtime(p) for p in outs if os.path.exists(p)}
+        for name in ('bambu.py', 'bambu_project.py', 'bambu_solar.py'):
+            r = run_builder_script(name, self.d)
+            self.assertNotEqual(r.returncode, 0, name)
+            self.assertIn('BambuStudio', r.stderr, name)               # the presets are not there
+        r = run_builder_script('bambu_hub.py', self.d)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('run tools/fusion_hub.py first', r.stderr)
+        self.assertEqual({p: os.path.getmtime(p) for p in before}, before)
+
+
 class BambuPacking(unittest.TestCase):
     BED_SIZE = (350.0, 320.0)                 # H2D: 350 x 320 mm
 
