@@ -12,7 +12,7 @@ Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md]
 - **Controller** (one per up to 3 blinds): an ESP32-C6 SuperMini on a carrier PCB, one protected 18650 cell, an
   Adafruit 6092 charger with its own USB-C, and 3 RJ12 ports, in a box that slides into a headrail.
   Build: [PCB](pcb-build.md), [box](controller-box.md).
-- **Cord**: a white, straight-wired RJ12 phone cord from each tilter to a port.
+- **Cord**: a straight-wired RJ12 phone cord (any color; white if you can) from each tilter to a port.
 - **Tilt Hub** (one per home): an ESP32-C6 on a USB wall plug ([firmware/tilt_hub](../firmware/tilt_hub/README.md)).
   The controllers talk to it over Thread and sleep between check-ins. **Apple Home** adds the hub once (Matter over
   Wi-Fi) and sees every blind through it.
@@ -27,7 +27,7 @@ Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md]
                      │                              └──┬──────┬──────┬──────────────┘
                      └─ 0.75 A fuse ×3                   │220 Ω │10 Ω   ▲ 1 k + 100 nF
                             ▼                            ▼      ▼       │
-     RJ12 port ×3 ═══ white RJ12 cord ═══ tilter: DRV8833 ─ N20, AS5600 (PWM out)
+     RJ12 port ×3 ═══ RJ12 cord ═════════ tilter: DRV8833 ─ N20, AS5600 (PWM out)
      (battery +, IN1, GND, angle, EN, IN2)       (EN wakes the driver and powers the sensor)
 ```
 
@@ -57,7 +57,7 @@ Words like Blind, Tilter, Controller, Port and Marks are defined in [CONTEXT.md]
 - **Protection.** A 0.75 A resettable fuse on each port's battery +, series resistors on the cord lines, a 470 µF
   capacitor by the jacks, keyed and labeled plugs, and a 6.2 V zener that clamps the solar input. The cell has its own
   protection board (protected cells only).
-- **White outside.** White cords, white printed parts.
+- **White outside.** White printed parts. The cords hide in the headrail: any color, white if you can find it.
 
 ## Battery rules
 From [CONTEXT.md](../CONTEXT.md) and `firmware/blinds_matter/main/config.h`. The Battery level is worked out from the

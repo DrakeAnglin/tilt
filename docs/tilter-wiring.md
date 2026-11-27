@@ -10,8 +10,6 @@ before the [mechanical build](tilter-assembly.md).
 
 ![tilter wiring](renders/tilter-wiring.png)
 
-The 10 µF capacitor in the picture is an [optional fix](#2-wire-it), not part of the normal build.
-
 ## Parts for one tilter
 | Part | Qty |
 |---|---|
@@ -82,9 +80,9 @@ Why two wires from pins 3 and 5: GND is split so the motor's current returns on 
 sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Leave **IN3, IN4, OUT3, OUT4, ULT** on
 the driver and **SCL, SDA** on the sensor empty.
 
-**Optional fix, if a blind's angle jumps when its motor starts:** solder a 10 µF ceramic capacitor ("106", from the
-controller's capacitor kit) right on the DRV8833's **VCC** and **GND** pins, either way round. The reference tilters
-work without it.
+**No capacitor on the driver.** Earlier guides put a 10 µF across the DRV8833's VCC and GND; no tilter has one, and
+none needs it. The controller reads the angle from the timing of the sensor's PWM signal, which a dip in the supply
+doesn't change, and it starts each motor gently (a 150 ms ramp).
 
 📷 **Photo S3:** the RJ12 breakout with its eight leads, pins readable.
 

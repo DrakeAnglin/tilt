@@ -6,7 +6,7 @@ Layout, end A (ports) to end B (USB-C):
     box, through the bosses and the PCB's holes, into heat-set inserts in three lid posts: they clamp the PCB between
     floor and lid, and hold the lid on.
   * 18650 in two saddles along the back wall, beside the PCB body; the lid's cradles press it down.
-  * Charger bay past the PCB's end: the 6092 flat on four posts, two M2 self-tapping screws at its far end, two short
+  * Charger bay past the PCB's end: the 6092 flat on four posts, two M2 × 6 screws at its far end, two short
     indexing studs by end wall B. It goes in USB-C end first, angled down into a slot in end wall B, then drops onto
     the studs; its USB-C (the charge port) sits behind a stadium window. A 3-wire harness from the PCB's J5 runs over
     the top to its pad row; the solar lead comes in through an opening in end wall B (big enough for its plug) and
@@ -226,7 +226,7 @@ def build(bx, cyl, cone, uni, cut, rbox, obox):
     g, t, hw = c['bat_gap'], c['stop_t'], c['stop_hw']
     tray = uni(tray, bx(C['bat_x0'] - g - t, C['bat_x0'] - g, by - hw, min(by + hw, ihi + 0.01), F0, bc - 2.5),
                bx(C['bat_x0'] + c['bat_l'] + g, C['bat_x0'] + c['bat_l'] + g + t, by - hw, min(by + hw, ihi + 0.01), F0, bc - 4.0))
-    # --- charger: Adafruit 6092 on four posts. The two away from the wall take M2 self-tapping screws; the two by end
+    # --- charger: Adafruit 6092 on four posts. The two away from the wall take M2 × 6 screws (they cut their own thread); the two by end
     # wall B carry short indexing studs (a screw there would sit 1.5 mm off the wall: no room for a driver). End wall B
     # has a slot for the board's end and the USB-C, its top inner edge a 45 deg lead-in, so the board goes in USB-C end
     # first, angled down, then drops onto the studs.

@@ -72,7 +72,7 @@ Later updates come from the app.
    ([bench charging](pcb-build.md#charging-the-battery-on-the-bench)).
 3. **Box:** inserts, PCB, cell, charger, lid, 3 screws, then **4 stick-on feet** in the corners of the floor
    ([box assembly](controller-box.md#assembly)).
-4. Plug the tilter into port 1 with a white RJ12 cord. Check the cord first: pin 1 to pin 1.
+4. Plug the tilter into port 1 with an RJ12 cord. Check the cord first: pin 1 to pin 1.
    Cord through a wall? Drill a 5/8 in hole and cover it with a printed plug on each side ([wall plug](wall-plug.md)).
 
 ### 7. Build the Tilt Hub
