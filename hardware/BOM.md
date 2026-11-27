@@ -17,6 +17,8 @@ Links are the parts used in the reference build. Any part with the same size and
 - **Tilters** = blinds.
 - **Controllers** = blinds ÷ 3, rounded up. Add one more wherever a blind is farther from a controller than a cord
   reaches (3 m, requirement E-5): controllers are grouped by cord reach, not by room.
+- **RJ12 cords** = one per tilter: one 3.3 ft per controller (its own blind), then 6.6 ft or 10 ft by distance
+  ([cord lengths](#cord-to-the-controller)).
 - **Tilt Hub** = 1 per home, however many controllers.
 - **ESP32-C6 SuperMini** = one per controller, plus one for the hub.
 - **RJ12 jack (87180-066LF) and fuse (0ZRE0075FF1A)** = one of each per controller port you use, so one per tilter.
@@ -82,11 +84,18 @@ pads, not hard rubber: hard rubber passes the vibration on. Where they go: [tilt
 ### Cord to the controller
 | Part | Per tilter | Sold as | Link |
 |---|---|---|---|
-| RJ12 cord, **white, straight-wired**, 10 ft | 1, for a far blind | 2-pack | [B0C1VK4W51](https://www.amazon.com/dp/B0C1VK4W51) |
-| RJ12 cord, **white, straight-wired**, 6.6 ft | 1, for a near blind | 2-pack | [B0C1VJN3DL](https://www.amazon.com/dp/B0C1VJN3DL) |
+| RJ12 6P6C cord, **white, straight-wired**, 3.3 ft | 1, for the blind beside the controller | pack (pick white) | [B0C1VHVJTS](https://www.amazon.com/dp/B0C1VHVJTS) |
+| RJ12 6P6C cord, **white, straight-wired**, 6.6 ft | 1, for the 2nd blind | 2-pack | [B0C1VJN3DL](https://www.amazon.com/dp/B0C1VJN3DL) |
+| RJ12 6P6C cord, **white, straight-wired**, 10 ft | 1, for a 3rd blind | 2-pack | [B0C1VK4W51](https://www.amazon.com/dp/B0C1VK4W51) |
 
-Each tilter needs one cord; pick the length by how far its blind is from the controller. Check every cord before
-use: pin 1 must beep to pin 1 ([tilter wiring](../docs/tilter-wiring.md)).
+Each tilter needs one cord. Measure from the controller to each tilter first, then pick:
+- **The blind beside the controller:** 3.3 ft. The controller sits in the same headrail as one of its tilters, so
+  every controller needs at least one 3.3 ft cord.
+- **The 2nd blind:** 6.6 ft.
+- **A 3rd blind:** 10 ft, or 6.6 ft if the controller sits in the middle.
+
+Example: 3 blinds with the controller in the middle = one 3.3 ft + two 6.6 ft. Check every cord before use: pin 1
+must beep to pin 1 ([tilter wiring](../docs/tilter-wiring.md)).
 
 ## One controller
 
