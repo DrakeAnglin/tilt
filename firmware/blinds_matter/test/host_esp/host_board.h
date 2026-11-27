@@ -7,6 +7,7 @@
 //   the clock      advanceMs / advanceUs move it; vTaskDelay and esp_rom_delay_us move it too
 //   the wall clock setWallClock(epoch) or settimeofday(); 0 = not set (the Mac's clock is never read or set)
 //   flash          kept in memory by namespace and key; survives restart(), wipeFlash() clears it
+//                  (putFlashStr / flashStr: a string as nvs_set_str keeps it)
 //   pins           the mode and level last written (pinTrace: the history), the millivolts on an ADC pin, LEDC duty
 //   reset reason   setResetReason: what esp_reset_reason() says after the next start
 //   mutexes        know if they are held; a give with no take or a second take is a fault
@@ -35,6 +36,7 @@ struct Board {
   time_t wallAt = 0;                                   // the wall clock when it was set (0: not set) ...
   int64_t wallSetUs = 0;                               // ... and the board clock then
   std::map<std::string, std::map<std::string, Entry>> flash;   // namespace -> key -> value
+  std::map<std::string, std::map<std::string, char>> kind;    // a value that is not a blob: 's' a string, 'u' a u32 (none: a u8)
   std::vector<std::string> handles;                    // nvs_handle_t n is the namespace handles[n - 1]
   std::map<int, int> mode, level, mv;                  // per pin: GPIO mode (0 off, 1 out), level, millivolts on it
   std::map<int, std::string> trace;                    // per pin: "O" made an output, "I" let go, "1"/"0" a level
@@ -84,6 +86,16 @@ inline void putFlashU8(const char *ns, const char *key, uint8_t v) {
   Entry &e = board().flash[ns][key];
   e.blob = false;
   e.bytes.assign(1, v);
+}
+inline void putFlashStr(const char *ns, const char *key, const std::string &v) {   // as nvs_set_str keeps it
+  Entry &e = board().flash[ns][key];
+  e.blob = false;
+  e.bytes.assign(v.c_str(), v.c_str() + v.size() + 1);
+  board().kind[ns][key] = 's';
+}
+inline std::string flashStr(const char *ns, const char *key) {   // "" when there is no string under the key
+  if (!flashHas(ns, key) || board().flash[ns][key].blob || board().kind[ns][key] != 's') return "";
+  return (const char *)board().flash[ns][key].bytes.data();
 }
 
 // ---- pins

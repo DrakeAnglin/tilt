@@ -85,7 +85,9 @@ Not needed to build a hub: the code, the API, push alerts, updates from the Mac 
 ### Code
 
 One compiled file: `main/hub.cpp` includes the parts below once, in this order (each uses what the ones before it
-hold). The pure rules beside them are tested on the Mac (`test/`).
+hold). The pure rules beside them are tested on the Mac (`test/`). The hub's own code is tested on the Mac too, on
+the stand-in board (`test/hub_board_test.cpp`, `test/host_esp`): `hub_store.h` and `hub_pair.h` so far, each including
+what it uses by its SDK name, so the test program includes them in its own order (`hub_store.h`, then `hub_pair.h`).
 
 - `hub.cpp`: the includes, Thread start, the status light, factory reset, `app_main`.
 - `hub_store.h`: what the hub keeps about each controller, in memory and in flash.

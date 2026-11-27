@@ -69,6 +69,7 @@ For people working on Tilt itself. You do not need any of this to build one.
 | `tools/pcb_guide.py` | Generates the PCB build guide and its pictures |
 | `tools/check_docs.py` | Checks the docs: links, anchors, and no leftovers from one house |
 | `tools/firmware_tests.sh`, `tools/app_tests.sh`, `tools/test_tools.py` | Tests |
+| `tools/host_cjson.py` | Finds the real cJSON (ESP-IDF's copy, else the system's) for the Tilt Hub's Mac tests |
 | `tools/coverage.sh`, `tools/coverage_gate.py` | Line coverage of the tests, and the gate every pull request must pass (below) |
 
 Fusion scripts run through the FusionBridge add-in: `python3 hardware/mechanical/fusion/fusion.py exec tools/<script>.py`.
@@ -81,7 +82,7 @@ Fusion scripts run through the FusionBridge add-in: `python3 hardware/mechanical
 |---|---|
 | Tilt app | at least 23% |
 | controller firmware | at least 38% |
-| Tilt Hub firmware | at least 10% |
+| Tilt Hub firmware | at least 17% |
 | tools | at least 77% |
 
 Every pull request covers at least 90% of the lines it changes in our own code, and no area may drop under its floor (`tools/coverage-floors.txt`). The live numbers: the `coverage` job of the [latest CI run on main](https://github.com/DrakeAnglin/tilt/actions/workflows/ci.yml?query=branch%3Amain). The rule: [docs/agents/workflow.md](docs/agents/workflow.md#coverage).

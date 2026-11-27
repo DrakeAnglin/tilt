@@ -2,5 +2,5 @@
 # Only goes up (tools/coverage_gate.py says when it can); a lower floor needs the owner. docs/agents/workflow.md, "Coverage".
 app 23
 controller 38
-hub 10
+hub 17
 tools 77

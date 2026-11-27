@@ -1,6 +1,15 @@
 // The ESP side of the hub's people (the rules are hub_people.h): keys and setup code from flash, the hub's id, the
 // key exchange for a new phone (tilt_pair.h, shared with the controller), and opening a phone's sealed command. Part of hub.cpp.
+// It includes what it uses; TAG and HUB_SETUP_PIN come from whoever includes it (hub.cpp, or the Mac test program).
 #pragma once
+#include <cJSON.h>
+#include <esp_log.h>
+#include <esp_mac.h>
+#include "hub_store.h"                           // nv, ms, rng
+#include "hub_people.h"                          // the rules
+#include "tilt_pair.h"                           // the key exchange in Pairing
+#include "tilt_link.h"                           // sealed frames
+#include "wire.h"                                // keptName
 static std::string hubCommand(int slot, const std::string &cmd);  // hub_api.h
 // ---- the hub's people (hub_people.h: the rules, tested on the Mac). keyMx guards people.
 // keyMx is a leaf lock: nothing that holds it takes another lock (the Matter stack lock, stateMx), because the Matter

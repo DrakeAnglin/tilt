@@ -40,7 +40,6 @@ static int ask(int c, char type, const std::string &payload, std::string &ans, u
 }
 
 // ---- the hub's own key for each controller (it moves blinds like a phone would)
-static int rng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
 #include "cloud.h"                               // alertRaise: push alerts through iCloud
 #include "alert_rules.h"                         // when to send them
 // The link key for the proofs on messages between the hub and a controller that has let the hub in (and been told

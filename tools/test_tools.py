@@ -16,6 +16,7 @@ import bambu_project  # noqa: E402
 import check_docs  # noqa: E402
 import coverage_gate  # noqa: E402
 import firmware_size  # noqa: E402
+import host_cjson  # noqa: E402
 import inventory  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
@@ -426,6 +427,70 @@ class FirmwareSize(unittest.TestCase):
         self.assertIn('--floor', script)
         for name in ('tilt_hub.bin', 'blinds_matter.bin'):
             self.assertIn(name, script)
+
+class HostCJSON(unittest.TestCase):
+    """The real cJSON for the hub's Mac tests (tools/host_cjson.py): ESP-IDF's copy, else the system's, else stop."""
+
+    def args_file(self, out):
+        with open(os.path.join(out, 'cjson.args')) as f:
+            return f.read().split()
+
+    def test_esp_idf_copy_is_compiled_into_the_out_dir(self):
+        with tempfile.TemporaryDirectory() as idf, tempfile.TemporaryDirectory() as out:
+            src = os.path.join(idf, 'components', 'json', 'cJSON')
+            os.makedirs(src)
+            with open(os.path.join(src, 'cJSON.c'), 'w') as f:
+                f.write('int cJSON_test_marker(void) { return 7; }\n')
+            self.assertEqual(host_cjson.main([out], env={'IDF_PATH': idf}, prefixes=[]), 0)
+            obj = os.path.join(out, 'cJSON.o')
+            self.assertTrue(os.path.isfile(obj))
+            self.assertEqual(self.args_file(out), ['"-I%s"' % src, '"%s"' % obj])
+
+    def test_esp_idf_in_the_home_folder_when_no_idf_path(self):
+        with tempfile.TemporaryDirectory() as home:
+            src = os.path.join(home, 'esp', 'esp-idf', 'components', 'json', 'cJSON', 'cJSON.c')
+            os.makedirs(os.path.dirname(src))
+            open(src, 'w').close()
+            self.assertEqual(host_cjson.idf_source({}, home), src)
+
+    def test_system_header_and_lcjson_without_esp_idf(self):
+        with tempfile.TemporaryDirectory() as empty, tempfile.TemporaryDirectory() as prefix, \
+                tempfile.TemporaryDirectory() as out:
+            inc = os.path.join(prefix, 'include', 'cjson')
+            os.makedirs(inc)
+            open(os.path.join(inc, 'cJSON.h'), 'w').close()
+            self.assertEqual(host_cjson.main([out], env={'IDF_PATH': empty}, home=empty, prefixes=[empty, prefix]), 0)
+            self.assertEqual(self.args_file(out), ['"-I%s"' % inc, '"-L%s"' % os.path.join(prefix, 'lib'), '"-lcjson"'])
+
+    def test_system_cjson_in_usr_needs_no_library_folder(self):
+        args = host_cjson.system_args(['/usr']) if os.path.isfile('/usr/include/cjson/cJSON.h') else None
+        if args is not None:
+            self.assertEqual(args, ['-I/usr/include/cjson', '-lcjson'])
+        self.assertEqual(host_cjson.system_prefixes()[-3:], ['/opt/homebrew', '/usr/local', '/usr'])
+
+    def test_neither_stops_with_the_install_line(self):
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as empty:
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(host_cjson.main([empty], env={'IDF_PATH': empty}, home=empty, prefixes=[empty]), 1)
+            self.assertIn('apt-get install libcjson-dev', err.getvalue())
+            self.assertIn('brew install cjson', err.getvalue())
+            self.assertFalse(os.path.exists(os.path.join(empty, 'cjson.args')))
+
+    def test_usage(self):
+        import contextlib
+        import io
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(host_cjson.main([]), 2)
+
+    def test_the_hub_test_build_reads_its_arguments(self):
+        with open(os.path.join(HERE, 'firmware_tests.sh')) as f:
+            script = f.read()
+        self.assertIn('python3 ../../../tools/host_cjson.py "$OUT"', script)
+        self.assertIn('@"$OUT/cjson.args"', script)
+
 
 class HubPeopleLock(unittest.TestCase):
     """The Tilt Hub reads its people under keyMx (firmware/tilt_hub/main/hub_pair.h). The lock is only on the chip,
