@@ -42,7 +42,7 @@ PETG is for the parts that rub or mesh against PLA all the time.
 |---|---|---|
 | M3 heat-set insert | 6 | bearing shell 4 (2 case bolts, 2 tray bolts), tray 2 (sensor bolt, lid corner) |
 | M3 × 25 flat-head | 1 | sensor bolt (through the lid's column and the AS5600) |
-| M3 × 20 flat-head | 4 | 2 case bolts, 2 tray bolts; the room-side tray bolt is also the cluster gear's axle |
+| M3 × 20 flat-head | 4 | 2 case bolts (M3 × 25 also fit), 2 tray bolts; the room-side tray bolt is also the cluster gear's axle |
 | M3 × 16 flat-head | 2, optional | hold the motor shell on while the sensor module is not ready; reusable |
 | M3 × 8 flat-head | 1 | lid's corner bolt |
 | M1.6 × 4 | 2 | N20 to the motor shell |
@@ -62,8 +62,8 @@ Then plug the cord in and set the blind up in the app: [build guide](../../../..
 ## Checked in Fusion
 - No part touches another, with a rod right through the tilter included.
 - Gears turned through their meshes in motor mode, wand mode and at the fast end: no overlap.
-- Assembly paths swept in the old build order: all clear. The photo build changed the order (see the tilter assembly);
-  not swept again yet ([#208](https://github.com/DrakeAnglin/tilt/issues/208)).
+- Assembly paths swept in the old build order: all clear. The first real build used a different order (the tilter
+  assembly guide) and everything went in. The sweep was not rerun for that order; the owner decided it is not needed (#208).
 - Sleeve end play: 0.25 mm forward, 0.35 mm back.
 - Print files scanned for overhangs: only the lid's gear shelf needs support.
 - Thin-wall scan (`tools/fusion_thin.py`): what it still lists is on purpose (the 0.8 mm bearing wall between the gear

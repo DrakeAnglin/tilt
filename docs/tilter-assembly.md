@@ -29,7 +29,7 @@ out, and a missing part shows up now and not halfway through.
 | Group | Printed | Bought |
 |---|---|---|
 | **A. Prep** | bearing shell, tray, carrier, worm, tray lid, magnet gear | 6 M3 heat-set inserts, 5 Ø2 × 6 dowel pins, the Ø4 × 2 magnet |
-| **B. Gearbox** | case right (main half), case left (lid), worm, worm wheel, ring cup, 4 planets | 2 M3 × 20 |
+| **B. Gearbox** | case right (main half), case left (lid), worm, worm wheel, ring cup, 4 planets | 2 M3 × 20 (or 25) |
 | **C. Motor end** | motor shell, sun piece (27T), motor pinion, cluster (20T / 9T), sensor sleeve | N20 motor, 2 M1.6 × 4 |
 | **D. Tray and lid** | (tray, lid and magnet gear from A) | the finished sensor module, 2 M3 × 20, 1 M3 × 25, 1 M3 × 8, 6 foam pads |
 
@@ -109,8 +109,8 @@ carrier's hub where it turns in the wheel.
 ![ring cup with the 4 planets in, bearing shell beside it](photos/tilter/b3-planets.jpg)
 
 ### B4. Bearing shell on
-Bearing shell over the cup, cup side down (its two pins find the lid). Two **M3 × 20** from the main half's back into
-the bearing shell's inserts. Tighten them down.
+Bearing shell over the cup, cup side down (its two pins find the lid). Two **M3 × 20** from the main half's back into the
+bearing shell's inserts. Tighten them down. M3 × 25 work too; they are just longer than needed.
 
 ![bearing shell on the gearbox](photos/tilter/b4-bearing-shell-on.jpg)
 
