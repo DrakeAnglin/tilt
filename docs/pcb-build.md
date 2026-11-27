@@ -165,7 +165,7 @@ missing C2–C6 doesn't stop anything working (the readings are just noisier). *
 2. **J3 (6-way, for the old USB-C board): not used.** USB plugs into the charger's own USB-C (step 11), so nothing
    plugs into J3. Leave it empty.
 
-## Step 6: JST headers (3)
+## Step 6: JST headers (2, plus J8 for solar)
 
 ![step 6](renders/pcb-build-06.png)
 

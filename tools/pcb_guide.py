@@ -731,7 +731,7 @@ def md():
     a('   plugs into J3. Leave it empty.')
     a('')
     # ---- step 6
-    a('## Step 6: JST headers (3)')
+    a('## Step 6: JST headers (2, plus J8 for solar)')
     a('')
     a('![step 6](renders/pcb-build-06.png)')
     a('')

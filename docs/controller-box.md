@@ -14,7 +14,7 @@ Built by [Controller.py](../hardware/mechanical/fusion/Controller/Controller.py)
 | Hardware | 3 × M3 heat-set inserts, 3 × M3 × 10 flat-head screws, 2 × M2 × 6 self-tapping screws (charger), 4 × stick-on foam pads 3/8 in (about 10 mm) across and 2 mm thick ([BOM](../hardware/BOM.md#box)) |
 | Check | Collision check of every part against the tray, the lid and each other, and the stays-inside check (nothing comes out through a wall or the floor): both clean |
 
-End A has the three RJ12 jacks. End B has the charger's USB-C and the solar opening.
+End A has the openings for up to three RJ12 jacks (one per port you use). End B has the charger's USB-C and the solar opening.
 
 ## Tight spots
 | Where | Room |
