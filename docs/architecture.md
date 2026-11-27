@@ -122,7 +122,9 @@ A reversed cord would put battery + on IN2, so the continuity check matters.
 ## Software
 - **Firmware** ([firmware/README.md](../firmware/README.md)): ESP-IDF and esp-matter. Soft start, slows near the
   target, stops on a stall, follows a blind turned by hand. Schedules run on the controller, so they work with the
-  phone away.
+  phone away. The Light trigger (a Schedule that starts when it gets dark or light) reads the solar panel's input,
+  which the controller already samples, once a minute around sunset or sunrise; the board cannot tell solar from USB by
+  voltage, so a panel counts as seen when the input was dark at night and lit by day within 3 days.
 - **App** ([app/README.md](../app/README.md)): SwiftUI, with a widget and Control Center buttons. No server. It sets up
   a new controller over Bluetooth and hands it the hub's Thread network (sealed, to the controller only), then talks to
   it through the hub over a secured channel with a key per phone (Owner and Guests); the hub cannot read it. Apple

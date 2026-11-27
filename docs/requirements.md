@@ -16,7 +16,7 @@ IDs are stable so issues, tests, and commits can reference them. **Must** = v1 r
 | F-7 | Should | Calibration stays valid with no re-homing (absolute sensor) | Drift < 2% after 500 cycles |
 | F-8 | Could | **Physical button** on the controller (pairing/reset) | — |
 | F-9 | Should | **Groups and scenes** (e.g. "living room blinds") | Through the ecosystem or the app |
-| F-10 | Should | **Schedules** (time, sunrise/sunset), stored on the device so they work without the cloud | — |
+| F-10 | Should | **Schedules** (time, sunrise/sunset, or the Light trigger: when it gets dark or light, read from the solar panel), stored on the device so they work without the cloud | — |
 | F-12 | Must | **Manual use**: the wand still tilts the blind by hand; the position updates at the next wake | Turn the wand; the app shows the new angle |
 
 ## Connectivity & integrations
