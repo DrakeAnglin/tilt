@@ -51,7 +51,12 @@ enum Secure {
         return URLSession(configuration: c)
     }()
 
-    static func http(_ host: String, _ path: String, body: Data? = nil) async throws -> (Int, Data) {
+    /// Carries one request to "http://<host><path>" (a POST when there is a body) and brings back (status, answer).
+    typealias Send = @Sendable (_ host: String, _ path: String, _ body: Data?) async throws -> (Int, Data)
+    /// The real way: `http` on this app's own session. Tests give Link, hello, recovery and pair a fake instead.
+    static let send: Send = { try await http($0, $1, body: $2) }
+
+    static func http(_ host: String, _ path: String, body: Data? = nil, session: URLSession = Secure.session) async throws -> (Int, Data) {
         guard let url = URL(string: "http://\(host)\(path)") else { throw TiltError("That address is not valid.") }
         var r = URLRequest(url: url)
         if let body { r.httpMethod = "POST"; r.httpBody = body; r.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type") }
@@ -59,25 +64,25 @@ enum Secure {
         return ((resp as? HTTPURLResponse)?.statusCode ?? 0, d)
     }
 
-    static func hello(_ host: String) async throws -> Hello {
-        let (st, d) = try await http(host, "/x/hello")
+    static func hello(_ host: String, via send: Send = Secure.send) async throws -> Hello {
+        let (st, d) = try await send(host, "/x/hello", nil)
         guard st == 200, let h = try? JSONDecoder().decode(Hello.self, from: d) else { throw TiltError("That is not a Tilt controller.") }
         return h
     }
 
     /// Make this phone's key on a controller. The first phone becomes an owner; later ones ask to join and wait.
     /// salt: the Tilt Hub's setup code (from its label) when connecting as its first owner; empty otherwise.
-    static func pair(host: String, phoneName: String, how: Joining, salt: Data = Data()) async throws -> Paired {
-        try await pair(phoneName: phoneName, salt: salt) { try await http(host, how.rawValue, body: $0) }
+    static func pair(host: String, phoneName: String, how: Joining, salt: Data = Data(), via send: Send = Secure.send) async throws -> Paired {
+        try await pair(phoneName: phoneName, salt: salt) { try await send(host, how.rawValue, $0) }
     }
     /// The three ways in: the first phone (of a Tilt Hub; a new controller's first phone pairs over Bluetooth), asking an
     /// owner, or proving you are at the window.
     enum Joining: String { case first = "/x/pair", ask = "/x/ask", recover = "/x/recover" }
     /// How far a recovery has got: steps done (0…3) and seconds left; nil when none is running. Throws when no answer
     /// came (through the hub one can be lost: see RecoveryPoll).
-    static func recovery(_ host: String) async throws -> (step: Int, left: Int)? {
+    static func recovery(_ host: String, via send: Send = Secure.send) async throws -> (step: Int, left: Int)? {
         struct R: Decodable { let on: Int, step: Int, left: Int }
-        let (st, d) = try await http(host, "/x/recstate")
+        let (st, d) = try await send(host, "/x/recstate", nil)
         guard st == 200, let r = try? JSONDecoder().decode(R.self, from: d) else { throw TiltError("No answer about the recovery.") }
         return r.on == 1 ? (r.step, r.left) : nil
     }
@@ -91,13 +96,19 @@ enum Secure {
         guard st == 200, let pub = (j["pub"] as? String).flatMap({ Data(base64Encoded: $0) }), let cid = (j["cid"] as? String).flatMap(Data.init(hex:)),
               let check = j["check"] as? String else { throw TiltError((j["err"] as? String) ?? "Pairing was refused.") }
         let shared = try priv.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: pub))
-        let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
-        // The check is made without the hub's setup code (so the answer to one pairing says nothing about the code);
-        // a wrong code shows up at the first command instead.
-        let checkKey = salt.isEmpty ? key : shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: Data(), sharedInfo: Data("blinds-v1".utf8) + cpub + pub, outputByteCount: 32)
+        let (key, checkKey) = pairingKey(shared: shared.withUnsafeBytes { Data($0) }, phone: cpub, controller: pub, salt: salt)
         let mine = Data(HMAC<SHA256>.authenticationCode(for: Data("confirm".utf8), using: checkKey)).prefix(8).hex
         guard mine == check else { throw TiltError("The controller's key did not match. Pairing was cancelled.") }
         return Paired(cid: cid, key: key, owner: (j["owner"] as? Int) == 1, waiting: (j["wait"] as? Int) == 1, topic: (j["topic"] as? String) ?? "", blindName: (j["blindName"] as? String) ?? "")
+    }
+    /// The Pairing key as sec.h makes it: HKDF-SHA256 of the key agreement's shared secret, salted with the Setup code
+    /// (empty when there is none), over "blinds-v1" + the phone's public key + the controller's. `check` is the key the
+    /// Pairing check is made with: always without the Setup code (so the answer to one Pairing says nothing about the
+    /// code); a wrong code shows up at the first command instead.
+    static func pairingKey(shared: Data, phone: Data, controller: Data, salt: Data) -> (key: SymmetricKey, check: SymmetricKey) {
+        let secret = SymmetricKey(data: shared), info = Data("blinds-v1".utf8) + phone + controller
+        let key = HKDF<SHA256>.deriveKey(inputKeyMaterial: secret, salt: salt, info: info, outputByteCount: 32)
+        return (key, salt.isEmpty ? key : HKDF<SHA256>.deriveKey(inputKeyMaterial: secret, salt: Data(), info: info, outputByteCount: 32))
     }
 }
 
@@ -147,8 +158,11 @@ actor Link: ControllerTransport {
     private(set) var host: String
     private var sealer: Sealer
     private var boot: Data?
+    private let send: Secure.Send
 
-    init(host: String, cid: Data, key: SymmetricKey) { self.host = host; sealer = Sealer(cid: cid, key: key) }
+    init(host: String, cid: Data, key: SymmetricKey, send: @escaping Secure.Send = Secure.send) {
+        self.host = host; sealer = Sealer(cid: cid, key: key); self.send = send
+    }
 
     /// The controller's address changed (found again on the network).
     func move(to newHost: String) { if newHost != host { host = newHost; boot = nil } }
@@ -156,10 +170,10 @@ actor Link: ControllerTransport {
     /// Send "/api/…?…" and return the controller's JSON answer.
     func call(_ command: String) async throws -> Data {
         for attempt in 0..<2 {
-            if boot == nil { boot = Data(hex: try await Secure.hello(host).boot) }
+            if boot == nil { boot = Data(hex: try await Secure.hello(host, via: send).boot) }
             guard let boot, boot.count == 4 else { throw TiltError("The controller gave a bad answer.") }
             let (packet, nonce) = try sealer.seal(command, boot: boot)
-            let (st, d) = try await Secure.http(host, "/x", body: packet)
+            let (st, d) = try await send(host, "/x", packet)
             if st == 200, d.count >= 28 { return try sealer.open(d, nonce: nonce) }
             if st == 409, attempt == 0 { self.boot = nil; continue }          // the controller restarted: get its new number
             if st == 401 || st == 410 { throw LinkProblem.notPaired }   // 410: the Tilt Hub does not know it (it was reset)
