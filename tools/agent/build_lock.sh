@@ -5,7 +5,10 @@
 # ESP-IDF builds take most of the CPU and a few GB of disk each; several at once filled the disk twice.
 # The lock is /tmp/tilt-idf-build.lock: its pid file names the process that holds it, and its owner file says
 # which checkout. The lock is stale only when that process is gone, never just because a build is long.
-# Before it builds, it warns when the disk has under 5 GB free.
+# Before it builds, with under 5 GB free, it runs clean_worktrees.sh (the one next to it, saying the build lock
+# is held) to clear finished worktrees and old build folders, then measures again. Still under 3 GB: it prints
+# what is free and how to see what holds the disk, and exits 75 without building (one build writes about 1 GB).
+# TILT_FREE_GB sets the free space for the tests.
 set -u
 [ $# -gt 0 ] || { echo "usage: build_lock.sh <command> [args...]" >&2; exit 2; }
 LOCK=${TILT_BUILD_LOCK:-/tmp/tilt-idf-build.lock}
@@ -24,6 +27,17 @@ echo "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)") pid $$" 
 # Remove the lock only while it is still ours. INT or TERM ends this script (and so the lock) after the build stops.
 trap '[ "$(cat "$LOCK/pid" 2>/dev/null)" = $$ ] && rm -rf "$LOCK"' EXIT
 trap 'exit 130' INT TERM
-FREE=$(df -k . | awk 'NR == 2 {print int($4 / 1048576)}')
-[ "$FREE" -ge 5 ] || echo "build_lock: only ${FREE} GB free. Worktrees of merged pull requests go with tools/agent/clean_worktrees.sh." >&2
+free_gb() { echo "${TILT_FREE_GB:-$(df -k . | awk 'NR == 2 {print int($4 / 1048576)}')}"; }
+FREE=$(free_gb)
+if [ "$FREE" -lt 5 ]; then
+  echo "build_lock: only ${FREE} GB free; clearing finished worktrees and old build folders first." >&2
+  TILT_BUILD_LOCK_HELD=1 "$(dirname "$0")/clean_worktrees.sh" >&2
+  FREE=$(free_gb)
+  if [ "$FREE" -lt 3 ]; then
+    echo "build_lock: only ${FREE} GB free, too little for a build (one writes about 1 GB). See what holds the disk:" >&2
+    echo "  tools/agent/clean_worktrees.sh --dry-run" >&2
+    echo "  du -sh .claude/worktrees/*/firmware/*/build" >&2
+    exit 75
+  fi
+fi
 "$@"
