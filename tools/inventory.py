@@ -13,6 +13,7 @@ Plan:
   --hub 0          the home already has its Tilt Hub (default 1)
   --solar N        N solar panels per controller (default 0: no solar)
   --no-crimper     pre-crimped JST-XH leads in place of the crimp pins
+  --hub-plug       buy a 5 V USB-C wall plug for the hub (default: use one from the house)
 Counts (repeat; KEY from `parts`):
   --have KEY=N       on hand now (In stock + Issued). N can be "kit" or "plenty": the builder's own kit covers it
   --on-order KEY=N   bought and on the way
@@ -48,7 +49,7 @@ class Part:
         self.amount = {}       # unit -> "about 40 cm" where the BOM gives a length, not a count
         self.mpn = ''
         self.cord = None       # '3.3', '6.6', '10' for the RJ12 cords
-        self.optional = None   # 'solar' or 'no-crimper'
+        self.optional = None   # 'solar', 'no-crimper' or 'hub-plug'
         self.shared = False    # listed under Buy once
 
     @property
@@ -229,10 +230,11 @@ def parse(bom_text, guide_text=''):
                 continue                                 # printed: made, not bought
             url = urls[0] if urls else None
             extra = cells[col['exact']] if 'exact' in col else ''
-            target = 'controller' if unit == 'optional' else unit
+            for_hub = unit == 'optional' and 'hub' in (sub or '')
+            target = ('hub' if for_hub else 'controller') if unit == 'optional' else unit
             part = add(target, cells[col['part']], url, sold, cells[per_col] if per_col is not None else '', extra)
             if unit == 'optional':
-                part.optional = 'solar'
+                part.optional = 'hub-plug' if for_hub else 'solar'
             m = re.search(r'(\d+(?:\.\d+)?) ft', clean(cells[col['part']]))
             if sub and 'cord' in sub and m:
                 part.cord = m.group(1)
@@ -270,9 +272,9 @@ def best_match(name, refs):
 
 
 class Plan:
-    def __init__(self, sets, hub=1, solar=0, crimper=True):
+    def __init__(self, sets, hub=1, solar=0, crimper=True, hub_plug=False):
         self.sets = sets                   # [(blinds, middle)]
-        self.hub, self.solar, self.crimper = hub, solar, crimper
+        self.hub, self.solar, self.crimper, self.hub_plug = hub, solar, crimper, hub_plug
         for blinds, _ in sets:
             if not 1 <= blinds <= 3:
                 raise ValueError(f'a set has 1 to 3 blinds, not {blinds}')
@@ -295,7 +297,7 @@ def needs(parts, plan):
     """{key: pieces the plan uses} for every part the plan uses; a kit or roll counts as 1."""
     units, cords, out = plan.units, plan.cords(), {}
     for part in parts.values():
-        if part.optional == 'solar' and not plan.solar or part.optional == 'no-crimper' and plan.crimper:
+        if part.optional and not chosen(part, plan):
             continue
         if not plan.crimper and 'crimp pin' in part.name.lower():
             continue
@@ -397,16 +399,21 @@ def plan_text(plan):
               f'| {u["tilter"]} | {u["controller"]} | {u["hub"]} | {u["tilter"]} of each | '
               f'{c["3.3"]} / {c["6.6"]} / {c["10"]} |', '',
               f'**Solar:** {"yes, " + str(plan.solar) + " panel(s) per controller" if plan.solar else "no"}. '
-              f'**JST crimper:** {"yes" if plan.crimper else "no (pre-crimped leads)"}.']
+              f'**JST crimper:** {"yes" if plan.crimper else "no (pre-crimped leads)"}. '
+              f'**Hub wall plug:** {"buy one" if plan.hub_plug else "from the house"}.']
     return '\n'.join(lines) + '\n'
+
+
+def chosen(part, plan):
+    """Whether the plan takes this optional part."""
+    return {'solar': bool(plan.solar), 'no-crimper': not plan.crimper, 'hub-plug': plan.hub_plug}[part.optional]
 
 
 def optional_text(parts, plan):
     out = ['| Part | Chosen | From |', '|---|---|---|']
     for p in parts.values():
         if p.optional:
-            chosen = bool(plan.solar) if p.optional == 'solar' else not plan.crimper
-            out.append(f'| {p.link()} | {"yes" if chosen else "no"} | {p.store} |')
+            out.append(f'| {p.link()} | {"yes" if chosen(p, plan) else "no"} | {p.store} |')
     return '\n'.join(out) + '\n'
 
 
@@ -443,6 +450,7 @@ def main(argv=None, parts=None):
     ap.add_argument('--hub', type=int, default=1)
     ap.add_argument('--solar', type=int, default=0)
     ap.add_argument('--no-crimper', action='store_true')
+    ap.add_argument('--hub-plug', action='store_true')
     ap.add_argument('--have', action='append')
     ap.add_argument('--on-order', action='append')
     ap.add_argument('--out')
@@ -455,7 +463,7 @@ def main(argv=None, parts=None):
         return 0
     try:
         sets = [(int(s.split(':')[0]), s.endswith(':middle')) for s in a.sets]
-        plan = Plan(sets, a.hub, a.solar, not a.no_crimper)
+        plan = Plan(sets, a.hub, a.solar, not a.no_crimper, a.hub_plug)
         rows = order(parts, plan, counts(a.have, parts), counts(a.on_order, parts, covered=False))
     except ValueError as e:
         print(f'inventory: {e}', file=sys.stderr)
