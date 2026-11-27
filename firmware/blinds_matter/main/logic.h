@@ -413,6 +413,8 @@ inline const char *permitRule(Who who, bool owner, const std::string &cidArg, co
 inline const char *permitQuery(Who who, bool owner, const std::string &query, const std::string &ownCid) {
   return permitRule(who, owner, queryValue(query, "cid"), ownCid);
 }
+// The role word the event log writes (people.h): the glossary's words, lowercase in running text.
+inline const char *roleWord(bool owner) { return owner ? "owner" : "guest"; }
 
 // ---- the owner's firmware update window (web.h hOtaOpen sets until; hub_link.h hubOtaBegin asks)
 // until: uptime in ms (64 bits, ardu.h uptimeMs) when the window shuts; 0 means never opened.

@@ -82,7 +82,7 @@ std::string hubStatusJson(int pct) {
   return j;
 }
 
-// ---- the commands (owner; /api/home also for a user, so a hub let in as a user can move the blinds)
+// ---- the commands (owner; /api/home also for a Guest, so a hub let in as a Guest can move the blinds)
 // Apple Home through the hub: the move a Matter command makes. lift = percent closed, hundredths.
 esp_err_t hHome(httpd_req_t *r) {
   Lock l;
@@ -123,7 +123,7 @@ static std::string backupBlob() {
   return b;
 }
 static uint32_t backupCrc() { std::string b = backupBlob(); return esp_crc32_le(0, (const uint8_t *)b.data(), b.size()); }
-esp_err_t hBackup(httpd_req_t *r) {              // the owner, or the hub (a user): read only
+esp_err_t hBackup(httpd_req_t *r) {              // the owner, or the hub (a Guest): read only
   Lock l;
   std::string b = backupBlob();
   return sendJson(r, "{\"ok\":1,\"cv\":" + std::to_string(esp_crc32_le(0, (const uint8_t *)b.data(), b.size())) + ",\"d\":\"" + hexOf((const uint8_t *)b.data(), b.size()) + "\"}");
