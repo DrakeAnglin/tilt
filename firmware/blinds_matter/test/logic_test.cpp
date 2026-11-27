@@ -1011,6 +1011,12 @@ int main() {
     if (rows != fixKeys) printf("  got: %s\n", rows.c_str());
     CHECK(keyJson("01", "Bj\xC3\xB6rn Anders Lin\xC3", 0, 0, 0, "") == "{\"cid\":\"01\",\"name\":\"Bj\xC3\xB6rn Anders Lin\",\"owner\":0,\"me\":0,\"wait\":0,\"code\":\"\"}",
           "a name cut inside a character (an old hub name) is written as valid UTF-8, the broken byte dropped");
+    // ---- a value from a command's query, decoded (the app sends names percent-encoded: Api.swift urlQuery)
+    CHECK(queryValue("cid=a1&name=O%E2%80%99Brien", "name") == "O\xE2\x80\x99" "Brien", "a curly apostrophe, percent-encoded, decoded");
+    CHECK(queryValue("name=John%20Smith", "name") == "John Smith" && queryValue("name=John+Smith", "name") == "John Smith", "%20 and + are a space");
+    CHECK(queryValue("name=%22Den%5CKid%22&cid=a1", "cid") == "a1" && queryValue("name=%22Den%5CKid%22", "name") == "\"Den\\Kid\"", "quotes and a backslash decoded; the right key");
+    CHECK(queryValue("xname=a&name=b", "name") == "b" && queryValue("name=a", "nam").empty() && queryValue("", "name").empty(), "only the whole key; missing: empty");
+    CHECK(queryValue("name=50%", "name") == "50%" && queryValue("name=%zz", "name") == "%zz", "a % without two hex digits is kept as it is");
     sq["mask"] = "1"; sq["t"] = "20";
     g = sceneOfArgs(sarg, 3);
     CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");

@@ -186,10 +186,7 @@ static std::string netJson() {
   return "{\"ok\":1,\"ds\":\"" + hexOf(tlv.mTlvs, tlv.mLength) + "\"}";
 }
 
-static std::string qv(const std::string &q, const char *key) {
-  char v[300] = "";
-  return httpd_query_key_value(q.c_str(), key, v, sizeof v) == ESP_OK ? std::string(v) : std::string();
-}
+static std::string qv(const std::string &q, const char *key) { return queryValue(q, key); }   // decoded, as a controller's arg() (wire.h)
 // One command from a phone that is in. Owner-only unless said otherwise.
 static std::string hubCommand(int slot, const std::string &cmd) {
   size_t qi = cmd.find('?');

@@ -197,7 +197,7 @@ struct ControllerSettingsView: View {
     private func rename(_ p: PhoneKey) {
         let n = NameRule.fit(newName.trimmingCharacters(in: .whitespaces), bytes: NameRule.phoneBytes)
         guard !n.isEmpty else { return }
-        if p.me == 1 { AppModel.myName = n }
+        if p.me == 1 { model.rename(to: n) }             // this iPhone: everywhere (every controller and the Tilt Hub)
         Task { do { try await controller.client.rename(cid: p.cid, to: n); await load() } catch { problem = error.localizedDescription } }
     }
     private func revoke(_ p: PhoneKey) {

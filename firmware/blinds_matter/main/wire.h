@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 
 // ---- small JSON helpers
@@ -33,6 +34,30 @@ inline std::string jn(float v, int dp) {
   return b;
 }
 inline int wireClamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+// ---- a command's query (the part after "?": a=b&c=d): the value of `key`, decoded ("+" and %20 a space, %XX a
+// byte), "" when it is missing. The app sends every name percent-encoded (Api.swift urlQuery). The controller's arg()
+// (api.h) and the Tilt Hub's qv() (hub_api.h) both read through it.
+inline std::string queryDecode(const std::string &v) {
+  auto hex = [](char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
+  std::string o;
+  for (size_t i = 0; i < v.size(); i++) {
+    if (v[i] == '+') o += ' ';
+    else if (v[i] == '%' && i + 2 < v.size() && hex(v[i + 1]) >= 0 && hex(v[i + 2]) >= 0) { o += (char)(hex(v[i + 1]) * 16 + hex(v[i + 2])); i += 2; }
+    else o += v[i];
+  }
+  return o;
+}
+inline std::string queryValue(const std::string &q, const char *key) {
+  size_t k = strlen(key);
+  for (size_t i = 0; i <= q.size();) {
+    size_t e = q.find('&', i);
+    if (e == std::string::npos) e = q.size();
+    if (e - i > k && !q.compare(i, k, key) && q[i + k] == '=') return queryDecode(q.substr(i + k + 1, e - i - k - 1));
+    i = e + 1;
+  }
+  return "";
+}
 
 // ---- what /api/cfg reports
 struct WireBlind { const char *name; int hid, speed, fav; };

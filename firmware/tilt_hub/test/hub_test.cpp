@@ -60,6 +60,13 @@ static void permitTests() {
 static std::string fakeCode(const uint8_t key[32]) { return std::string("c") + std::to_string(key[0]); }
 static void nameTests() {
   const char *mom = "Mom\xE2\x80\x99s \"caf\xC3\xA9\"";
+  // A rename as the app sends it (HubApi.rename: percent-encoded), read the way hubCommand reads it (wire.h queryValue).
+  { HubPeople p = fresh(); int a = addIn(p, 1, true);
+    for (auto c : {std::make_pair("name=O%E2%80%99Brien", "O\xE2\x80\x99" "Brien"), std::make_pair("name=John%20Smith", "John Smith"),
+                   std::make_pair("name=Mom%E2%80%99s%20%22caf%C3%A9%22", "Mom\xE2\x80\x99s \"caf\xC3\xA9\"")}) {
+      CHECK(!p.rename(a, queryValue(c.first, "name").c_str()) && !strcmp(p.keys[a].name, c.second), "a rename from the app's command is kept decoded");
+      if (strcmp(p.keys[a].name, c.second)) printf("  got: %s\n", p.keys[a].name);
+    } }
   { HubPeople p = fresh(); uint8_t id[8], key[32] = {0}; idOf(1, id);
     p.pairTake(0, false, true, id, key, mom);
     CHECK(!strcmp(p.keys[0].name, mom), "a name with a curly apostrophe, quotes and an accent is kept byte for byte");

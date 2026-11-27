@@ -13,16 +13,8 @@ bool restartSoon = false;                // restart once the answer has gone out
 void pokeBlinds();                       // app_main.cpp: wake the blinds task
 
 // ---- small helpers (ap, jq, jn: wire.h)
-std::string arg(httpd_req_t *r, const char *key) {       // a value from the address's ?a=b&c=d part, decoded
-  char v[300];
-  if (!secQuery || httpd_query_key_value(secQuery, key, v, sizeof v) != ESP_OK) return "";
-  std::string o;
-  for (char *p = v; *p; p++) {
-    if (*p == '+') o += ' ';
-    else if (*p == '%' && isxdigit((unsigned char)p[1]) && isxdigit((unsigned char)p[2])) { char h[3] = {p[1], p[2], 0}; o += (char)strtol(h, nullptr, 16); p += 2; }
-    else o += *p;
-  }
-  return o;
+std::string arg(httpd_req_t *r, const char *key) {       // a value from the address's ?a=b&c=d part, decoded (wire.h)
+  return secQuery ? queryValue(secQuery, key) : std::string();
 }
 int argi(httpd_req_t *r, const char *key) { return atoi(arg(r, key).c_str()); }
 esp_err_t sendJson(httpd_req_t *r, const std::string &j) {
