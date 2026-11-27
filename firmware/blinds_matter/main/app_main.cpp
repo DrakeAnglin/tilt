@@ -199,6 +199,11 @@ extern "C" void app_main()
     node::config_t node_config;
     node_t *node = node::create(&node_config, attr_cb, ident_cb);
     ABORT_APP_ON_FAILURE(node != nullptr, ESP_LOGE(TAG, "no node"));
+    // The controller's own Matter endpoints are made here, once, at a start: a later change of the Home layout (hksep),
+    // or of a blind's hidden when there is one covering per blind, adds or removes endpoints only at the next start.
+    // (With one covering for all, hidden takes effect at once: report() uses only movable blinds.) Nobody sees these
+    // endpoints on a Tilt Hub: the hub makes Apple Home's tiles from this controller's status (sep and h in
+    // hubStatusJson, hub_link.h) and remakes them at once.
     for (int i = 0; i < PORTS; i++) {
         pend[i] = -1; lastLift[i] = -1; lastOp[i] = -1;
         if (hkSeparate ? cfg.b[i].hidden : i > 0) continue;       // one covering for all, or one per blind that is shown

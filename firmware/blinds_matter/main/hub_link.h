@@ -129,7 +129,10 @@ esp_err_t hBackup(httpd_req_t *r) {              // the owner, or the hub (a Gue
   return sendJson(r, "{\"ok\":1,\"cv\":" + std::to_string(esp_crc32_le(0, (const uint8_t *)b.data(), b.size())) + ",\"d\":\"" + hexOf((const uint8_t *)b.data(), b.size()) + "\"}");
 }
 // Owner: put a backup back, in pieces (o = offset in bytes, d = hex, end=1 on the last). Settings and the time zone
-// take effect at once; only the Home layout (hksep) waits for the next start.
+// take effect at once, and on a Tilt Hub so do Apple Home's tiles (the hub remakes them from the status). Only the
+// controller's own Matter endpoints are added or removed only at the next start, for the Home layout (hksep) and,
+// with one covering per blind, each blind's hidden (app_main.cpp). This does not restart; the app does, after a
+// restore at setup.
 esp_err_t hRestore(httpd_req_t *r) {
   Lock l;
   static std::string in;
