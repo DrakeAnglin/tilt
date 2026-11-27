@@ -178,8 +178,8 @@ inline PowerSource powerSourceOf(bool powered, bool clockOk, uint32_t now, uint3
 // A zone a controller takes: at least 3 characters, and it fits the field.
 inline bool zoneOk(const char *tz, size_t cap) { size_t n = strlen(tz); return n >= 3 && n < cap; }
 // ---- a settings backup (hub_link.h hRestore): "TB1", three uint16 sizes, then Settings, Tune, SchedExtra and 4 bytes.
-// The parts as this firmware has them. Each part that has a magic holds it in its first 4 bytes.
-struct BackupLayout { size_t settings, tune, sched; uint32_t settingsMagic, schedMagic; size_t tzAt, tzCap; };
+// The parts as this firmware has them. Settings and SchedExtra hold a 4-byte magic first, Tune a 2-byte one.
+struct BackupLayout { size_t settings, tune, sched; uint32_t settingsMagic, schedMagic; size_t tzAt, tzCap; uint16_t tuneMagic; };
 // Why this backup is refused, or nullptr when it may be taken. It only reads the blob: a refused backup changes nothing.
 inline const char *backupRefusal(const uint8_t *b, size_t n, const BackupLayout &l) {
   if (n < 9 || memcmp(b, "TB1", 3)) return "not a Tilt backup";
@@ -193,6 +193,9 @@ inline const char *backupRefusal(const uint8_t *b, size_t n, const BackupLayout 
   uint32_t m;
   memcpy(&m, s, 4);
   if (m != l.settingsMagic) return "not a Tilt backup";
+  uint16_t tm;
+  memcpy(&tm, s + l.settings, 2);
+  if (tm != l.tuneMagic) return "not a Tilt backup";
   memcpy(&m, x, 4);
   if (m != l.schedMagic) return "not a Tilt backup";
   return nullptr;

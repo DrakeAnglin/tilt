@@ -142,7 +142,8 @@ esp_err_t hRestore(httpd_req_t *r) {
   in += piece;
   if (arg(r, "end") != "1") return ok(r);
   static_assert(offsetof(Settings, magic) == 0 && offsetof(SchedExtra, magic) == 0, "backupRefusal reads each magic first");
-  const BackupLayout lay = {sizeof cfg, sizeof tune, sizeof sx, CFG_MAGIC, SX_MAGIC, offsetof(Settings, tz), sizeof cfg.tz};
+  static_assert(offsetof(Tune, magic) == 0 && sizeof(Tune::magic) == 2, "backupRefusal reads the tune magic first, 16-bit");
+  const BackupLayout lay = {sizeof cfg, sizeof tune, sizeof sx, CFG_MAGIC, SX_MAGIC, offsetof(Settings, tz), sizeof cfg.tz, TUNE_MAGIC};
   if (const char *why = backupRefusal((const uint8_t *)in.data(), in.size(), lay)) { in.clear(); return fail(r, why); }
   // Nothing above this line writes: a refused backup changes nothing.
   const char *p = in.data() + 9;
