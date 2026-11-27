@@ -82,7 +82,7 @@ Fusion scripts run through the FusionBridge add-in: `python3 hardware/mechanical
 | Tilt app | at least 16% |
 | controller firmware | at least 31% |
 | Tilt Hub firmware | at least 10% |
-| tools | at least 72% |
+| tools | at least 76% |
 
 Every pull request covers at least 90% of the lines it changes in our own code, and no area may drop under its floor (`tools/coverage-floors.txt`). The live numbers: the `coverage` job of the [latest CI run on main](https://github.com/DrakeAnglin/tilt/actions/workflows/ci.yml?query=branch%3Amain). The rule: [docs/agents/workflow.md](docs/agents/workflow.md#coverage).
 <!-- coverage:end -->
