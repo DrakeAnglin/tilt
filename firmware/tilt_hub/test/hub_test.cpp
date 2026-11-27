@@ -47,13 +47,25 @@ static int owners(const HubPeople &p) { int n = 0; for (auto &k : p.keys) if (k.
 
 static void permitTests() {
   CHECK(!hubPermit("/api/net", HUB_OWNER) && !hubPermit("/api/resetpeople", HUB_OWNER), "owner: anything");
-  for (const char *ok : {"/api/info", "/api/keys", "/api/leave"}) CHECK(!hubPermit(ok, HUB_USER), "user: see the hub and its people, leave");
+  for (const char *ok : {"/api/info", "/api/keys", "/api/leave"}) CHECK(!hubPermit(ok, HUB_GUEST), "Guest: see the hub and its people, leave");
   for (const char *no : {"/api/approve", "/api/revoke", "/api/makeowner", "/api/resetpeople", "/api/net", "/api/hubupdate", "/api/upload", "/api/homecode", "/api/backup", "/nope"})
-    CHECK(same(hubPermit(no, HUB_USER), "only the hub's owner can do that"), "user: not the owner's commands");
+    CHECK(same(hubPermit(no, HUB_GUEST), "only the hub's owner can do that"), "Guest: not the owner's commands");
   CHECK(!hubPermit("/api/leave", HUB_WAITING), "waiting: may leave");
   for (const char *no : {"/api/info", "/api/keys", "/api/net", "/api/leave?x=1"}) CHECK(same(hubPermit(no, HUB_WAITING), "waiting"), "waiting: nothing but leave");
-  CHECK(!hubPermit("/api/keyname", HUB_OWNER) && !hubPermit("/api/keyname", HUB_USER), "owner and Guest: may rename their own phone");
+  CHECK(!hubPermit("/api/keyname", HUB_OWNER) && !hubPermit("/api/keyname", HUB_GUEST), "owner and Guest: may rename their own phone");
   CHECK(same(hubPermit("/api/keyname", HUB_WAITING), "waiting"), "waiting: may not rename");
+  CHECK(HUB_WAITING == 0 && HUB_GUEST == 1 && HUB_OWNER == 2, "roles keep their order: waiting, Guest, owner");
+  // The hub's people rules say Guest, never "user" (CONTEXT.md). A substring check, so HUB_USER is caught too;
+  // "Matter user" (someone using Apple Home or Alexa) is a glossary term and is let through.
+  for (const char *path : {"../main/hub_people.h", "../main/hub_pair.h", "../main/hub_api.h", "../main/hub_care.h"}) {
+    std::ifstream f(path);
+    std::stringstream b; b << f.rdbuf();
+    std::string s = b.str();
+    for (char &c : s) c = (char)tolower((unsigned char)c);
+    for (size_t at; (at = s.find("matter user")) != std::string::npos;) s.erase(at, 11);
+    CHECK(!s.empty() && s.find("user") == std::string::npos, "the hub's people rules never say \"user\": a Guest");
+    if (s.empty() || s.find("user") != std::string::npos) printf("  in %s\n", path);
+  }
 }
 
 // ---- phone names: kept as typed (wire.h keptName), 19 bytes at most
@@ -189,7 +201,7 @@ static void peopleOpTests() {
     PeopleResult r = p.apply(PO_LEAVE, o);
     CHECK(same(r.err, "you are the hub's only owner: make someone else an owner first, or reset its people") && p.keys[o].used, "the only owner can't leave others behind");
     int w = addAsked(p, 3); (void)w;
-    CHECK(!p.apply(PO_LEAVE, u).err && !p.keys[u].used, "a user may leave");
+    CHECK(!p.apply(PO_LEAVE, u).err && !p.keys[u].used, "a Guest may leave");
     CHECK(p.apply(PO_LEAVE, o).err, "a waiting phone counts as someone left behind");
     idOf(3, id); p.apply(PO_DENY, o, id);
     saves = 0;
@@ -220,7 +232,7 @@ static void peopleOpTests() {
     CHECK(!r.err && !strcmp(r.name, "asker") && p.role(a) == HUB_OWNER && p.last[a] == 0, "approve as an owner");
     fakeNow += 20000;
     int b = addAsked(p, 4); idOf(4, id);
-    CHECK(!p.apply(PO_APPROVE, o, id, false).err && p.role(b) == HUB_USER, "approve as a user");
+    CHECK(!p.apply(PO_APPROVE, o, id, false).err && p.role(b) == HUB_GUEST, "approve as a Guest");
     fakeNow += 20000;
     int c = addAsked(p, 5); idOf(5, id);
     CHECK(!p.apply(PO_DENY, o, id).err && !p.keys[c].used, "deny: the place goes"); }

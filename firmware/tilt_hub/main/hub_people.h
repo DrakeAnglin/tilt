@@ -20,7 +20,7 @@ struct HubKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20
 enum HubKeyUse : uint8_t { HK_FREE = 0, HK_IN = 1, HK_ASKED = 2, HK_CLAIM = 3 };
 
 // Who the caller is, for hubPermit.
-enum HubRole { HUB_WAITING, HUB_USER, HUB_OWNER };
+enum HubRole { HUB_WAITING, HUB_GUEST, HUB_OWNER };
 // What a phone may ask the hub. nullptr: allowed. Otherwise the reason it is refused. A phone that waits for an owner
 // may only leave (the whole command, as it came); one that is in may see the hub and its people, rename itself and
 // leave; an owner may do anything.
@@ -51,7 +51,7 @@ struct HubPeople {
   void saved() { if (save) save(*this); }
   bool owned() const { for (auto &k : keys) if (k.used == HK_IN && k.role == 1) return true; return false; }
   int find(const uint8_t id[8]) const { int s = -1; for (int i = 0; i < HUB_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, id, 8)) s = i; return s; }
-  HubRole role(int slot) const { return keys[slot].used != HK_IN ? HUB_WAITING : keys[slot].role == 1 ? HUB_OWNER : HUB_USER; }
+  HubRole role(int slot) const { return keys[slot].used != HK_IN ? HUB_WAITING : keys[slot].role == 1 ? HUB_OWNER : HUB_GUEST; }
 
   // A phone asks to pair (ask false: the first phone, it becomes the owner) or to join (ask true: it waits for an
   // owner). Before the key exchange: 0 if it may go on (first: no owner yet), else the HTTP status and why not.

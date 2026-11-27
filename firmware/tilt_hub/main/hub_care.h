@@ -26,7 +26,7 @@ static uint32_t backupCv(const char *id) {
   BackupMeta m; size_t n = sizeof m;
   return nvs_get_blob(nv, key, &m, &n) == ESP_OK ? m.cv : 0;
 }
-static void takeBackup(int c) {                  // with the hub's own key (a user may read the backup)
+static void takeBackup(int c) {                  // with the hub's own key (a Guest may read the backup)
   std::string r = ctrlCommand(c, "/api/backup");
   cJSON *j = r.empty() ? nullptr : cJSON_Parse(r.c_str());
   const char *d = j ? cJSON_GetStringValue(cJSON_GetObjectItem(j, "d")) : nullptr;
