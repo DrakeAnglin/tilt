@@ -65,6 +65,9 @@ trim() {
   if [ -n "$DRY" ]; then echo "would trim $NAME: build folders"; return; fi
   build_lock || return 0
   rm -rf "$WT"/firmware/*/build && echo "trimmed $NAME: build folders"
+  # Give the build lock back right away, so a build does not wait on the GitHub calls for the next worktrees.
+  [ -n "$OURS" ] && [ "$(cat "$BLOCK/pid" 2>/dev/null)" = $$ ] && rm -rf "$BLOCK" && { OURS=""; BUILD=""; }
+  return 0
 }
 
 # Sets PR to "<number> <state> <head>" (empty when there is none). Fails when GitHub cannot be asked.
@@ -75,7 +78,9 @@ find_pr() {
   fi
   [ -n "$PR" ] && return 0
   PR=$(gh pr list --state all --search "$HEAD" --json number,state,headRefOid --jq '.[] | "\(.number) \(.state) \(.headRefOid)"' </dev/null 2>/dev/null) || return 1
-  PR=$(printf '%s\n' "$PR" | awk -v h="$HEAD" '$3 == h {print; exit}')
+  # Several with this head (closed and opened again, or a second base): an open one wins, so the worktree stays.
+  PR=$(printf '%s\n' "$PR" | awk -v h="$HEAD" '$3 == h { if ($2 == "OPEN") { print; found = 1; exit } if (first == "") first = $0 }
+    END { if (!found && first != "") print first }')
 }
 
 git -C "$ROOT" worktree prune

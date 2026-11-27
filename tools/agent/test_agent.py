@@ -315,6 +315,22 @@ class CleanWorktreesTest(unittest.TestCase):
         out = self.run_clean()
         self.assertEqual(self.left(), ['moved'], out)
 
+    def test_an_open_pull_request_with_the_same_head_wins(self):
+        path, head = self.add('twice', 'worktree-twice')
+        self.pr('CLOSED', head, by_commit=head)
+        self.pr('OPEN', head, by_commit=head)
+        out = self.run_clean()
+        self.assertEqual(self.left(), ['twice'], out)
+        self.assertIn('worktree-twice', self.branches())
+
+    def test_a_session_lock_with_no_pid_keeps_the_worktree(self):
+        path, head = self.add('nopid', 'b-nopid')
+        self.pr('MERGED', head, branch='b-nopid')
+        self.git('worktree', 'lock', '--reason', 'claude session t', path)
+        out = self.run_clean()
+        self.assertEqual(self.left(), ['nopid'], out)
+        self.assertIn('keep   nopid: a session is in it', out)
+
     def test_a_session_lock_whose_pid_is_gone_is_taken_off(self):
         path, head = self.add('stale', 'b-stale')
         self.pr('MERGED', head, branch='b-stale')
@@ -591,6 +607,28 @@ class BuildLockTest(unittest.TestCase):
             self.assertIn('2 GB free', r.stderr)
             self.assertIn('clean_worktrees.sh --dry-run', r.stderr)
             self.assertIn('du -sh .claude/worktrees/*/firmware/*/build', r.stderr)
+
+    def test_a_low_disk_runs_the_cleanup_under_the_lock_before_the_build(self):
+        import subprocess, tempfile, shutil
+        here = os.path.dirname(os.path.abspath(__file__))
+        with tempfile.TemporaryDirectory() as tmp:
+            # A copy of build_lock.sh next to a fake clean_worktrees.sh that says how it was run.
+            shutil.copy(os.path.join(here, 'build_lock.sh'), tmp)
+            seen = os.path.join(tmp, 'seen')
+            with open(os.path.join(tmp, 'clean_worktrees.sh'), 'w') as f:
+                f.write('#!/bin/sh\n[ -d "$TILT_BUILD_LOCK" ] && echo "held=$TILT_BUILD_LOCK_HELD" > "%s"\n' % seen)
+            os.chmod(os.path.join(tmp, 'clean_worktrees.sh'), 0o755)
+            lock = os.path.join(tmp, 'lock')
+            env = dict(os.environ, TILT_BUILD_LOCK=lock)
+            env.pop('TILT_BUILD_LOCK_HELD', None)
+            build = ['sh', '-c', 'cat "%s"' % seen]
+            r = subprocess.run([os.path.join(tmp, 'build_lock.sh'), *build], cwd=tmp, env=dict(env, TILT_FREE_GB='4'), capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(r.stdout.strip(), 'held=1')
+            os.remove(seen)
+            r = subprocess.run([os.path.join(tmp, 'build_lock.sh'), 'true'], cwd=tmp, env=dict(env, TILT_FREE_GB='10'), capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertFalse(os.path.exists(seen))  # enough disk: no cleanup
 
     def test_takes_a_lock_whose_holder_is_gone_but_not_a_live_one(self):
         import subprocess, tempfile
