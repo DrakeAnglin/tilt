@@ -19,9 +19,9 @@ The first part of this page is what a builder needs. [For developers](#for-devel
 
 - **New controllers are found by themselves.** A controller nobody owns says "Tilt new" over Bluetooth for its first
   15 minutes; the hub scans for it (a few seconds every half minute, 10 % duty) and the app shows "New controller
-  found". Setup offers Tilt Hub or Wi-Fi; with the hub the app hands over the hub's Thread network (from one of your
-  controllers on it, or from the hub while a new controller is nearby), lets the hub in, and the blinds appear in
-  Apple Home by themselves.
+  found". The hub's Owner picks it and chooses Start fresh or Restore a backup; the app gets the hub's Thread network
+  from the hub, gives it to the controller over Bluetooth, lets the hub in, and the blinds appear in Apple Home by
+  themselves. Someone who is not the hub's Owner is told to connect to the hub first, or to ask its Owner.
 - **Firmware updates through the hub.** The app uploads the signed file to `/c/<id>/api/update`; the hub keeps it in
   its `fwstage` partition and feeds it over Thread (the controller keeps its radio on meanwhile). Thread carries about
   4 KB a second, so a whole file (1.6 MB) takes about 7 minutes. Usually it is a **patch** instead: only what changed

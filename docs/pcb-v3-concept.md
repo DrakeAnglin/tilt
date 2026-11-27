@@ -4,7 +4,7 @@ A design note for the next PCB, on hold. Not needed to build the current version
 
 > **On hold.** Nothing here is ordered. Two things changed since this was written: the v2 build now uses the
 > **Adafruit 6092** charger instead of the MCP73871 module ([PCB build, step 11](pcb-build.md#step-11-the-charger-the-battery-and-solar)),
-> and the controller runs **Matter over Wi-Fi**, not Thread. Solar gets a DC jack
+> and the controller is now **Thread-only**, through a Tilt Hub ([ADR 0003](adr/0003-thread-only-tilt-hub.md)). Solar gets a DC jack
 > ([#8](https://github.com/DrakeAnglin/tilt/issues/8)); the battery life is measured first
 > ([#6](https://github.com/DrakeAnglin/tilt/issues/6)). The must-test list below still stands. "V5" below means
 > the current controller box.
@@ -99,10 +99,10 @@ can both stay connected with the cell, and neither can push current back into th
 | LiFePO4 18650 | ~5 Wh | yes | safest in heat, but 3.2 V makes the N20s weaker (already torque-limited): no |
 | AA NiMH ×2–3 | 2.4–3.6 V | — | too low a voltage for the motors: no |
 
-What decides the capacity is the ESP. On Wi-Fi in power save it is estimated at a few mA (not measured yet:
-[#6](https://github.com/DrakeAnglin/tilt/issues/6)), so a 2800 mAh cell runs weeks on its own; as a Thread sleepy
-device it would be roughly 1–2 mA, months. The motors are a
-rounding error. The window's heat matters more than capacity: the NTC stops charging above ~45 °C, and the case should
+What decides the capacity is the ESP. Asleep on Thread, with the regulator and charger standby, it is estimated at
+about 7–15 mAh a day ([power budget](architecture.md#power-budget-estimates-not-measured); not measured yet:
+[#6](https://github.com/DrakeAnglin/tilt/issues/6)), so one cell runs months on its own (on Wi-Fi it was weeks). The
+motors are a rounding error. The window's heat matters more than capacity: the NTC stops charging above ~45 °C, and the case should
 stay out of direct sun.
 
 ## Size: to be redone
@@ -139,13 +139,13 @@ Found on the first v2 board (2026-11-07). **v3 is not ordered until each of thes
    limit isn't the cause. Most likely: the module's solar input-voltage control (VPCC) backs off when USB arrives at only
    about 4.7 V after D1 and the harness.
    - **Fix to test:** a 1N5819 from TP4 (PWR) to TP2 (5V), band toward TP2, so the ESP runs straight from USB/solar and
-     only falls back to the battery through D3. Check TP3 stays at 3.3 V with Wi-Fi running, on USB and on battery.
+     only falls back to the battery through D3. Check TP3 stays at 3.3 V with the radio transmitting, on USB and on battery.
    - **Check with solar:** the ESP's 5V pin would then see up to the zener clamp (about 6.2 V) minus 0.3 V. Confirm
      that's within the ESP regulator's limit, or pick a lower clamp.
    - **For v3:** build this diode path into the board, or pick a charger module whose LOAD output doesn't drop on a
      5 V input.
 2. **The ESP on a low battery.** D3 drops about 0.3 V, so below about 3.8 V on the cell the ESP's 3V3 sags below
-   3.3 V. Measure the lowest cell voltage where Wi-Fi still runs without resets. v3 may need a lower-drop path, such as
+   3.3 V. Measure the lowest cell voltage where the radio still runs without resets. v3 may need a lower-drop path, such as
    an ideal-diode module.
 3. **Charging from USB is only a trickle.** With the cell at 3.45 V, a USB power meter read 0.05 A (it should be
    about 0.35 A: PROG resistor 282 = 2.8 kΩ). SEL/PROG2 high, THERM 10 kΩ, both fine. A wire across D1 (5.02 V at

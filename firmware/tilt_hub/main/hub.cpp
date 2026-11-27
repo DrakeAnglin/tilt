@@ -8,8 +8,8 @@
 //   controllers -- UDP over Thread ---> hub: the hub's own Thread network; the hub leads it, the controllers are its
 //                                       sleepy children. Protocol: blinds_matter/main/hub_link.h.
 //
-// The hub moves blinds with its own key, like a phone: it asks to join each controller ("Tilt Hub"), and the owner
-// The owner's Tilt app lets it in by itself (as a guest) and tells the controller which key is the hub's.
+// The hub moves blinds with its own key, like a phone: it asks to join each controller ("Tilt Hub"), and the owner's
+// Tilt app lets it in by itself (as a Guest) and tells the controller which key is the hub's.
 #include <string>
 #include <vector>
 #include <esp_err.h>

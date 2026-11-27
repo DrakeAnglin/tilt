@@ -151,14 +151,30 @@ class BambuPacking(unittest.TestCase):
 
 class BambuProject(unittest.TestCase):
     """tools/bambu_project.py: a bulk project, a one-part-per-plate project, per-part brims and supports."""
-    EVERY = sorted([c for n in orient.PARTS for c in orient.copies(n)] + list(bambu_project.BOX))
-    PLATES = bambu_project.BULK + bambu_project.SINGLE
+    EVERY = sorted(c for n in orient.PARTS for c in orient.copies(n))
+    PLATES = bambu_project.BULK + bambu_project.SINGLE + bambu_project.CONTROLLER
 
     def test_every_part_has_its_own_plate(self):
         printed = [n for _, rows in bambu_project.SINGLE for r in rows for n in r]
         self.assertEqual(sorted(printed), self.EVERY)
 
-    def test_bulk_prints_one_tilter_and_the_box_one_material_per_plate(self):
+    def test_every_project_has_studio_project_info(self):
+        self.assertEqual(set(bambu_project.PROFILE), set(bambu_project.PROJECTS))
+        for name in bambu_project.PROJECTS:
+            info = bambu_project.project_info(name)
+            for key in ('Title', 'Designer', 'Description', 'ProfileTitle', 'ProfileDescription'):
+                self.assertTrue(info[key], (name, key))
+        model = bambu_project.set_metadata('<metadata name="Title"></metadata>\n <resources>', {'Title': 'a & b',
+                                                                                                  'Designer': 'x'})
+        self.assertIn('<metadata name="Title">a &amp;amp; b</metadata>', model)
+        self.assertIn('<metadata name="Designer">x</metadata>', model)
+
+    def test_controller_box_is_its_own_project(self):
+        self.assertEqual(sorted(n for _, rows in bambu_project.CONTROLLER[:1] for r in rows for n in r),
+                         sorted(bambu_project.BOX))
+        self.assertEqual([rows for _, rows in bambu_project.CONTROLLER[1:]], [[[n]] for n in bambu_project.BOX])
+
+    def test_bulk_prints_one_tilter_one_material_per_plate(self):
         sets = [n for _, rows in bambu_project.BULK for r in rows for n in r]
         self.assertEqual(sorted(sets), self.EVERY)
         for title, rows in bambu_project.BULK:
