@@ -113,12 +113,13 @@ References match the [PCB build guide](../docs/pcb-build.md).
 | JST-XH header, 2-pin, vertical | **B2B-XH-A(LF)(SN)** | 1 (J4, battery) | each |
 | JST-XH header, 6-pin, vertical | **B6B-XH-A(LF)(SN)** | 1 (J5, charger) | each |
 | JST-XH 6-pin housing | **XHP-6** | 1 | each |
-| Pre-crimped JST-XH leads, 6", crimp both ends (cut in half = 2 leads) | **ASXHSXH22K152** | 2 (4 half leads: 2 splice, GND, PWR) | each |
+| JST-XH crimp pins, for 22 AWG wire | JST **SXH-001T-P0.6** | 4 (J5 plug: 2 splice, GND, PWR) | bag |
+| Optional, only with no JST crimper: pre-crimped JST-XH leads, 6", crimp both ends (cut in half = 2 leads), in place of the crimp pins and wire | **ASXHSXH22K152** | 2 (4 half leads) | each |
 | JST-ZH header, 2-pin, vertical (solar, optional) | **B2B-ZR(LF)(SN)** | 1 (J8) | each |
 | Female header socket, 10-way | Sullins **PPTC101LFBN-RC** | 2 (J1, J2: ESP) | each |
 | Resistors, 1/4 W metal film | 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | kit ([B072BL2VX1](https://www.amazon.com/dp/B072BL2VX1)) |
 | Ceramic capacitors (the kit also covers each tilter's 10 µF) | 100 nF ×5, 10 µF ×1 | 6 | kit ([B0C1V8Q93P](https://www.amazon.com/dp/B0C1V8Q93P)) |
-| 22 AWG stranded wire | about 5 cm (charger BAT lead) | | the red roll ([Buy once](#buy-once)) |
+| 22 AWG stranded wire | about 30 cm (the J5 harness; 5 cm with the pre-crimped leads) | | the red and black rolls ([Buy once](#buy-once)) |
 
 J3 (a 6-way socket for a separate USB-C board) is not used: USB plugs into the 6092's own USB-C.
 
@@ -164,7 +165,7 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 | M3 countersunk screw kit, 4–20 mm | M3 × 20, M3 × 16 and M3 × 8 (5 per tilter, plus 2 reusable M3 × 16), M3 × 10 (3 per box) | kit | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
 | M1.6 × 4 socket screws | 2 per tilter | kit | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) |
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm per tilter | kit | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) |
-| 22 AWG stranded wire, red and black | about 12 cm per tilter, 5 cm per controller | small roll each | search "22 AWG silicone wire red black" |
+| 22 AWG stranded wire, red and black | about 12 cm per tilter, 30 cm per controller | small roll each | search "22 AWG silicone wire red black" |
 | 2-conductor 22 AWG (motor leads; any color, the build used red and black) | about 8 cm per tilter | roll (30 ft) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
 | Heat-shrink kit | a few pieces per tilter and controller | kit | [B01MFA3OFA](https://www.amazon.com/dp/B01MFA3OFA) |
 | PTFE grease, Super Lube 21030 | a little per tilter | tube | [B000XBH9HI](https://www.amazon.com/dp/B000XBH9HI) |
@@ -172,8 +173,9 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 | White PLA and white PETG filament | the tilters, the boxes and the hub box | spool each | |
 
 ## Tools
-Soldering iron (also presses the heat-set inserts), multimeter with beep mode, flush cutters, a USB-C cable to flash
-the ESP. Only for a cord through a wall: a drill and a 5/8 in bit.
+Soldering iron (also presses the heat-set inserts), multimeter with beep mode, flush cutters, wire strippers, a
+crimper for JST-XH pins (an open-barrel crimper, such as an Engineer PA-09 or IWISS SN-28B), a USB-C cable to flash
+the ESP. No crimper? Use the optional pre-crimped XH leads for the J5 plug. Only for a cord through a wall: a drill and a 5/8 in bit.
 Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC)) for charge and motor current.
 
 ## Check on arrival

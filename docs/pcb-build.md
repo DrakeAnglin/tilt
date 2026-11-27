@@ -42,7 +42,7 @@ the box floor.
 | 0.75A PTC | 3 | F1, F2, F3 | 9 |
 | ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |
 | Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |
-| Extra pre-crimped JST lead for the J5 battery splice (slot 4) + heat-shrink | 1 | J5 plug | 11 |
+| JST-XH crimp pins on 22 AWG wire (or the optional pre-crimped leads) for the J5 harness, + heat-shrink | 4 | J5 plug | 11 |
 | 18650 cell with its JST-XH plug | 1 | J4 | 12 |
 | Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |
 
@@ -242,15 +242,17 @@ only 0.05–0.15 A instead of 0.35 A, even off the PCB, and starved the ESP on U
 
 | Lead | Wire | Cut | From → to |
 |---|---|---|---|
-| Splice leg A | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 2 → the splice |
-| Splice leg B | 22 AWG, pre-crimped JST lead | about 30 mm | J5 slot 4 → the splice |
+| Splice leg A | 22 AWG, XH crimp pin on the plug end | about 30 mm | J5 slot 2 → the splice |
+| Splice leg B | 22 AWG, XH crimp pin on the plug end | about 30 mm | J5 slot 4 → the splice |
 | Charger BATT | 22 AWG | about 50 mm | the splice → **BAT** pad |
-| Charger GND | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 1 → **G** pad |
-| Charger PWR | 22 AWG, pre-crimped JST lead | 76 mm | J5 pin 6 → **VIN** pad (solar in; USB shows here too) |
+| Charger GND | 22 AWG, XH crimp pin on the plug end | 76 mm | J5 pin 1 → **G** pad |
+| Charger PWR | 22 AWG, XH crimp pin on the plug end | 76 mm | J5 pin 6 → **VIN** pad (solar in; USB shows here too) |
 | Battery | the cell's own JST-XH lead (needs ≥ 45 mm) | as is | cell → J4 |
 | Solar (optional) | the panel's flat 2-core cable | to suit | through end wall B → JST-ZH plug in J8 |
 
-The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the crimp end goes in the J5 housing.
+Cut the four plug wires, strip about 2 mm on one end and crimp a JST-XH pin (SXH-001T-P0.6) on it with an XH
+crimper. Tug each pin hard: it must not slide off. **No crimper?** Use the optional pre-crimped leads (152 mm, a
+crimp on both ends) instead: cut each one to the length above, keeping a crimp end for the J5 housing.
 
 ### 11a: The battery splice in the J5 plug (slots 2 and 4)
 
@@ -259,7 +261,7 @@ The pre-crimped JST leads are 152 mm with a crimp on both ends: cut them so the 
 Nothing changes on the PCB. On the board, J5 pin 2 is the battery and pin 4 is the board supply; putting the battery
 wire in **both** slots joins them, so the battery feeds the board directly.
 
-1. Two pre-crimped leads, cut to about **30 mm**: their crimp ends go in **slot 2** and **slot 4**.
+1. The two splice legs, about **30 mm** each, with their crimp pins in **slot 2** and **slot 4**.
 2. Strip the two bare ends and the wire to the 6092's **BAT** pad, twist all three together, solder, and slide
    heat-shrink over the joint.
 3. If your J5 plug still has the old LOAD wire in slot 4, pull it out first (lift the plastic tab over its crimp with a
