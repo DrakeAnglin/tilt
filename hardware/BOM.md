@@ -66,7 +66,7 @@ If a faster motor overshoots (the log shows "turn-backs"), raise the stop-early 
 | Part | Per tilter | Sold as | Link |
 |---|---|---|---|
 | M3 × 25 flat-head screw | 1 (sensor, through the lid and the AS5600) | pack of 50 | [B0DKY4B3VG](https://www.amazon.com/dp/B0DKY4B3VG) |
-| M3 × 20 flat-head screw | 4 (2 case, 2 tray; one tray bolt is the cluster gear's axle) | in the M3 kit ([Buy once](#buy-once)) | |
+| M3 × 20 flat-head screw | 4 (2 case, 2 tray; one tray bolt is the cluster gear's axle). The case bolts can be M3 × 25 instead | in the M3 kit ([Buy once](#buy-once)) | |
 | M3 × 16 flat-head screw | 2, optional and reusable: hold the motor shell on while the sensor module is not ready ([step C5](../docs/tilter-assembly.md#c5-hold-it-together)) | in the M3 kit ([Buy once](#buy-once)) | |
 | M3 × 8 flat-head screw | 1 (lid corner) | in the M3 kit ([Buy once](#buy-once)) | |
 | M3 heat-set insert, M3 × 5.7 × 4.6 (Ø4.0 hole) | 6 | pack of 100 (the boxes use them too) | [B0DQL4ZSCP](https://www.amazon.com/dp/B0DQL4ZSCP) |
