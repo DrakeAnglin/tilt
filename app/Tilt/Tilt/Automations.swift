@@ -153,47 +153,8 @@ struct ScenesRow: View {
     }
 }
 
-@MainActor @Observable
-final class AutomationStore {
-    var schedules: [Schedule] = []
-    var sun: (rise: Date, set: Date)?
-    var hasPlace = false
-    var loading = false
-    /// Per controller: what it reported as "panel" (1 a solar panel seen, 0 none). A controller missing from it runs
-    /// firmware without the Light trigger (or did not answer).
-    var panels: [String: Int] = [:]
-    private var slots: [String: [SchedSlot]] = [:]          // per controller, as last read
-    private var limits: [String: ControllerLimits] = [:]    // per controller, as it reported them
-
-    private func limits(_ id: String) -> ControllerLimits { limits[id] ?? .fallback }
-    /// Every Port of these controllers (a new Schedule starts with all of them).
-    func everyBlind(_ controllers: [Controller]) -> Set<BlindTarget> { Schedule.everyPort(controllers.map { ($0.id, limits($0.id).ports) }) }
-
-    func load(_ controllers: [Controller]) async {
-        loading = true; defer { loading = false }
-        slots = [:]; panels = [:]
-        for c in controllers {
-            guard let cfg = try? await c.client.schedules() else { continue }
-            slots[c.id] = cfg.sched
-            limits[c.id] = cfg.limits
-            panels[c.id] = cfg.panel
-            if let s = cfg.sun, s.count == 2, s[0] > 0 { sun = (Date(timeIntervalSince1970: s[0]), Date(timeIntervalSince1970: s[1])); hasPlace = true; Sky.remember(rise: sun!.rise, set: sun!.set) }
-        }
-        schedules = SchedulePlan.schedules(controllers.compactMap { c in slots[c.id].map { (c.id, $0) } })
-    }
-
-    /// Write a Schedule to every controller it covers, and clear it from the ones it no longer covers.
-    func save(_ s: Schedule, delete: Bool = false, controllers: [Controller]) async throws {
-        let name = { (id: String) in controllers.first { $0.id == id }?.state?.name ?? "A controller" }
-        let writes: [SlotWrite]
-        do { writes = try SchedulePlan.writes(s, delete: delete, slots: slots, ports: limits.mapValues(\.ports), panels: panels) }
-        catch .full(let c) { throw TiltError("\(name(c)) already has \(limits(c).slots) schedules.") }
-        catch .notRead(let c) { throw TiltError("\(name(c)) did not answer. Try again when it is reachable.") }
-        catch .noLight(let c) { throw TiltError("\(name(c)) needs a firmware update before it can run a Schedule that follows the light.") }
-        for w in writes { try await controllers.first { $0.id == w.controller }?.client.setSchedule(slot: w.slot, w.value) }
-        await load(controllers)
-    }
-}
+// AutomationStore, ScheduleNote and ScheduleForm live in Shared/ScheduleStore.swift.
+extension Controller: ScheduleHolder { var scheduleName: String { state?.name ?? record.name } }
 
 struct AutomationsTab: View {
     @Environment(AppModel.self) private var model
@@ -226,6 +187,7 @@ struct AutomationsTab: View {
                                     }
                                     Text("\(s.actionText) · \(s.daysText) · \(blindNames(s))").font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                                     ForEach(lastRunLines(s), id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                                    ForEach(store.notes(s), id: \.self) { n in Text(n.text).font(.caption).foregroundStyle(n.warn ? Palette.warning : Color.secondary) }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())      // the whole row opens it, not just the words
                             }
@@ -236,10 +198,10 @@ struct AutomationsTab: View {
                     if owner { Button("New Schedule", systemImage: "plus") { editing = Schedule(targets: store.everyBlind(model.controllers)) } }
                 } header: { Text("Schedules") } footer: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Schedules are kept on the controllers, so they run even when this phone is away. The play button runs one right now.")
+                        Text(TiltWords.homeAutomations)
                         if let sun = store.sun { Text("Today: sunrise \(sun.rise.formatted(date: .omitted, time: .shortened)), sunset \(sun.set.formatted(date: .omitted, time: .shortened)).") }
                         if !owner { Text("Only an owner can add or change schedules.") }
-                        if owner { Button(store.hasPlace ? "Update Location for Sunrise and Sunset" : "Set Location for Sunrise and Sunset") { setPlace() }.font(.footnote) }
+                        if owner { Button(store.placeButton) { setPlace() }.font(.footnote) }
                     }
                 }
                 if let problem { Section { Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(Palette.warning) } }
@@ -310,8 +272,8 @@ struct ScheduleEditor: View {
     let done: (Schedule, Bool) -> Void
     @State private var custom = false
     @State private var all = true
-    /// The light triggers are offered when a controller this Schedule covers has seen a solar panel (SchedulePlan).
-    private var offersLight: Bool { SchedulePlan.offersLight(kind: schedule.kind, targets: all ? everyBlind : schedule.targets, panels: panels) }
+    /// What can be picked and saved (Shared/ScheduleStore.swift).
+    private var form: ScheduleForm { ScheduleForm(schedule: schedule, isNew: isNew, all: all, everyBlind: everyBlind, panels: panels) }
 
     var body: some View {
         NavigationStack {
@@ -319,8 +281,7 @@ struct ScheduleEditor: View {
             Group {
                 Section {
                     Picker("Starts", selection: $schedule.kind) {
-                        Text("At a time").tag(0); Text("At sunrise").tag(1); Text("At sunset").tag(2)
-                        if offersLight { Text("When it gets light").tag(3); Text("When it gets dark").tag(4) }
+                        ForEach(form.kinds, id: \.self) { Text(TiltWords.kindName($0)).tag($0) }
                     }
                     if schedule.kind == 0 {
                         DatePicker("Time", selection: Binding(get: { Calendar.current.date(bySettingHour: schedule.minute / 60, minute: schedule.minute % 60, second: 0, of: .now) ?? .now },
@@ -339,7 +300,7 @@ struct ScheduleEditor: View {
                                 .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
                         }
                     }
-                } header: { Text("When") } footer: { if schedule.isLight { Text(TiltWords.lightTrigger(schedule.kind)) } }
+                } header: { Text("When") } footer: { if let f = form.footer { Text(f) } }
                 Section("Do this") {
                     Picker("Tilt", selection: Binding(get: { custom ? 1 : schedule.tilt }, set: { if $0 == 1 { custom = true; schedule.tilt = 50 } else { custom = false; schedule.tilt = $0 } })) {
                         Text("Open").tag(0); Text("Close up").tag(100); Text("Close down").tag(-100); Text("Other").tag(1)
@@ -378,7 +339,7 @@ struct ScheduleEditor: View {
             .navigationTitle(isNew ? "New Schedule" : "Schedule").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { var s = schedule; if all { s.targets = everyBlind }; done(s, false); dismiss() }.disabled(schedule.days == 0 || (!all && schedule.targets.isEmpty)) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { var s = schedule; if all { s.targets = everyBlind }; done(s, false); dismiss() }.disabled(!form.canSave) }
             }
             .onAppear {
                 custom = ![0, 100, -100].contains(schedule.tilt)

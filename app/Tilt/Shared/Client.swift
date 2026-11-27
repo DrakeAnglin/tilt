@@ -46,6 +46,8 @@ struct SchedConfig: Decodable {
     var panel: Int?
     var limits: ControllerLimits { .reported(ports: ports, slots: slots) }
     var panelSeen: Bool { panel == 1 }
+    /// The controller has no location: it sends today's sunrise as 0. (Firmware that sends no "sun" is not judged.)
+    var placeMissing: Bool { sun.map { ($0.first ?? 0) <= 0 } ?? false }
 }
 struct PhoneKey: Decodable, Identifiable, Equatable { let cid: String; let name: String; let owner: Int; let me: Int; let wait: Int?; let code: String?; var id: String { cid } }
 /// {"ok":1} or {"ok":0,"err":"…"}, sometimes with more.
