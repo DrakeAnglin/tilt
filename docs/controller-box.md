@@ -11,7 +11,7 @@ Built by [Controller.py](../hardware/mechanical/fusion/Controller/Controller.py)
 |---|---|
 | Size | **157.4 × 51.8 × 23.0 mm**. Both long sides have 45° bevels, top and bottom. Nothing on the sides: the box is narrower than the rail and the rod in its groove keeps it in place, so the same box fits rails of other widths |
 | Prints | `hardware/mechanical/stl/controller/controller_tray.stl` and `controller_lid.stl`. Both files already lie the way they print (tray floor down, lid top face down): drop them on the plate as they are. White PLA, no supports |
-| Hardware | 3 × M3 heat-set inserts, 3 × M3 × 10 flat-head screws, 2 × M2 × 6 self-tapping screws (charger), 4 × stick-on foam pads about 10 mm across and 2 mm thick ([BOM](../hardware/BOM.md#box)) |
+| Hardware | 3 × M3 heat-set inserts, 3 × M3 × 10 flat-head screws, 2 × M2 × 6 self-tapping screws (charger), 4 × stick-on foam pads 3/8 in (about 10 mm) across and 2 mm thick ([BOM](../hardware/BOM.md#box)) |
 | Check | Collision check of every part against the tray, the lid and each other, and the stays-inside check (nothing comes out through a wall or the floor): both clean |
 
 End A has the three RJ12 jacks. End B has the charger's USB-C and the solar opening.
