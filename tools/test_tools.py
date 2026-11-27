@@ -1040,6 +1040,11 @@ class CoverageGate(unittest.TestCase):
             lcov('/elsewhere/b.h', {1: 1}) + lcov('tools/c.py', {3: 0})
         self.assertEqual(self.G.parse_lcov(text, root), {'tools/a.py': {1: 2, 2: 1}, 'tools/c.py': {3: 0}})
 
+    def test_paths_from_another_checkout_land_on_this_repo(self):
+        # The app's coverage is made on a Mac runner (/Users/runner/...) and read on Linux (/home/runner/...).
+        text = lcov('/Users/runner/work/tilt/tilt/tools/coverage_gate.py', {1: 1}) + lcov('/Users/runner/work/x/nothere.py', {1: 1})
+        self.assertEqual(self.G.parse_lcov(text), {'tools/coverage_gate.py': {1: 1}})
+
     def test_exclusion_lines_need_a_reason_and_a_file(self):
         files = ['tools/fusion_a.py', 'tools/fusion_b.py', 'tools/bambu.py']
         excluded, errors = self.G.parse_exclusions('# the list\nfusion_*.py  # runs only inside Fusion\n', 'tools/coverage-exclude.txt', files)

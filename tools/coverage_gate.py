@@ -72,6 +72,18 @@ def parse_exclusions(text, list_path, files):
     return excluded, errors
 
 
+def from_elsewhere(path, root):
+    """A path from another checkout of this repo (the app's coverage is made on a Mac runner and read on Linux): the
+    shortest tail that names a file here, from a folder of ours (app, firmware, tools), or None."""
+    parts = path.strip('/').split('/')
+    for i in range(len(parts) - 1, 0, -1):
+        if parts[i] in ('app', 'firmware', 'tools'):
+            tail = '/'.join(parts[i:])
+            if os.path.isfile(os.path.join(root, tail)):
+                return tail
+    return None
+
+
 def parse_lcov(text, root=ROOT):
     """-> {repo path: {line: hits}}. Records of the same file (one per test program) add up."""
     real = os.path.realpath(root)
@@ -81,7 +93,7 @@ def parse_lcov(text, root=ROOT):
             p = line[3:].strip()
             if os.path.isabs(p):
                 p = os.path.realpath(p)
-                p = os.path.relpath(p, real) if p.startswith(real + os.sep) else None
+                p = os.path.relpath(p, real) if p.startswith(real + os.sep) else from_elsewhere(p, real)
             path = p.replace(os.sep, '/') if p else None
         elif line.startswith('DA:') and path:
             n, hits = line[3:].split(',')[:2]
