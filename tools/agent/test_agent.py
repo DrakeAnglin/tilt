@@ -186,7 +186,11 @@ class ShellSyntaxTest(unittest.TestCase):
     def test_agent_scripts_parse(self):
         import glob, subprocess
         here = os.path.dirname(os.path.abspath(__file__))
-        for script in sorted(glob.glob(os.path.join(here, '*.sh'))):
+        tools = os.path.dirname(here)
+        scripts = glob.glob(os.path.join(here, '*.sh')) + [os.path.join(tools, 'coverage.sh')] + \
+            glob.glob(os.path.join(tools, 'coverage-bin', '*'))
+        self.assertGreaterEqual(len([s for s in scripts if 'coverage' in s]), 3)
+        for script in sorted(scripts):
             r = subprocess.run(['sh', '-n', script], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, script + ': ' + r.stderr)
 
@@ -435,7 +439,8 @@ else: sys.exit("unexpected gh " + " ".join(a))
 class MergeScriptTest(unittest.TestCase):
     """tools/agent/merge_pr.sh --check with a fake gh: whether the two agents agree decides, not which files."""
 
-    def run_check(self, review, files=('tools/agent/merge_pr.sh', 'docs/agents/review-policy.md'), labels=(), env_extra=None, rounds=0):
+    def run_check(self, review, files=('tools/agent/merge_pr.sh', 'docs/agents/review-policy.md'), labels=(), env_extra=None, rounds=0,
+                  checks=(('ci', 'pass'), ('coverage', 'pass'))):
         import subprocess, tempfile, json
         here = os.path.dirname(os.path.abspath(__file__))
         sha = 'a' * 40
@@ -446,7 +451,7 @@ class MergeScriptTest(unittest.TestCase):
               'labels': [{'name': n} for n in labels], 'comments': earlier + [
                   me('<!-- factory-review sha=%s door=two-way blast=small %s -->' % (sha, review)),
                   me('<!-- factory-gate sha=%s verdict=merge -->' % sha)]}
-        data = {'pr': pr, 'checks': [{'name': 'ci', 'bucket': 'pass'}],
+        data = {'pr': pr, 'checks': [{'name': n, 'bucket': b} for n, b in checks],
                 'files': [{'filename': f, 'additions': 1, 'deletions': 1, 'status': 'modified', 'patch': ''} for f in files]}
         with tempfile.TemporaryDirectory() as tmp:
             fake = os.path.join(tmp, 'gh')
@@ -498,6 +503,26 @@ class MergeScriptTest(unittest.TestCase):
     def test_looks_after_a_merge_from_main_do_not_count(self):
         code, out = self.run_check('must-fix=0 stuck=0', rounds=12)
         self.assertEqual(code, 0, out)
+
+    def test_a_failed_coverage_check_is_not_yet(self):
+        code, out = self.run_check('must-fix=0 stuck=0', checks=(('ci', 'pass'), ('coverage', 'fail')))
+        self.assertEqual(code, 1, out)
+        self.assertIn('not yet', out)
+        self.assertIn('coverage comment', out)
+        self.assertNotIn('A human decides', out)
+
+    def test_no_coverage_check_is_not_yet(self):
+        code, out = self.run_check('must-fix=0 stuck=0', checks=(('ci', 'pass'),))
+        self.assertEqual(code, 1, out)
+        self.assertIn('not yet', out)
+        self.assertIn('coverage', out)
+        self.assertNotIn('A human decides', out)
+
+    def test_a_running_coverage_check_is_not_yet(self):
+        code, out = self.run_check('must-fix=0 stuck=0', checks=(('ci', 'pass'), ('coverage', 'pending')))
+        self.assertEqual(code, 1, out)
+        self.assertIn('not yet', out)
+        self.assertNotIn('A human decides', out)
 
 
 FAKE_GH_LABEL = r'''#!/usr/bin/env python3

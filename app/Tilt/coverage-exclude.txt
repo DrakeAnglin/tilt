@@ -1,0 +1,2 @@
+# Tilt app files the coverage gate leaves out: one per line, `<path from this folder>  # <why>`.
+# Empty for now: #151 decides which views are pure layout. The rule: docs/agents/workflow.md, "Coverage".

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Stand-in for c++ while tools/coverage.sh runs the firmware tests: the same build with clang's source-based coverage
+# on, and a copy of each test program for llvm-cov (tools/firmware_tests.sh deletes its own when it ends).
+OUT=""; PREV=""
+for A in "$@"; do [ "$PREV" = -o ] && OUT=$A; PREV=$A; done
+clang++ "$@" -fprofile-instr-generate -fcoverage-mapping -O0 || exit $?
+case "$OUT" in
+  ""|*.o) ;;
+  *) [ -f "$OUT" ] && cp "$OUT" "$TILT_COVERAGE_OUT/bin/$(basename "$OUT")" ;;
+esac
+exit 0

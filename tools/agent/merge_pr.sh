@@ -92,13 +92,22 @@ for F in $(printf '%s\n' "$FILES" | grep -E '^tools/(firmware_tests|app_tests)\.
     sticky "How the tests run changed, not only which tests run. Confirm: no test was dropped or weakened. Files: $F"
 done
 
-# CI: the 'ci' check must have passed, and nothing may be failing or still running.
+# CI: the 'ci' and 'coverage' checks must have passed, and nothing may be failing or still running.
+# The coverage check is the test evidence (docs/agents/workflow.md, "Coverage"): failed, running or missing is
+# "not yet" for the author to fix (add tests, or merge from main to get the check), never a reason for a person.
 CHECKS=$(gh pr checks "$PR" --json name,bucket 2>/dev/null) || true
 printf '%s' "$CHECKS" | jq -e 'type == "array"' >/dev/null 2>&1 || CHECKS='[]'
-if [ "$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length')" != 0 ]; then
+COV=$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.name == "coverage") | .bucket] | first // "missing"')
+case "$COV" in
+  pass) ;;
+  fail|cancel) wait_for "the coverage check failed, not yet: read the coverage comment on the pull request, add the tests it asks for, push" ;;
+  missing) wait_for "no coverage check, not yet: merge from main to get one (the coverage comment then says what it found)" ;;
+  *) wait_for "the coverage check is still running, not yet (the coverage comment shows the result)" ;;
+esac
+if [ "$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.name != "coverage") | select(.bucket == "fail" or .bucket == "cancel")] | length')" != 0 ]; then
   wait_for "CI is red: fix it"
 elif [ "$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.name == "ci" and .bucket == "pass")] | length')" = 0 ] ||
-     [ "$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.bucket != "pass" and .bucket != "skipping")] | length')" != 0 ]; then
+     [ "$(printf '%s' "$CHECKS" | jq -r '[.[] | select(.name != "coverage" and .bucket != "pass" and .bucket != "skipping")] | length')" != 0 ]; then
   wait_for "CI has not finished"
 fi
 

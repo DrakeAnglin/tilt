@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(HERE, '../hardware/pcb'))
 import bambu  # noqa: E402
 import bambu_project  # noqa: E402
 import check_docs  # noqa: E402
+import coverage_gate  # noqa: E402
 import firmware_size  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
@@ -945,6 +946,280 @@ class DeviceIdentity(unittest.TestCase):
             self.assertTrue(self.di.pin_valid(ok), ok)
         for bad in (0, 99999999, 33333333, 11111111, 12345678, 87654321, 100000000):
             self.assertFalse(self.di.pin_valid(bad), bad)
+
+
+def lcov(path, hits):
+    """A made-up LCOV record: hits = {line: count}."""
+    return 'SF:%s\n%s\nend_of_record\n' % (path, '\n'.join('DA:%d,%d' % (n, h) for n, h in sorted(hits.items())))
+
+
+def added(path, start, count):
+    """A made-up `git diff -U0` that adds `count` lines at `start`."""
+    return 'diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n@@ -0,0 +%d,%d @@\n' % (path, path, path, path, start, count)
+
+
+FAKE_GH_COMMENTS = r'''#!/usr/bin/env python3
+import json, os, sys
+state = os.environ["FAKE_GH_STATE"]
+d = json.load(open(state))
+a = sys.argv[1:]
+d["calls"].append({"args": a, "stdin": sys.stdin.read() if "--input" in a else ""})
+json.dump(d, open(state, "w"))
+if "--paginate" in a:
+    half = len(d["comments"]) // 2
+    print(json.dumps(d["comments"][:half]) + json.dumps(d["comments"][half:]))
+'''
+
+
+class CoverageGate(unittest.TestCase):
+    """tools/coverage_gate.py: the 90% changed-lines gate, the floors, the exclusion lists, the comment."""
+    G = coverage_gate
+    F = 'tools/thing.py'
+
+    def run_gate(self, covered, total=10, changed=None, floor=0):
+        src = {self.F: 'x = 1\n' * total}
+        cov = self.G.parse_lcov(lcov(self.F, {n: (1 if n <= covered else 0) for n in range(1, total + 1)}))
+        return self.G.measure('tools', src, cov, self.G.diff_lines(changed if changed is not None else added(self.F, 1, total)),
+                              floor=floor)
+
+    def test_nine_of_ten_changed_lines_pass(self):
+        r = self.run_gate(9)
+        self.assertTrue(r['ok'], r)
+        self.assertEqual((r['changed_covered'], r['changed_total']), (9, 10))
+        self.assertEqual(r['uncovered'], ['tools/thing.py:10'])
+
+    def test_eight_of_ten_fail_and_list_the_lines(self):
+        r = self.run_gate(8)
+        self.assertFalse(r['ok'])
+        self.assertEqual(r['uncovered'], ['tools/thing.py:9', 'tools/thing.py:10'])
+        self.assertIn('under the 90% gate', ' '.join(r['notes']))
+
+    def test_a_file_no_test_compiles_fails_on_its_code_lines(self):
+        path = 'firmware/blinds_matter/main/new.h'
+        text = '// a comment\n#pragma once\n\nint f() {\n  /* a\n     block */\n  return 1; // why\n}\n'
+        r = self.G.measure('controller', {path: text}, {}, self.G.diff_lines(added(path, 1, 8)))
+        self.assertFalse(r['ok'])
+        self.assertEqual(r['uncovered'], ['%s:%d' % (path, n) for n in (2, 4, 7, 8)])
+        self.assertEqual((r['covered'], r['total']), (0, 4))
+
+    def test_code_lines_of_python_and_swift(self):
+        self.assertEqual(self.G.code_lines('a.py', '# c\n\nx = 1\n  # d\n'), {3})
+        self.assertEqual(self.G.code_lines('a.swift', '/* one */ let a = 1\n/* two */\nlet b = 2 /* x */\n'), {1, 3})
+
+    def test_only_docs_tests_or_an_excluded_file_pass_with_no_changed_lines(self):
+        src = {self.F: 'x = 1\n' * 4, 'tools/fusion_x.py': 'import adsk\n'}
+        cov = self.G.parse_lcov(lcov(self.F, {1: 1, 2: 1, 3: 1, 4: 1}))
+        diff = added('README.md', 1, 3) + added('tools/test_tools.py', 5, 2) + added('tools/fusion_x.py', 1, 1)
+        r = self.G.measure('tools', src, cov, self.G.diff_lines(diff), excluded={'tools/fusion_x.py'})
+        self.assertTrue(r['ok'], r)
+        self.assertIsNone(r['changed'])
+        self.assertIn('no changed lines', r['notes'])
+
+    def test_the_floor(self):
+        src = {self.F: 'x = 1\n' * 1000}
+        cov = self.G.parse_lcov(lcov(self.F, {n: (1 if n <= 614 else 0) for n in range(1, 1001)}))
+        r = self.G.measure('tools', src, cov, None, floor=61)
+        self.assertTrue(r['ok'], r)
+        self.assertAlmostEqual(r['overall'], 61.4)
+        r = self.G.measure('tools', src, cov, None, floor=62)
+        self.assertFalse(r['ok'])
+        self.assertIn('under the floor of 62% by 0.6 points', ' '.join(r['notes']))
+        r = self.G.measure('tools', src, cov, None, floor=59)
+        self.assertIn('floor can go up to 61', ' '.join(r['notes']))
+
+    def test_a_tracked_file_missing_from_the_lcov_counts_as_uncovered(self):
+        src = {self.F: 'x = 1\n' * 4, 'tools/other.py': 'a = 1\nb = 2\n# no\n\nc = 3\nd = 4\n'}
+        cov = self.G.parse_lcov(lcov(self.F, {1: 1, 2: 1, 3: 1, 4: 1}))
+        r = self.G.measure('tools', src, cov)
+        self.assertEqual((r['covered'], r['total']), (4, 8))
+        self.assertAlmostEqual(r['overall'], 50.0)
+
+    def test_records_of_one_file_add_up_and_paths_become_repo_paths(self):
+        root = os.path.realpath(tempfile.mkdtemp())
+        text = lcov(os.path.join(root, 'tools/a.py'), {1: 0, 2: 1}) + lcov(os.path.join(root, 'tools/a.py'), {1: 2}) + \
+            lcov('/elsewhere/b.h', {1: 1}) + lcov('tools/c.py', {3: 0})
+        self.assertEqual(self.G.parse_lcov(text, root), {'tools/a.py': {1: 2, 2: 1}, 'tools/c.py': {3: 0}})
+
+    def test_exclusion_lines_need_a_reason_and_a_file(self):
+        files = ['tools/fusion_a.py', 'tools/fusion_b.py', 'tools/bambu.py']
+        excluded, errors = self.G.parse_exclusions('# the list\nfusion_*.py  # runs only inside Fusion\n', 'tools/coverage-exclude.txt', files)
+        self.assertEqual((excluded, errors), ({'tools/fusion_a.py', 'tools/fusion_b.py'}, []))
+        _, errors = self.G.parse_exclusions('bambu.py\n', 'tools/coverage-exclude.txt', files)
+        self.assertIn('no reason', errors[0])
+        _, errors = self.G.parse_exclusions('gone.py  # was here\n', 'tools/coverage-exclude.txt', files)
+        self.assertIn('matches no file', errors[0])
+        r = self.G.measure('tools', {'tools/bambu.py': 'x = 1\n'}, {}, errors=errors)
+        self.assertFalse(r['ok'])
+
+    def test_an_excluded_file_is_left_out_of_both_numbers(self):
+        src = {self.F: 'x = 1\n' * 2, 'tools/fusion_a.py': 'a = 1\n' * 50}
+        cov = self.G.parse_lcov(lcov(self.F, {1: 1, 2: 1}))
+        r = self.G.measure('tools', src, cov, self.G.diff_lines(added('tools/fusion_a.py', 1, 50)), excluded={'tools/fusion_a.py'})
+        self.assertEqual((r['covered'], r['total'], r['changed_total']), (2, 2, 0))
+        self.assertTrue(r['ok'])
+
+    def test_every_exclusion_list_in_the_repo_holds(self):
+        for area in self.G.AREAS:
+            sources, excluded, errors = self.G.area_inputs(area)
+            self.assertEqual(errors, [], area)
+            self.assertTrue(excluded <= set(sources), area)
+
+    def test_the_areas_do_not_overlap_and_hold_no_test_file(self):
+        files = self.G.repo_files()
+        for f in files:
+            hits = [a for a, (_, pattern, _) in self.G.AREAS.items() if __import__('re').fullmatch(pattern, f)]
+            self.assertLessEqual(len(hits), 1, f)
+            if hits:
+                self.assertFalse(os.path.basename(f).startswith('test_') or '/Tests/' in f or '/test/' in f, f)
+        for area in self.G.AREAS:
+            self.assertTrue(any(self.G.area_of(f) == area for f in files), area)
+        self.assertIsNone(self.G.area_of('app/Tilt/Tests/main.swift'))
+        self.assertIsNone(self.G.area_of('tools/agent/test_agent.py'))
+        self.assertEqual(self.G.area_of('tools/agent/claim.py'), 'tools')
+
+    def test_no_inline_skip_markers_in_our_code(self):
+        markers = ('pragma: ' + 'no cover', 'LCOV_' + 'EXCL', 'GCOV_' + 'EXCL')
+        for f in self.G.repo_files():
+            if self.G.area_of(f):
+                text = self.G.read(f)
+                for m in markers:
+                    self.assertNotIn(m, text, f)
+
+    def test_unused_inline_and_static_functions_are_uncovered(self):
+        # The reason for clang's coverage: gcov style counts a function no test calls as "no code".
+        import shutil, subprocess
+        llvm_cov = shutil.which('llvm-cov') or (subprocess.run(['xcrun', '-f', 'llvm-cov'], capture_output=True).returncode == 0
+                                                if shutil.which('xcrun') else None) or __import__('glob').glob('/usr/bin/llvm-cov-*')
+        if not shutil.which('clang++') or not llvm_cov:
+            self.skipTest('needs clang++ and llvm-cov (CI has both)')
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = os.path.realpath(tmp)
+            with open(os.path.join(tmp, 'fx.h'), 'w') as f:
+                f.write('#pragma once\ninline int used(int x) {\n  return x + 1;\n}\ninline int unusedInline(int x) {\n'
+                        '  return x * 2;\n}\nstatic int unusedStatic(int x) {\n  return x - 3;\n}\n')
+            with open(os.path.join(tmp, 'fx_test.cpp'), 'w') as f:
+                f.write('#include <cstdio>\n#include "fx.h"\nint main() { std::printf("%d passed, 0 failed\\n", used(0)); }\n')
+            script = os.path.join(tmp, 'tests.sh')
+            with open(script, 'w') as f:
+                f.write('#!/bin/sh\nset -e\ncd "%s"\nOUT=$(mktemp -d)\nc++ -std=c++17 -o "$OUT/fx_test" fx_test.cpp\n'
+                        '"$OUT/fx_test"\nrm -rf "$OUT"\n' % tmp)
+            os.chmod(script, 0o755)
+            out = os.path.join(tmp, 'out')
+            r = subprocess.run([os.path.join(HERE, 'coverage.sh'), 'firmware', out], capture_output=True, text=True,
+                               env=dict(os.environ, TILT_COVERAGE_TESTS=script))
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            with open(os.path.join(out, 'firmware.lcov')) as f:
+                cov = self.G.parse_lcov(f.read(), tmp)['fx.h']
+            with open(os.path.join(out, 'firmware.log')) as f:
+                self.assertEqual(self.G.test_counts(f.read()), (1, 0))
+        self.assertGreater(cov[3], 0)
+        self.assertEqual(cov.get(6), 0, cov)
+        self.assertEqual(cov.get(9), 0, cov)
+
+    def test_test_counts(self):
+        self.assertEqual(self.G.test_counts('12 passed, 0 failed\nota: 12 passed, 0 failed\niPhone: 3 passed, 1 failed\n'), (27, 1))
+        log = '....\n------\nRan 40 tests in 1.2s\n\nFAILED (failures=2, errors=1)\nRan 1 test in 0.1s\n\nOK\n'
+        self.assertEqual(self.G.test_counts(log), (38, 3))
+
+    def results(self):
+        r = self.run_gate(8)
+        r['overall'] = 80.0
+        return {'tools': r, 'controller': self.G.measure('controller', {}, {}, None)}
+
+    def test_the_comment(self):
+        body = self.G.render(self.results(), {'app': 'no app files changed'}, 'abc123', 'https://run/1',
+                             {'tools': dict(self.results()['tools'], overall=78.5)})
+        self.assertTrue(body.startswith(self.G.MARKER))
+        rows = [line for line in body.splitlines() if line.startswith('| ') and not line.startswith('| Area')]
+        self.assertEqual([row.split(' | ')[0][2:] for row in rows], ['Tilt app', 'controller firmware', 'Tilt Hub firmware', 'tools'])
+        self.assertIn('did not run: no app files changed', rows[0])
+        self.assertIn('not gated (main)', rows[1])
+        self.assertIn('**fail**: no result', rows[2])
+        self.assertIn('+1.5 points', rows[3])
+        self.assertIn('80.0% (8 of 10)', rows[3])
+        self.assertIn('`tools/thing.py:9`', body)
+        self.assertIn('abc123', body.splitlines()[-1])
+        self.assertIn('https://run/1', body.splitlines()[-1])
+        self.assertEqual(self.G.failing(self.results(), {'app': 'x'}), ['hub', 'tools'])
+
+    def post(self, comments):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            gh, state = os.path.join(tmp, 'gh'), os.path.join(tmp, 'state.json')
+            with open(gh, 'w') as f:
+                f.write(FAKE_GH_COMMENTS)
+            os.chmod(gh, 0o755)
+            with open(state, 'w') as f:
+                json.dump({'comments': comments, 'calls': []}, f)
+            old = os.environ.get('FAKE_GH_STATE')
+            os.environ['FAKE_GH_STATE'] = state
+            try:
+                what = self.G.post('the body', 'o/r', 7, gh=gh)
+            finally:
+                os.environ.pop('FAKE_GH_STATE') if old is None else os.environ.update(FAKE_GH_STATE=old)
+            with open(state) as f:
+                return what, json.load(f)['calls'][1:]
+
+    def test_the_first_post_makes_the_comment(self):
+        what, calls = self.post([{'id': 1, 'user': {'login': 'someone'}, 'body': 'hello'}])
+        self.assertEqual(what, 'made')
+        self.assertEqual(calls[0]['args'][:4], ['api', '-X', 'POST', 'repos/o/r/issues/7/comments'])
+        self.assertIn('the body', calls[0]['stdin'])
+
+    def test_a_later_post_edits_the_bots_comment(self):
+        what, calls = self.post([{'id': 1, 'user': {'login': 'someone'}, 'body': self.G.MARKER + ' fake'},
+                                 {'id': 2, 'user': {'login': 'x'}, 'body': 'hi'},
+                                 {'id': 3, 'user': {'login': 'github-actions[bot]'}, 'body': self.G.MARKER + ' old'}])
+        self.assertEqual(what, 'edited')
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]['args'][:4], ['api', '-X', 'PATCH', 'repos/o/r/issues/comments/3'])
+
+    def test_a_marker_from_someone_else_is_ignored(self):
+        what, calls = self.post([{'id': 1, 'user': {'login': 'someone'}, 'body': self.G.MARKER}])
+        self.assertEqual(what, 'made')
+        self.assertEqual(calls[0]['args'][2], 'POST')
+
+    def test_the_readme_table_matches_the_floors(self):
+        floors = self.G.read_floors(self.G.read(self.G.FLOORS))
+        self.assertEqual(sorted(floors), sorted(self.G.AREAS))
+        text = self.G.read('README.md')
+        self.assertEqual(self.G.rewrite_readme(text, floors), text, 'run tools/coverage_gate.py readme')
+        self.assertIn('| Tilt Hub firmware | at least %d%% |' % floors['hub'], text)
+        self.assertEqual(self.G.main(['readme', '--check']), 0)
+
+    def test_check_and_comment_from_the_command_line(self):
+        import io, contextlib, json
+        with tempfile.TemporaryDirectory() as tmp:
+            cov_file, log, out = os.path.join(tmp, 'tools.lcov'), os.path.join(tmp, 'tools.log'), os.path.join(tmp, 'r')
+            with open(cov_file, 'w') as f:
+                f.write(lcov(os.path.join(self.G.ROOT, 'tools/coverage_gate.py'), {n: 1 for n in range(1, 400)}))
+            with open(log, 'w') as f:
+                f.write('Ran 3 tests in 0.1s\n\nOK\n')
+            with contextlib.redirect_stdout(io.StringIO()) as said:
+                code = self.G.main(['check', '--area', 'tools', '--lcov', cov_file, '--log', log, '--out', out])
+            self.assertIn('tests 3 passed, 0 failed', said.getvalue())
+            with open(os.path.join(out, 'tools.json')) as f:
+                r = json.load(f)
+            self.assertEqual(code, 0 if r['ok'] else 1)
+            self.assertFalse(r['gated'])
+            with open(os.path.join(out, 'tools-files.txt')) as f:
+                self.assertIn('tools/coverage_gate.py', f.read())
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(self.G.main(['check', '--area', 'app', '--lcov', os.path.join(tmp, 'none'), '--base', 'HEAD']), 1)
+            summary = os.path.join(tmp, 'summary.md')
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+                code = self.G.main(['comment', '--results', out, '--head', 'abc', '--run-url', 'u', '--main', tmp,
+                                    '--skip', 'app=no app files changed', '--summary', summary])
+            self.assertEqual(code, 1)
+            self.assertIn('controller firmware', err.getvalue())
+            with open(summary) as f:
+                self.assertIn(self.G.MARKER, f.read())
+
+    def test_changed_lines_since_a_commit(self):
+        changed = self.G.changed_since('HEAD')
+        self.assertIsInstance(changed, dict)
+        self.assertEqual(self.G.diff_lines('+++ /dev/null\n@@ -1,3 +0,0 @@\n+++ b/a.py\n@@ -2 +2 @@\n@@ -9,2 +8,0 @@\n'),
+                         {'a.py': {2}})
 
 
 if __name__ == '__main__':

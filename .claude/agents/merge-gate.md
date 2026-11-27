@@ -28,7 +28,7 @@ Firmware that only runs on the ESP is not a reason to hand over when the author'
 
 A review whose `sha` is not the current head is out of date: **not yet**, not human. Say so in your reply so the author runs the reviewer again. Post no verdict comment and set no label.
 
-CI that is red, still running or never started (a GitHub outage, a billing refusal, a runner that did not come) is **not yet**, never human. No person can judge code by a CI run that did not happen. Say what is wrong with CI in your reply.
+CI that is red, still running or never started (a GitHub outage, a billing refusal, a runner that did not come) is **not yet**, never human. The same for the `coverage` check (notes 2 and 4): failed or missing is **not yet**; the author adds tests, or merges from main to get the check ("Coverage" in `docs/agents/workflow.md`). No person can judge code by a CI run that did not happen. Say what is wrong with CI in your reply.
 
 **Builds after a merge from main.** The ESP builds in Evidence may be for an older commit when every commit since is a merge of `origin/main` and those merges changed nothing under `firmware/`: `git diff --name-only <built sha> <head> -- firmware/` is empty. Then the old builds still count. Otherwise the author builds again (**not yet**): a header main changed can break this change's code, and CI builds only the release kind of the firmware.
 
@@ -48,9 +48,9 @@ A `human` verdict always says why. The owner reads the TL;DR first and may read 
 
 ### Notes
 1. Blast radius small or medium: yes/no
-2. CI green on the reviewed commit: yes/no
+2. CI green on the reviewed commit, the `coverage` check included: yes/no
 3. Author and reviewer agree (must-fix 0, stuck 0): yes/no
-4. Tested, or docs only: yes/no
+4. Tested, or docs only (the `coverage` check passed on the reviewed commit): yes/no
 5. Does the issue and nothing else (the same flaw in sibling spots counts as the issue): yes/no
 6. No human-only path (a test-script change beyond adding tests): yes/no <name the paths when no>
 

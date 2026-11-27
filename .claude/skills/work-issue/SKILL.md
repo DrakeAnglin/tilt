@@ -8,7 +8,7 @@ Follow `docs/agents/workflow.md` step by step, start to finish, without stopping
 What each step leans on:
 
 - **Build**: the `tdd` skill where a test has a place; `diagnosing-bugs` for a bug that is not obvious.
-- **Local check**: `tools/agent/check.sh`.
+- **Local check**: `tools/agent/check.sh`. It ends with the coverage gate ("Coverage" in the workflow doc): tests for at least 90% of the changed lines.
 - **Review**: start the `pr-reviewer` agent with a prompt that is only `Review pull request <n>`. Do not tell it what you did or what you think: it must come to it fresh.
 - **Findings**: answer each must-fix on the pull request, fixed or disagree with a reason ("Answer every must-fix" in the workflow doc). Then the reviewer looks again, the same one continued or a fresh one. Merge only when you both agree.
 - **Gate**: start the `merge-gate` agent with only `Gate pull request <n>`.

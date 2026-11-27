@@ -1,7 +1,8 @@
 name: CI
 
 # Runs the same tests as tools/agent/check.sh on every pull request and on main, plus the Tilt Hub build and the
-# controller build (ESP-IDF, release kind), each when its code changed.
+# controller build (ESP-IDF, release kind), each when its code changed. The coverage job holds every pull request to
+# the coverage rule (docs/agents/workflow.md, "Coverage") and keeps one comment on it up to date.
 on:
   pull_request:
   push:
@@ -29,9 +30,11 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          # The app tests need a Mac (10x the minutes), so they run only when the app or the shared wire fixture changed.
+          # The app tests need a Mac (10x the minutes), so they run only when the app, the shared wire fixture or the
+          # coverage tools changed. On main they always run, so main always has all four coverage numbers.
           if FILES=$(git diff --name-only "$BASE" HEAD 2>/dev/null); then
-            if echo "$FILES" | grep -qE '^(app/|firmware/blinds_matter/test/wire|tools/app_tests\.sh|\.github/workflows/)'; then
+            if [ "$GITHUB_EVENT_NAME" = push ] ||
+               echo "$FILES" | grep -qE '^(app/|firmware/blinds_matter/test/wire|tools/app_tests\.sh|tools/coverage(\.sh|_gate\.py|-floors\.txt|-bin/)|\.github/workflows/)'; then
               echo "app=true" >> "$GITHUB_OUTPUT"
             else
               echo "app=false" >> "$GITHUB_OUTPUT"
@@ -60,8 +63,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libmbedtls-dev   # the hub test checks signatures with it
+      - run: sudo apt-get update && sudo apt-get install -y libmbedtls-dev clang llvm   # mbedtls: the hub test; clang, llvm: coverage
       - run: tools/firmware_tests.sh
+      - name: Coverage
+        run: tools/coverage.sh firmware coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-firmware
+          path: |
+            coverage/firmware.lcov
+            coverage/firmware.log
+          if-no-files-found: ignore
 
   tools:
     runs-on: ubuntu-latest
@@ -70,9 +83,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install cryptography qrcode pillow
+      - run: sudo apt-get update && sudo apt-get install -y clang llvm   # the coverage test of unused header functions
+      - run: pip install cryptography qrcode pillow 'coverage>=7.10'
       - run: python3 -m unittest tools/test_tools.py
       - run: python3 -m unittest tools/agent/test_agent.py
+      - run: python3 -m unittest hardware/mechanical/fusion/test_geometry.py   # the gear math (not measured: not one of the four areas)
+      - name: Coverage
+        run: tools/coverage.sh tools coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-tools
+          path: |
+            coverage/tools.lcov
+            coverage/tools.log
+          if-no-files-found: ignore
 
   app:
     needs: changes
@@ -81,6 +106,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: tools/app_tests.sh
+      - name: Coverage
+        run: tools/coverage.sh app coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-app
+          path: |
+            coverage/app.lcov
+            coverage/app.log
+          if-no-files-found: ignore
 
   hub-build:
     name: Tilt Hub build
@@ -122,10 +157,76 @@ jobs:
             espressif/esp-matter:release-v1.5_idf_v5.5.5@sha256:51e890d6e913be195d273384eb93785bc9e64c35751a13fdd02c79ff06c07273 \
             -c '. "$IDF_PATH/export.sh" >/dev/null && tools/firmware_build_ci.sh controller'
 
+  # The coverage rule: changed lines at least 90% covered (pull requests only) and no area under its floor. It runs no
+  # tests, only reads the other jobs' coverage. Its token may write one comment; on a pull request from a fork it
+  # cannot, and the check and the job summary still happen. Never pull_request_target: that would hand a token that
+  # can write to a stranger's code.
+  coverage:
+    if: always()
+    needs: [changes, firmware, tools, app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage
+          merge-multiple: true
+      - name: Check each area
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          APP: ${{ needs.changes.outputs.app }}
+        run: |
+          # A pull request: changed lines since its base. A push to main: the floors only.
+          GATE=""; [ -z "$BASE" ] || GATE="--base $BASE"
+          for A in controller:firmware hub:firmware tools:tools app:app; do
+            AREA=${A%%:*}; RUN=${A#*:}
+            [ "$AREA" != app ] || [ "$APP" = true ] || continue
+            [ -f "coverage/$RUN.lcov" ] || { echo "$AREA: no coverage from the $RUN job"; continue; }
+            # shellcheck disable=SC2086
+            python3 tools/coverage_gate.py check --area "$AREA" --lcov "coverage/$RUN.lcov" --log "coverage/$RUN.log" \
+              $GATE --out coverage-report || true
+          done
+          mkdir -p coverage-report && cp coverage/*.lcov coverage-report/ 2>/dev/null || true
+      - name: The change from main (information only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success \
+            --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)
+          [ -z "$ID" ] || gh run download "$ID" --repo "$GITHUB_REPOSITORY" -n coverage-report -D main-report 2>/dev/null ||
+            echo "no coverage report from main yet"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage-report
+          if-no-files-found: ignore
+      - name: Comment and summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          APP: ${{ needs.changes.outputs.app }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$APP" = true ]; then set --; else set -- --skip "app=no app files changed"; fi
+          # A pull request from a fork: its token cannot write, so no comment (the check and the summary still count).
+          [ -z "$PR" ] || [ "$FORK" = true ] || set -- "$@" --post "$PR" --repo "$GITHUB_REPOSITORY"
+          python3 tools/coverage_gate.py comment --results coverage-report --main main-report --head "$HEAD" \
+            --run-url "$RUN_URL" --summary "$GITHUB_STEP_SUMMARY" "$@"
+
   # One check to look at: green only when every job passed or was skipped on purpose.
   ci:
     if: always()
-    needs: [changes, firmware, tools, app, hub-build, controller-build]
+    needs: [changes, firmware, tools, app, hub-build, controller-build, coverage]
     runs-on: ubuntu-latest
     steps:
       - env:

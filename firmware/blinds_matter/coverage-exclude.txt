@@ -1,0 +1,6 @@
+# Controller firmware files the coverage gate leaves out: one per line, `<path from this folder>  # <why>`.
+# Only files where nothing can run off the chip. The rule: docs/agents/workflow.md, "Coverage".
+main/app_main.cpp  # the Matter and FreeRTOS start-up and callbacks; builds only with esp-matter. Its rules live in tested headers
+main/ardu.h  # the Arduino calls on ESP-IDF (GPIO, ADC, LEDC, NVS, timers): chip calls only
+main/ble.h  # the NimBLE GATT service and its scan data: chip calls; the requests it hands on are in sec.h and people.h, counted there
+main/ot_config.h  # OpenThread radio settings (macros for esp_openthread)
