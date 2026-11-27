@@ -109,7 +109,7 @@ actor Demo: ControllerTransport {
         case Api.dev:
             out = [:]
         case Api.log:
-            out = ["log": ["demo room started"]]
+            out = ["lines": ["demo room started"]]
         default:
             break                                    // everything else just succeeds
         }

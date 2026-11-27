@@ -119,6 +119,8 @@ try await Task.sleep(for: .seconds(3.5))
 let done = try await demo.state()
 check(done.mv == -1 && done.b.allSatisfy { ($0.tilt ?? 0) == 100 }, "after a few seconds they are closed (slats up)")
 check((try? await demo.homeSetupCode()) == nil, "Apple Home says it is not available in the demo")
+// The event log answers under "lines", like the controller (firmware web.h) and ControllerClient.log()
+check(await !demo.log().isEmpty, "the demo room's event log is not empty")
 
 // ---- the client against a fake controller: no network, no crypto
 actor FakeController: ControllerTransport {
