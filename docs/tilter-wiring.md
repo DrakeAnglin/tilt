@@ -68,7 +68,7 @@ leads already attached.
 - **DRV8833**: every lead comes in from the **top** edge.
 - **AS5600**: every lead comes in from the **bottom** edge.
 
- Then run each lead to its board. Cut leads ~6 cm and trim to length when you fit the boards in
+Then run each lead to its board. Cut leads ~6 cm and trim to length when you fit the boards in
 the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch a neighbor.
 
 | # | From | To | Wire |
