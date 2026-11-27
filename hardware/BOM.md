@@ -47,7 +47,7 @@ White PLA for the housing and most gears, white PETG for the four parts that rub
 | Ceramic capacitor 10 µF ("106") | 1 | in the controller's capacitor kit | |
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm | [Buy once](#buy-once) | |
 | 22 AWG stranded wire, red and black | about 12 cm | [Buy once](#buy-once) | |
-| White flat 2-conductor 22 AWG (motor leads) | about 8 cm | [Buy once](#buy-once) | |
+| 2-conductor 22 AWG (motor leads; any color, the build used red and black) | about 8 cm | [Buy once](#buy-once) | |
 
 ### Motor speed
 150 RPM is the default: quiet, and strong enough for the reference blinds. The tilter gears it down 20:1, so the rod
@@ -165,7 +165,7 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 | M1.6 × 4 socket screws | 2 per tilter | kit | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) |
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm per tilter | kit | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) |
 | 22 AWG stranded wire, red and black | about 12 cm per tilter, 5 cm per controller | small roll each | search "22 AWG silicone wire red black" |
-| White flat 2-conductor 22 AWG (motor leads) | about 8 cm per tilter | roll (30 ft) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
+| 2-conductor 22 AWG (motor leads; any color, the build used red and black) | about 8 cm per tilter | roll (30 ft) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
 | Heat-shrink kit | a few pieces per tilter and controller | kit | [B01MFA3OFA](https://www.amazon.com/dp/B01MFA3OFA) |
 | PTFE grease, Super Lube 21030 | a little per tilter | tube | [B000XBH9HI](https://www.amazon.com/dp/B000XBH9HI) |
 | Stick-on foam pad, 3/8 in (about 10 mm) across, 2 mm thick, black | 6 per tilter, 4 per box | pack of 261 to 504, about $6 | [B0HKVXW9MW](https://www.amazon.com/dp/B0HKVXW9MW) |

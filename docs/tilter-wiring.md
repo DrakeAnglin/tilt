@@ -20,7 +20,7 @@ before the [mechanical build](tilter-assembly.md).
 | Ceramic capacitor 10 µF (106) | 1 |
 | **22 AWG** stranded: 1 red, 1 black, ~6 cm each (battery +, GND to the driver) | 2 |
 | **30 AWG** silicone, ~6 cm each: green, yellow, blue ×2, white, black | 6 |
-| Red and black 22 AWG two-conductor pair, ~8 cm (motor leads) | 1 |
+| 22 AWG two-conductor pair, ~8 cm (motor leads; any color, the build used red and black) | 1 |
 | Heat-shrink (small) | a few |
 
 ## 1. Prepare the boards (before any wiring)
