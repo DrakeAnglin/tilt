@@ -1,12 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -16 156 84" width="1248" height="672" font-family="Helvetica, Arial, sans-serif">
   <!-- Controller PCB v3 floor plan, top view, 1 unit = 1 mm. X along the rail (end A left), Y across (0 = room side). -->
   <rect x="-12" y="-16" width="156" height="84" fill="#ffffff"/>
-  <path d="M0,0 H107 V18.5 H110 V0 H129 V47 H110 V28.5 H107 V47 H0 Z" fill="#e7f1e4" stroke="#2f6b2f" stroke-width="0.5"/>
-  <rect x="24" y="25.8" width="77.1" height="20.7" fill="#3a3a3a" stroke="#111" stroke-width="0.4"/>
-  <rect x="28" y="27" width="69" height="18.3" rx="3" fill="#f6e3a8" stroke="#8a6d1a" stroke-width="0.4"/>
-  <text x="62.5" y="37.3" font-size="3.4" text-anchor="middle" fill="#5a4710">18650 cell in its holder (drops in from above)</text>
-  <text x="30" y="43.5" font-size="3" fill="#5a4710">+</text>
-  <text x="93" y="43.5" font-size="3" fill="#5a4710">−</text>
+  <path d="M0,0 H107 V18.5 H110 V0 H129 V47 H110 V28.5 H107 V47 H101 V27 H21 V47 H0 Z" fill="#e7f1e4" stroke="#2f6b2f" stroke-width="0.5"/>
+  <rect x="23" y="28" width="74" height="19" rx="3" fill="#f6e3a8" stroke="#8a6d1a" stroke-width="0.4"/>
+  <text x="60.5" y="38.8" font-size="3.4" text-anchor="middle" fill="#5a4710">18650 cell in the notch (on the box's saddles)</text>
+  <rect x="16.5" y="33" width="4.5" height="9" fill="#b0b0b0" stroke="#555" stroke-width="0.3"/>
+  <rect x="101" y="33" width="5" height="9" fill="#b0b0b0" stroke="#555" stroke-width="0.3"/>
+  <text x="18.7" y="45.6" font-size="2.8" text-anchor="middle" fill="#333">+</text>
+  <text x="103.5" y="45.6" font-size="2.8" text-anchor="middle" fill="#333">−</text>
+  <circle cx="119" cy="38" r="1.7" fill="#fff" stroke="#444" stroke-width="0.4"/>
   <rect x="-3" y="1.2" width="17.3" height="13.2" fill="#d9d9d9" stroke="#444" stroke-width="0.4"/>
   <text x="5.6" y="8.8" font-size="3" text-anchor="middle">Port 1</text>
   <rect x="-1" y="16.5" width="7.4" height="9" fill="#cfd8ea" stroke="#444" stroke-width="0.4"/>
@@ -21,8 +23,8 @@
   <rect x="52" y="2" width="22" height="21" fill="#f3dede" stroke="#444" stroke-width="0.4" stroke-dasharray="1.2 0.8"/>
   <text x="63" y="8.5" font-size="2.8" text-anchor="middle">charger chip,</text>
   <text x="63" y="12.1" font-size="2.8" text-anchor="middle">3.3 V regulator,</text>
-  <text x="63" y="15.7" font-size="2.8" text-anchor="middle">cell guard</text>
-  <text x="63" y="20" font-size="2.4" text-anchor="middle">(factory-soldered)</text>
+  <text x="63" y="15.7" font-size="2.8" text-anchor="middle">input diodes</text>
+  <text x="63" y="20" font-size="2.4" text-anchor="middle"></text>
   <rect x="77" y="2" width="26" height="21" fill="#f3dede" stroke="#444" stroke-width="0.4" stroke-dasharray="1.2 0.8"/>
   <text x="90" y="8.5" font-size="2.8" text-anchor="middle">port fuses,</text>
   <text x="90" y="12.1" font-size="2.8" text-anchor="middle">sensor switches,</text>

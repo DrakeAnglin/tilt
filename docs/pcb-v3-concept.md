@@ -1,12 +1,13 @@
-# Controller PCB v3: design (rev 4, proposal)
+# Controller PCB v3: design (rev 5, hand-solder)
 
-The next controller board. **Nothing is ordered yet.** This is the design to review before the schematic and the
-KiCad layout are drawn ([#23](https://github.com/DrakeAnglin/tilt/issues/23)). Not needed to build the current
-version (PCB v2.2).
+The next controller board. **Nothing is ordered yet.** This is the design to review before the schematic, the
+KiCad layout and the box are drawn ([#23](https://github.com/DrakeAnglin/tilt/issues/23)). Not needed to build the
+current version (PCB v2.2).
 
-**Rev 4 (2026-11-27)** replaces rev 3 (hand-solder only, modules on headers). What changed: the charger is now a
-chip on the board, soldered by the board factory; the cell drops in; the ports for blinds 2 and 3 are on an end
-section you can cut off.
+**Rev 5 (2026-11-27)** replaces rev 4. Rev 4 had the board factory solder a leadless charger chip; costed out, that
+came to about $29 a board against about $16–18 for a bare board and parts. So v3 is a **bare board, hand-soldered**, as
+[#23](https://github.com/DrakeAnglin/tilt/issues/23) asked. Every part that is not a plain resistor, capacitor or
+diode has a maker's datasheet, linked in [the parts table](#parts-and-their-datasheets).
 
 ## What it is, in short
 
@@ -17,81 +18,104 @@ ports. No wires, no harness, no separate charger board.
 
 | | v2.2 today | v3 |
 |---|---|---|
-| Charger | Adafruit 6092 board ($8.95) on a hand-made 3-wire harness | The same chip (bq25185) on the board, about $1.40 |
-| Cell | 18650 with a soldered lead and plug | Any protected 18650, dropped into a holder on the board. A cell with a lead still plugs in |
+| Charger | Adafruit 6092 board ($8.95) on a hand-made 3-wire harness | A TI charger chip (BQ21040, about $1) soldered to the board |
+| Cell | 18650 with a soldered lead and plug | Any protected 18650, dropped in between two contacts on the board. A cell with a lead plugs in instead |
 | USB-C | on the charger board | on the board |
 | Solar | 2-pin plug inside the box | 3.5 × 1.35 mm barrel jack at the end wall |
-| 3.3 V for the ESP and the sensors | sags to about 3.0 V (sensors drop out, [#139](https://github.com/DrakeAnglin/tilt/issues/139)) | its own regulator, 3.3 V down to a 3.4 V cell |
+| 3.3 V for the ESP and the sensors | sags to about 3.0 V (sensors drop out, [#139](https://github.com/DrakeAnglin/tilt/issues/139)) | its own regulator: 3.3 V down to about a 3.5 V cell |
 | Reset | unplug the cell | a button at the end wall |
 | One blind | same long board | cut the end section off: about 22 mm shorter |
-| Charge status to the ESP | none (a light on the charger) | yes, and a light |
-| Hand soldering | about 45 parts + a crimped harness | about 8 parts |
-| Box (estimate) | 157 mm long, 23 mm tall | about 134 mm long, or about 112 mm for one blind; about 3 mm taller on the cell side |
+| USB or solar | cannot tell | each has its own sense line |
+| Soldering | about 45 through-hole parts + a crimped harness | about 60 parts, 6 of them small surface-mount parts |
+| Box (estimate) | 157 mm long, 23 mm tall | about 134 mm long, or about 112 mm for one blind; same height, or about 1 mm more on the cell side |
+| Cost per board, 3 ports, no ESP or cell | about $21 | about $16–18 |
 
 ## Decisions and why
 
-### 1. The charger chip goes on the board, soldered by the factory
-The Adafruit 6092 is a bq25185 chip with a few small parts round it, and Adafruit publishes the schematic. v3 copies
-that circuit onto the board: same chip, 4.2 V, 1.1 A input limit. The charge current drops from 1 A to 0.75 A: in a
-closed box the chip gets hot at 1 A and throttles itself anyway.
+### 1. Hand-soldered, with a few small chips
+Everything is through-hole except six small parts with legs an iron can reach: the charger (6 legs), the
+regulator (5 legs), a transistor for each sensor switch (3 legs each) and the USB-C socket (6 pads). The legs are
+0.95 mm apart. No factory assembly, no stencil.
 
-- The chip is 2 × 2 mm with no legs, so it cannot be hand-soldered. JLCPCB places it (their part C19725033, in
-  stock). They also place every other small part: resistors, capacitors, diodes, the USB-C socket.
-- Why this chip and not a cheaper one: it is the only one found that takes the solar panel's 7 V directly (good to
-  18 V, survives 25 V), so the 6.2 V zener goes away; it runs the ESP from USB while it charges; and it draws only
-  4 µA from the cell when idle. The cheap chargers (TP4056 class, $0.20) stop at 6 V, need a clamp for the panel, and
-  have no way to run the board while charging.
-- A plug-in charger module (rev 3's plan) is dropped: it costs more and brings the harness back.
-- The chip stops after 6 hours of nonstop charging. A 2600 mAh cell takes about 4.5 hours at 0.75 A. The ESP gets
-  the chip's charge-enable line, so the firmware can restart a charge that timed out, and stop charging when the
-  box is over 45 °C.
-- This changes [#23](https://github.com/DrakeAnglin/tilt/issues/23)'s "hand-solder only, bare PCB" rule. That rule
-  and an on-board charger cannot both hold.
+### 2. The charger is a TI BQ21040
+A linear charger for one cell, in a 6-leg package, with a full TI datasheet. It only charges; the cell feeds the
+board, as on v2.2.
 
-### 2. The ESP32-C6 stays a SuperMini on sockets
-A bare ESP32-C6 module costs about the same ($4), so there is nothing to save, and the SuperMini can be flashed on
-the bench and swapped. One change: v3 feeds the SuperMini's **3V3 pin** from the board's own regulator, and leaves its
-5V pin empty.
+- **Why this one:** when the input sags it holds the input at 4.3 V and takes what current there is, instead of
+  dragging a small solar panel down. It survives 30 V on its input. It draws 1 µA from the cell when idle. It has a
+  temperature input, so charging stops when the box is too hot or too cold (requirement E-4, open until now).
+- **Charge current: 540 mA** (a 1 kΩ resistor). A 2600 mAh cell fills in about 5.5 hours. Higher would only make the
+  small chip throttle on heat. Its safety timer is 10 hours.
+- **It switches off above 6.5 V** (and survives 30 V), and a panel reaches 7 V with no load. v3 does not clamp
+  the panel with a zener: a zener would have to burn the whole panel's power as heat in the box whenever the cell is
+  full, and it cannot take 2 to 6 panels. Instead the solar jack feeds the charger through **two plain diodes in
+  series** (1N4001). While charging, the chip holds its input at 4.3 V, so the panel sits near 6 V, where it works
+  best. A cold panel in bright sun with a full cell can push the input above 6.5 V; the chip then rests, and
+  starts again by itself when the light drops a little. The cost is at most a late top-up of a cell that is already
+  over 90 % full. While the solar input is that high, USB does not charge either. A wrong adapter in the solar jack
+  (up to 24 V, the jack's rating) does no harm. The board has a place for a third diode, bridged as made, in case
+  the panels measure higher than 7 V.
+- **USB** comes in through one low-loss diode (1N5817), so the chip still sees about 4.6 V.
+- **Charging ends** when the current falls to about 50 mA. If the board itself draws more than that for hours
+  with USB in, charging never ends and the 10-hour timer stops it. The firmware keeps its plugged-in average
+  under about 40 mA.
+- **Not used:** the TP4056 (a thin 3-page datasheet, and no input regulation), and ready-made charger modules (no
+  datasheet at all).
+- No power path: with no cell in, USB alone does not run the ESP reliably. Same as v2.2.
+- Temperature: a 10 kΩ sensor by the cell with 1.0 kΩ in series, and 237 kΩ (1 %) on the board from the chip's
+  temperature pin to ground. Charging is allowed from about 5 to 43 °C (47 °C at the chip's worst tolerance), and a
+  broken sensor lead cannot switch the safety timer off.
+
+### 3. The ESP32-C6 stays a SuperMini on sockets
+v3 feeds the SuperMini's **3V3 pin** from the board's own regulator, and leaves its 5V pin empty.
 
 - Why: on v2.2 the ESP gets the cell through a diode and then its own regulator, which costs about 0.6 V. At a 3.6 V
   cell the 3.3 V line is 3.0 V, under what the AS5600 sensor needs.
-- The new regulator (RT9080-33, 600 mA, 2 µA idle) loses about 0.1 V, so the line holds 3.3 V until the cell is
-  down to about 3.4 V, and is still 3.2 V at the 3.35 V motor cut-off.
-- The SuperMini's own parts (its regulator, back-fed, and its two lights) may draw 40 to 400 µA asleep, going by
-  other people's measurements. That is most of a 0.5 mA budget, so it is the first bench test.
+- The regulator is a Richtek RT9080-33: 600 mA, 2 µA idle. It loses about 0.08 V at 150 mA and 0.16 V at 300 mA
+  (0.27 V at worst). So the 3.3 V line holds down to about a 3.5 V cell, and is about 3.2 V at the 3.35 V motor
+  cut-off.
+- It gets 10 µF on its input and 22 µF on its output, for the radio's 300 mA bursts (1 µF is only what keeps it
+  stable).
+- **Rule: put the cell in before plugging USB into the ESP itself.** With no cell, that USB would push the 3.3 V
+  line backwards through the regulator. (A diode to guard this was considered and dropped: its leakage could lift
+  the 3.3 V line while the board sleeps.) With that USB in, the reset button does nothing: unplug it first.
+- The SuperMini has no maker's datasheet, and its own parts (its regulator, back-fed, and its two lights) may draw
+  40 to 400 µA asleep, going by other people's measurements. It is the one part chosen on bench results, not
+  paper, so it is the first bench test.
 
-### 3. Each sensor gets a real power switch
-Today an ESP pin powers each tilter's sensor directly and loses 0.26 V on the way. v3 puts a small transistor switch
-on each port's EN line, fed from the 3.3 V line. The sensor then sees the full 3.3 V. The firmware change is small:
+### 4. Each sensor gets a real power switch
+Today an ESP pin powers each tilter's sensor directly and loses 0.26 V on the way. v3 puts a transistor (AO3401A)
+on each port's EN line, fed from the 3.3 V line, with 6.8 Ω in series instead of 10 Ω (low enough to cost only
+0.04 V, high enough that a crushed cord cannot pull the 3.3 V line down). The firmware change is small:
 the pin is low for "on" instead of high.
 
-### 4. The cell drops into a holder on the board
-A standard through-hole 18650 holder (Keystone 1043P, 77 × 21 × 15 mm) is soldered to the board. The cell presses
-in from above. No lead, no plug.
+This fixes the controller's end only. At the far end of a 3 m cord a running motor lifts the tilter's ground: thin
+phone cord is about 0.64 Ω per wire, so 0.3 A costs about 0.2 V. With a 3.3 V line the sensor then sees about
+3.1 V; at a low cell and a hard start it can still dip under its 3.0 V. So: a bench check at 3 m with a low cell,
+cords of 26 AWG where they are long, and the firmware keeps ignoring a dropout during a start.
 
-- Why a holder and not bare contacts: it is one known part with a drawing, it grips the cell, and the "P" type is
-  sold as polarized against a cell put in backwards (to confirm with one in hand). An earlier idea, a notch in the board with a contact at
-  each end, kept the box at 23 mm but needed two contacts nobody sells as a matched pair. It stays as the fallback.
-- **The price is height.** The cell sits about 4 mm higher than today, so the box grows about 3 mm on the cell
-  side, beside the tilt rod (the rail has 36 mm inside; the box is 23 mm). The CAD has to show the rod still clears
-  the lid and the box still tilts in past the rail's lips. That check comes before the layout
-  ([open items](#open-items-before-the-layout)).
-- The holder takes cells up to about 69 mm, so most protected cells fit. Check a new brand's length before buying.
-- **A cell put in backwards must do no harm.** Three layers: the polarized holder; protected cells, which cut off
-  a short on their own; and a **cell guard** on the board, a transistor switch that connects the cell only when + is
-  on the + contact.
-- **The cell guard is not finished.** The simple version works when a cell goes into a dead board. The review found
-  two holes: with USB plugged in the switch stays closed after the cell is pulled, so a backwards cell would meet a
-  live contact; and it cannot wake a cell whose own protection has tripped. It needs a fast turn-off and a wake
-  path, simulated and then tried on a breadboard, before the layout.
-- **Cells with a lead still work.** The board keeps a 2-pin JST-XH header beside the holder, on the same guarded
-  line.
-- A 10 kΩ temperature sensor on the board beside the holder stops charging when the box is very hot or freezing
-  (requirement E-4, open until now).
+### 5. The cell drops into a notch, between two contacts
+The board has a notch the size of the cell. The cell lies in the notch on two saddles in the box, exactly where it
+lies on v2.2, between a fixed contact (+) and a spring contact (−) soldered to the board at the notch's ends.
+
+- **Why not a holder on top of the board:** it was the first choice (Keystone 1043P). The review put it in the box
+  numbers: the holder stands 18 mm above the board and its inner edge is under the tilt rod's groove, so it cuts
+  into the groove. The groove may not move, so the holder is out.
+- **The contacts are not picked yet.** They must be board-mount parts with a drawing, with the contact point about
+  6 to 7 mm above the board, and about 4 mm of spring travel for cells from 65 to 69 mm. Contacts made for AA cells
+  are the right height, but they must be leaf contacts of 20 mΩ or less (a coil spring can be 100 mΩ, in the
+  motors' path). This is the first thing settled in the CAD ([open items](#open-items-before-the-layout)).
+  If no pair fits, the fallback is the cell with a lead, as today.
+- **A cell put in backwards:** the box gets a printed gate in front of the + contact that only a button top
+  reaches. Behind that, the board has a 3 A resettable fuse in the cell's + lead and a diode (1N5822) across the
+  board side of it. A backwards cell is shorted through the diode, and the fuse or the cell's own protection opens.
+  The chips see about −0.6 V for a moment instead of −4 V. That is still past their −0.3 V rating, so this has to
+  pass a bench test before it is trusted.
+- **A cell with a lead** plugs into a 2-pin JST-XH header on the same guarded line. One or the other: never a cell
+  in the notch and a second one on the header.
 - Protected cells only, as today.
-- A cheaper holder ($0.46 from JLCPCB's list, against $2.90) is possible if its drawing matches. Not checked yet.
 
-### 5. One cell, not two
+### 6. One cell, not two
 A second cell does not fix battery life; the idle drain does.
 
 | Average drain | One 2600 mAh cell | Two cells |
@@ -102,93 +126,72 @@ A second cell does not fix battery life; the idle drain does.
 
 The drain is the idle current plus the moves (three blinds, six moves a day each, add roughly 0.1 to 0.4 mA).
 At today's drain two cells still mean charging every week. Once the firmware sleeps properly, one cell meets the
-2-month goal with room to spare. Two cells in parallel also need care (a full cell dumps into an empty one), and a
-second cell adds 75 mm.
+2-month goal with room to spare. For more life in the same space: a protected 3400–3500 mAh cell, if it is
+no longer than 69 mm.
 
-- For more life in the same space: a protected 3400–3500 mAh cell (about a third more). It takes about 6 hours to
-  fill, so the firmware's charge restart matters for it.
-
-### 6. Ports 2 and 3 are on a cut-off section
+### 7. Ports 2 and 3 are on a cut-off section
 Port 1 is at end A with USB-C and the solar jack. Ports 2 and 3 sit on a section at end B, joined to the board by a
 10 mm neck with a printed **cut line**.
 
 - **For one blind:** cut the neck with a small saw and file the edge. The board is then about 107 mm instead of
-  129 mm, and goes in the short box. No jacks to buy for ports 2 and 3.
+  129 mm, and goes in the short box. Leave out the fuses and jacks for ports 2 and 3.
+- The end section has its own screw hole, so a cord pushed into its jacks does not lever on the neck. The copper
+  stays 0.5 mm back from the cut line.
 - **For two blinds:** keep the section, fit one jack. Same box as three.
-- The fuses and resistors for ports 2 and 3 stay on the main board, so nothing live crosses the cut: only dead copper ends show at the sawn edge. Each of those
-  two ports gets battery power through a solder jumper that is open as made: bridge it with a blob of solder only if
-  the port is used.
-- Why a cut line and not perforations: JLCPCB bills a board with snap-off holes or slots as two designs (a surcharge
-  on the boards, and $8 more on assembly). A neck in a plain outline is one design. It is also stiffer, which matters
-  because cords get pushed into those jacks.
+- The fuses and resistors for ports 2 and 3 stay on the main board. A port whose fuse is not fitted has no battery
+  power on its traces, so only dead copper ends show at the sawn edge.
 
-### 7. No power monitor chip
-Rev 3 had an INA3221 current monitor. It is out: with a 0.1 Ω shunt it resolves 0.4 mA, so it cannot see the idle
-drain that matters (0.5 mA), and it costs a chip, three shunts and two pins. v3 gives the ESP four plain signals
-instead. They cover most of what [#23](https://github.com/DrakeAnglin/tilt/issues/23) asks for, with one gap,
-named under the table:
-
+### 8. No power monitor chip; four sense lines instead
 | Signal | Pin | Tells the firmware |
 |---|---|---|
 | Cell voltage | GPIO3 (as today) | Battery level |
-| Solar jack voltage, before its diode | GPIO0 | a panel is lit (Light Schedules); solar or USB |
-| Charging (the chip's status line) | GPIO8 | the chip is charging. Charging with a dark panel means USB |
-| Charge enable (to the chip) | GPIO15 | stop charging when hot; restart after the 6-hour stop |
+| Solar jack voltage, before its diodes | GPIO0 | a panel is lit (Light Schedules) |
+| USB plugged in, before its diode (on or off, not a voltage) | GPIO15 | USB is plugged in |
+| Charging (the chip's status line) | GPIO8 | the first charge after power arrives is running |
 
-**The gap: USB while a panel is lit.** The ESP has no pin left for a USB voltage sense (GPIO9
-cannot take one: it must be high at start-up). So: charging with a dark panel is USB for certain (`src` 2);
-charging with a lit panel may be solar, USB or both, so the firmware sends "not sure" (`src` 3), as v2.2 does by
-day. That falls short of #23's "for certain" whenever a panel is lit.
+- **Leakage:** a diode that is "off" still leaks a little, more when hot, and that could make a dark jack look live.
+  The solar diodes are a low-leakage type, and the USB sense has a 1 kΩ load on it (390 Ω over 620 Ω, about 5 mA,
+  only while USB is in), so the worst leakage reads as "off". A 10 kΩ resistor protects the pin.
+- The charger's status line is low for the first charge and for a temperature stop, and off for top-ups, so the
+  firmware treats it as a hint. Its light runs from the 3.3 V line. While it is low, the ESP cannot be put in
+  flashing mode with the BOOT button: unplug the charge cable first.
+- GPIO8 and GPIO15 also carry the SuperMini's two lights. Whether they still read cleanly decides these two pins,
+  so it is part of the first bench test. If GPIO15 fails, USB sense is dropped and the firmware reports "not sure"
+  when a panel is lit, as v2.2 does.
 
-The chip's second status line (fault) drives a light only: the ESP has no pin left for it. A fault and a normal
-charge both pull the charging line low, so the firmware tells them apart by time and by the cell voltage.
-GPIO8 and GPIO15 also carry the SuperMini's two lights; that they still read and drive cleanly is a bench check.
+### 9. No low-light harvester
+A window with no direct sun gives about 1 mA per panel, which no linear charger can use. A harvester chip costs $5–6
+and brings in about 5 mAh a day per panel. Left out.
 
-Idle current is measured on the bench with a meter in the cell lead ([#6](https://github.com/DrakeAnglin/tilt/issues/6)).
-
-### 8. No low-light harvester
-A window with no direct sun gives about 1 mA per panel; the charger chip needs about that much just to wake. A
-harvester chip that can use it costs $5–6 plus its own parts, and would bring in about 5 mAh a day per panel. Left
-out. With the idle drain fixed, one charge lasts months, and a panel in direct sun (about 100 mA) works with the
-charger as it is.
-
-### 9. No capacitor for the tilter on this board
-The 10 µF question: a capacitor only helps a motor driver if it sits next to the driver, and the driver is at the
-other end of the cord. The DRV8833 board in the tilter has its own. What the controller board should carry is the big
-reservoir for motor starts, and it does: the 470 µF on battery +. The tilter needs nothing added.
+### 10. No capacitor for the tilter on this board
+A capacitor only helps a motor driver if it sits next to the driver, and the driver is at the other end of the cord.
+The controller carries the reservoir for motor starts: the 470 µF on battery +.
 
 ## The circuit
 
 ```
-USB-C VBUS ──►|──┐                 ┌── SYS (4.5 V on USB / the cell on battery)
-                 │                 │        └─► 3.3 V regulator ─► ESP 3V3 pin, sensor switches ×3
-solar jack ──►|──┴─► IN  bq25185  ─┤                 ▲ reset button holds it off
-  (sense→GPIO0)        │  │        └── BAT ──┬── cell guard ── cell holder + / JST-XH   (cell −: GND)
-  status → GPIO8, lights ┘  └ 10 k sensor     ├── 1 M / 1 M ─► GPIO3
-  enable ← GPIO15             by the cell     ├── 470 µF
-                                              └── 0.75 A fuse ×3 ─► RJ12 pin 1 (ports 2, 3: solder jumper)
+USB-C VBUS ─►|───┐ (1N5817)
+  (sense→GPIO15) │                              ┌── 1 M / 1 M ─► GPIO3
+solar jack ►|─►|─┴─► IN  BQ21040  OUT ── BAT ───┼── 3 A fuse ── cell + contact / JST-XH   (cell −: GND)
+  (sense→GPIO0)       │   │                     ├── 1N5822 to GND (backwards-cell diode), 470 µF
+          status→GPIO8┘   └ 10 k sensor         ├── RT9080 3.3 V ─► ESP 3V3 pin, sensor switches ×3
+              + light        by the cell        │        ▲ reset button holds it off
+                                                └── 0.75 A fuse ×3 ─► RJ12 pin 1
 RJ12 (unchanged): 1 battery +, 2 IN1, 3 GND, 4 angle, 5 EN, 6 IN2
   IN1, IN2: ESP pin ─ 220 Ω ─ jack      angle: jack ─ 1 k ─ ESP pin, 100 nF
-  EN: 3.3 V ─ switch (ESP pin low = on, slowed so the 3.3 V line does not dip) ─ 10 Ω ─ jack
+  EN: 3.3 V ─ AO3401A (ESP pin low = on, slowed so the 3.3 V line does not dip) ─ 6.8 Ω ─ jack
+  against static, at each jack: 10 nF on IN1 and IN2, 100 nF on EN (the angle line has its 100 nF already)
 ```
 
-- **Motors run straight from the cell**, as today, not through the charger chip. The chip's own battery switch trips
-  at 3.1 A and can latch off until USB is plugged in; the motors stay clear of it.
-- **The ESP runs from the chip's SYS output.** On USB it runs even with a flat or missing cell. On battery the
-  chip cuts the ESP off when the cell falls to 3.0 V, which protects the cell. The risk: a motor start that dips a
-  low cell under 3.0 V would restart the ESP. A solder jumper lets the regulator take the cell directly instead, and
-  the dip is a bench test before the order.
-- **USB and solar together:** each has its own diode into the charger, so neither feeds the other. The higher one
-  charges. USB gets a low-loss diode (SS34). Solar gets a low-leakage one, and its voltage divider is about 100 kΩ,
-  so USB cannot make the solar reading look lit.
+- **Everything runs straight from the cell**, as today: motors through their fuses, the ESP through the regulator.
+- **USB and solar together:** each has its own diode path into the charger, so neither feeds the other.
 - **Reset button:** it holds the 3.3 V regulator off. Hold it for 2 seconds.
-- **Idle cost of the board itself:** about 12 µA (charger 4, regulator 2, cell guard 4, divider 2). The SuperMini
-  comes on top.
+- **Idle cost of the board itself:** about 15 to 50 µA (charger 1, regulator 2, cell divider 2, the 470 µF's
+  leakage, and each plugged-in tilter's sleeping driver at about 2 µA). The SuperMini comes on top.
 - **The board's USB-C is for charging only.** Flashing by cable still means the ESP's own USB, with the lid off.
-  Updates go over the air.
 
 ### Pins
-The port pins do not move, so the firmware's pin table only gains a few lines.
+The port pins do not move.
 
 | Port | IN1 | IN2 | EN (low = on) | Angle |
 |---|---|---|---|---|
@@ -196,97 +199,97 @@ The port pins do not move, so the firmware's pin table only gains a few lines.
 | 2 | GPIO19 | GPIO20 | GPIO5 | GPIO4 |
 | 3 | GPIO16 | GPIO17 | GPIO1 | GPIO2 |
 
-Cell voltage GPIO3, solar voltage GPIO0, charging GPIO8, charge enable GPIO15. GPIO9 (the BOOT button) stays free:
-it must be high at start-up, so nothing may pull it low.
+Cell voltage GPIO3, solar voltage GPIO0, charging GPIO8, USB voltage GPIO15. GPIO9 (the BOOT button) stays free:
+it must be high at start-up, so nothing may pull it low. No pin is spare.
 
-## Who solders what
+## Parts and their datasheets
 
-| Soldered by JLCPCB (top side) | Soldered by hand |
-|---|---|
-| bq25185 charger and its parts, 2 input diodes | RJ12 jack per port used (1 to 3) |
-| 3.3 V regulator | 2 socket strips for the ESP |
-| cell guard (2 transistors), 3 sensor switches | the cell holder |
-| 3 port fuses (surface-mount, low-resistance type, so no more folding them over) | 470 µF capacitor |
-| all resistors and small capacitors, temperature sensor | solar jack (DC003-1.3), only if solar is used |
-| USB-C socket (power only), reset button, charge and fault lights | JST-XH battery header, only for a cell with a lead |
+Numbers are from the datasheet named, read 2026-11-27. "Stock" parts are already on hand from v2.2.
 
-Parts already on hand that v3 still uses: RJ12 jacks, socket strips, 470 µF capacitors, JST-XH headers, ESP32-C6
-boards, cells with leads. No longer needed: the 6092, the 6-pin harness parts, the zener, through-hole diodes,
-resistors and fuses.
+| Part | Exact part | Datasheet | What was checked |
+|---|---|---|---|
+| Charger | TI **BQ21040DBVR** (SOT-23-6) | [bq21040.pdf](https://www.ti.com/lit/ds/symlink/bq21040.pdf) | input 4.45–6.45 V, off above 6.5–6.8 V, survives 30 V; holds a weak input at 4.3 V; 540 / R for the current, 800 mA max; 1 µA from the cell; 10 h timer; temperature input for a 10 k sensor |
+| 3.3 V regulator | Richtek **RT9080-33GJ5** (TSOT-23-5) | [DS9080](https://www.richtek.com/assets/product_file/RT9080/DS9080-09.pdf) | 600 mA; dropout 310 mV typical, 530 max at 600 mA; 2 µA idle; 5.5 V max in; 1 µF in and out; enable pin |
+| Sensor switch ×3 | Alpha & Omega **AO3401A** (SOT-23) | [AO3401A](https://www.aosmd.com/pdfs/datasheet/AO3401A.pdf) | 85 mΩ at 2.5 V drive |
+| Cell contacts (+ and spring −) | **not picked** | needed before layout | board-mount leaf contacts, 20 mΩ or less, contact point 6 to 7 mm above the board, about 4 mm travel |
+| Cell fuse | radial resettable fuse, about 3 A hold, 16 V or more: **not picked** | needed before layout | holds 2 A or more at 60 °C; 50 mΩ or less |
+| Backwards-cell diode | **1N5822** (3 A Schottky) | onsemi 1N5820 series | to read at the schematic: surge rating |
+| USB-C socket | GCT **USB4125-GF-A** | [drawing](https://gct.co/files/drawings/usb4125.pdf) | power only; 6 pads plus 4 through-hole shell tabs; both CC pins brought out for the 5.1 k resistors; 3 A |
+| Solar jack | Same Sky (CUI) **PJ-007** | [pj-007.pdf](https://www.sameskydevices.com/product/resource/pj-007.pdf) | for a 3.5 × 1.35 mm plug; through-hole; 7.4 mm high; 24 V |
+| Reset button | C&K **PTS645VL39-2 LFS** | [datasheet](https://www.farnell.com/datasheets/3762905.pdf) | right-angle, through-hole, 6 × 6 mm |
+| Temperature sensor | Vishay **NTCLE100E3103JB0** (10 k) | [ntcle100.pdf](https://www.vishay.com/docs/29049/ntcle100.pdf) | B 3977; with 1.0 kΩ in series, charging is allowed from about 5 to 43 °C (worked out from the charger's thresholds) |
+| Solar diodes ×2 (place for a 3rd) | **1N4001** | any maker | low leakage; 1 A, enough for six panels |
+| USB diode | **1N5817** | onsemi 1N5817 series | 0.45 V at most at 1 A; leaks up to 1 mA, hence the 1 kΩ sense load |
+| ESP32-C6 chip | Espressif | [datasheet](https://documentation.espressif.com/esp32-c6_datasheet_en.html) | 3.0–3.6 V supply; start-up pins; transmit peaks up to about 315 mA |
+| ESP32-C6 SuperMini board | no maker's datasheet | bench-measured | pin order as on v2.2 |
+| RJ12 jack | Amphenol **87180-066LF** | stock | as v2.2 |
+| Port fuse | Bel **0ZRE0075FF1A** (stock), or a lower-resistance 16–30 V type on the same holes | stock | the Bel is 0.3 to 0.8 Ω, which costs a starting motor up to 0.4 V. A better part is picked at the schematic |
+| Diodes, 470 µF, JST-XH header, sockets | 1N5819 and the rest | stock | as v2.2 |
+| Resistors, capacitors, lights | from the kits | | |
+
+To buy new for v3: the charger, regulator, three transistors, cell contacts, the two new fuses and diodes, USB-C
+socket, solar jack, button and sensor. DigiKey's live stock was not checked. The 6.2 V zeners on hand are not used.
 
 ## Cost
 
-Per controller, without the ESP, the cell, the jacks and the box (those do not change). Prices from JLCPCB's parts
-list on 2026-11-27.
+Per board, 3 ports, without the ESP and the cell.
 
-| | v2.2 | v3, order of 5 | v3, order of 10 |
-|---|---|---|---|
-| Bare board | about $2 | about $2 | about $1.50 |
-| Charger | $8.95 | in the assembly | in the assembly |
-| Harness parts, zener, diodes, fuses, resistors | about $3.50 | none | none |
-| Assembly: fixed fees ($8.18 setup, $1.53 stencil, $3.07 for each of about 6 special parts) | none | about $5.60 | about $2.80 |
-| Assembly: the parts and placing them | none | about $3.20 | about $3.20 |
-| Cell holder (Keystone 1043P), solar jack | none | about $3 | about $3 |
-| **Total** | **about $14.50** | **about $13.80** | **about $10.50** |
-| With JLCPCB's lowest US duty (35 %) on their part | | about $17.50 | about $13 |
-| With the highest (90 %) | | about $23.50 | about $17 |
+| | v2.2 | v3 |
+|---|---|---|
+| Bare board | about $2 | about $2 |
+| Charger | $8.95 | about $1 |
+| Cell contacts, cell fuse and diode | none (the cell has a lead) | about $2 |
+| 3 RJ12 jacks, 3 fuses | about $5.60 | about $5.60 |
+| Everything else | about $4.50 (harness parts, zener, sockets, capacitor, small parts) | about $6–8 (regulator, switches, USB-C, solar jack, button, sensor, sockets, capacitors, small parts) |
+| **Total** | **about $21** | **about $16–18** |
 
-Not in these numbers: shipping. The bare-board price is a guess (the board is longer than JLCPCB's 100 mm cheap
-size), and the duty rate only shows in the cart. On the other side, the v2.2 cell with a soldered lead costs a few
-dollars more than a plain protected cell, which is not counted either.
-
-So, plainly: **v3 does not save much money.** In an order of 10 with a low duty it is $1 to $4 cheaper per
-controller; in an order of 5, or with a high duty, it costs the same or more. The cheap holder would take about $2.50
-off. The sure gains are the ones in the table at the top: no harness, a steady 3.3 V, 8 parts to solder. Get the
-real quote before deciding the quantity.
-
-A further saving, not decided: RJ12 jacks at $0.10–0.23 from JLCPCB's list instead of the $1.43 Amphenol. Their
-footprint has to be checked against the Amphenol's first.
+These are estimates from list prices, without shipping. Having JLCPCB solder everything was costed at about $29 a
+board with US duty, which is why rev 4 was dropped.
 
 ## Open items before the layout
 
-1. **Bench test first: the SuperMini fed at its 3V3 pin.** 3.3 V from a bench supply into 3V3, 5V pin empty. Check
-   that it runs Thread and Bluetooth, measure its sleep current, check that plugging USB into the ESP at the same
-   time does no harm, and that GPIO8 and GPIO15 work as a status input and an enable output with the lights on them.
-2. **Bench test: a low cell and a motor start.** A 6092 wired the v3 way on a v2 board (the ESP from its 4.5V
-   terminal, the motors from the cell): cell at 3.35 V, stall a motor, three blinds starting together. The ESP must
-   not restart. This is the old list's "ESP on a low cell" test, still open.
-3. **Box height with the holder.** Put the holder and the cell on the board in the box CAD: the rod clears the lid,
-   the box tilts in past the lips, nothing pokes out. If it fails: the notch with end contacts, or a cell with a lead.
-4. **Cell guard.** Simulate, then breadboard: cell in backwards with USB live, cell swapped with USB live, a tripped
-   cell woken by USB. If no simple circuit passes, the guard is left off and the polarized holder, protected cells
-   and "unplug USB before you change the cell" carry it.
-5. **Bench test: the EN switch.** One transistor on a breadboard between 3.3 V and a tilter's EN line: the sensor
-   reads every time, with the cell at 3.5 V.
-6. **Quote.** Upload the finished files to JLCPCB for the real price with duty.
-7. **At layout:** three screw holes that work in both lengths; USB-C and the solar jack at least 14 mm apart so
-   both plugs fit; the ESP 1.5 mm nearer the room side than on v2.2, clear of the rod groove; copper round the
-   charger chip for heat, and the temperature sensor away from it; how far the USB-C socket overhangs the edge; the
-   DC jack's holes; the regulator's dropout at 150 mA; a low-resistance fuse.
+1. **The cell in the box CAD, first.** Pick the two contacts from real drawings and place the board, the cell on its
+   saddles and the contacts in the box CAD: contact height against the cell's center, spring travel for 65 to 69 mm
+   cells, the printed + gate, the rod groove untouched, the three screw posts and the end section's screw. Nothing
+   else is drawn until this fits.
+2. **Bench test: the SuperMini fed at its 3V3 pin.** 3.3 V from a bench supply into 3V3, 5V pin empty. Check that it
+   runs Thread and Bluetooth, measure its sleep current (the 0.5 mA target depends on it), check that plugging USB
+   into the ESP at the same time does no harm, and that GPIO8 and GPIO15 read an on/off line with the lights on them.
+3. **Bench test: a low cell, a 3 m cord and a motor start.** Cell at 3.35 V, the ESP fed at 3V3 from a regulator on
+   the cell, the sensor switched by an AO3401A with 6.8 Ω: stall a motor, start three together. The ESP must not
+   restart, and the sensor must read. Measure the sensor's supply at the tilter.
+4. **Bench test: the charger.** One BQ21040 on a breakout: about 540 mA from USB through a 1N5817; one panel and
+   three panels in sun through two 1N4001; the panels' voltage with no load, cold; what the chip does in bright sun
+   with a full cell; USB and panel together.
+5. **Shorted EN line.** The 6.8 Ω resistor is rated 2 W (it carries about 1.6 W into a shorted cord), and the
+   firmware switches a port off within a second when no sensor answers, and leaves it off after a restart during
+   switch-on. Bench: short pin 5 to ground; the ESP stays up and the port is reported.
+6. **Bench test: a backwards cell.** The 3 A fuse and the 1N5822 with a charger and a regulator on the line: cell in
+   backwards with and without USB. Nothing is damaged, and it works again with the cell turned round.
+7. **Bench tests: the rest.** Charging stops near 43 °C and near 5 °C, and with the sensor lead open; charging
+   ends with the board's own load on; the 3.3 V line holds through radio bursts at a 3.5 V cell.
+8. **At layout:** the USB-C socket's mouth close enough to the end wall's outer face for a plug to seat; USB-C and the solar jack at least 14 mm apart so both plugs fit, with the reset button clear of
+   both plugs; the ESP 1.5 mm nearer the room side than on v2.2, clear of the rod groove; copper round the charger
+   chip for heat, and the temperature sensor by the cell, away from it.
 
-From the old "must test on the v2 board" list: the brown-out on USB and the trickle charge were the old MCP73871
-module (gone), and the lost crimp was the harness (gone). Solar behind a window is measured
-([#8](https://github.com/DrakeAnglin/tilt/issues/8)). The low-cell test stays, as item 2. The USB charge rate is
-checked on the first v3 board.
+## What gets made before any order
+
+1. Schematic and KiCad board, generated like v2 (`hardware/pcb`), DRC and ERC clean, with a 3D model of the board
+   and its parts.
+2. The box built round that 3D model, in both lengths, with the fit checks: nothing collides, nothing pokes through
+   a wall, the rod groove unchanged, the box tilts into the rail.
+3. Pictures of the board and of the board in the box.
+4. A printed box and a printed dummy board, tried in a real headrail.
+5. An outside review of the schematic, the board and the fit, as was done for this design (three rounds, by a
+   reviewer with no part in writing it, until both sides agreed). Changes agreed there go in.
+6. Firmware: EN low = on, the new sense pins, a v3 line in the pin table.
+7. Then the order.
 
 ## First-board checks
 
-On the first assembled board, before any more are built:
-
-1. No cell, USB in: 3.3 V on the 3V3 test pad, the ESP starts.
-2. Cell in the right way: charge light on, about 0.75 A on a USB meter. Cell in backwards, with and without USB,
-   and with USB in, cell pulled and put back backwards: nothing gets warm, and it works again with the cell turned
-   round.
+1. No cell, USB in: note what the charge light does (the 470 µF can look like a cell to the chip).
+2. Cell in: charge light on, about 0.55 A on a USB meter; 3.3 V on the 3V3 test pad; the ESP starts.
 3. USB out: the ESP keeps running. Reset button: it restarts.
 4. USB and a panel in sun together: neither jack shows the other's voltage.
 5. All three ports moving at once on a 3.5 V cell: no restart, sensors read.
 6. Idle current with a meter in the cell lead.
-
-## Next
-
-1. Review of this design; the bench tests; the box height check.
-2. Schematic and KiCad board, generated like v2 (`hardware/pcb`), DRC and ERC clean, with JLCPCB's parts and
-   placement files.
-3. Box for the new board, in two lengths, with the fit checks.
-4. Firmware: EN low = on, the new sense pins, a v3 line in the pin table.
-5. Quote, then the order.
