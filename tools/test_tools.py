@@ -1517,5 +1517,64 @@ Soldering iron.
                     self.assertEqual(inventory.main(['order', '--set', '1'] + bad), 2)
 
 
+class BenchJSON(unittest.TestCase):
+    """tools/bench_json.py: what flash.sh and battery_log.sh read out of a Tilt Hub's or a controller's answer."""
+    INFO = {'c': [{'id': 'a1', 'ota': 2, 'otaPct': 40, 'otaErr': '', 'hubCid': 'beef'},
+                  {'id': 'b2', 'ota': 4, 'otaPct': 7, 'otaErr': 'no space'}, {'id': 'c3'}]}
+    # The one-liners flash.sh ran before (tools/flash.sh, lines 29 and 65), with the controller id put in.
+    OLD_MEMBER = ("import sys,json; m=[c for c in json.load(sys.stdin)['c'] if c['id']=='%s']; "
+                  "print(*(m and [m[0].get('ota',0), m[0].get('otaPct',0), m[0].get('otaErr','')] or ['?']))")
+    OLD_HUBCID = "import sys,json; print(next((c.get('hubCid','') for c in json.load(sys.stdin)['c'] if c['id']=='%s'), ''))"
+
+    def run_py(self, args, info, code=None):
+        import json, subprocess
+        cmd = [sys.executable] + (['-c', code] if code else [os.path.join(HERE, 'bench_json.py')] + args)
+        r = subprocess.run(cmd, input=json.dumps(info), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout
+
+    def test_ota_progress(self):
+        import bench_json
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'a1'), '2 40 ')
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'b2'), '4 7 no space')
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'c3'), '0 0 ')
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'zz'), '?')
+
+    def test_ota_progress_prints_what_the_shell_one_liner_did(self):
+        for cid in ('a1', 'b2', 'c3', 'zz'):
+            self.assertEqual(self.run_py(['ota-progress', cid], self.INFO), self.run_py([], self.INFO, self.OLD_MEMBER % cid))
+
+    def test_hub_cid(self):
+        import bench_json
+        self.assertEqual(bench_json.hub_cid(self.INFO, 'a1'), 'beef')
+        self.assertEqual(bench_json.hub_cid(self.INFO, 'b2'), '')
+        self.assertEqual(bench_json.hub_cid(self.INFO, 'zz'), '')
+        for cid in ('a1', 'b2', 'zz'):
+            self.assertEqual(self.run_py(['hub-cid', cid], self.INFO), self.run_py([], self.INFO, self.OLD_HUBCID % cid))
+
+    def test_battery_row(self):
+        import bench_json, time
+        dev = {'pwr': {'rest': 3.91234, 'vin': 4.987, 'pct': 80}, 'st': {'motorS': 125}}
+        now = time.mktime((2026, 11, 27, 9, 5, 0, 0, 0, -1))
+        self.assertEqual(bench_json.battery_row(dev, 'thread', now), '2026-11-27 09:05,thread,3.912,,4.99,125')
+        self.assertEqual(bench_json.battery_row(dev, '', now), '2026-11-27 09:05,?,3.912,,4.99,125')
+        out = self.run_py(['battery-row', 'wifi'], dev)
+        self.assertRegex(out, r'^\d{4}-\d\d-\d\d \d\d:\d\d,wifi,3\.912,,4\.99,125\n$')
+
+    def test_a_bad_command_is_a_usage_error(self):
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'bench_json.py'), 'nonsense'], input='{}',
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('usage:', r.stderr)
+
+    def test_the_shell_scripts_call_it(self):
+        for name in ('flash.sh', 'battery_log.sh'):
+            text = open(os.path.join(HERE, name)).read()
+            self.assertNotIn('-c "import', text, name)
+            self.assertNotIn('python3 -c', text, name)
+            self.assertIn('bench_json.py', text, name)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -15,10 +15,7 @@ OUT=~/.tilt/battery-log.csv
 [ -f "$OUT" ] || echo "time,net,rest_v,pct,vin_v,motor_s" > "$OUT"
 while true; do
   NET=$("$PY" blinds_client.py --ip "$ADDR" hello 2>/dev/null | sed -n 's/.*"net":"\([a-z]*\)".*/\1/p')
-  "$PY" blinds_client.py --ip "$ADDR" --as "$AS" get /api/dev 2>/dev/null | python3 -c "
-import sys, json, time
-d = json.load(sys.stdin); p = d['pwr']
-print('%s,%s,%.3f,,%.2f,%d' % (time.strftime('%Y-%m-%d %H:%M'), '$NET' or '?', p['rest'], p['vin'], d['st']['motorS']))" >> "$OUT" 2>/dev/null \
+  "$PY" blinds_client.py --ip "$ADDR" --as "$AS" get /api/dev 2>/dev/null | python3 bench_json.py battery-row "$NET" >> "$OUT" 2>/dev/null \
     || echo "$(date '+%Y-%m-%d %H:%M'),no answer,,,," >> "$OUT"
   sleep $((MIN * 60))
 done
