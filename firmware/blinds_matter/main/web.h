@@ -206,7 +206,7 @@ esp_err_t hSet(httpd_req_t *r) {
     }
     else if (f == "speed") b.speed = constrain(n, 50, 100);
     else if (f == "fav") b.fav = constrain(n, -100, 100);
-    else if (f == "hid") b.hidden = n ? 1 : 0;   // own endpoints: next start, no restart here; Tilt Hub tiles: at once
+    else if (f == "hid") b.hidden = n ? 1 : 0;   // own endpoint (one per blind): next start; Tilt Hub tiles: at once
     else if (f == "sign") b.motSign = n < 0 ? -1 : 1;   // a move on this blind is stopped first (cfgApply)
     else return fail(r, "unknown setting");
   } else return fail(r, "unknown setting");
