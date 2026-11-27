@@ -68,6 +68,7 @@
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm: the same as the controller's
 #include "tilt_link.h"                           // the link to the controllers: proofs, pushes, datagrams, sealed frames
 #include "tilt_pair.h"                           // the key exchange in Pairing: the same as the controller's
+#include "trial.h"                               // keep new firmware or go back: the same rule as the controller's
 #include "ctrl_link.h"                           // CtrlLink: one controller's boot id and counter, behind one lock
 #if defined(TILT_RELEASE)                         // an update file carries no Wi-Fi of anyone's
 #define WIFI_SSID ""

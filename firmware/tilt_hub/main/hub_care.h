@@ -64,13 +64,20 @@ static void careTask(void *) {
   }
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(ms() < 90000 ? 5000 : 15000));   // quicker just after a start: find the controllers again
-    if (hubTrial) {                              // new hub firmware: keep it once Wi-Fi and Apple Home are up for a minute
-      static uint32_t upSince = 0;
-      bool up = hubIp() != "0.0.0.0" && matterUp;
-      if (up && !upSince) upSince = ms() ? ms() : 1;
-      if (!up) upSince = 0;
-      if (upSince && ms() - upSince > 60000) { esp_ota_mark_app_valid_cancel_rollback(); hubTrial = false; ESP_LOGI(TAG, "new hub firmware %s kept", esp_app_get_description()->version); }
-      else if (ms() > 300000) { ESP_LOGE(TAG, "new hub firmware did not get Wi-Fi and Apple Home up: going back"); vTaskDelay(pdMS_TO_TICKS(200)); esp_ota_mark_app_invalid_rollback_and_reboot(); }
+    // New hub firmware: kept once Wi-Fi and Apple Home are up for a minute; back to the one before when they are not
+    // up 5 minutes after the start (trial.h). Going back refused (no valid firmware in the other slot): it asks once,
+    // logs it once and stays on this firmware, still on trial, still kept the normal way if both come up later.
+    if (hubTrial) {
+      static Trial trial;
+      TrialVerdict v = trial.tick(ms(), hubIp() != "0.0.0.0" && matterUp, true);
+      if (v == TRIAL_KEEP) { esp_ota_mark_app_valid_cancel_rollback(); hubTrial = false; ESP_LOGI(TAG, "new hub firmware %s kept", esp_app_get_description()->version); }
+      else if (v == TRIAL_ROLLBACK) {
+        ESP_LOGE(TAG, "new hub firmware did not get Wi-Fi and Apple Home up: going back");
+        vTaskDelay(pdMS_TO_TICKS(200));
+        esp_err_t e = esp_ota_mark_app_invalid_rollback_and_reboot();   // returns only when refused
+        trial.rollbackRefused();
+        ESP_LOGE(TAG, "cannot go back (%s): staying on this firmware", esp_err_to_name(e));
+      }
     }
     static uint32_t lastScan = 0;
     if (ms() - lastScan > 30000) { lastScan = ms(); bleScan(); }

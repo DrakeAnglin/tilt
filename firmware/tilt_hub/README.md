@@ -181,8 +181,8 @@ tools/flash_hub.sh
 
 Raise `PROJECT_VER` in `CMakeLists.txt` first. The hub has two firmware slots: the signed file goes into the spare
 one over Wi-Fi (owner-allowed, signature and version checked), the hub restarts on it on trial and keeps it once Wi-Fi
-and Apple Home have worked for a minute, otherwise it goes back by itself. About a minute in all. The spare slot is
-also where a controller's update waits while the hub sends it. The codes live in the hub's saved data (written by
+and Apple Home have worked for a minute, otherwise it goes back by itself. About a minute in all. With no firmware to
+go back to, it stays on the new one, still on trial. The spare slot is also where a controller's update waits while the hub sends it. The codes live in the hub's saved data (written by
 `tools/flash_hub.sh --usb`, or copied from `main/setup_pin.h` at its first start), so update files carry no code.
 
 ### Update a controller from the Mac

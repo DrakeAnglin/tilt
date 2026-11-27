@@ -77,6 +77,7 @@ static const char *stageCheck(const Ctrl &k) {
 // ---- the hub's own firmware, over Wi-Fi: POST /hub/api/update, in the 5 minutes after its owner allowed it (sealed
 // /api/hubupdate). The signed file goes into the spare slot; the hub checks the signature and that it is not older,
 // then starts it on trial. Kept once Wi-Fi and Apple Home have worked for a minute; otherwise it goes back by itself.
+// With no firmware to go back to, it stays on the new one, still on trial.
 static uint32_t hubUpdUntil = 0;
 static bool cloudBusy() {                        // a firmware file is coming in or going out: no TLS meanwhile (memory)
   if (otaFor >= 0 || (hubUpdUntil && (int32_t)(hubUpdUntil - ms()) > 0)) return true;
