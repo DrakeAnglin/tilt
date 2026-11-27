@@ -186,10 +186,7 @@ static std::string netJson() {
   return "{\"ok\":1,\"ds\":\"" + hexOf(tlv.mTlvs, tlv.mLength) + "\"}";
 }
 
-static std::string qv(const std::string &q, const char *key) {
-  char v[300] = "";
-  return httpd_query_key_value(q.c_str(), key, v, sizeof v) == ESP_OK ? std::string(v) : std::string();
-}
+static std::string qv(const std::string &q, const char *key) { return queryValue(q, key); }   // decoded, as a controller's arg() (wire.h)
 // One command from a phone that is in. Owner-only unless said otherwise.
 static std::string hubCommand(int slot, const std::string &cmd) {
   size_t qi = cmd.find('?');
@@ -200,19 +197,18 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     std::string j = infoJson();
     return owner ? "{\"topic\":\"" + hexOf(htopic, 16) + "\"," + j.substr(1) : j;
   }
-  if (path == "/api/keys") {                     // the hub's people (as a controller lists its phones)
+  if (path == "/api/keys") {                     // the hub's people (as a controller lists its phones: wire.h keyJson)
     xSemaphoreTake(keyMx, portMAX_DELAY);
-    std::string j = "{\"ok\":1,\"keys\":[";
-    bool first = true;
-    for (int i = 0; i < HUB_KEYS; i++) {
-      HubKey &k = people.keys[i];
-      if (!k.used) continue;
-      j += std::string(first ? "" : ",") + "{\"cid\":\"" + hexOf(k.id, 8) + "\",\"name\":\"" + k.name + "\",\"owner\":" + (k.role ? "1" : "0") + ",\"me\":" + (i == slot ? "1" : "0") +
-           ",\"wait\":" + (k.used == 2 ? "1" : "0") + ",\"code\":\"" + (k.used == 2 && owner ? askCode(k.key) : std::string()) + "\"}";   // the code: owners only
-      first = false;
-    }
+    std::string j = people.listJson(slot, owner, askCode);
     xSemaphoreGive(keyMx);
-    return j + "]}";
+    return j;
+  }
+  if (path == "/api/keyname") {                  // this phone renames itself (only itself: no cid here)
+    xSemaphoreTake(keyMx, portMAX_DELAY);
+    const char *err = people.rename(slot, qv(q, "name").c_str());
+    xSemaphoreGive(keyMx);
+    if (err) return std::string("{\"ok\":0,\"err\":\"") + err + "\"}";
+    return "{\"ok\":1}";
   }
   if (path == "/api/leave") {                    // this phone leaves the hub (everywhere, not just on the phone)
     xSemaphoreTake(keyMx, portMAX_DELAY);

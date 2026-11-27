@@ -345,6 +345,17 @@ let nameCases: [(String, Int, String)] = [
     (String(repeating: "b", count: 30), 23, String(repeating: "b", count: 23)),
 ]
 for (typed, bytes, kept) in nameCases { check(Array(NameRule.fit(typed, bytes: bytes).utf8) == Array(kept.utf8), "\(typed): kept as the controller keeps it") }
+// A phone's name in the People list: the same rule, 19 bytes (ClientKey and HubKey name[20]).
+check(NameRule.phoneBytes == 19, "the phone name size a controller and the Tilt Hub keep")
+check(NameRule.fit("O\u{2019}Brien", bytes: NameRule.phoneBytes) == "O\u{2019}Brien", "a phone name with a curly apostrophe is kept")
+check(NameRule.fit(String(repeating: "y", count: 16) + "\u{1F3AC}", bytes: NameRule.phoneBytes) == String(repeating: "y", count: 16), "a phone name one emoji too long is cut before the emoji")
+check(Api.rename(cid: "a1", to: "O\u{2019}Brien") == "/api/keyname?cid=a1&name=O%E2%80%99Brien", "a controller rename keeps the curly apostrophe")
+check(HubApi.rename(to: "O\u{2019}Brien") == "/api/keyname?name=O%E2%80%99Brien", "a hub rename: only this phone, no cid")
+let keysData = try Data(contentsOf: wireDir.appendingPathComponent("keys.json"))
+struct KeysAnswer: Decodable { let keys: [PhoneKey] }
+let fixKeys = try JSONDecoder().decode(KeysAnswer.self, from: keysData).keys
+check(fixKeys.count == 3 && fixKeys[0].name == "Mom\u{2019}s \"caf\u{E9}\"" && fixKeys[0].me == 1 && fixKeys[0].owner == 1, "wire/keys.json: the owner's name as typed, this phone")
+check(fixKeys[1].name == "Den\\Kid" && fixKeys[2].wait == 1 && fixKeys[2].code == "0427", "wire/keys.json: a backslash in a name, a Join request with its code")
 // Made while its controller could not keep Scenes yet (old firmware): after the update it is kept, not taken for deleted.
 let onPhone = BlindScene(name: "Read", symbol: "book", tilts: [atHall(0): 40], gid: 77, ver: 300)
 let afterUpdate = ScenePlan.scenes(read: ["den": [], "hall": []], kept: [onPhone])

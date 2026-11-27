@@ -1,4 +1,4 @@
-/// A name as the controller keeps it: a Scene, a blind or the controller. UTF-8 as typed (quotes, the curly apostrophe,
+/// A name as the controller keeps it: a Scene, a blind, the controller or a phone. UTF-8 as typed (quotes, the curly apostrophe,
 /// accents, emoji), without control characters, at most so many bytes, never cut inside a character. The firmware's twin
 /// is wire.h keptName, so what was typed is what every phone, the Tilt Hub and Apple Home read back.
 enum NameRule {
@@ -6,6 +6,8 @@ enum NameRule {
     static let blindBytes = 19
     /// The longest controller name, in UTF-8 bytes (firmware store.h Settings name[24]).
     static let controllerBytes = 23
+    /// The longest phone name in the People list, on a controller and on the Tilt Hub (firmware ClientKey and HubKey name[20]).
+    static let phoneBytes = 19
 
     /// A name as it can be typed: no control characters, at most `bytes` bytes, never cut inside a character.
     static func limit(_ s: String, bytes: Int) -> String {

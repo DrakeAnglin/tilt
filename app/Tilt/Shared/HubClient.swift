@@ -14,6 +14,8 @@ enum HubApi {
     static func approve(cid: String, _ ok: Bool, owner: Bool) -> String { Api.approve(cid: cid, ok, owner: owner) }
     static func revoke(cid: String) -> String { Api.revoke(cid: cid) }
     static func makeOwner(cid: String, _ on: Bool) -> String { Api.makeOwner(cid: cid, on) }
+    /// This phone's own name (no cid: on the hub a phone renames only itself).
+    static func rename(to name: String) -> String { "/api/keyname?name=\(name.urlQuery)" }
     /// The hub's Thread network, for a new controller.
     static let network = "/api/net"
     /// Apple Home's setup code (it opens Apple Home's pairing window).
@@ -110,6 +112,8 @@ struct HubClient: Sendable {
     func approve(cid: String, _ ok: Bool, owner: Bool = false) async throws { try await send(HubApi.approve(cid: cid, ok, owner: owner)) }
     func revoke(cid: String) async throws { try await send(HubApi.revoke(cid: cid)) }
     func makeOwner(cid: String, _ on: Bool) async throws { try await send(HubApi.makeOwner(cid: cid, on)) }
+    /// This iPhone's name in the hub's People list (an owner or a Guest; a hub before 0.3.20 answers with an error).
+    func rename(to name: String) async throws { try await send(HubApi.rename(to: name)) }
     /// This iPhone leaves the hub (the hub's only owner cannot while others are in).
     func leave() async throws { try await send(HubApi.leave) }
     /// Take back a request to join that is still waiting (the hub answers "not paired" to it).

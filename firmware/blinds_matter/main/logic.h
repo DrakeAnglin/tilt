@@ -8,6 +8,7 @@
 #include <ctime>
 #include <string>
 #include "routes.h"                              // Who: the roles permitRule decides by
+#include "wire.h"                                // queryValue: the one query parser (the handlers read through it too)
 
 const int PORTS = 3;                                         // a controller has 3 ports
 
@@ -386,6 +387,11 @@ inline const char *permitRule(Who who, bool owner, const std::string &cidArg, co
   if (owner || who == GUEST) return nullptr;
   if (who == SELF && !cidArg.empty() && cidArg == ownCid) return nullptr;
   return "only the owner can do that";
+}
+// The same, from the command's whole query: the cid is read with queryValue, the parser the handlers' arg() uses, so
+// the rule and the handler always see the same phone (a second parser let a Guest show each a different cid).
+inline const char *permitQuery(Who who, bool owner, const std::string &query, const std::string &ownCid) {
+  return permitRule(who, owner, queryValue(query, "cid"), ownCid);
 }
 
 // ---- the owner's firmware update window (web.h hOtaOpen sets until; hub_link.h hubOtaBegin asks)

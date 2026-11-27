@@ -26,7 +26,8 @@
 #include <esp_http_server.h>
 #include "ardu.h"
 #include "logic.h"                               // nonceFresh, permitRule
-#include "store.h"                               // nvs, event, cleanText
+#include "store.h"                               // nvs, event
+#include "wire.h"                                // keptName: a phone's name as typed
 #include "lock.h"                                // mx
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm (shared with the Tilt Hub)
 #include "tilt_link.h"                           // linkKey, proofs, the hub link's layouts (shared with the Tilt Hub)
@@ -152,7 +153,7 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false, boo
   k.used = ask ? 2 : 1; k.role = first ? 1 : 0;
   esp_fill_random(k.id, 8);
   memcpy(k.key, pk.key, 32);
-  cleanText(k.name, sizeof k.name, jsonStr(b, "name"));
+  strlcpy(k.name, keptName(jsonStr(b, "name"), sizeof k.name - 1).c_str(), sizeof k.name);   // as typed (UTF-8): wire.h
   if (!k.name[0]) strlcpy(k.name, "iPhone", sizeof k.name);
   keysSave();
   lastCtr[slot] = 0;
@@ -172,14 +173,10 @@ struct Caller {
   bool owner;                                    // the phone is an Owner (else a Guest)
   const uint8_t *id;                             // the phone's 8-byte id
 };
-std::string qarg(const std::string &query, const char *key) {
-  char v[80] = "";
-  return httpd_query_key_value(query.c_str(), key, v, sizeof v) == ESP_OK ? std::string(v) : std::string();
-}
 // nullptr: allowed. Otherwise the reason it is refused. Rules about the target (you cannot remove yourself, the last
 // owner stays) live in the handlers; who the caller is and what that lets them do is decided only here.
 const char *permit(const Route &rt, const std::string &query, const Caller &c) {
-  return permitRule(rt.who, c.owner, qarg(query, "cid"), hexOf(c.id, 8));
+  return permitQuery(rt.who, c.owner, query, hexOf(c.id, 8));   // the cid as the handler reads it (api.h arg)
 }
 // The answer is sealed bytes when the status is "200 OK", plain JSON otherwise.
 const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool *fromHub = nullptr) {

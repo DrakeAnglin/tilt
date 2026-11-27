@@ -794,6 +794,17 @@ int main() {
     const RouteRule *r = routeRule(path);
     return r ? permitRule(r->who, owner, cid, me) : "not a command";
   };
+  // permit() reads the cid from the whole query with the parser the handlers use (wire.h queryValue), so a Guest
+  // cannot show one cid to the rule and another to the handler (#173 review M2).
+  {
+    const RouteRule *kn = routeRule("/api/keyname");
+    CHECK(kn && !permitQuery(kn->who, false, "cid=" + me + "&name=x", me), "a Guest renames itself");
+    CHECK(kn && permitQuery(kn->who, false, "cid=" + them + "&name=x", me), "a Guest may not rename another phone");
+    CHECK(kn && permitQuery(kn->who, false, "CID=" + me + "&cid=" + them + "&name=x", me), "a cid in other case is not this phone's: refused");
+    CHECK(kn && permitQuery(kn->who, false, "z&cid=" + them + "&cid=" + me + "&name=x", me), "a key with no value cannot hide the cid the handler reads: refused");
+    CHECK(kn && queryValue("z&cid=" + them + "&cid=" + me, "cid") == them, "the handler reads the same first cid the rule refused");
+    CHECK(kn && !permitQuery(kn->who, true, "cid=" + them + "&name=x", me), "an Owner renames any phone");
+  }
   {
     bool roles = routeRuleCount > 30, paths = true, once = true;
     for (int i = 0; i < routeRuleCount; i++) {
@@ -998,8 +1009,25 @@ int main() {
         {"Den \"Caf\xC3\xA9\"", 23, "Den \"Caf\xC3\xA9\""},
         {"Master Bedroom East \xF0\x9F\x8E\xAC", 23, "Master Bedroom East"},
         {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 23, "bbbbbbbbbbbbbbbbbbbbbbb"},
+        {"O\xE2\x80\x99" "Brien", 19, "O\xE2\x80\x99" "Brien"},                        // a phone's name (19 bytes)
+        {"cccccccccccccccccccccccccccccc", 19, "ccccccccccccccccccc"},
     };
-    for (const NameCase &c : names) CHECK(keptName(c.in, c.bytes) == c.kept, "a blind or controller name kept as the app fits it");
+    for (const NameCase &c : names) CHECK(keptName(c.in, c.bytes) == c.kept, "a blind, controller or phone name kept as the app fits it");
+
+    // ---- the People list on the wire (/api/keys on a controller; the Tilt Hub builds its rows the same way)
+    std::string fixKeys = readFile("wire/keys.json");
+    std::string rows = "{\"keys\":[" + keyJson("0102030405060708", "Mom\xE2\x80\x99s \"caf\xC3\xA9\"", 1, 1, 0, "") + "," +
+                       keyJson("a1b2c3d4e5f60718", "Den\\Kid", 0, 0, 0, "") + "," + keyJson("ffeeddccbbaa9988", "Guest", 0, 0, 1, "0427") + "]}";
+    CHECK(!fixKeys.empty() && rows == fixKeys, "/api/keys matches wire/keys.json byte for byte");
+    if (rows != fixKeys) printf("  got: %s\n", rows.c_str());
+    CHECK(keyJson("01", "Bj\xC3\xB6rn Anders Lin\xC3", 0, 0, 0, "") == "{\"cid\":\"01\",\"name\":\"Bj\xC3\xB6rn Anders Lin\",\"owner\":0,\"me\":0,\"wait\":0,\"code\":\"\"}",
+          "a name cut inside a character (an old hub name) is written as valid UTF-8, the broken byte dropped");
+    // ---- a value from a command's query, decoded (the app sends names percent-encoded: Api.swift urlQuery)
+    CHECK(queryValue("cid=a1&name=O%E2%80%99Brien", "name") == "O\xE2\x80\x99" "Brien", "a curly apostrophe, percent-encoded, decoded");
+    CHECK(queryValue("name=John%20Smith", "name") == "John Smith" && queryValue("name=John+Smith", "name") == "John Smith", "%20 and + are a space");
+    CHECK(queryValue("name=%22Den%5CKid%22&cid=a1", "cid") == "a1" && queryValue("name=%22Den%5CKid%22", "name") == "\"Den\\Kid\"", "quotes and a backslash decoded; the right key");
+    CHECK(queryValue("xname=a&name=b", "name") == "b" && queryValue("name=a", "nam").empty() && queryValue("", "name").empty(), "only the whole key; missing: empty");
+    CHECK(queryValue("name=50%", "name") == "50%" && queryValue("name=%zz", "name") == "%zz", "a % without two hex digits is kept as it is");
     sq["mask"] = "1"; sq["t"] = "20";
     g = sceneOfArgs(sarg, 3);
     CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");

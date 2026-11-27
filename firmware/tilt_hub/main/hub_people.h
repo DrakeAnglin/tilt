@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include "wire.h"                                // keptName, keyJson: a phone's name as typed (blinds_matter/main)
 
 const int HUB_KEYS = 8;
 struct HubKey { uint8_t used, role; uint8_t id[8]; uint8_t key[32]; char name[20]; };   // used 1 in, 2 asked, 3 first owner not yet proven; role 1 owner
@@ -21,12 +22,12 @@ enum HubKeyUse : uint8_t { HK_FREE = 0, HK_IN = 1, HK_ASKED = 2, HK_CLAIM = 3 };
 // Who the caller is, for hubPermit.
 enum HubRole { HUB_WAITING, HUB_USER, HUB_OWNER };
 // What a phone may ask the hub. nullptr: allowed. Otherwise the reason it is refused. A phone that waits for an owner
-// may only leave (the whole command, as it came); one that is in may see the hub and its people and leave; an owner
-// may do anything.
+// may only leave (the whole command, as it came); one that is in may see the hub and its people, rename itself and
+// leave; an owner may do anything.
 inline const char *hubPermit(const std::string &cmd, HubRole role) {
   if (role == HUB_OWNER) return nullptr;
   if (role == HUB_WAITING) return cmd == "/api/leave" ? nullptr : "waiting";
-  for (const char *ok : {"/api/info", "/api/keys", "/api/leave"}) if (cmd == ok) return nullptr;
+  for (const char *ok : {"/api/info", "/api/keys", "/api/keyname", "/api/leave"}) if (cmd == ok) return nullptr;
   return "only the hub's owner can do that";
 }
 
@@ -90,8 +91,8 @@ struct HubPeople {
     claimAt[slot] = ask ? 0 : now();
     memcpy(k.id, id, 8);
     memcpy(k.key, key, 32);
-    strncpy(k.name, name, sizeof k.name - 1);
-    if (!k.name[0]) strncpy(k.name, "iPhone", sizeof k.name - 1);
+    std::string nm = keptName(name, sizeof k.name - 1);         // as typed (UTF-8): wire.h
+    strncpy(k.name, nm.empty() ? "iPhone" : nm.c_str(), sizeof k.name - 1);
     last[slot] = 0;
     saved();
   }
@@ -113,6 +114,39 @@ struct HubPeople {
   }
   // A phone that waits for an owner gives up (its /api/leave): it is forgotten.
   void forget(int slot) { memset(&keys[slot], 0, sizeof keys[slot]); saved(); }
+
+  // The phone in `slot` renames itself (its /api/keyname). nullptr: saved; otherwise why not. On the hub a phone renames
+  // only itself.
+  const char *rename(int slot, const char *name) {
+    std::string nm = keptName(name, sizeof keys[slot].name - 1);
+    if (nm.empty()) return "a name is needed";
+    memset(keys[slot].name, 0, sizeof keys[slot].name);
+    memcpy(keys[slot].name, nm.data(), nm.size());
+    saved();
+    return nullptr;
+  }
+  // The hub's people, as /api/keys answers the phone in `me` (owner: it may see the join codes). codeOf: a waiting
+  // phone's join code from its key (tilt_pair.h askCode; passed in so the crypto stays in hub_pair.h).
+  std::string listJson(int me, bool owner, std::string (*codeOf)(const uint8_t key[32])) const {
+    std::string j = "{\"ok\":1,\"keys\":[";
+    bool first = true;
+    for (int i = 0; i < HUB_KEYS; i++) {
+      const HubKey &k = keys[i];
+      if (!k.used) continue;
+      std::string name(k.name, strnlen(k.name, sizeof k.name));
+      j += (first ? "" : ",") + keyJson(hexOf8(k.id), name, k.role ? 1 : 0, i == me ? 1 : 0, k.used == HK_ASKED ? 1 : 0,
+                                       k.used == HK_ASKED && owner ? codeOf(k.key) : std::string());
+      first = false;
+    }
+    return j + "]}";
+  }
+  // tilt_crypto.h hexOf for an id, here without its mbedtls (this file runs on the Mac without it)
+  static std::string hexOf8(const uint8_t id[8]) {
+    static const char *d = "0123456789abcdef";
+    std::string h;
+    for (int i = 0; i < 8; i++) { h += d[id[i] >> 4]; h += d[id[i] & 15]; }
+    return h;
+  }
 
   // A people command from the phone in `slot` (one that is in). cid: the phone it is about (approve, deny, revoke,
   // makeowner). A change that would leave the hub with no owner is put back.

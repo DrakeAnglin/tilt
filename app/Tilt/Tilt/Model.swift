@@ -158,20 +158,24 @@ final class AppModel {
         let n = UserDefaults.standard.string(forKey: Prefs.myName) ?? NSUbiquitousKeyValueStore.default.string(forKey: Prefs.myName)
         return n.flatMap { $0.isEmpty || $0 == UIDevice.current.name || $0 == "iPhone" ? nil : $0 }      // a device name is not a person's name
     }
+    /// Always fitted to what a controller and the Tilt Hub keep (NameRule.phoneBytes), so Pairing, the join notice and
+    /// the People list all carry the same name.
     static var myName: String {
-        get { savedName ?? UIDevice.current.name }
+        get { NameRule.fit(savedName ?? UIDevice.current.name, bytes: NameRule.phoneBytes) }
         set {
-            let n = newValue.trimmingCharacters(in: .whitespaces)
+            let n = NameRule.fit(newValue.trimmingCharacters(in: .whitespaces), bytes: NameRule.phoneBytes)
             UserDefaults.standard.set(n, forKey: Prefs.myName)
             NSUbiquitousKeyValueStore.default.set(n, forKey: Prefs.myName)
         }
     }
-    /// Change the name, here and on every controller this phone is on.
+    /// Change the name, here, on every controller this phone is on and on the Tilt Hub.
     func rename(to name: String) {
-        let n = name.trimmingCharacters(in: .whitespaces)
+        let n = NameRule.fit(name.trimmingCharacters(in: .whitespaces), bytes: NameRule.phoneBytes)
         guard !n.isEmpty else { return }
         AppModel.myName = n
         for c in controllers { Task { try? await c.client.rename(cid: c.record.cid, to: n) } }
+        let hub = HubWatch.shared
+        if hub.status == .connected, let h = try? hub.client() { Task { try? await h.rename(to: n) } }   // an old hub says no: ignored
     }
 
     init() {

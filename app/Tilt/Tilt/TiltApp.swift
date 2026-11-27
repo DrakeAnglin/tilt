@@ -154,6 +154,7 @@ struct WelcomeSheet: View {
             Text(note ?? "Or type the name people should see.").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             HStack {
                 TextField("First and last name", text: $name).textInputAutocapitalization(.words).autocorrectionDisabled().textFieldStyle(.roundedBorder).onSubmit { save(name) }
+                    .onChange(of: name) { let n = NameRule.limit(name, bytes: NameRule.phoneBytes); if n != name { name = n } }   // stops at what the controllers and the hub keep
                 Button("Save") { save(name) }.buttonStyle(.bordered).disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             Button("Not Now") { UserDefaults.standard.set(true, forKey: Prefs.nameSkipped); done() }

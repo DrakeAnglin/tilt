@@ -146,6 +146,7 @@ struct ControllerSettingsView: View {
         .sheet(item: $review, onDismiss: { Task { await load() } }) { a in JoinSheet(ask: a) { review = nil }.presentationDetents([.height(480)]) }
         .alert("Name", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }), presenting: renaming) { p in
             TextField("Name", text: $newName)
+                .onChange(of: newName) { let n = NameRule.limit(newName, bytes: NameRule.phoneBytes); if n != newName { newName = n } }   // stops at what the controller keeps
             Button("Save") { rename(p) }
             Button("Cancel", role: .cancel) {}
         } message: { p in Text(p.me == 1 ? "What other people see for this iPhone." : "What this iPhone is called in the list.") }
@@ -194,9 +195,9 @@ struct ControllerSettingsView: View {
         Task { do { try await controller.client.makeOwner(cid: p.cid, owner); await load() } catch { problem = error.localizedDescription } }
     }
     private func rename(_ p: PhoneKey) {
-        let n = newName.trimmingCharacters(in: .whitespaces)
+        let n = NameRule.fit(newName.trimmingCharacters(in: .whitespaces), bytes: NameRule.phoneBytes)
         guard !n.isEmpty else { return }
-        if p.me == 1 { AppModel.myName = n }
+        if p.me == 1 { model.rename(to: n) }             // this iPhone: everywhere (every controller and the Tilt Hub)
         Task { do { try await controller.client.rename(cid: p.cid, to: n); await load() } catch { problem = error.localizedDescription } }
     }
     private func revoke(_ p: PhoneKey) {

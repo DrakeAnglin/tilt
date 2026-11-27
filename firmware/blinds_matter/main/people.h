@@ -10,8 +10,8 @@ esp_err_t hKeys(httpd_req_t *r) {
   std::string j = "{\"keys\":[";
   bool any = false;
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used) {
-    ap(j, "%s{\"cid\":\"%s\",\"name\":%s,\"owner\":%d,\"me\":%d,\"wait\":%d,\"code\":\"%s\"}", any ? "," : "", hexOf(keys[i].id, 8).c_str(), jq(keys[i].name).c_str(), keys[i].role,
-       i == secClient ? 1 : 0, keys[i].used == 2 ? 1 : 0, keys[i].used == 2 && (secClient < 0 || keys[secClient].role) ? askCode(keys[i].key).c_str() : "");   // the code: owners only
+    bool showCode = keys[i].used == 2 && (secClient < 0 || keys[secClient].role);   // the code: owners only
+    j += (any ? "," : "") + keyJson(hexOf(keys[i].id, 8), keys[i].name, keys[i].role, i == secClient ? 1 : 0, keys[i].used == 2 ? 1 : 0, showCode ? askCode(keys[i].key) : "");
     any = true;
   }
   j += "]}";
@@ -45,10 +45,9 @@ esp_err_t hKeyName(httpd_req_t *r) {             // rename a phone in the People
   uint8_t id[8];
   if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, id, 8)) {
-    char nm[sizeof keys[i].name];
-    cleanText(nm, sizeof nm, arg(r, "name"));
-    if (!nm[0]) return fail(r, "a name is needed");
-    strlcpy(keys[i].name, nm, sizeof keys[i].name);
+    std::string nm = keptName(arg(r, "name"), sizeof keys[i].name - 1);   // as typed (UTF-8): wire.h
+    if (nm.empty()) return fail(r, "a name is needed");
+    strlcpy(keys[i].name, nm.c_str(), sizeof keys[i].name);
     keysSave();
     return ok(r);
   }

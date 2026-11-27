@@ -37,6 +37,9 @@ actor DemoHub: ControllerTransport {
             if let i = people.firstIndex(where: { $0["cid"] as? String == q["cid"] }), people[i]["wait"] as? Int == 1 {
                 if q["ok"] == "1" { people[i]["wait"] = 0; people[i]["owner"] = q["owner"] == "1" ? 1 : 0 } else { people.remove(at: i) }
             } else { out = ["ok": 0, "err": "no such phone"] }
+        case cmdPath(HubApi.rename(to: "")):
+            let n = NameRule.fit(q["name"]?.removingPercentEncoding ?? "", bytes: NameRule.phoneBytes)
+            if n.isEmpty { out = ["ok": 0, "err": "a name is needed"] } else if let i = people.firstIndex(where: { $0["me"] as? Int == 1 }) { people[i]["name"] = n }
         case cmdPath(HubApi.revoke(cid: "")):
             if q["cid"] == "demo" { out = ["ok": 0, "err": "you cannot remove yourself"] } else { people.removeAll { $0["cid"] as? String == q["cid"] } }
         case HubApi.network:

@@ -47,7 +47,9 @@ struct SettingsTab: View {
                     Text("Tap a device for its settings: blind names and setup, people and Apple Home.")
                 }
                 Section {
-                    LabeledContent { TextField("Name", text: $myName).multilineTextAlignment(.trailing).onSubmit { model.rename(to: myName) } } label: { Label("Display Name", systemImage: "person.crop.circle").lineLimit(1).fixedSize(horizontal: true, vertical: false) }.selectionDisabled()
+                    LabeledContent { TextField("Name", text: $myName).multilineTextAlignment(.trailing)
+                        .onChange(of: myName) { let n = NameRule.limit(myName, bytes: NameRule.phoneBytes); if n != myName { myName = n } }   // stops at what the controllers and the hub keep
+                        .onSubmit { myName = NameRule.fit(myName, bytes: NameRule.phoneBytes); model.rename(to: myName) } } label: { Label("Display Name", systemImage: "person.crop.circle").lineLimit(1).fixedSize(horizontal: true, vertical: false) }.selectionDisabled()
                     LabeledContent { Text(cloud == nil ? "Checking…" : cloud == true ? "On" : "Off") } label: { Label("iCloud Notices", systemImage: "icloud") }.selectionDisabled()
                     Picker(selection: $appearance) {
                         Text("Automatic").tag(0); Text("Light").tag(1); Text("Dark").tag(2)
