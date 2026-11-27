@@ -25,7 +25,7 @@ enum Who { OWNER, GUEST, SELF };
   TILT_DEV_ROUTES(R)
 
 #ifdef TILT_DEVLOG
-#define TILT_DEV_ROUTES(R) R("/api/powerlog", hPowerLog, OWNER)
+#define TILT_DEV_ROUTES(R) R("/api/powerlog", hPowerLog, OWNER) R("/api/lightlog", hLightLog, OWNER)
 #else
 #define TILT_DEV_ROUTES(R)
 #endif

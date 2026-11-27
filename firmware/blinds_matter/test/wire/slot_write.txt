@@ -1,1 +1,1 @@
-/api/sched?i=2&on=1&days=127&mask=5&min=480&tilt=-100&kind=2&off=-15&ramp=10&gid=4000000000
+/api/sched?i=2&on=1&days=127&mask=5&min=480&tilt=-100&kind=4&off=-15&ramp=10&gid=4000000000

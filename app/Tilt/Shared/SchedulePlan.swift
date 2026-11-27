@@ -5,22 +5,38 @@ import Foundation
 
 struct BlindTarget: Hashable, Codable { var controller: String; var blind: Int }
 
+/// When a light Schedule last ran on one controller, and why (SchedSlot.fwhy: 1 by light, 2 no steady reading,
+/// 3 sun time, no solar panel seen).
+struct LastRun: Equatable { var at: Date; var why: Int }
+
 /// One Schedule as the app shows it.
 struct Schedule: Identifiable, Equatable {
     var id: UInt32 = UInt32.random(in: 1...UInt32.max)
     var on = true
     var days = 127                  // bit 0 = Sunday
-    var kind = 0                    // 0 clock time, 1 sunrise, 2 sunset
+    var kind = 0                    // 0 clock time, 1 sunrise, 2 sunset, 3 when it gets light, 4 when it gets dark
     var minute = 8 * 60
     var offset = 0                  // minutes after (+) or before (-) sunrise / sunset
     var tilt = 0
     var ramp = 0                    // gentle: minutes to take
     var targets: Set<BlindTarget> = []
+    /// Light Schedules: when each controller last ran it (read from the controllers, never written).
+    var lastRun: [String: LastRun] = [:]
+
+    /// The Light trigger: read from the controller's solar panel, around sunrise (3) or sunset (4).
+    static func isLight(_ kind: Int) -> Bool { kind == 3 || kind == 4 }
+    static func onSunrise(_ kind: Int) -> Bool { kind == 1 || kind == 3 }
+    var isLight: Bool { Self.isLight(kind) }
 
     var whenText: String {
         if kind == 0 { return Self.clock(minute) }
-        let base = kind == 1 ? "Sunrise" : "Sunset"
-        return offset == 0 ? base : "\(abs(offset)) min \(offset > 0 ? "after" : "before") \(base.lowercased())"
+        let base = Self.onSunrise(kind) ? "Sunrise" : "Sunset"
+        let off = "\(abs(offset)) min \(offset > 0 ? "after" : "before") \(base.lowercased())"
+        if isLight {
+            let name = kind == 3 ? "When it gets light" : "When it gets dark"
+            return offset == 0 ? name : "\(name) (\(off))"
+        }
+        return offset == 0 ? base : off
     }
     var actionText: String { TiltWords.action(tilt) }
     var daysText: String {
@@ -44,9 +60,18 @@ struct SlotWrite: Equatable { var controller: String; var slot: Int; var value: 
 enum PlanProblem: Error, Equatable {
     case full(controller: String)          // every slot on it is taken
     case notRead(controller: String)       // its slots are not known (it did not answer)
+    case noLight(controller: String)       // a light Schedule on firmware that does not know it (it would run at sunset)
 }
 
 enum SchedulePlan {
+    /// Offer "When it gets light / dark" for a Schedule: every controller it covers knows the Light trigger and one of
+    /// them has seen a solar panel, or it already is one, so it can be changed back. `panels`: what each controller
+    /// reported as "panel" (SchedConfig.panel); one missing from it runs older firmware, which would turn the kind into
+    /// sunset (`writes` refuses that too).
+    static func offersLight(kind: Int, targets: Set<BlindTarget>, panels: [String: Int]) -> Bool {
+        if Schedule.isLight(kind) { return true }
+        return !targets.isEmpty && targets.allSatisfy { panels[$0.controller] != nil } && targets.contains { panels[$0.controller] == 1 }
+    }
     /// The id for a slot written before Schedules had ids (gid 0). The same on every launch.
     static func legacyId(controller: String, slot: Int) -> UInt32 {
         var h: UInt32 = 2166136261                       // FNV-1a, 32 bits
@@ -66,6 +91,7 @@ enum SchedulePlan {
                 var s = found[id] ?? Schedule(id: id, on: sl.on == 1, days: sl.days, kind: sl.kind, minute: sl.min, offset: sl.off, tilt: sl.tilt, ramp: sl.ramp)
                 var m = sl.mask                          // bit n = Port n (the controller keeps only its own Ports' bits)
                 while m != 0 { s.targets.insert(BlindTarget(controller: c, blind: m.trailingZeroBitCount)); m &= m - 1 }
+                if let at = sl.fat, at > 0 { s.lastRun[c] = LastRun(at: Date(timeIntervalSince1970: TimeInterval(at)), why: sl.fwhy ?? 0) }
                 found[id] = s
             }
         }
@@ -74,9 +100,17 @@ enum SchedulePlan {
 
     /// The slot writes that save (or delete) a Schedule: one slot on each controller it covers, the slot that
     /// already holds it if there is one, and clears for any other slot holding it. `ports`: each controller's number of
-    /// Ports (ControllerLimits); a controller not in it has the fallback.
-    static func writes(_ s: Schedule, delete: Bool = false, slots: [String: [SchedSlot]], ports: [String: Int] = [:]) throws(PlanProblem) -> [SlotWrite] {
+    /// Ports (ControllerLimits); a controller not in it has the fallback. `panels`: what each controller reported as
+    /// "panel"; a light Schedule is never written to one missing from it (older firmware would run it at sunset).
+    static func writes(_ s: Schedule, delete: Bool = false, slots: [String: [SchedSlot]], ports: [String: Int] = [:],
+                       panels: [String: Int] = [:]) throws(PlanProblem) -> [SlotWrite] {
         for t in s.targets where !delete && slots[t.controller] == nil { throw .notRead(controller: t.controller) }
+        if s.isLight && !delete {
+            for t in s.targets.sorted(by: { ($0.controller, $0.blind) < ($1.controller, $1.blind) })
+            where t.blind < (ports[t.controller] ?? ControllerLimits.fallback.ports) && panels[t.controller] == nil {
+                throw .noLight(controller: t.controller)
+            }
+        }
         var out: [SlotWrite] = []
         for c in slots.keys.sorted() {
             let mine = slots[c]!

@@ -137,6 +137,21 @@ Install **Tilt** from the App Store on an iPhone or iPad on your home Wi-Fi.
 
 To share the blinds, the Owner invites the people they live with from the room's settings.
 
+#### Schedules that follow the light
+With a solar panel plugged in, a Schedule can start **When it gets dark** or **When it gets light** instead of at a
+time. The controller reads the panel: when its input stays dark (or light) for a few minutes within 90 minutes of
+sunset (or sunrise), the Schedule runs, once a day. Under the Schedule the app shows when it last ran and why.
+
+- It is not a brightness meter. It only sees how much light reaches the panel, so put the panel where it sees the sky,
+  not behind the slats.
+- It needs a panel and a place (**Set Location for Sunrise and Sunset**). The two choices show up in the app about a
+  day after the panel is first plugged in: the controller has to see one night and one day first.
+- With no steady reading by the end of the 90 minutes (a USB cable plugged in at dusk, say), it runs then. The same
+  goes when the panel already reads dark (or light) as the 90 minutes start, for example when it was unplugged at
+  midday: it waits for a real change and otherwise runs at the end.
+- Every controller the Schedule covers needs firmware that knows these choices. The app offers them only then.
+- With no solar panel seen, it runs at sunset or sunrise, like a plain sun Schedule.
+
 ### 9. Add to Apple Home
 Apple Home adds the Tilt Hub once, and every blind on every controller shows up through it. There is no code per
 controller.

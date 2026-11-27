@@ -149,8 +149,14 @@ esp_err_t hRestore(httpd_req_t *r) {
   Tune t; memcpy(&t, p, sizeof t); p += sizeof t;
   c.tz[sizeof c.tz - 1] = 0;
   if (!zoneOk(c.tz, sizeof c.tz)) return fail(r, "bad time zone");   // before anything is written: nothing changes
-  memcpy(&sx, p, sizeof sx); p += sizeof sx;
   if (c.magic != CFG_MAGIC) return fail(r, "not a Tilt backup");
+  SchedExtra was = sx;
+  memcpy(&sx, p, sizeof sx); p += sizeof sx;
+  // The backup does not carry the Light trigger's latches: a slot that now holds another Schedule has not run today.
+  bool lit = false;
+  for (int i = 0; i < SCHEDS; i++)
+    if (!lightLatchKept(was.x[i].gid, was.x[i].kind, sx.x[i].gid, sx.x[i].kind)) { memset(&lite.l[i], 0, sizeof lite.l[i]); lit = true; }
+  if (lit) liteSave();
   // The backup comes through the hub: end every string, and keep the names as if they were typed in the app (keptName).
   c.tzName[sizeof c.tzName - 1] = 0;             // (the zone was ended and checked above)
   { std::string n(c.name, strnlen(c.name, sizeof c.name)); strlcpy(c.name, keptName(n, sizeof c.name - 1).c_str(), sizeof c.name); }

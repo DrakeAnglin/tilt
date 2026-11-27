@@ -116,6 +116,35 @@ void plogPush(uint32_t at, float rest, float tempC) {
   nvs.putBytes("plog", plog, sizeof plog);
   plogAcc = {0, 0, stats.motorMs, 0, 0, 0, 0};
 }
+// Dev builds only: the input by the minute for 2 hours either side of each sunrise and sunset, the data the Light
+// trigger's levels are tuned from (#212). The last 6 windows, kept in NVS: one write as each window ends. A restart
+// inside a window loses that window. Read it with /api/lightlog (owner).
+const int LLOG_N = 6, LLOG_MIN = 241;            // minutes in a window: event - 120 .. event + 120
+const uint32_t LLOG_HALF_S = 120 * 60;
+struct LightWin { uint32_t start; uint8_t rise, pad[3]; uint8_t v[LLOG_MIN]; };   // v: volts * 40, 0 = no reading
+LightWin llog[LLOG_N];                           // newest last; start == 0 is an empty slot
+LightWin llCur;                                  // the window being filled (start 0: none)
+void llogBegin() {
+  if (nvs.getBytes("llog", llog, sizeof llog) != sizeof llog) memset(llog, 0, sizeof llog);
+  memset(&llCur, 0, sizeof llCur);
+}
+// Once a minute with the minute's mean input, and today's sunrise and sunset (0 not known).
+void llogMinute(uint32_t now, float v, uint32_t rise, uint32_t set) {
+  uint32_t ev = 0;
+  bool isRise = false;
+  if (rise && now + LLOG_HALF_S >= rise && now <= rise + LLOG_HALF_S) { ev = rise; isRise = true; }
+  else if (set && now + LLOG_HALF_S >= set && now <= set + LLOG_HALF_S) ev = set;
+  if (llCur.start && (!ev || ev - LLOG_HALF_S != llCur.start)) {      // the window ended: keep it
+    memmove(llog, llog + 1, sizeof(LightWin) * (LLOG_N - 1));
+    llog[LLOG_N - 1] = llCur;
+    nvs.putBytes("llog", llog, sizeof llog);
+    memset(&llCur, 0, sizeof llCur);
+  }
+  if (!ev) return;
+  if (!llCur.start) { llCur.start = ev - LLOG_HALF_S; llCur.rise = isRise ? 1 : 0; }
+  uint32_t k = (now - llCur.start) / 60;
+  if (k < (uint32_t)LLOG_MIN) llCur.v[k] = (uint8_t)constrain((int)lroundf(v * 40.0f), 1, 255);
+}
 #endif
 void cfgDefaultsOf(Settings &c) {             // (a handler puts them in place with cfgApply, motion.h)
   memset(&c, 0, sizeof c);
@@ -166,6 +195,7 @@ void storeBegin() {
   if (nvs.getBytes("bhist", battHist, sizeof battHist) != sizeof battHist) memset(battHist, 0, sizeof battHist);
 #ifdef TILT_DEVLOG
   plogBegin();
+  llogBegin();
 #endif
   stats.boots++;                                 // count this start, and why the last one ended
   esp_reset_reason_t rr = esp_reset_reason();

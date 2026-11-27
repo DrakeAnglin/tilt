@@ -103,9 +103,14 @@ esp_err_t hCfg(httpd_req_t *r) {
   WireBlind b[PORTS];
   WireSlot sl[SCHEDS];
   for (int i = 0; i < PORTS; i++) b[i] = {cfg.b[i].name, cfg.b[i].hidden, cfg.b[i].speed, cfg.b[i].fav};
-  for (int i = 0; i < SCHEDS; i++) { const Sched &s = cfg.sched[i]; sl[i] = {s.on, s.days, s.mask, s.minute, s.tilt, sx.x[i].kind, sx.x[i].off, sx.x[i].ramp, sx.x[i].gid}; }
+  for (int i = 0; i < SCHEDS; i++) {
+    const Sched &s = cfg.sched[i];
+    const LightLatch &l = lite.l[i];             // the Light trigger's last fire (schedules.h)
+    sl[i] = {s.on, s.days, s.mask, s.minute, s.tilt, sx.x[i].kind, sx.x[i].off, sx.x[i].ramp, sx.x[i].gid, l.day ? l.at : 0, l.day ? (int)l.why : 0};
+  }
   time_t now = time(nullptr);
-  WireCfg c = {cfg.name, cfg.closeUp, syncMode, parMode, cfg.txPower, cfg.tz, cfg.tzName, hkSeparate, b, PORTS, sl, SCHEDS, sx.lat, sx.lon, sunEvent(now, true), sunEvent(now, false)};
+  WireCfg c = {cfg.name, cfg.closeUp, syncMode, parMode, cfg.txPower, cfg.tz, cfg.tzName, hkSeparate, b, PORTS, sl, SCHEDS, sx.lat, sx.lon, sunEvent(now, true), sunEvent(now, false),
+               panelSeen() ? 1 : 0};
   return sendJson(r, cfgJson(c));
 }
 esp_err_t hLog(httpd_req_t *r) {
@@ -138,6 +143,26 @@ esp_err_t hPowerLog(httpd_req_t *r) {
     if (!h.at) continue;
     ap(j, "%s[%lu,%.2f,%.2f,%u,%d,%u,%u,%u,%.2f]", any ? "," : "", (unsigned long)h.at, 2.5f + h.rest / 100.0f, h.vinMax / 40.0f,
        h.poweredMin, h.tempC, h.motorS, h.flags, h.litMin, h.vinAvg / 40.0f);
+    any = true;
+  }
+  j += "]}";
+  return sendJson(r, j);
+}
+// The dev light log (store.h): the input by the minute, 2 hours either side of each sunrise and sunset, oldest first.
+// start: epoch of the first minute; rise: 1 sunrise, 0 sunset; v: volts * 40 per minute, 0 = no reading. The window
+// being filled now comes last.
+esp_err_t hLightLog(httpd_req_t *r) {
+  Lock l;
+  std::string j;
+  j.reserve((LLOG_N + 1) * (LLOG_MIN * 4 + 40) + 40);
+  j += "{\"scale\":40,\"w\":[";
+  bool any = false;
+  for (int i = 0; i <= LLOG_N; i++) {
+    const LightWin &w = i < LLOG_N ? llog[i] : llCur;
+    if (!w.start) continue;
+    ap(j, "%s{\"start\":%lu,\"rise\":%d,\"v\":[", any ? "," : "", (unsigned long)w.start, w.rise);
+    for (int k = 0; k < LLOG_MIN; k++) ap(j, "%s%d", k ? "," : "", w.v[k]);
+    j += "]}";
     any = true;
   }
   j += "]}";
@@ -194,6 +219,8 @@ esp_err_t hSched(httpd_req_t *r) {
   Settings c = cfg;
   Sched &s = c.sched[i];
   s.on = w.on; s.days = w.days; s.mask = w.mask; s.minute = w.min; s.tilt = w.tilt;
+  // Another Schedule in the slot starts with no Light trigger fire; an edit of the same one keeps today's (logic.h).
+  if (!lightLatchKept(sx.x[i].gid, sx.x[i].kind, w.gid, w.kind)) { memset(&lite.l[i], 0, sizeof lite.l[i]); liteSave(); }
   sx.x[i] = {(uint8_t)w.kind, (uint8_t)w.ramp, (int16_t)w.off, w.gid};
   sxSave();
   cfgApply(c);

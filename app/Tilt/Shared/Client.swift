@@ -32,11 +32,20 @@ struct ControllerConfig: Decodable {
     var b: [Blind]
     var limits: ControllerLimits { .reported(ports: ports, slots: slots) }
 }
-struct SchedSlot: Decodable, Equatable { var on: Int, days: Int, mask: Int, min: Int, tilt: Int, kind: Int, off: Int, ramp: Int; var gid: UInt32 }
+/// One Schedule slot. kind: 0 clock time, 1 sunrise, 2 sunset, 3 when it gets light, 4 when it gets dark.
+/// fat / fwhy (firmware 2.3.0 and later, read only): when a light slot last ran (epoch, 0 never) and why
+/// (1 by light, 2 no steady reading, 3 sun time: no solar panel seen).
+struct SchedSlot: Decodable, Equatable {
+    var on: Int, days: Int, mask: Int, min: Int, tilt: Int, kind: Int, off: Int, ramp: Int; var gid: UInt32
+    var fat: UInt32? = nil, fwhy: Int? = nil
+}
 struct SchedConfig: Decodable {
     var ports: Int?, slots: Int?
     var sched: [SchedSlot]; var lat: Double?; var lon: Double?; var sun: [Double]?
+    /// 1: the controller has seen a solar panel (firmware 2.3.0 and later; older firmware never sends it).
+    var panel: Int?
     var limits: ControllerLimits { .reported(ports: ports, slots: slots) }
+    var panelSeen: Bool { panel == 1 }
 }
 struct PhoneKey: Decodable, Identifiable, Equatable { let cid: String; let name: String; let owner: Int; let me: Int; let wait: Int?; let code: String?; var id: String { cid } }
 /// {"ok":1} or {"ok":0,"err":"…"}, sometimes with more.
