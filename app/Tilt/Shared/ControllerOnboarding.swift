@@ -55,7 +55,11 @@ actor ControllerOnboarding {
             }
             step(.joining)
             try await controller.moveToHub(network: network, onThread: onThread)
-            if onThread && restore != nil { try? await controller.restart() }   // the restored settings take effect
+            // Apple Home does not wait for this: the hub remakes its tiles from the controller's status as soon as the
+            // restored Home layout is in it. The restart only rebuilds the controller's own Matter endpoints (made at a
+            // start; nobody sees them on a hub), so it starts clean. A controller already on its Thread firmware does not
+            // restart by itself when it joins (one on Wi-Fi firmware restarts anyway, in swapFirmware).
+            if onThread && restore != nil { try? await controller.restart() }
             await leftBluetooth()
             moved = true
         }

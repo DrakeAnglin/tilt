@@ -564,6 +564,29 @@ let onbExpected = ["hub /api/net", "hub /api/backup?id=old1",
                 "hub /api/replace?old=old1&new=new1"]
 check(olog.all == onbExpected, "restore before joining, wait for it on the hub, keep it, let the hub in, take over the old one's place\n  got \(olog.all.map { String($0.prefix(60)) })")
 
+// A controller already on its Thread firmware, set up with a backup: restarted once, so its own Matter endpoints are
+// rebuilt for the restored Home layout (the hub's tiles do not wait for this)
+let tlog = Recorder()
+let thub = HubClient(transport: ScriptedDevice(name: "hub", log: tlog, address: "10.0.0.2/hub") { c in
+    switch cmdPath(c) {
+    case HubApi.network: #"{"ok":1,"ds":"0e08"}"#
+    case "/api/backup": #"{"ok":1,"d":"\#(backupHex)"}"#
+    case HubApi.info: hubInfoJSON("new1", hubCid: hubCidOnNew)
+    default: #"{"ok":1}"#
+    }
+})
+let tonb = ControllerOnboarding(transport: ScriptedDevice(name: "ble", log: tlog, address: "bluetooth") { _ in #"{"ok":1}"# },
+                                store: TestStore(log: tlog, client: controllerOnHub(tlog, hubWaiting: Cell(true), hkey: Cell(0))),
+                                hello: fakeHello("new1", boot: "0a0b0c0d", net: "thread"), paired: Paired(cid: fcid, key: fkey, owner: true),
+                                look: { _ in fakeHello("new1", boot: "11223344", net: "thread") },
+                                sleep: { _ in }, leftBluetooth: { tlog.add("left bluetooth") })
+let trun = await collect(tonb.run(restore: "old1", hub: thub, hubHost: "10.0.0.2"))
+check(trun.error == nil && trun.steps == [.gettingNetwork, .restoring, .joining, .waitingOnHub, .lettingHubIn, .done], "a restored Thread controller: steps, in order (\(trun.steps), \(trun.error?.localizedDescription ?? "-"))")
+let tble = tlog.all.filter { $0.hasPrefix("ble ") || $0 == "left bluetooth" }
+check(tble == ["ble /api/restore?o=0&d=\(String(repeating: "ab", count: 128))", "ble /api/restore?o=128&d=\(String(repeating: "ab", count: 72))&end=1",
+               "ble /api/hubjoin?ds=0e08", "ble /api/reboot", "left bluetooth"],
+      "a restored Thread controller: restore, join, one restart (no firmware switch), then off Bluetooth\n  got \(tble.map { String($0.prefix(60)) })")
+
 // A Thread controller that did not reach the hub: the second try only waits for it again, at the hub's address then
 let rlog = Recorder(), reachable = Cell(false)
 let rhub = HubClient(transport: ScriptedDevice(name: "hub", log: rlog, address: "10.0.0.2/hub") { c in
