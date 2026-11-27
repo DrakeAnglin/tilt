@@ -63,7 +63,7 @@ Then plug the cord in and set the blind up in the app: [build guide](../../../..
 - No part touches another, with a rod right through the tilter included.
 - Gears turned through their meshes in motor mode, wand mode and at the fast end: no overlap.
 - Assembly paths swept in the old build order: all clear. The first real build used a different order (the tilter
-  assembly guide) and everything went in, so either order works.
+  assembly guide) and everything went in. The sweep was not rerun for that order; the owner decided it is not needed (#208).
 - Sleeve end play: 0.25 mm forward, 0.35 mm back.
 - Print files scanned for overhangs: only the lid's gear shelf needs support.
 - Thin-wall scan (`tools/fusion_thin.py`): what it still lists is on purpose (the 0.8 mm bearing wall between the gear
