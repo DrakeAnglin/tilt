@@ -1,0 +1,12 @@
+#!/bin/sh
+# Stand-in for swiftc while tools/coverage.sh runs the app tests: the same build with coverage on, and a copy of each
+# test program for llvm-cov. The real swiftc is found on the PATH from before this folder was put in front.
+OUT=""; PREV=""
+for A in "$@"; do [ "$PREV" = -o ] && OUT=$A; PREV=$A; done
+REAL=$(PATH=$TILT_COVERAGE_PATH command -v swiftc) || { echo "coverage: no swiftc" >&2; exit 1; }
+"$REAL" "$@" -profile-generate -profile-coverage-mapping || exit $?
+case "$OUT" in
+  ""|*.o) ;;
+  *) [ -f "$OUT" ] && cp "$OUT" "$TILT_COVERAGE_OUT/bin/$(basename "$OUT")" ;;
+esac
+exit 0

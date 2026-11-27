@@ -1,0 +1,13 @@
+# coverage.py settings for the tools' coverage run (tools/coverage.sh tools). The rule: docs/agents/workflow.md, "Coverage".
+[run]
+source = tools
+omit = */test_*.py
+parallel = True
+relative_files = True
+# Tools the tests start as their own process (guard.py, claim.py) are measured too.
+patch = subprocess
+
+[report]
+# No inline skip markers: a file that cannot run outside another program goes on tools/coverage-exclude.txt, with
+# its reason. This pattern never matches, so the default marker does nothing either.
+exclude_lines = a^

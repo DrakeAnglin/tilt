@@ -1,0 +1,6 @@
+# The coverage floor of each area, in whole percent: overall line coverage may not drop under it.
+# Only goes up (tools/coverage_gate.py says when it can); a lower floor needs the owner. docs/agents/workflow.md, "Coverage".
+app 16
+controller 31
+hub 10
+tools 51

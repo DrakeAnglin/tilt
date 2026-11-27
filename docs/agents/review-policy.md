@@ -47,9 +47,9 @@ Some changes are only safe to release once they have run on real hardware. The r
 **The agent merges** when all of these are true:
 
 1. Blast radius is small or medium. The door, one-way or two-way, is not a rule here.
-2. CI is green on the commit that was reviewed.
+2. CI is green on the commit that was reviewed, the `coverage` check included (docs/agents/workflow.md, "Coverage"). A failed, running or missing `coverage` check is "not yet" for the author, never a reason for a person.
 3. The author and the reviewer agree: no must-fix finding is left, and none is in dispute (below).
-4. Changed behavior has a test, or the change is docs or comments only. Firmware that only runs on the ESP counts as tested when the author built it (`firmware/blinds_matter/build.sh`, `firmware/tilt_hub/build.sh`) on the reviewed commit, said so in Evidence, and the pull request has `bench-check`.
+4. Changed behavior has a test, or the change is docs or comments only. The `coverage` check is the evidence: at least 90% of the changed lines in our own code covered, no area under its floor. Firmware that only runs on the ESP counts as tested when the author built it (`firmware/blinds_matter/build.sh`, `firmware/tilt_hub/build.sh`) on the reviewed commit, said so in Evidence, and the pull request has `bench-check`.
 5. The change does what the issue asked and nothing else. The same flaw fixed in sibling spots (the spec's Same flaw elsewhere, or named in the pull request as found on the way) counts as asked.
 6. No human-only path is touched (below).
 
@@ -100,5 +100,7 @@ There is no size limit and no list of risky files. Keys, pairing, the update pat
 
 - `tools/firmware_tests.sh`, `tools/app_tests.sh`: how the tests run. Adding a test to the run is fine and an agent may merge it: every removed line is a comment, and every added line is a comment, a compile (`c++`, `cc`), a test run (`"$OUT/<name>"`), a `python3 <file>.py` generator or the `$OUT` cleanup trap, with no `; & | $( ) { } < > ! \`, and no open quote. `tools/agent/only_adds_tests.awk` decides. Anything else is a human's. The reviewer still reads the diff: the check narrows what can change, it does not prove a test is good.
 **What decides a merge** (`docs/agents/review-policy.md`, `.claude/agents/`, `.claude/settings.json`, `tools/agent/`, `.githooks/`, `.github/workflows/`) merges by agreement like anything else. The reviewer holds one more line there: a change that lets more through (a check dropped or loosened, a path taken off a list, fewer rounds, a weaker reviewer) must be something the owner asked for, quoted in the issue. If it is not, that is must-fix.
+
+The coverage rule's files decide a merge too: the exclusion lists (`app/Tilt/coverage-exclude.txt`, `firmware/blinds_matter/coverage-exclude.txt`, `firmware/tilt_hub/coverage-exclude.txt`, `tools/coverage-exclude.txt`), the floors (`tools/coverage-floors.txt`), the coverage.py settings (`tools/.coveragerc`: what it measures and leaves out), `tools/coverage.sh`, `tools/coverage-bin/` and `tools/coverage_gate.py`. A new exclusion line must be one of the kinds issue #150 lists (third-party, generated, runs only inside another program, runs only on the chip, pure layout), with a reason that is true of the file. A lower floor needs the owner's words, quoted in the issue. Anything else there is must-fix.
 
 The script's check is in `tools/agent/merge_pr.sh`, with the why and the what-to-confirm. Keep the two the same.

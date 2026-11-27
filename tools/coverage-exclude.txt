@@ -1,0 +1,8 @@
+# Tools files the coverage gate leaves out: one per line, `<path from this folder>  # <why no test can run it>`.
+# Only files that run only inside another program. The rule: docs/agents/workflow.md, "Coverage".
+fusion_controller.py  # runs only inside Fusion 360 (its adsk API and the app object, through fusion.py exec)
+fusion_hub.py  # runs only inside Fusion 360 (its adsk API and the app object, through fusion.py exec)
+fusion_plug.py  # runs only inside Fusion 360 (its adsk API and the app object, through fusion.py exec)
+fusion_solar.py  # runs only inside Fusion 360 (its adsk API and the app object, through fusion.py exec)
+fusion_thin.py  # runs only inside Fusion 360 (its adsk API and the app object, through fusion.py exec)
+fusion_tilter.py  # runs only inside Fusion 360 (the app object and fusion_kit's load_script, through fusion.py exec)

@@ -1,0 +1,3 @@
+# Tilt Hub firmware files the coverage gate leaves out: one per line, `<path from this folder>  # <why>`.
+# Only files where nothing can run off the chip. The rule: docs/agents/workflow.md, "Coverage".
+main/lights.h  # the WS2812 color light through the RMT pulse hardware: chip calls only
