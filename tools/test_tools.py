@@ -21,6 +21,7 @@ import netlist  # noqa: E402
 import orient  # noqa: E402
 import release_ci  # noqa: E402
 import release_firmware  # noqa: E402
+import tilter_wiring  # noqa: E402
 
 try:
     import blinds_client
@@ -970,6 +971,42 @@ if "--paginate" in a:
     half = len(d["comments"]) // 2
     print(json.dumps(d["comments"][:half]) + json.dumps(d["comments"][half:]))
 '''
+
+
+class TilterWiring(unittest.TestCase):
+    def setUp(self):
+        import xml.etree.ElementTree as ET
+        self.svg = tilter_wiring.svg()
+        self.root = ET.fromstring(self.svg)       # well-formed SVG
+
+    def test_breakout_pins_read_6_to_1_from_the_top(self):
+        ys = [y for _, _, y in tilter_wiring.RJ_PINS]
+        self.assertEqual([p for p, _, _ in tilter_wiring.RJ_PINS], [6, 5, 4, 3, 2, 1])
+        self.assertEqual(ys, sorted(ys))
+        self.assertIn('pins 6 to 1 from the top', self.svg)
+
+    def test_every_wire_starts_or_ends_on_a_pad(self):
+        rj = {(tilter_wiring.RJ_X, y) for _, _, y in tilter_wiring.RJ_PINS}
+        drv = {(x, y) for x in (tilter_wiring.DRV_L, tilter_wiring.DRV_R) for y in tilter_wiring.DRV_Y.values()}
+        for _, _, _, pts in tilter_wiring.WIRES:
+            self.assertTrue(pts[0] in rj or pts[0] in drv, pts[0])
+
+    def test_motor_pair_is_red_and_black_with_no_capacitor(self):
+        motor = [w for w in tilter_wiring.WIRES if w[3][-1][0] == 1422]
+        self.assertEqual(sorted(w[0] for w in motor), sorted([tilter_wiring.RED, tilter_wiring.BLACK]))
+        self.assertNotIn('µF', self.svg)
+        self.assertNotIn('swap', self.svg)
+
+    def test_direction_arrows_on_all_three_boards(self):
+        for words in ('RJ12: leads leave toward the TOP edge', 'DRV8833: leads come in from the TOP edge',
+                      'AS5600: leads come in from the BOTTOM edge'):
+            self.assertIn(words, self.svg)
+        self.assertEqual(sum(1 for e in self.root.iter() if e.tag.endswith('polygon')), 3)
+
+    def test_main_writes_the_svg(self):
+        path = tilter_wiring.main(['tilter_wiring.py'])
+        with open(path) as f:
+            self.assertEqual(f.read(), self.svg)
 
 
 class CoverageGate(unittest.TestCase):
