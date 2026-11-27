@@ -61,9 +61,24 @@ enum PlanProblem: Error, Equatable {
     case full(controller: String)          // every slot on it is taken
     case notRead(controller: String)       // its slots are not known (it did not answer)
     case noLight(controller: String)       // a light Schedule on firmware that does not know it (it would run at sunset)
+    case noPlace(controller: String)       // a sun or light Schedule on a controller with no location (it would never run)
 }
 
 enum SchedulePlan {
+    /// ADR 0007: clock, sunrise and sunset automations are made in the home app (Apple Home, Alexa); Tilt makes only
+    /// Light Schedules. An old clock or sun Schedule still shows, runs, and can be turned off or deleted.
+    static func isOld(_ kind: Int) -> Bool { !Schedule.isLight(kind) }
+    /// The kinds the Starts picker offers: the light kinds when `light` (offersLight), and an old Schedule's own kind,
+    /// so editing it does not change what it is. Empty: there is nothing to pick (the screen says why).
+    static func kindsOffered(current: Int, isNew: Bool, light: Bool) -> [Int] {
+        (!isNew && isOld(current) ? [current] : []) + (light ? [3, 4] : [])
+    }
+    /// The controllers this Schedule covers that have no location, when it needs one (every kind but a clock time):
+    /// sunrise and sunset, and so the Light trigger's window, are worked out from it. Sorted.
+    static func missingPlace(_ s: Schedule, noPlace: Set<String>) -> [String] {
+        guard s.kind != 0 else { return [] }
+        return Set(s.targets.map(\.controller)).intersection(noPlace).sorted()
+    }
     /// Offer "When it gets light / dark" for a Schedule: every controller it covers knows the Light trigger and one of
     /// them has seen a solar panel, or it already is one, so it can be changed back. `panels`: what each controller
     /// reported as "panel" (SchedConfig.panel); one missing from it runs older firmware, which would turn the kind into
@@ -102,9 +117,11 @@ enum SchedulePlan {
     /// already holds it if there is one, and clears for any other slot holding it. `ports`: each controller's number of
     /// Ports (ControllerLimits); a controller not in it has the fallback. `panels`: what each controller reported as
     /// "panel"; a light Schedule is never written to one missing from it (older firmware would run it at sunset).
+    /// `noPlace`: controllers with no location; a Schedule that is on and needs one (missingPlace) is never written.
     static func writes(_ s: Schedule, delete: Bool = false, slots: [String: [SchedSlot]], ports: [String: Int] = [:],
-                       panels: [String: Int] = [:]) throws(PlanProblem) -> [SlotWrite] {
+                       panels: [String: Int] = [:], noPlace: Set<String> = []) throws(PlanProblem) -> [SlotWrite] {
         for t in s.targets where !delete && slots[t.controller] == nil { throw .notRead(controller: t.controller) }
+        if !delete && s.on, let c = missingPlace(s, noPlace: noPlace).first { throw .noPlace(controller: c) }
         if s.isLight && !delete {
             for t in s.targets.sorted(by: { ($0.controller, $0.blind) < ($1.controller, $1.blind) })
             where t.blind < (ports[t.controller] ?? ControllerLimits.fallback.ports) && panels[t.controller] == nil {

@@ -297,6 +297,29 @@ check((try? SchedulePlan.writes(dawn, slots: mixedSlots)) == nil, "no panel fiel
 check((try? SchedulePlan.writes(dawn, delete: true, slots: mixedSlots)) != nil, "deleting a light Schedule from an old controller is fine")
 var toSunset = dawn; toSunset.kind = 2
 check((try? SchedulePlan.writes(toSunset, slots: mixedSlots)) != nil, "changing it back to sunset writes to the old one too")
+// ADR 0007: Tilt makes only Light Schedules; old clock and sun ones still show and can be turned off or deleted
+check(SchedulePlan.kindsOffered(current: 3, isNew: true, light: true) == [3, 4], "a new Schedule: only the light kinds")
+check(SchedulePlan.kindsOffered(current: 0, isNew: true, light: false).isEmpty, "a new Schedule with no light trigger offered: nothing to pick")
+check(SchedulePlan.kindsOffered(current: 1, isNew: false, light: true) == [1, 3, 4], "an old sunrise Schedule keeps its own kind, and can become a light one")
+check(SchedulePlan.kindsOffered(current: 0, isNew: false, light: false) == [0], "an old clock Schedule with no light offered: only its own kind")
+check(SchedulePlan.kindsOffered(current: 4, isNew: false, light: true) == [3, 4], "a light Schedule: the light kinds")
+check(TiltWords.kindName(0) == "At a time" && TiltWords.kindName(2) == "At sunset" && TiltWords.kindName(4) == "When it gets dark", "the Starts picker's names")
+check(TiltWords.noPlace(["Dining room blinds"]) == "Will not run: no location on Dining room blinds. Tap Set Location below.", "the no-location warning names the controller")
+check(TiltWords.homeAutomations.contains("Apple Home or Alexa") && TiltWords.noLightYet.contains("Apple Home or Alexa") && TiltWords.oldSchedule.contains("Apple Home"), "the screens point to the home app")
+check(SchedulePlan.isOld(0) && SchedulePlan.isOld(1) && SchedulePlan.isOld(2) && !SchedulePlan.isOld(3) && !SchedulePlan.isOld(4), "clock and sun kinds are old")
+// a controller with no location: sun and light Schedules would never run there, so they are not written
+let noPlaceCfg = try JSONDecoder().decode(SchedConfig.self, from: Data(#"{"sched":[],"lat":null,"lon":null,"sun":[0,0]}"#.utf8))
+check(noPlaceCfg.placeMissing, "sun [0,0] (as the Dining controller sent on 2026-11-27): no location")
+check(!(try JSONDecoder().decode(SchedConfig.self, from: Data(#"{"sched":[],"sun":[1795780000,1795816000]}"#.utf8))).placeMissing, "a sunrise time: it has a location")
+check(!(try JSONDecoder().decode(SchedConfig.self, from: Data(#"{"sched":[]}"#.utf8))).placeMissing, "no sun field: not judged")
+check(SchedulePlan.missingPlace(dawn, noPlace: ["hall", "attic"]) == ["hall"], "only covered controllers with no location are named")
+check(SchedulePlan.missingPlace(Schedule(kind: 0, targets: covers), noPlace: ["den", "hall"]).isEmpty, "a clock Schedule needs no location")
+do { _ = try SchedulePlan.writes(dawn, slots: mixedSlots, panels: ["den": 1, "hall": 1], noPlace: ["hall"]); check(false, "a light Schedule with no location throws") }
+catch { check(error == .noPlace(controller: "hall"), "the controller with no location is named, and nothing is written") }
+var dawnOff = dawn; dawnOff.on = false
+check((try? SchedulePlan.writes(dawnOff, slots: mixedSlots, panels: ["den": 1, "hall": 1], noPlace: ["hall"])) != nil, "turning it off is fine with no location")
+check((try? SchedulePlan.writes(dawn, delete: true, slots: mixedSlots, noPlace: ["hall"])) != nil, "deleting it is fine with no location")
+check((try? SchedulePlan.writes(dawn, slots: mixedSlots, panels: ["den": 1, "hall": 1], noPlace: ["attic"])) != nil, "no location only on a controller it does not cover: written")
 let demoCfg = try JSONDecoder().decode(SchedConfig.self, from: await Demo.shared.answer(Api.config))
 check(demoCfg.panelSeen && demoCfg.sched.contains { $0.kind == 4 && $0.mask != 0 }, "the demo room has a panel and a light Schedule")
 

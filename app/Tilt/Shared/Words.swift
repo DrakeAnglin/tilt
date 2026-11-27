@@ -33,6 +33,20 @@ enum TiltWords {
         default: return nil
         }
     }
+    /// ADR 0007: where clock and sun automations are made now, under the Schedules list.
+    static let homeAutomations = "Make time, sunrise and sunset automations in Apple Home or Alexa. Schedules here follow the light, read from the controller's solar panel, and are kept on the controllers, so they run even when this phone is away."
+    /// Under an old clock or sun Schedule.
+    static let oldSchedule = "Move this to Apple Home or Alexa"
+    /// In a new Schedule when no covered controller offers the Light trigger yet.
+    static let noLightYet = "Schedules here follow the light, read from a solar panel. They show up about a day after a panel is plugged in. For a time, sunrise or sunset, make an automation in Apple Home or Alexa."
+    /// Under a Schedule that needs a location some of its controllers do not have.
+    static func noPlace(_ names: [String]) -> String {
+        "Will not run: no location on \(names.joined(separator: ", ")). Tap Set Location below."
+    }
+    /// The Starts picker's name for a Schedule kind.
+    static func kindName(_ kind: Int) -> String {
+        ["At a time", "At sunrise", "At sunset", "When it gets light", "When it gets dark"][max(0, min(4, kind))]
+    }
     /// What a light trigger does, under the Starts picker.
     static func lightTrigger(_ kind: Int) -> String {
         let (what, when) = kind == 3 ? ("light", "sunrise") : ("dark", "sunset")
