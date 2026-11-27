@@ -192,7 +192,7 @@ static std::string hubCommand(int slot, const std::string &cmd) {
   size_t qi = cmd.find('?');
   std::string path = cmd.substr(0, qi), q = qi == std::string::npos ? "" : cmd.substr(qi + 1);
   bool owner = people.keys[slot].role == 1;
-  if (const char *why = hubPermit(path, owner ? HUB_OWNER : HUB_USER)) return std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
+  if (const char *why = hubPermit(path, owner ? HUB_OWNER : HUB_GUEST)) return std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
   if (path == "/api/info") {                    // owners also get the hub's alert name (their phones watch it for its pushes)
     std::string j = infoJson();
     return owner ? "{\"topic\":\"" + hexOf(htopic, 16) + "\"," + j.substr(1) : j;
