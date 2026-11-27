@@ -1335,5 +1335,112 @@ check(TiltWords.action(50) == "50% toward up" && Schedule(tilt: -100).actionText
 check([127, 62, 65, 0].map { Schedule(days: $0).daysText } == ["Every day", "Weekdays", "Weekends", "Never"] && Schedule(days: 0b1010).daysText == "Mon Wed", "a Schedule's days")
 check(Schedule.clock(7 * 60 + 30).contains("7:30") && Schedule(kind: 0, minute: 7 * 60 + 30).whenText == Schedule.clock(450), "a clock time")
 
+// ---- the Schedules screen's store (Shared/ScheduleStore.swift), against fake controllers
+/// A controller that answers /api/cfg with `cfg` (changed between loads), takes every /api/sched, and records both.
+/// With `down`, it does not answer at all.
+struct SchedDevice: ControllerTransport {
+    let name: String, log: Recorder, cfg: Cell<String>, down: Cell<Bool>
+    var host: String { name }
+    func move(to host: String) async {}
+    func call(_ c: String) async throws -> Data {
+        if down.value { throw TiltError("\(name) is not answering") }
+        log.add("\(name) \(c)")
+        return Data((c == Api.config ? cfg.value : #"{"ok":1}"#).utf8)
+    }
+}
+@MainActor final class FakeHolder: ScheduleHolder {
+    nonisolated let id: String
+    let scheduleName: String, client: ControllerClient
+    let cfg: Cell<String>, down = Cell(false)
+    init(_ id: String, name: String, log: Recorder, cfg: String) {
+        self.id = id; scheduleName = name; self.cfg = Cell(cfg)
+        client = ControllerClient(transport: SchedDevice(name: id, log: log, cfg: self.cfg, down: down))
+    }
+}
+/// A /api/cfg answer: 8 slots (slot 0 as given), a panel, and today's sunrise and sunset (0 = no location).
+func schedCfg(slot0: SchedSlot = .empty, rise: Int = 1_795_780_000, panel: Int = 1) -> String {
+    let empty = #"{"on":0,"days":127,"mask":0,"min":480,"tilt":0,"kind":0,"off":0,"ramp":0,"gid":0}"#
+    let s0 = "{\"on\":\(slot0.on),\"days\":\(slot0.days),\"mask\":\(slot0.mask),\"min\":\(slot0.min),\"tilt\":\(slot0.tilt),\"kind\":\(slot0.kind),\"off\":\(slot0.off),\"ramp\":\(slot0.ramp),\"gid\":\(slot0.gid)}"
+    let sun = rise == 0 ? "[0,0]" : "[\(rise),\(rise + 36_000)]"
+    return "{\"ports\":3,\"slots\":8,\"sched\":[\(([s0] + Array(repeating: empty, count: 7)).joined(separator: ","))],\"sun\":\(sun),\"panel\":\(panel)}"
+}
+let schedLog = Recorder()
+let sunrise1 = SchedSlot(on: 1, days: 127, mask: 7, min: 480, tilt: 0, kind: 1, off: 0, ramp: 0, gid: 11)   // an old sunrise Schedule
+let denC = FakeHolder("den", name: "Den", log: schedLog, cfg: schedCfg())
+let dining = FakeHolder("dining", name: "Dining room blinds", log: schedLog, cfg: schedCfg(slot0: sunrise1, rise: 0))
+var remembered: [(Date, Date)] = []
+let store = AutomationStore(remember: { remembered.append(($0, $1)) })
+await store.load([denC, dining])
+check(store.noPlace == ["dining"], "the controller that sent sun [0,0] has no location; the other has one")
+check(store.hasPlace && store.sun?.rise == Date(timeIntervalSince1970: 1_795_780_000), "today's sunrise comes from the controller that has a location")
+check(remembered.count == 1 && remembered[0].0 == Date(timeIntervalSince1970: 1_795_780_000), "only a real sunrise is passed on to the sky colors, never 0 (1970)")
+check(store.placeButton == "Set Location for Sunrise and Sunset", "one controller without a location: the button says Set, not Update")
+check(store.schedules.count == 1 && store.schedules[0].kind == 1, "the old sunrise Schedule is listed")
+check(store.notes(store.schedules[0]) == [ScheduleNote(text: TiltWords.oldSchedule), ScheduleNote(text: "Will not run: no location on Dining room blinds. Tap Set Location below.", warn: true)],
+      "an old sunrise Schedule on a controller with no location: where it belongs now, and that it will not run, by name")
+var sunriseOff = store.schedules[0]; sunriseOff.on = false
+check(store.notes(sunriseOff) == [ScheduleNote(text: TiltWords.oldSchedule)], "turned off: no will-not-run warning")
+check(store.notes(Schedule(kind: 0, targets: [BlindTarget(controller: "dining", blind: 0)])) == [ScheduleNote(text: TiltWords.oldSchedule)], "a clock Schedule needs no location: no warning")
+check(store.notes(Schedule(kind: 3, targets: [BlindTarget(controller: "den", blind: 0)])).isEmpty, "a light Schedule where there is a location: no lines")
+// a light Schedule on both: refused, and nothing at all is sent (not even to the controller that has a location)
+let both2 = Schedule(id: 77, kind: 3, targets: [BlindTarget(controller: "den", blind: 0), BlindTarget(controller: "dining", blind: 0)])
+let sentBefore = schedLog.all.count
+do { try await store.save(both2, controllers: [denC, dining]); check(false, "a light Schedule on a controller with no location is refused") }
+catch { check(error.localizedDescription == "Dining room blinds has no location, so this Schedule would never run. Tap Set Location, then save again.", "the refusal names the controller (got \(error.localizedDescription))") }
+check(schedLog.all.count == sentBefore, "a refused save sends nothing to any controller")
+// turning the old one off works with no location, and is written to the controller that holds it
+try await store.save(sunriseOff, controllers: [denC, dining])
+let offWrites = schedLog.all.dropFirst(sentBefore).filter { $0.contains("/api/sched") }
+check(offWrites == ["dining " + ControllerClient.scheduleCommand(slot: 0, SchedSlot(on: 0, days: 127, mask: 7, min: 480, tilt: 0, kind: 1, off: 0, ramp: 0, gid: 11))], "turning it off writes on=0 to its own slot, and nothing else (got \(offWrites))")
+check(schedLog.all.last == "dining " + Api.config, "after a save the store reads the controllers again")
+// the location is set on Dining and taken away on Den: the next load shows both at once, nothing left over
+dining.cfg.value = schedCfg(slot0: sunrise1); denC.cfg.value = schedCfg(rise: 0)
+await store.load([denC, dining])
+check(store.noPlace == ["den"], "Den lost its location, Dining has one now")
+dining.cfg.value = schedCfg(slot0: sunrise1, rise: 0)
+await store.load([denC, dining])
+check(!store.hasPlace && store.sun == nil, "no controller has a location any more: no sunrise left over from before")
+check(store.placeButton == "Set Location for Sunrise and Sunset", "and the button says Set")
+// a controller that does not answer: not judged as having no location, and a save that covers it names it
+denC.down.value = true; dining.cfg.value = schedCfg(slot0: sunrise1)
+await store.load([denC, dining])
+check(store.noPlace.isEmpty && store.hasPlace, "a controller that does not answer is not called one with no location")
+check(store.placeButton == "Update Location for Sunrise and Sunset", "every controller that answered has one: Update")
+check(store.everyBlind([denC, dining]).count == 6, "every Port of both controllers, the one not answering too (its last known limits)")
+do { try await store.save(both2, controllers: [denC, dining]); check(false, "a save covering a controller that did not answer is refused") }
+catch { check(error.localizedDescription == "Den did not answer. Try again when it is reachable.", "it names the silent controller (got \(error.localizedDescription))") }
+denC.down.value = false
+check(TiltWords.planProblem(.full(controller: "den"), name: { $0 == "den" ? "Den" : "?" }, slots: { _ in 8 }) == "Den already has 8 schedules.", "a full controller: its name and slot count")
+check(TiltWords.planProblem(.noLight(controller: "x"), name: { _ in "Hall" }, slots: { _ in 0 }).hasPrefix("Hall needs a firmware update"), "old firmware: named")
+// a new light Schedule on two controllers with a location: one slot on each
+denC.cfg.value = schedCfg()
+await store.load([denC, dining])
+let sentNew = schedLog.all.count
+try await store.save(both2, controllers: [denC, dining])
+let newWrites = schedLog.all.dropFirst(sentNew).filter { $0.contains("/api/sched") }.sorted()
+check(newWrites.count == 2 && newWrites[0].hasPrefix("den /api/sched?i=0&") && newWrites[1].hasPrefix("dining /api/sched?i=1&") && newWrites.allSatisfy { $0.contains("kind=3") && $0.contains("gid=77") },
+      "a light Schedule goes to the first free slot on each controller (Dining's slot 0 is taken) (got \(newWrites))")
+// the editor's rules (ScheduleForm)
+let room = Schedule.everyPort([("den", 3), ("dining", 3)])
+let lit = ["den": 1, "dining": 0], dark = ["den": 0, "dining": 0]
+var form = ScheduleForm(schedule: Schedule(kind: 3, targets: room), isNew: true, all: true, everyBlind: room, panels: lit)
+check(form.kinds == [3, 4] && form.canSave && form.footer == TiltWords.lightTrigger(3), "a new Schedule where a panel was seen: light or dark, and it can be saved")
+form.panels = dark
+check(form.kinds.isEmpty && !form.canSave && form.footer == TiltWords.noLightYet, "no panel seen anywhere: nothing to pick, no Save, and the footer says why")
+form.panels = lit; form.all = false; form.schedule.targets = [BlindTarget(controller: "dining", blind: 0)]
+check(form.kinds.isEmpty && !form.canSave, "only blinds on a controller with no panel picked: the light kinds go, Save goes")
+form.schedule.targets = []
+check(!form.canSave, "no blinds picked: no Save")
+form.schedule.targets = [BlindTarget(controller: "den", blind: 1)]; form.schedule.days = 0
+check(form.kinds == [3, 4] && !form.canSave, "no days: no Save")
+form.schedule.days = 127; form.schedule.kind = 1
+check(!form.canSave, "a new Schedule can never be saved as sunrise, even if its kind was set to it some other way")
+var oldForm = ScheduleForm(schedule: Schedule(on: true, kind: 1, targets: room), isNew: false, all: true, everyBlind: room, panels: dark)
+check(oldForm.kinds == [1] && oldForm.canSave && oldForm.footer == TiltWords.oldSchedule + ".", "an old sunrise Schedule, no panel: it keeps its kind, can be saved (to turn it off), and says to move it")
+oldForm.panels = lit
+check(oldForm.kinds == [1, 3, 4], "with a panel it can also become a light one")
+oldForm.schedule.kind = 4
+check(oldForm.kinds == [3, 4] && oldForm.footer == TiltWords.lightTrigger(4), "once changed to light, sunrise is no longer offered back")
+
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

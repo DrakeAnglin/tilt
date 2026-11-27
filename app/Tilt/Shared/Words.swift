@@ -34,7 +34,7 @@ enum TiltWords {
         }
     }
     /// ADR 0007: where clock and sun automations are made now, under the Schedules list.
-    static let homeAutomations = "Make time, sunrise and sunset automations in Apple Home or Alexa. Schedules here follow the light, read from the controller's solar panel, and are kept on the controllers, so they run even when this phone is away."
+    static let homeAutomations = "Make time, sunrise and sunset automations in Apple Home or Alexa. Schedules here follow the light, read from the controller's solar panel, and are kept on the controllers, so they run even when this phone is away. The play button runs one right now."
     /// Under an old clock or sun Schedule.
     static let oldSchedule = "Move this to Apple Home or Alexa"
     /// In a new Schedule when no covered controller offers the Light trigger yet.
@@ -42,6 +42,15 @@ enum TiltWords {
     /// Under a Schedule that needs a location some of its controllers do not have.
     static func noPlace(_ names: [String]) -> String {
         "Will not run: no location on \(names.joined(separator: ", ")). Tap Set Location below."
+    }
+    /// Why a Schedule edit was not written (SchedulePlan.writes), naming the controller. `slots`: how many it has.
+    static func planProblem(_ p: PlanProblem, name: (String) -> String, slots: (String) -> Int) -> String {
+        switch p {
+        case .full(let c): return "\(name(c)) already has \(slots(c)) schedules."
+        case .notRead(let c): return "\(name(c)) did not answer. Try again when it is reachable."
+        case .noLight(let c): return "\(name(c)) needs a firmware update before it can run a Schedule that follows the light."
+        case .noPlace(let c): return "\(name(c)) has no location, so this Schedule would never run. Tap Set Location, then save again."
+        }
     }
     /// The Starts picker's name for a Schedule kind.
     static func kindName(_ kind: Int) -> String {
