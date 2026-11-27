@@ -26,7 +26,7 @@ The board was drawn for an MCP73871 charger module and a separate USB-C board (J
 | Layers | 2, GND poured on both and stitched with ~80 vias; 1 mm motor-return GND track from the jacks to the battery / charger GND |
 | Tracks | 0.3 mm signals, 0.6–0.8 mm power; 0.2 mm clearance; vias 0.7 / 0.35 mm |
 | Checks | KiCad 10: **DRC 0 violations, 0 unconnected; ERC 0 violations; schematic ↔ board parity 0 differences** (re-run 2026-11-07, v2.2) |
-| Files | [schematic (PDF)](controller/controller-schematic.pdf), [controller.kicad_pro](controller/controller.kicad_pro) (open in KiCad), [parts list (CSV)](controller/controller-bom.csv), [controller-pcbway.zip](controller/controller-pcbway.zip) (Gerbers + drill: upload this) |
+| Files | [schematic (PDF)](controller/controller-schematic.pdf), [controller.kicad_pro](controller/controller.kicad_pro) (open in KiCad), [parts list (CSV)](controller/controller-bom.csv) (every footprint on the board, J3 included: J3 is not used, and the RJ12 jacks and fuses are only for the ports you use; buy from the [BOM](../BOM.md#parts-on-the-pcb)), [controller-pcbway.zip](controller/controller-pcbway.zip) (Gerbers + drill: upload this) |
 
 Generated, not drawn: [netlist.py](netlist.py) holds the parts and connections; [schematic.py](schematic.py) writes the
 schematic from it; [board.py](board.py) places the parts, routes the copper with [router.py](router.py), pours and

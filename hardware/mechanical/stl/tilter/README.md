@@ -50,7 +50,7 @@ PETG is for the parts that rub or mesh against PLA all the time.
 | Super Lube 21030 | a little | worm, wheel, every gear, the carrier's hub, the sleeve's nose |
 | Foam pad, 3/8 in (about 10 mm) across, 2 mm thick | 6 | 4 under the floor, 1 on each long side wall (step D6) |
 
-Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout, 10 µF): [BOM](../../../BOM.md#one-tilter).
+Electronics (N20, AS5600 with magnet, DRV8833, RJ12 breakout): [BOM](../../../BOM.md#one-tilter).
 
 ## Assembly
 Two subassemblies, each step by step with photos:

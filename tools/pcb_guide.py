@@ -601,13 +601,15 @@ def md():
         for r in refs:
             groups.setdefault(val(r), []).append((r, k))
     for v, lst in groups.items():
-        a('| %s | %d | %s | %s |' % (v + (' (optional, not used with the 6092)' if any(r == 'J3' for r, _ in lst) else ''), len(lst),
+        a('| %s | %d | %s | %s |' % (v + (' (**not used** with the 6092: leave empty, don\'t buy)' if any(r == 'J3' for r, _ in lst) else ''), len(lst),
                                    ', '.join(r for r, _ in lst), ', '.join(sorted({str(k) for _, k in lst}))))
     a('| ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |')
     a('| Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |')
     a('| JST-XH crimp pins on 22 AWG wire (or the optional pre-crimped leads) for the J5 harness, + heat-shrink | 4 | J5 plug | 11 |')
     a('| 18650 cell with its JST-XH plug | 1 | J4 | 12 |')
     a('| Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |')
+    a('')
+    a('**RJ12 jacks and fuses:** one of each per port you use (step 7), not always three.')
     a('')
     a('Nothing goes in the five square **test pads** (TP1 BAT+, TP2 5V, TP3 3V3, TP4 PWR, TP5 GND, a row near the middle and')
     a('one by the 470 µF). They\'re for the meter. The three big holes (H1–H3) take the box\'s M3 screws.')
@@ -619,7 +621,7 @@ def md():
     a('| Resistors, ceramic capacitors, fuses | **No** | either way round |')
     a('| **1N5819 diodes (D1–D3), 6.2 V zener (D4)** | **YES** | the **band** on the part goes over the **square pad**, where the silkscreen has its thick band line (red **K** in the pictures) |')
     a('| **470 µF capacitor (C9)** | **YES** | **long leg (+) in the square pad**, by the silkscreen\'s **+**; the can\'s stripe (−) on the shaded half of the circle |')
-    a('| **Sockets J1, J2, J3** | fit either way, but **solder them straight** | pin 1 is the square pad |')
+    a('| **Sockets J1, J2** | fit either way, but **solder them straight** | pin 1 is the square pad |')
     a('| **JST headers J4, J5, J8** | **YES** | match the silkscreen outline. Before soldering, push the plug in and hold it over the board: the wires must land on the pads named on the silkscreen (J4: **−  +**, J5: **G  B+  (blank)  L+  (blank)  P+**, J8: **−  +**) |')
     a('| **RJ12 jacks** | fit only one way | two plastic pegs |')
     a('| **ESP32-C6** | **YES** | **chip up, its USB toward end B** (silkscreen: "ESP32-C6: chip up, USB this way"); its 5V pin in J1 pin 1 |')
@@ -721,9 +723,8 @@ def md():
     a('1. **ESP sockets J1, J2 (10-way):** push both onto the ESP32-C6\'s pins, set the ESP and sockets into the board')
     a('   (chip up, USB toward end B), solder one pin at each end of each socket, check they sit flat and square, solder the')
     a('   rest, then lift the ESP back out. That way the two rows end up exactly the ESP\'s width apart.')
-    a('2. **USB-C socket J3 (6-way): optional, not used.** USB now plugs into the charger\'s own USB-C (step 11), so nothing')
-    a('   plugs into J3. Leave it empty, or solder it anyway (harmless; it keeps the option of the old USB-C board).')
-    a('   Pin 1 is the square pad, at the room-side edge.')
+    a('2. **J3 (6-way, for the old USB-C board): not used.** USB plugs into the charger\'s own USB-C (step 11), so nothing')
+    a('   plugs into J3. Leave it empty; you don\'t need to buy its socket.')
     a('')
     # ---- step 6
     a('## Step 6: JST headers (3)')
@@ -753,6 +754,10 @@ def md():
     a('fully down and square** before soldering the six pins: in the box each jack slides through an opening cut to its own')
     a('outline with 0.3 mm to spare, so a tilted jack won\'t go in. Solder the two outer pins, check from the front, then the')
     a('rest.')
+    a('')
+    a('**Only the ports you use.** Each port needs its own jack and its own fuse (port 1: J9 + F1, port 2: J10 + F2,')
+    a('port 3: J11 + F3). A controller for one blind needs one of each; start with port 1. A port without them is just')
+    a('empty holes.')
     a('')
     # ---- step 8
     a('## Step 8: 470 µF capacitor (1)')
