@@ -82,7 +82,7 @@ C = dict(
     # G BAT 3V EN, VIN at the USB-C end) along one long edge, 2.54 in. Board coordinates: x from the USB-C edge, y from
     # the pad-row edge.
     c6_l=29.21, c6_w=19.05, c6_t=1.6, c6_holes=((2.54, 2.54), (26.67, 2.54), (2.54, 16.51), (26.67, 16.51)),
-    c6_post=4.0, c6_post_d=4.4, c6_pilot=1.6,     # posts 4 tall: room under the board for the pads' solder, and the M2 x 6 screws' tips stop 0.8 above the box's underside (at 3 tall they came out through the floor); pilot for M2 self-tapping screws
+    c6_post=4.0, c6_post_d=4.4, c6_pilot=1.6,     # posts 4 tall: room under the board for the pads' solder, and the M2 x 6 screws' tips stop 0.8 above the box's underside (at 3 tall they came out through the floor); pilot for M2 × 6 screws
     c6_stud_d=2.1, c6_stud_up=0.8,                # studs in the two holes by end wall B: short, only for indexing (half the board)
     c6_bevel=1.0,                                 # 45 deg lead-in on the slot's top inner edge, so the board angles down and in
     c6_usb=(3.94, 9.525), c6_usb_w=8.94, c6_usb_h=3.26, c6_usb_len=7.35, c6_usb_over=1.0,

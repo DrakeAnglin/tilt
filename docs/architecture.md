@@ -113,7 +113,7 @@ A reversed cord would put battery + on IN2, so the continuity check matters.
 ## Connectors
 | Link | Connector |
 |---|---|
-| Tilter to controller | RJ12 6P6C, white straight-wired cord |
+| Tilter to controller | RJ12 6P6C, straight-wired cord (any color) |
 | Battery to PCB | JST-XH 2-pin (on the cell's lead) |
 | Charger to PCB | JST-XH 6-pin harness |
 | Solar to PCB (optional) | JST-ZH 2-pin. v3 gets a DC jack instead ([#8](https://github.com/DrakeAnglin/tilt/issues/8)) |
