@@ -113,7 +113,7 @@ Setting a blind's Marks. In the app this is **Setup**, always one word ("Setup r
 A named set of target tilts across any blinds. Kept on the controllers (each holds its own blinds' part), so every phone with a key, Owner or Guest, sees and edits the same Scenes ([ADR 0006](docs/adr/0006-scenes-live-on-the-controllers.md)). A phone runs it by moving each blind.
 
 **Schedule**:
-A trigger (clock time, sunrise/sunset plus an offset, or a Light trigger) that applies a Scene. Stored on each controller for its own blinds so it runs with the phone away. Gentle wake is a kind of Schedule (a slow ramp), not its own concept.
+A trigger (clock time, sunrise/sunset plus an offset, or a Light trigger) that applies a Scene. Stored on each controller for its own blinds so it runs with the phone away. Gentle wake is a kind of Schedule (a slow ramp), not its own concept. Going forward Tilt keeps only the Light trigger; clock and sun automations belong to the home (Apple Home, Alexa) ([ADR 0007](docs/adr/0007-automations-live-in-the-home.md)).
 
 **Light trigger**:
 A Schedule that starts "When it gets dark" or "When it gets light", read from the controller's solar panel input, inside a window of 90 minutes around sunset or sunrise (plus the offset). It runs at most once a day; with no steady reading by the window's end it runs then (falls back), and on a controller with no solar panel seen it runs at the sunset or sunrise time. Each controller decides by its own panel.
