@@ -172,7 +172,8 @@ shell). This is much easier than fishing the screws in from the back afterward.
   its hole.
 - The **floor bolt** goes in beside it.
 
-Tighten both down. Then check: the worm's loop turns the whole train, with no tight spot.
+Tighten both down, but don't overtighten the room-side bolt: pulled too hard, it bows the motor plate onto the
+cluster gear. Then check: the worm's loop turns the whole train, with no tight spot.
 
 ![tray going on with its two screws already in, sensor module to the side](photos/tilter/d2-tray-on.jpg)
 
