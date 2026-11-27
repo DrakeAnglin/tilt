@@ -42,6 +42,12 @@ enum TiltWords {
     static func action(_ tilt: Int) -> String {
         tilt == 0 ? "Open" : tilt == 100 ? "Close up" : tilt == -100 ? "Close down" : long(Double(tilt))
     }
+    /// What the chosen role can do, under the Guest/Owner picker on the join sheet.
+    static func role(owner: Bool) -> String {
+        owner
+            ? "An owner can also change settings, run blind setup, make schedules, and approve or remove people."
+            : "A guest can open and close the blinds and make or change scenes."
+    }
     static func status(_ b: BlindState) -> String {
         if b.seen == 1 && b.pres == 0 { return "Not connected" }
         if b.cal == 0 { return "Setup required" }
