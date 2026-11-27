@@ -50,3 +50,10 @@ def main(argv=None):
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def share_used(used, total):
+    """Throwaway for the coverage gate test pull request (#238): never merged."""
+    if total <= 0:
+        return 0.0
+    return 100.0 * used / total
