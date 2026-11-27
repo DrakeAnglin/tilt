@@ -26,7 +26,8 @@
 #include <esp_http_server.h>
 #include "ardu.h"
 #include "logic.h"                               // nonceFresh, permitRule
-#include "store.h"                               // nvs, event, cleanText
+#include "store.h"                               // nvs, event
+#include "wire.h"                                // keptName: a phone's name as typed
 #include "lock.h"                                // mx
 #include "tilt_crypto.h"                         // hexOf, unhex, hmac256, gcm (shared with the Tilt Hub)
 #include "tilt_link.h"                           // linkKey, proofs, the hub link's layouts (shared with the Tilt Hub)
@@ -152,7 +153,7 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false, boo
   k.used = ask ? 2 : 1; k.role = first ? 1 : 0;
   esp_fill_random(k.id, 8);
   memcpy(k.key, pk.key, 32);
-  cleanText(k.name, sizeof k.name, jsonStr(b, "name"));
+  strlcpy(k.name, keptName(jsonStr(b, "name"), sizeof k.name - 1).c_str(), sizeof k.name);   // as typed (UTF-8): wire.h
   if (!k.name[0]) strlcpy(k.name, "iPhone", sizeof k.name);
   keysSave();
   lastCtr[slot] = 0;

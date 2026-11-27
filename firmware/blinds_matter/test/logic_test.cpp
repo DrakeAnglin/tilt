@@ -998,8 +998,19 @@ int main() {
         {"Den \"Caf\xC3\xA9\"", 23, "Den \"Caf\xC3\xA9\""},
         {"Master Bedroom East \xF0\x9F\x8E\xAC", 23, "Master Bedroom East"},
         {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 23, "bbbbbbbbbbbbbbbbbbbbbbb"},
+        {"O\xE2\x80\x99" "Brien", 19, "O\xE2\x80\x99" "Brien"},                        // a phone's name (19 bytes)
+        {"cccccccccccccccccccccccccccccc", 19, "ccccccccccccccccccc"},
     };
-    for (const NameCase &c : names) CHECK(keptName(c.in, c.bytes) == c.kept, "a blind or controller name kept as the app fits it");
+    for (const NameCase &c : names) CHECK(keptName(c.in, c.bytes) == c.kept, "a blind, controller or phone name kept as the app fits it");
+
+    // ---- the People list on the wire (/api/keys on a controller; the Tilt Hub builds its rows the same way)
+    std::string fixKeys = readFile("wire/keys.json");
+    std::string rows = "{\"keys\":[" + keyJson("0102030405060708", "Mom\xE2\x80\x99s \"caf\xC3\xA9\"", 1, 1, 0, "") + "," +
+                       keyJson("a1b2c3d4e5f60718", "Den\\Kid", 0, 0, 0, "") + "," + keyJson("ffeeddccbbaa9988", "Guest", 0, 0, 1, "0427") + "]}";
+    CHECK(!fixKeys.empty() && rows == fixKeys, "/api/keys matches wire/keys.json byte for byte");
+    if (rows != fixKeys) printf("  got: %s\n", rows.c_str());
+    CHECK(keyJson("01", "Bj\xC3\xB6rn Anders Lin\xC3", 0, 0, 0, "") == "{\"cid\":\"01\",\"name\":\"Bj\xC3\xB6rn Anders Lin\",\"owner\":0,\"me\":0,\"wait\":0,\"code\":\"\"}",
+          "a name cut inside a character (an old hub name) is written as valid UTF-8, the broken byte dropped");
     sq["mask"] = "1"; sq["t"] = "20";
     g = sceneOfArgs(sarg, 3);
     CHECK(g.t[0] == 20 && g.t[1] == 0 && g.t[2] == 0, "a short tilt list: the rest are 0, and blinds not in the Scene are 0");

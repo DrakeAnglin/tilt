@@ -210,8 +210,8 @@ void histPush(float v) {
   histSave();
 }
 
-// The time zone name and phone names only: keeps letters, digits and a few signs. Blind, controller and Scene names
-// are kept as typed (wire.h keptName).
+// The time zone name only: keeps letters, digits and a few signs. Every name a person types (a blind, the controller,
+// a Scene, a phone) is kept as typed (wire.h keptName).
 void cleanText(char *dst, size_t n, const String &src) {
   size_t k = 0;
   for (size_t i = 0; i < src.length() && k + 1 < n; i++) {

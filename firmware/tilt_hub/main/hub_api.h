@@ -200,19 +200,18 @@ static std::string hubCommand(int slot, const std::string &cmd) {
     std::string j = infoJson();
     return owner ? "{\"topic\":\"" + hexOf(htopic, 16) + "\"," + j.substr(1) : j;
   }
-  if (path == "/api/keys") {                     // the hub's people (as a controller lists its phones)
+  if (path == "/api/keys") {                     // the hub's people (as a controller lists its phones: wire.h keyJson)
     xSemaphoreTake(keyMx, portMAX_DELAY);
-    std::string j = "{\"ok\":1,\"keys\":[";
-    bool first = true;
-    for (int i = 0; i < HUB_KEYS; i++) {
-      HubKey &k = people.keys[i];
-      if (!k.used) continue;
-      j += std::string(first ? "" : ",") + "{\"cid\":\"" + hexOf(k.id, 8) + "\",\"name\":\"" + k.name + "\",\"owner\":" + (k.role ? "1" : "0") + ",\"me\":" + (i == slot ? "1" : "0") +
-           ",\"wait\":" + (k.used == 2 ? "1" : "0") + ",\"code\":\"" + (k.used == 2 && owner ? askCode(k.key) : std::string()) + "\"}";   // the code: owners only
-      first = false;
-    }
+    std::string j = people.listJson(slot, owner, askCode);
     xSemaphoreGive(keyMx);
-    return j + "]}";
+    return j;
+  }
+  if (path == "/api/keyname") {                  // this phone renames itself (only itself: no cid here)
+    xSemaphoreTake(keyMx, portMAX_DELAY);
+    const char *err = people.rename(slot, qv(q, "name").c_str());
+    xSemaphoreGive(keyMx);
+    if (err) return std::string("{\"ok\":0,\"err\":\"") + err + "\"}";
+    return "{\"ok\":1}";
   }
   if (path == "/api/leave") {                    // this phone leaves the hub (everywhere, not just on the phone)
     xSemaphoreTake(keyMx, portMAX_DELAY);

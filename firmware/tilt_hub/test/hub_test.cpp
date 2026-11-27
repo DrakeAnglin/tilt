@@ -52,6 +52,53 @@ static void permitTests() {
     CHECK(same(hubPermit(no, HUB_USER), "only the hub's owner can do that"), "user: not the owner's commands");
   CHECK(!hubPermit("/api/leave", HUB_WAITING), "waiting: may leave");
   for (const char *no : {"/api/info", "/api/keys", "/api/net", "/api/leave?x=1"}) CHECK(same(hubPermit(no, HUB_WAITING), "waiting"), "waiting: nothing but leave");
+  CHECK(!hubPermit("/api/keyname", HUB_OWNER) && !hubPermit("/api/keyname", HUB_USER), "owner and Guest: may rename their own phone");
+  CHECK(same(hubPermit("/api/keyname", HUB_WAITING), "waiting"), "waiting: may not rename");
+}
+
+// ---- phone names: kept as typed (wire.h keptName), 19 bytes at most
+static std::string fakeCode(const uint8_t key[32]) { return std::string("c") + std::to_string(key[0]); }
+static void nameTests() {
+  const char *mom = "Mom\xE2\x80\x99s \"caf\xC3\xA9\"";
+  { HubPeople p = fresh(); uint8_t id[8], key[32] = {0}; idOf(1, id);
+    p.pairTake(0, false, true, id, key, mom);
+    CHECK(!strcmp(p.keys[0].name, mom), "a name with a curly apostrophe, quotes and an accent is kept byte for byte");
+    // 15 letters and a 4-byte emoji, then more: 30 bytes in all
+    p.pairTake(1, true, false, id, key, "aaaaaaaaaaaaaaa\xF0\x9F\x8E\xAC" "bbbbbbbbbbb");
+    CHECK(!strcmp(p.keys[1].name, "aaaaaaaaaaaaaaa\xF0\x9F\x8E\xAC"), "a long name: 19 bytes, the emoji whole");
+    p.pairTake(2, true, false, id, key, "aaaaaaaaaaaaaaaaa\xF0\x9F\x8E\xAC");
+    CHECK(!strcmp(p.keys[2].name, "aaaaaaaaaaaaaaaaa"), "a name one emoji too long: cut before the emoji, never inside it");
+    p.pairTake(3, true, false, id, key, "");
+    CHECK(!strcmp(p.keys[3].name, "iPhone"), "no name: iPhone");
+    p.pairTake(3, true, false, id, key, "\x01\x02");
+    CHECK(!strcmp(p.keys[3].name, "iPhone"), "only control characters: iPhone"); }
+
+  { HubPeople p = fresh(); int a = addIn(p, 1, true), b = addIn(p, 2, false);
+    saves = 0;
+    CHECK(!p.rename(b, "O\xE2\x80\x99" "Brien") && !strcmp(p.keys[b].name, "O\xE2\x80\x99" "Brien"), "a Guest renames itself, as typed");
+    CHECK(!strcmp(p.keys[a].name, "phone") && saves == 1, "only the caller's name changes, saved once");
+    saves = 0;
+    CHECK(same(p.rename(b, "\x01\n\t"), "a name is needed") && !strcmp(p.keys[b].name, "O\xE2\x80\x99" "Brien") && saves == 0,
+          "a name of only control characters: refused, nothing changed"); }
+
+  { HubPeople p = fresh(); int a = addIn(p, 1, true);
+    p.rename(a, mom);
+    uint8_t wid[8], wkey[32] = {7}; idOf(2, wid);
+    int st = 0; const char *err = nullptr;
+    int w = p.pairPlace(true, st, err);
+    p.pairTake(w, true, false, wid, wkey, "Den\\Kid");          // a Join request
+    std::string want = "{\"ok\":1,\"keys\":[{\"cid\":\"0100000000000000\",\"name\":\"Mom\xE2\x80\x99s \\\"caf\xC3\xA9\\\"\",\"owner\":1,\"me\":1,\"wait\":0,\"code\":\"\"},"
+                       "{\"cid\":\"0200000000000000\",\"name\":\"Den\\\\Kid\",\"owner\":0,\"me\":0,\"wait\":1,\"code\":\"c7\"}]}";
+    std::string got = p.listJson(a, true, fakeCode);
+    CHECK(got == want, "the people list: quotes and \\ escaped, me marked, the join code for an owner");
+    if (got != want) printf("  got: %s\n", got.c_str());
+    int g = addIn(p, 3, false);
+    std::string guest = p.listJson(g, false, fakeCode);
+    CHECK(guest.find("\"code\":\"\"},{\"cid\":\"0300000000000000\",\"name\":\"phone\",\"owner\":0,\"me\":1") != std::string::npos &&
+          guest.find("c7") == std::string::npos, "a Guest: no join code; its own row marked me");
+    memcpy(p.keys[a].name, "Lin\xC3\xA9" "aaaaaaaaaaaaaa", 19);   // an old hub name, cut at 19 bytes inside a character
+    p.keys[a].name[18] = '\xC3';
+    CHECK(p.listJson(a, true, fakeCode).find("\"name\":\"Lin\xC3\xA9" "aaaaaaaaaaaaa\"") != std::string::npos, "a name cut inside a character: the broken byte is not written"); }
 }
 
 static void pairTests() {
@@ -285,6 +332,7 @@ static void hubTrialTests() {
 int main() {
   permitTests();
   pairTests();
+  nameTests();
   lockoutTests();
   waitingTests();
   peopleOpTests();

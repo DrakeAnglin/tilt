@@ -59,6 +59,8 @@ static std::string jsonStr(const std::string &j, const char *key) {
   if (o) cJSON_Delete(o);
   return r;
 }
+// For text no person types (the firmware version, an update error): no quotes, backslashes or control characters.
+// A phone's name is kept as typed instead (hub_people.h pairTake, wire.h keptName).
 static void cleanName(char *out, size_t n, const std::string &in) {
   size_t k = 0;
   for (char ch : in) if (k + 1 < n && (unsigned char)ch >= 32 && ch != '"' && ch != '\\') out[k++] = ch;
@@ -81,10 +83,8 @@ static int pairDo(const std::string &b, std::string &out, bool ask) {
   int slot = people.pairPlace(ask, st, why);
   if (slot < 0) { xSemaphoreGive(keyMx); out = std::string("{\"err\":\"") + why + "\"}"; return st; }
   uint8_t id[8];
-  char name[sizeof(HubKey::name)];
   esp_fill_random(id, 8);
-  cleanName(name, sizeof name, jsonStr(b, "name"));
-  people.pairTake(slot, ask, first, id, pk.key, name);
+  people.pairTake(slot, ask, first, id, pk.key, jsonStr(b, "name").c_str());   // the name as it came: pairTake keeps it (wire.h)
   HubKey &k = people.keys[slot];
   if (ask) ESP_LOGI(TAG, "%s asked to join the hub", k.name); else ESP_LOGI(TAG, "%s is connecting (owner, once its code is right)", k.name);
   std::string code = ask ? askCode(k.key) : std::string();

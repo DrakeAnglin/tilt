@@ -126,6 +126,13 @@ inline std::string keptName(const std::string &in, size_t maxBytes) {
   while (!o.empty() && o.back() == ' ') o.pop_back();
   return o;
 }
+// ---- the People list: one phone's row of /api/keys, on a controller and on the Tilt Hub. The name goes through
+// keptName (19 bytes: ClientKey and HubKey name[20]), so a name kept before this rule (an old hub's, cut inside a
+// character) still reads as valid UTF-8. code: the join code of a phone that waits ("" for the rest, and for a Guest).
+inline std::string keyJson(const std::string &cidHex, const std::string &name, int owner, int me, int wait, const std::string &code) {
+  return "{\"cid\":\"" + cidHex + "\",\"name\":" + jq(keptName(name, 19).c_str()) + ",\"owner\":" + std::to_string(owner) + ",\"me\":" + std::to_string(me) +
+         ",\"wait\":" + std::to_string(wait) + ",\"code\":\"" + code + "\"}";
+}
 // A Scene write, from the query. Out-of-range values are brought into range; the icon keeps only a-z, 0-9 and dots
 // (an SF Symbol name). The name is kept as typed (keptName, by the caller).
 template <class Arg> WireScene sceneOfArgs(Arg arg, int ports) {
