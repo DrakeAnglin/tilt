@@ -116,6 +116,6 @@ Remove the lock. Leave the worktree (`ExitWorktree`, `keep`; `tools/agent/clean_
 ## If a stage goes wrong
 
 - An agent fails or stops without its answer: start it again once with the same prompt.
-- A second failure from the model service (overloaded, rate limit, timeout, `API Error`): not the owner's problem. Post a comment on the issue with `<!-- loop-retry -->` and one line of what failed, keep the `agent-loop` label, and go to step 8: the next run resumes it. Step 7 only when the issue already has two `<!-- loop-retry -->` comments, so three runs in a row failed.
+- A second failure from the model service (overloaded, rate limit, timeout, `API Error`): not the owner's problem. Post a comment on the issue with `<!-- loop-retry -->` and one line of what failed, keep the `agent-loop` label, and go to step 8: the next run resumes it. Step 7 only when the issue already has two `<!-- loop-retry -->` comments by `DrakeAnglin` (anyone can comment on this public repo), so three runs in a row failed.
 - A second failure for any other reason: step 7.
 - The run is cut off (the Mac sleeps, the app closes): nothing to do. The `agent-loop` label and the comments on GitHub say where it got to, and the next run finishes it (step 1). The stale lock runs out after 3 hours.
