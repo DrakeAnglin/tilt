@@ -80,7 +80,7 @@ def copies(name):
     return [name] + ['%s_%d' % (name, k) for k in range(2, PARTS[name][3] + 1)]
 
 
-if __name__ == '__main__':
+def main():
     os.makedirs(OUT, exist_ok=True)
     for name, (rot, _, _, count, how) in PARTS.items():
         tris, size = orient(read(os.path.join(SRC, name + '.stl')), rot)
@@ -89,3 +89,7 @@ if __name__ == '__main__':
                                                      ' (print %d)' % count if count > 1 else ''))
         for copy in copies(name)[1:]:
             shutil.copy(os.path.join(OUT, name + '.stl'), os.path.join(OUT, copy + '.stl'))
+
+
+if __name__ == '__main__':
+    main()

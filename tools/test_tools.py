@@ -411,6 +411,47 @@ class Orient(unittest.TestCase):
         self.assertEqual(orient.copies('planet'), ['planet', 'planet_2', 'planet_3', 'planet_4'])
         self.assertEqual(orient.copies('worm'), ['worm'])
 
+    # A small part: one triangle across a 4 x 2 x 6 box at x 1..5, y 10..12, z -3..3 (all exact in float32).
+    TRIS = [(0.0, 0.0, 1.0, 1.0, 10.0, -3.0, 5.0, 10.0, 0.0, 1.0, 12.0, 3.0),
+            (1.0, 0.0, 0.0, 5.0, 12.0, 3.0, 1.0, 10.0, -3.0, 5.0, 11.0, 1.5)]
+
+    def test_write_then_read_gives_the_same_triangles(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'p.stl')
+            orient.write(path, self.TRIS)
+            self.assertEqual(os.path.getsize(path), 84 + 50 * len(self.TRIS))
+            self.assertEqual(orient.read(path), self.TRIS)
+
+    def test_orient_centers_the_part_and_stands_it_on_the_bed(self):
+        sizes = {orient.ID: [4, 2, 6], orient.FLIP: [4, 2, 6], orient.X_UP: [6, 2, 4], orient.X_DOWN: [6, 2, 4]}
+        for rot, size in sizes.items():
+            tris, got = orient.orient(self.TRIS, rot)
+            self.assertEqual(got, size)
+            pts = [t[3 + 3 * k:6 + 3 * k] for t in tris for k in range(3)]
+            for j in (0, 1):
+                self.assertAlmostEqual(min(p[j] for p in pts) + max(p[j] for p in pts), 0)
+            self.assertAlmostEqual(min(p[2] for p in pts), 0)
+            self.assertEqual(tris[0][:3], rot(*self.TRIS[0][:3]))      # normals turn, never move
+
+    def test_main_writes_one_file_per_printed_copy(self):
+        import contextlib, io
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            src, out = os.path.join(d, 'tilter'), os.path.join(d, 'tilter', 'print')
+            os.makedirs(src)
+            for name in orient.PARTS:
+                orient.write(os.path.join(src, name + '.stl'), self.TRIS)
+            with mock.patch.object(orient, 'SRC', src), mock.patch.object(orient, 'OUT', out), \
+                    contextlib.redirect_stdout(io.StringIO()) as said:
+                orient.main()
+            want = sorted(c + '.stl' for n in orient.PARTS for c in orient.copies(n))
+            self.assertEqual(sorted(os.listdir(out)), want)
+            self.assertIn('planet_4.stl', want)
+            self.assertEqual(orient.read(os.path.join(out, 'planet_4.stl')), orient.read(os.path.join(out, 'planet.stl')))
+            self.assertEqual(orient.read(os.path.join(out, 'worm.stl')), orient.orient(self.TRIS, orient.PARTS['worm'][0])[0])
+            self.assertIn('(print 4)', said.getvalue())
+            self.assertEqual(len(said.getvalue().splitlines()), len(orient.PARTS))
+
 
 @unittest.skipUnless(os.path.isdir(bambu.PRINT), 'no oriented STLs (run tools/orient.py)')
 class BambuPacking(unittest.TestCase):
