@@ -177,6 +177,26 @@ inline PowerSource powerSourceOf(bool powered, bool clockOk, uint32_t now, uint3
 // ---- time zone: the POSIX zone string Schedules run on (Settings.tz: cap bytes, its end included)
 // A zone a controller takes: at least 3 characters, and it fits the field.
 inline bool zoneOk(const char *tz, size_t cap) { size_t n = strlen(tz); return n >= 3 && n < cap; }
+// ---- a settings backup (hub_link.h hRestore): "TB1", three uint16 sizes, then Settings, Tune, SchedExtra and 4 bytes.
+// The parts as this firmware has them. Each part that has a magic holds it in its first 4 bytes.
+struct BackupLayout { size_t settings, tune, sched; uint32_t settingsMagic, schedMagic; size_t tzAt, tzCap; };
+// Why this backup is refused, or nullptr when it may be taken. It only reads the blob: a refused backup changes nothing.
+inline const char *backupRefusal(const uint8_t *b, size_t n, const BackupLayout &l) {
+  if (n < 9 || memcmp(b, "TB1", 3)) return "not a Tilt backup";
+  uint16_t sz[3];
+  memcpy(sz, b + 3, sizeof sz);
+  if (sz[0] != l.settings || sz[1] != l.tune || sz[2] != l.sched || n != 9 + l.settings + l.tune + l.sched + 4)
+    return "this backup is from a different firmware";
+  const uint8_t *s = b + 9, *x = s + l.settings + l.tune;
+  const char *tz = (const char *)s + l.tzAt;
+  if (!memchr(tz, 0, l.tzCap) || !zoneOk(tz, l.tzCap)) return "bad time zone";
+  uint32_t m;
+  memcpy(&m, s, 4);
+  if (m != l.settingsMagic) return "not a Tilt backup";
+  memcpy(&m, x, 4);
+  if (m != l.schedMagic) return "not a Tilt backup";
+  return nullptr;
+}
 // Run on this zone. The only place the firmware sets it (cfgApply when tz changes, schedBegin at start). It changes the
 // process's TZ: the one piece of shared state this file touches.
 inline void zoneUse(const char *tz) { setenv("TZ", tz, 1); tzset(); }

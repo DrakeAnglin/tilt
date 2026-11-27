@@ -24,6 +24,7 @@
 // sealed end to end with the sender's own key: the hub can pass a phone's command along but cannot read or change it.
 //
 #pragma once
+#include <cstddef>
 #include <string>
 #include <lwip/sockets.h>
 #include <esp_ota_ops.h>
@@ -140,16 +141,13 @@ esp_err_t hRestore(httpd_req_t *r) {
   if (!unhex(hex, (uint8_t *)&piece[0], piece.size())) return fail(r, "bad piece");
   in += piece;
   if (arg(r, "end") != "1") return ok(r);
-  uint16_t sz[3];
-  if (in.size() < 9 || in.compare(0, 3, "TB1")) return fail(r, "not a Tilt backup");
-  memcpy(sz, in.data() + 3, sizeof sz);
-  if (sz[0] != sizeof cfg || sz[1] != sizeof tune || sz[2] != sizeof sx || in.size() != 9 + sizeof cfg + sizeof tune + sizeof sx + 4) return fail(r, "this backup is from a different firmware");
+  static_assert(offsetof(Settings, magic) == 0 && offsetof(SchedExtra, magic) == 0, "backupRefusal reads each magic first");
+  const BackupLayout lay = {sizeof cfg, sizeof tune, sizeof sx, CFG_MAGIC, SX_MAGIC, offsetof(Settings, tz), sizeof cfg.tz};
+  if (const char *why = backupRefusal((const uint8_t *)in.data(), in.size(), lay)) { in.clear(); return fail(r, why); }
+  // Nothing above this line writes: a refused backup changes nothing.
   const char *p = in.data() + 9;
   Settings c; memcpy(&c, p, sizeof c); p += sizeof c;
   Tune t; memcpy(&t, p, sizeof t); p += sizeof t;
-  c.tz[sizeof c.tz - 1] = 0;
-  if (!zoneOk(c.tz, sizeof c.tz)) return fail(r, "bad time zone");   // before anything is written: nothing changes
-  if (c.magic != CFG_MAGIC) return fail(r, "not a Tilt backup");
   SchedExtra was = sx;
   memcpy(&sx, p, sizeof sx); p += sizeof sx;
   // The backup does not carry the Light trigger's latches: a slot that now holds another Schedule has not run today.
