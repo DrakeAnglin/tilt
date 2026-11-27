@@ -1001,6 +1001,22 @@ int main() {
   CHECK(!fixCfg.empty(), "wire/cfg.json is there");
   CHECK(cfgJson(FIX) == fixCfg, "/api/cfg matches wire/cfg.json byte for byte");
   if (cfgJson(FIX) != fixCfg) printf("  got: %s\n", cfgJson(FIX).c_str());
+  // /api/s, one blind each: a set-up PWM blind, a blind whose sensor was never burned to PWM ("an":1), an empty port,
+  // and one not checked yet since a restart (no "an" until it has been seen)
+  {
+    const WireBlindState st[4] = {{"Mom\xE2\x80\x99s caf\xC3\xA9", 0, 1, 1, 1, 42.5f, NAN, 0, 0, 0, 181.3f, "ok", 1},
+                                  {"Left", 0, 1, 1, 0, NAN, -100, 1, 0, -50, 12.0f, "", 0},
+                                  {"Port 3", 0, 0, 1, 0, NAN, NAN, 0, 0, 0, NAN, "", 0},
+                                  {"Right", 1, 1, 0, 1, NAN, NAN, 0, 1, 0, NAN, "blocked", 0}};
+    std::string got = "[";
+    for (int i = 0; i < 4; i++) got += (i ? "," : "") + blindStateJson(st[i]);
+    got += "]";
+    std::string fixSt = readFile("wire/state_blinds.json");
+    CHECK(!fixSt.empty() && got == fixSt, "/api/s blinds match wire/state_blinds.json byte for byte");
+    if (got != fixSt) printf("  got: %s\n", got.c_str());
+    CHECK(sensorAnalogRule(1, 1, 0) && !sensorAnalogRule(1, 1, 1) && !sensorAnalogRule(0, 1, 0) && !sensorAnalogRule(1, 0, 0),
+          "analog only for a tilter plugged in, checked, with no PWM");
+  }
   std::string write = readFile("wire/slot_write.txt");       // the app's command that writes slot 2 of the fixture
   std::map<std::string, std::string> q;
   std::stringstream qs(write.substr(write.find('?') + 1));

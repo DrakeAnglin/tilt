@@ -82,6 +82,25 @@ enum TiltWords {
     }
 }
 
+/// A warning on a blind's sheet, and where to read how to fix it (nil: nothing to read).
+struct BlindWarning: Equatable, Identifiable {
+    let text: String
+    let link: URL?
+    var id: String { text }
+    /// How to burn a sensor to PWM: the sensor bench tool in the firmware's README.
+    static let sensorBenchTool = URL(string: "https://github.com/DrakeAnglin/tilt/blob/main/firmware/README.md#as5600_setup-sensor-bench-tool")!
+    static let analogSensor = BlindWarning(text: "Sensor not set to PWM: run the sensor bench tool", link: sensorBenchTool)
+    static let stuck = BlindWarning(text: "The motor ran but the sensor saw no movement. Check that the blind's rod is turning.", link: nil)
+    /// The warnings on a blind's sheet, in order. A shown blind whose sensor runs on the analog fallback, which is noisy
+    /// near the motor (#256); a set-up blind whose last move ran the motor but saw no turn.
+    static func all(_ b: BlindState) -> [BlindWarning] {
+        var out: [BlindWarning] = []
+        if b.listed && b.analogSensor { out.append(analogSensor) }
+        if b.ready && b.stuck { out.append(stuck) }
+        return out
+    }
+}
+
 /// The words of Tilt's push alerts (the Tilt Hub sends what happened; the alerts extension turns it into these).
 /// kind: what happened (the hub's names, firmware/tilt_hub/main/hub_alerts.h); room: the controller's name;
 /// detail: the blind's name (stall), the battery percent, or why an update failed.

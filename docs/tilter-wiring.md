@@ -19,7 +19,7 @@ before the [mechanical build](tilter-assembly.md).
 | N20 motor (screwed to the motor shell at assembly) | 1 |
 | **22 AWG** stranded: 1 red, 1 black, ~6 cm each (battery +, GND to the driver) | 2 |
 | **30 AWG** silicone, ~6 cm each: green, yellow, blue ×2, white, black | 6 |
-| 22 AWG two-conductor pair, ~8 cm (motor leads; any color, the build used red and black) | 1 |
+| 22 AWG two-conductor pair, ~8 cm (motor leads: one red, one black) | 1 |
 | Heat-shrink (small) | a few |
 
 ## 1. Prepare the boards (before any wiring)
@@ -61,7 +61,14 @@ pin 6) on every cord: "straight-wired" is used loosely in listings, and a revers
 
 ## 2. Wire it
 Solder the leads to the **RJ12 breakout first** (pin 1 = the square pad), because in the module it slides in with its
-leads already attached. Then run each lead to its board. Cut leads ~6 cm and trim to length when you fit the boards in
+leads already attached.
+
+**Which way the leads run** (orange arrows in the picture). Hold each board as drawn:
+- **RJ12 breakout**, jack on the left, pins 6 to 1 from the top: every lead leaves toward the **top** edge.
+- **DRV8833**: every lead comes in from the **top** edge.
+- **AS5600**: every lead comes in from the **bottom** edge.
+
+Then run each lead to its board. Cut leads ~6 cm and trim to length when you fit the boards in
 the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch a neighbor.
 
 | # | From | To | Wire |

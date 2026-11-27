@@ -187,6 +187,20 @@ check((try? JSONDecoder().decode(SchedSlot.self, from: oldSlot)).map { $0.fat ==
 let fromFixture = SchedulePlan.schedules([("den", wsched.sched)]).first { $0.id == 4_000_000_000 }
 check(fromFixture?.kind == 4 && fromFixture?.lastRun["den"] == LastRun(at: Date(timeIntervalSince1970: 1_795_385_700), why: 1), "a Schedule carries each controller's last run")
 
+// /api/s blinds (wire/state_blinds.json): a sensor never burned to PWM shows the warning, nothing else does (#256)
+let stBlinds = try JSONDecoder().decode([BlindState].self, from: Data(contentsOf: wireDir.appendingPathComponent("state_blinds.json")))
+check(stBlinds.count == 4 && stBlinds.map(\.analogSensor) == [false, true, false, false], "the sensor signal decodes: only Left is analog")
+check(stBlinds.map(BlindWarning.all) == [[], [.analogSensor], [], []], "the sensor warning only on the analog blind")
+check(BlindWarning.analogSensor.text == "Sensor not set to PWM: run the sensor bench tool", "the warning's words")
+let hiddenAnalog = try JSONDecoder().decode(BlindState.self, from: Data(#"{"name":"R","hid":1,"pres":1,"seen":1,"cal":1,"tilt":0,"tgt":null,"mov":0,"q":0,"fav":0,"ang":3,"last":"","an":1}"#.utf8))
+check(hiddenAnalog.analogSensor && BlindWarning.all(hiddenAnalog).isEmpty, "a hidden blind is not shown, so no warning")
+let stuckAnalog = try JSONDecoder().decode(BlindState.self, from: Data(#"{"name":"L","hid":0,"pres":1,"seen":1,"cal":1,"tilt":0,"tgt":null,"mov":0,"q":0,"fav":0,"ang":3,"last":"blocked","an":1}"#.utf8))
+check(BlindWarning.all(stuckAnalog) == [.analogSensor, .stuck] && BlindWarning.stuck.link == nil, "a stuck blind on an analog sensor: both warnings, the sensor first")
+check(Set(BlindWarning.all(stuckAnalog).map(\.id)).count == 2, "the two warnings have their own ids (the sheet lists them by id)")
+check(BlindWarning.all(stBlinds[0]).isEmpty && !stBlinds[3].ready, "a blind that moved fine: no warning")
+let benchLink = BlindWarning.all(stBlinds[1]).first?.link
+check(benchLink?.fragment == "as5600_setup-sensor-bench-tool" && benchLink?.path.hasSuffix("firmware/README.md") == true, "the warning links to the sensor bench tool")
+
 // ---- the hub link's vectors (firmware/blinds_matter/test/wire/link.json, made by tools/link_vectors.py and checked by
 // the firmware's link_test.cpp): this app seals, opens and derives keys the same way
 let lv = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: wireDir.appendingPathComponent("link.json")))

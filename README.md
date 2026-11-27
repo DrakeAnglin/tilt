@@ -40,7 +40,7 @@ For people working on Tilt itself. You do not need any of this to build one.
 | [CONTEXT.md](CONTEXT.md) | The words used everywhere |
 | [docs/adr](docs/adr) | Decisions on record |
 | [docs/developer](docs/developer/README.md) | App Store notes, firmware releases, security hardening, the agent workflow |
-| [pcb-v3-concept.md](docs/pcb-v3-concept.md) | The next PCB (on hold) |
+| [pcb-v3-concept.md](docs/pcb-v3-concept.md) | The next PCB (design proposal) |
 
 ### What is in here
 | Folder | What |

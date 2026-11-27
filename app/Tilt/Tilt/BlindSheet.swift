@@ -32,11 +32,8 @@ struct BlindSheet: View {
                     }
                     .onEnded { _ in commit(); dragStart = nil })
                 .sensoryFeedback(.selection, trigger: drag.map { Int($0 / 10) })
+            if let blind { ForEach(BlindWarning.all(blind)) { w in Group { if let url = w.link { SwiftUI.Link(destination: url) { Label(w.text, systemImage: "exclamationmark.triangle.fill") } } else { Label(w.text, systemImage: "exclamationmark.triangle.fill") } }.font(.footnote).foregroundStyle(Palette.warning).frame(maxWidth: .infinity, alignment: .leading) } }
             if let blind, blind.ready {
-                if blind.stuck {
-                    Label("The motor ran but the sensor saw no movement. Check that the blind's rod is turning.", systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote).foregroundStyle(Palette.warning).frame(maxWidth: .infinity, alignment: .leading)
-                }
                 HStack(spacing: 12) {
                     Image(systemName: "arrow.down.to.line").foregroundStyle(.secondary)
                     Slider(value: Binding(get: { shownTilt }, set: { drag = $0.rounded() }), in: -100...100, onEditingChanged: { if !$0 { commit() } }).accessibilityLabel("Tilt")
