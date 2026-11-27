@@ -532,15 +532,16 @@ static void zoneTests() {
 }
 
 // ---- a settings backup the controller takes or refuses (issue #181); a refused one changes nothing
-// A made-up layout: settings 16 bytes (magic, then a 6-byte zone at 6), tune 4, schedule extras 8 (magic first).
-static const BackupLayout TEST_LAYOUT = {16, 4, 8, 0xB11D0003, 0x53580001, 6, 6};
+// A made-up layout: settings 16 bytes (magic, then a 6-byte zone at 6), tune 4 (a 16-bit magic first), schedule extras 8 (magic first).
+static const BackupLayout TEST_LAYOUT = {16, 4, 8, 0xB11D0003, 0x53580001, 6, 6, 0x7E57};
 static std::string goodBackup() {
   std::string b = "TB1";
   uint16_t sz[3] = {16, 4, 8};
   b.append((const char *)sz, sizeof sz);
   std::string s(16, 0); uint32_t m = 0xB11D0003; memcpy(&s[0], &m, 4); memcpy(&s[6], "UTC0", 5);
+  std::string t(4, 7); uint16_t tm = 0x7E57; memcpy(&t[0], &tm, 2);
   std::string x(8, 0); uint32_t xm = 0x53580001; memcpy(&x[0], &xm, 4);
-  return b + s + std::string(4, 7) + x + std::string(4, 1);
+  return b + s + t + x + std::string(4, 1);
 }
 static void backupTests() {
   auto refusal = [](const std::string &b) {
@@ -558,6 +559,9 @@ static void backupTests() {
   { std::string b = goodBackup(); memcpy(&b[9 + 6], "ABCDEF", 6); CHECK(refusal(b) == "bad time zone", "backup: a zone with no end in its field"); }
   { std::string b = goodBackup(); b[9] ^= 1; CHECK(refusal(b) == "not a Tilt backup", "backup: right sizes, wrong settings magic (#181)"); }
   { std::string b = goodBackup(); b[9 + 16 + 4] ^= 1; CHECK(refusal(b) == "not a Tilt backup", "backup: wrong schedule-extras magic"); }
+  { std::string b = goodBackup(); b[9 + 16] ^= 1; CHECK(refusal(b) == "not a Tilt backup", "backup: wrong tune magic, byte 0 (#220)"); }
+  { std::string b = goodBackup(); b[9 + 16 + 1] ^= 1; CHECK(refusal(b) == "not a Tilt backup", "backup: wrong tune magic, byte 1"); }
+  { std::string b = goodBackup(); b[9 + 16 + 2] ^= 0x55; b[9 + 16 + 3] ^= 0x55; CHECK(refusal(b).empty(), "backup: a change in the tune values only is still taken"); }
 }
 
 // ---- the light trigger (issue #207): "when it gets dark / light", read from the solar panel's input
