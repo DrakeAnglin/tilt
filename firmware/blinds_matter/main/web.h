@@ -182,7 +182,9 @@ esp_err_t hSet(httpd_req_t *r) {
   else if (k == "loc") { float la = NAN, lo = NAN; if (sscanf(v.c_str(), "%f,%f", &la, &lo) != 2 || fabsf(la) > 90 || fabsf(lo) > 180) return fail(r, "bad place"); sx.lat = la; sx.lon = lo; sxSave(); }
   else if (k == "sync") { syncMode = n ? 1 : 0; syncSave(); hand.reset(); }   // start fresh: no following of old turns
   else if (k == "par") { parMode = n ? 1 : 0; syncSave(); }
-  else if (k == "hksep") { hkSeparate = n ? 1 : 0; nvs.putUChar("hksep", hkSeparate); restartSoon = true; }   // Home's layout changes: restart
+  // Home layout: the restart is only for the controller's own Matter endpoints (made at a start, app_main.cpp). On a
+  // Tilt Hub, Apple Home's tiles follow sep in the status at once, without it.
+  else if (k == "hksep") { hkSeparate = n ? 1 : 0; nvs.putUChar("hksep", hkSeparate); restartSoon = true; }
   else if (k == "tune.grace") { tune.graceMs = constrain(n, 0, 30000); tuneSave(); }
   else if (k == "tune.stall") { tune.stallMs = constrain(n, 200, 10000); tuneSave(); }
   else if (k == "tune.deg10") { tune.stallDeg10 = constrain(n, 1, 100); tuneSave(); }
@@ -204,7 +206,7 @@ esp_err_t hSet(httpd_req_t *r) {
     }
     else if (f == "speed") b.speed = constrain(n, 50, 100);
     else if (f == "fav") b.fav = constrain(n, -100, 100);
-    else if (f == "hid") b.hidden = n ? 1 : 0;
+    else if (f == "hid") b.hidden = n ? 1 : 0;   // own endpoints: next start, no restart here; Tilt Hub tiles: at once
     else if (f == "sign") b.motSign = n < 0 ? -1 : 1;   // a move on this blind is stopped first (cfgApply)
     else return fail(r, "unknown setting");
   } else return fail(r, "unknown setting");
