@@ -84,9 +84,9 @@ pads, not hard rubber: hard rubber passes the vibration on. Where they go: [tilt
 ### Cord to the controller
 | Part | Per tilter | Sold as | Link |
 |---|---|---|---|
-| RJ12 6P6C cord, **white, straight-wired**, 3.3 ft | 1, for the blind beside the controller | pack (pick white) | [B0C1VHVJTS](https://www.amazon.com/dp/B0C1VHVJTS) |
-| RJ12 6P6C cord, **white, straight-wired**, 6.6 ft | 1, for the 2nd blind | 2-pack | [B0C1VJN3DL](https://www.amazon.com/dp/B0C1VJN3DL) |
-| RJ12 6P6C cord, **white, straight-wired**, 10 ft | 1, for a 3rd blind | 2-pack | [B0C1VK4W51](https://www.amazon.com/dp/B0C1VK4W51) |
+| RJ12 6P6C cord, **straight-wired**, 3.3 ft | 1, for the blind beside the controller | 2-pack | [B0C1VHVJTS](https://www.amazon.com/dp/B0C1VHVJTS) |
+| RJ12 6P6C cord, **straight-wired**, 6.6 ft | 1, for the 2nd blind | 2-pack | [B0C1VJN3DL](https://www.amazon.com/dp/B0C1VJN3DL) |
+| RJ12 6P6C cord, **straight-wired**, 10 ft | 1, for a 3rd blind | 2-pack | [B0C1VK4W51](https://www.amazon.com/dp/B0C1VK4W51) |
 
 Each tilter needs one cord. Measure from the controller to each tilter first, then pick:
 - **The blind beside the controller:** 3.3 ft. The controller sits in the same headrail as one of its tilters, so
@@ -94,7 +94,8 @@ Each tilter needs one cord. Measure from the controller to each tilter first, th
 - **The 2nd blind:** 6.6 ft.
 - **A 3rd blind:** 10 ft, or 6.6 ft if the controller sits in the middle.
 
-Example: 3 blinds with the controller in the middle = one 3.3 ft + two 6.6 ft. Check every cord before use: pin 1
+Example: 3 blinds with the controller in the middle = one 3.3 ft + two 6.6 ft. Any color works: the cords sit
+hidden in the headrail. White is nicest if you can find it. Check every cord before use: pin 1
 must beep to pin 1 ([tilter wiring](../docs/tilter-wiring.md)).
 
 ## One controller
@@ -132,7 +133,7 @@ References match the [PCB build guide](../docs/pcb-build.md).
 | Printed tray, lid (white PLA) | 1 each | | [controller box](../docs/controller-box.md) |
 | M3 heat-set insert | 3 | from the tilters' pack of 100 | [B0DQL4ZSCP](https://www.amazon.com/dp/B0DQL4ZSCP) |
 | M3 × 10 flat-head screw | 3 | in the M3 kit ([Buy once](#buy-once)) | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
-| M2 × 6 self-tapping screw (charger) | 2 | small pack | [search](https://www.amazon.com/s?k=M2+x+6+self+tapping+screw) |
+| M2 × 6 screw (charger; it cuts its own thread in the printed post) | 2 | any small pack | [search](https://www.amazon.com/s?k=M2+x+6+screw) |
 | **Stick-on foam pad, 3/8 in (about 10 mm) across and 2 mm thick** | **4** | 504-piece set ([Buy once](#buy-once)) | [B0HKVXW9MW](https://www.amazon.com/dp/B0HKVXW9MW) |
 
 The pads lift the box off the rail floor so it does not pinch the blind's lift cord, which runs down the middle of the
@@ -147,7 +148,7 @@ Every home needs one. One hub serves every controller, and it stays plugged in.
 | Printed box (white) | 1 | | [hub box](../docs/hub-box.md) |
 | ESP32-C6 SuperMini, **no pins soldered** | 1 | from the controllers' 5-pack | [B0GD19KJ4B](https://www.amazon.com/dp/B0GD19KJ4B) |
 | USB-C male-to-male adapter | 1 | each | [B0HFHVN7B6](https://www.amazon.com/dp/B0HFHVN7B6) |
-| 5 V USB-C wall plug (1 A is plenty) | 1 | each | any; [search](https://www.amazon.com/s?k=5V+USB-C+wall+charger) |
+| 5 V USB-C wall plug (1 A is plenty) | 1 | each | any |
 
 ## Buy once
 Shared kits and supplies: many tilters, controllers and hubs draw from one of each. Buy them once, not per unit. The
@@ -166,7 +167,7 @@ per-unit amounts say how far a pack goes.
 | Resistor kit, 1/4 W metal film | 19 per controller | kit | [B072BL2VX1](https://www.amazon.com/dp/B072BL2VX1) |
 | Ceramic capacitor kit | 6 per controller | kit | [B0C1V8Q93P](https://www.amazon.com/dp/B0C1V8Q93P) |
 | JST-XH crimp pins, SXH-001T-P0.6 | 4 per controller | bag | [DigiKey](https://www.digikey.com/en/products/result?keywords=SXH-001T-P0.6) |
-| White PLA and white PETG filament | the tilters, the boxes and the hub box | spool each | [PLA](https://www.amazon.com/s?k=white+PLA+filament+1.75mm), [PETG](https://www.amazon.com/s?k=white+PETG+filament+1.75mm) |
+| White PLA and white PETG filament | the tilters, the boxes and the hub box | spool each | any brand |
 
 ## Optional
 Only what you choose. None of it is in the counts above.
@@ -180,7 +181,7 @@ none of this and leave J8 empty. With **yes**, the v2 board takes a panel on J8:
 | JST-ZH header, 2-pin, vertical, JST **B2B-ZR(LF)(SN)** (J8 on the PCB) | 1 | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=B2B-ZR%28LF%29%28SN%29) |
 | 6 V 0.8 W mono ETFE solar panel, 70 × 70 mm | 1 to 6, wired in parallel | 3-pack | [B0H1LQFFPN](https://www.amazon.com/dp/B0H1LQFFPN) |
 | Solar housing: tray sections + end cap (1 to 6 panels in a row, printed) | 1 | | [docs/solar-housing.md](../docs/solar-housing.md) |
-| Double-sided tape, for the housing's ends on the window | about 20 cm | 1 roll | [search](https://www.amazon.com/s?k=clear+double+sided+mounting+tape) |
+| Double-sided tape, for the housing's ends on the window | about 20 cm | 1 roll | any |
 | JST-ZH 1.5 mm 2-pin plugs | 1 | pack of 20 + 20 | [B0D9SMKFNS](https://www.amazon.com/dp/B0D9SMKFNS) |
 
 ### No JST crimper
@@ -192,13 +193,9 @@ wires, in place of the crimp pins and most of the wire ([PCB build, step 11](../
 A 5/8 in hole and one printed [wall plug](../docs/wall-plug.md) on each side (white PLA, about 1.1 g each). Tools: a
 drill and a 5/8 in bit.
 
-### Fix: a blind's angle jumps when its motor starts
-A 10 µF ceramic capacitor ("106") on the DRV8833's power pins ([tilter wiring](../docs/tilter-wiring.md#2-wire-it)).
-Take it from the controller's capacitor kit. The reference tilters work without it.
-
 ## Tools
 Soldering iron (also presses the heat-set inserts), multimeter with beep mode, flush cutters, wire strippers, a
-crimper for JST-XH pins (an open-barrel crimper, such as an Engineer PA-09 or [IWISS SN-28B](https://www.amazon.com/s?k=IWISS+SN-28B+crimper)), a USB-C cable to flash
+crimper for JST-XH pins (an open-barrel crimper, any brand, such as an Engineer PA-09 or IWISS SN-28B), a USB-C cable to flash
 the ESP. No crimper? See [Optional](#optional).
 Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC)) for charge and motor current.
 

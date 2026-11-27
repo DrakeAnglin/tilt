@@ -27,6 +27,9 @@ power monitor) are gone; they are listed at the bottom only so the reasons stay 
    mounting points: header holes (or pads for its wires), screw or standoff holes where the module has mounting holes,
    and a keep-out under it. Each module's footprint is drawn from the real part once it's measured.
 4. Three tilter ports, the ESP32-C6 on sockets so it stays replaceable.
+5. **No 10 µF per port.** The tilters have no capacitor on the DRV8833, and v3 doesn't add one either: the angle is
+   read from PWM timing (not changed by a supply dip), the motor soft-starts, and the 470 µF bulk on the battery stays.
+   A capacitor here would sit on the far side of the cord from the driver, so it would do little anyway.
 
 ## What's on the board
 | Function | Part | How it's mounted | Notes |
