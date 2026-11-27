@@ -89,6 +89,22 @@ inline std::string cfgJson(const WireCfg &c) {
   return j;
 }
 
+// ---- one blind in the status the app polls (/api/s: web.h hState; the keys are listed there). pwm: the port's sensor
+// sends PWM (seen now or last time). "an":1 is sent only for a sensor on the analog fallback (sensorAnalogRule):
+// a PWM or empty port has no "an", the same as older firmware, and older apps ignore it.
+// Analog: a tilter plugged in and checked whose sensor was never burned to PWM with the sensor bench tool
+// (firmware/as5600_setup). It still works on the analog fallback, but noisily near the motor, so the app warns (#256).
+inline bool sensorAnalogRule(int present, int seen, int pwm) { return present && seen && !pwm; }
+struct WireBlindState { const char *name; int hid, pres, seen, cal; float tilt, tgt; int mov, q, fav; float ang; const char *last; int pwm; };
+inline std::string blindStateJson(const WireBlindState &b) {
+  std::string j;                              // three parts: each must fit ap's buffer
+  ap(j, "{\"name\":%s,\"hid\":%d,\"pres\":%d,\"seen\":%d,\"cal\":%d", jq(b.name).c_str(), b.hid, b.pres, b.seen, b.cal);
+  ap(j, ",\"tilt\":%s,\"tgt\":%s,\"mov\":%d,\"q\":%d,\"fav\":%d", jn(b.tilt, 1).c_str(), jn(b.tgt, 0).c_str(), b.mov, b.q, b.fav);
+  ap(j, ",\"ang\":%s,\"last\":%s", jn(b.ang, 1).c_str(), jq(b.last).c_str());
+  if (sensorAnalogRule(b.pres, b.seen, b.pwm)) j += ",\"an\":1";
+  return j + "}";
+}
+
 // ---- a Schedule slot write: /api/sched?i=N&on=&days=&mask=&min=&tilt=&kind=&off=&ramp=&gid=
 // `arg(key)` gives one value of the query ("" when missing). Out-of-range values are brought into range.
 template <class Arg> WireSlot slotOfArgs(Arg arg, int ports) {

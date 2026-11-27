@@ -50,7 +50,8 @@ bool hubJoined();
 //   follow mode, par move at the same time, mv the blind moving (-1 none), log event count, hk in a Matter home,
 //   asks join requests waiting, hkey knows the Tilt Hub's key, me caller is an owner, gentle a slow move running,
 //   topic iCloud notice topic; b[] per blind: hid hidden, pres plugged in, seen checked, cal marks set, tilt, tgt
-//   target, mov moving, q queued, fav, ang raw sensor angle, last what it last did.
+//   target, mov moving, q queued, fav, ang raw sensor angle, last what it last did, an 1 = its sensor sends analog (never
+//   burned to PWM; sent only then: wire.h blindStateJson).
 esp_err_t hState(httpd_req_t *r) {
   Lock l;
   std::string j;
@@ -60,9 +61,7 @@ esp_err_t hState(httpd_req_t *r) {
   ap(j, ",\"pw\":{\"mode\":1,\"sleepIn\":-1,\"checkin\":0},\"closeUp\":%d,\"sync\":%d,\"par\":%d,\"ap\":0,\"mv\":%d,\"log\":%lu,\"hk\":%d,\"asks\":%d,\"hkey\":%d,\"me\":%d,\"gentle\":%d,\"topic\":\"%s\",\"b\":[", cfg.closeUp, syncMode, parMode, firstMoving(), (unsigned long)logSeq, homesPaired(), asksWaiting(), hubSlot() >= 0 ? 1 : 0, secClient >= 0 ? keys[secClient].role : 1, rampAny() ? 1 : 0, secClient >= 0 ? hexOf(cloudTopic, 16).c_str() : "");
   for (int i = 0; i < PORTS; i++) {
     BlindCfg &c = cfg.b[i];
-    ap(j, "%s{\"name\":%s,\"hid\":%d,\"pres\":%d,\"seen\":%d,\"cal\":%d,\"tilt\":%s,\"tgt\":%s,\"mov\":%d,\"q\":%d,\"fav\":%d,\"ang\":%s,\"last\":%s}", i ? "," : "",
-       jq(c.name).c_str(), c.hidden, bs[i].present ? 1 : 0, bs[i].seen ? 1 : 0, calibrated(i) ? 1 : 0, jn(blindNow(i).tilt, 1).c_str(),
-       jn(bs[i].target, 0).c_str(), movingPort(i) ? 1 : 0, bs[i].queued ? 1 : 0, c.fav, jn(bs[i].ang, 1).c_str(), jq(bs[i].last).c_str());
+    j += (i ? "," : "") + blindStateJson({c.name, c.hidden, bs[i].present, bs[i].seen, calibrated(i), blindNow(i).tilt, bs[i].target, movingPort(i), bs[i].queued, c.fav, bs[i].ang, bs[i].last, bs[i].pwm || ((pwmSaved >> i) & 1)});
   }
   j += "]}";
   return sendJson(r, j);
