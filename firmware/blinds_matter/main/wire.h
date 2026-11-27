@@ -74,7 +74,7 @@ template <class Arg> WireSlot slotOfArgs(Arg arg, int ports) {
   s.mask = n("mask") & ((1 << ports) - 1);
   s.min = wireClamp(n("min"), 0, 1439);
   s.tilt = wireClamp(n("tilt"), -100, 100);
-  s.kind = wireClamp(n("kind"), 0, 4);                // logic.h SCHED_KIND_MAX
+  s.kind = wireClamp(n("kind"), 0, 4);                // 4: when it gets dark, the highest (logic.h)
   s.off = wireClamp(n("off"), -180, 180);
   s.ramp = wireClamp(n("ramp"), 0, 60);
   s.gid = strtoul(arg("gid").c_str(), nullptr, 10);

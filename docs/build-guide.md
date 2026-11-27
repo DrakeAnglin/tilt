@@ -146,7 +146,10 @@ sunset (or sunrise), the Schedule runs, once a day. Under the Schedule the app s
   not behind the slats.
 - It needs a panel and a place (**Set Location for Sunrise and Sunset**). The two choices show up in the app about a
   day after the panel is first plugged in: the controller has to see one night and one day first.
-- With no steady reading by the end of the 90 minutes (a USB cable plugged in at dusk, say), it runs then.
+- With no steady reading by the end of the 90 minutes (a USB cable plugged in at dusk, say), it runs then. The same
+  goes when the panel already reads dark (or light) as the 90 minutes start, for example when it was unplugged at
+  midday: it waits for a real change and otherwise runs at the end.
+- Every controller the Schedule covers needs firmware that knows these choices. The app offers them only then.
 - With no solar panel seen, it runs at sunset or sunrise, like a plain sun Schedule.
 
 ### 9. Add to Apple Home

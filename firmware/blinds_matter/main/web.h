@@ -219,9 +219,8 @@ esp_err_t hSched(httpd_req_t *r) {
   Settings c = cfg;
   Sched &s = c.sched[i];
   s.on = w.on; s.days = w.days; s.mask = w.mask; s.minute = w.min; s.tilt = w.tilt;
-  // A new Schedule in the slot (another id or kind) starts with no Light trigger fire; an edit of the same one keeps
-  // today's, so it does not fire again (an edit is not a new day).
-  if (sx.x[i].gid != w.gid || sx.x[i].kind != w.kind) { memset(&lite.l[i], 0, sizeof lite.l[i]); liteSave(); }
+  // Another Schedule in the slot starts with no Light trigger fire; an edit of the same one keeps today's (logic.h).
+  if (!lightLatchKept(sx.x[i].gid, sx.x[i].kind, w.gid, w.kind)) { memset(&lite.l[i], 0, sizeof lite.l[i]); liteSave(); }
   sx.x[i] = {(uint8_t)w.kind, (uint8_t)w.ramp, (int16_t)w.off, w.gid};
   sxSave();
   cfgApply(c);

@@ -245,7 +245,7 @@ for kind in [3, 4] {
     var lit: [String: [SchedSlot]] = ["den": emptySlots(), "hall": emptySlots()]
     let s = Schedule(id: 77, days: 127, kind: kind, minute: 0, offset: -15, tilt: kind == 4 ? -100 : 0, ramp: 0,
                      targets: [BlindTarget(controller: "den", blind: 0), BlindTarget(controller: "hall", blind: 2)])
-    let ws = try SchedulePlan.writes(s, slots: lit)
+    let ws = try SchedulePlan.writes(s, slots: lit, panels: ["den": 1, "hall": 0])
     check(ws.allSatisfy { $0.value.kind == kind && $0.value.off == -15 }, "kind \(kind) is written as it is")
     apply(ws, to: &lit)
     check(both(lit) == [s], "kind \(kind) round-trips through the slots")
@@ -260,10 +260,21 @@ check(TiltWords.lastRun(why: 3, kind: 4, time: "5:01 PM") == "Last ran at sunset
 check(TiltWords.lastRun(why: 3, kind: 3, time: "7:01 AM") == "Last ran at sunrise (no solar panel seen)", "last ran: no panel, sunrise")
 check(TiltWords.lastRun(why: 0, kind: 4, time: "") == nil, "never ran: no line")
 let covers: Set<BlindTarget> = [BlindTarget(controller: "den", blind: 0), BlindTarget(controller: "hall", blind: 1)]
-check(SchedulePlan.offersLight(kind: 2, targets: covers, panels: ["den": false, "hall": true]), "a covered controller with a panel: offered")
-check(!SchedulePlan.offersLight(kind: 2, targets: covers, panels: ["den": false, "hall": false, "attic": true]), "only a controller it does not cover has one: not offered")
+// panels: what each controller reported in "panel"; a controller missing from it runs older firmware (or was not read)
+check(SchedulePlan.offersLight(kind: 2, targets: covers, panels: ["den": 0, "hall": 1]), "a covered controller with a panel: offered")
+check(!SchedulePlan.offersLight(kind: 2, targets: covers, panels: ["den": 0, "hall": 0, "attic": 1]), "only a controller it does not cover has one: not offered")
 check(!SchedulePlan.offersLight(kind: 0, targets: covers, panels: [:]), "older firmware (no panel field): not offered")
+check(!SchedulePlan.offersLight(kind: 2, targets: covers, panels: ["hall": 1]), "one covered controller on older firmware: not offered, even with a panel on the other")
 check(SchedulePlan.offersLight(kind: 4, targets: covers, panels: [:]), "a Schedule that already is a light trigger: offered, so it can be changed back")
+// one new and one old controller: a light Schedule is never written to the old one (it would turn kind 3 into sunset)
+let mixedSlots: [String: [SchedSlot]] = ["den": emptySlots(), "hall": emptySlots()]
+let dawn = Schedule(id: 88, kind: 3, tilt: 0, targets: covers)
+do { _ = try SchedulePlan.writes(dawn, slots: mixedSlots, panels: ["hall": 1]); check(false, "a light Schedule on an old controller throws") }
+catch { check(error == .noLight(controller: "den"), "the old controller is named, and nothing is written") }
+check((try? SchedulePlan.writes(dawn, slots: mixedSlots)) == nil, "no panel field known at all: refused")
+check((try? SchedulePlan.writes(dawn, delete: true, slots: mixedSlots)) != nil, "deleting a light Schedule from an old controller is fine")
+var toSunset = dawn; toSunset.kind = 2
+check((try? SchedulePlan.writes(toSunset, slots: mixedSlots)) != nil, "changing it back to sunset writes to the old one too")
 let demoCfg = try JSONDecoder().decode(SchedConfig.self, from: await Demo.shared.answer(Api.config))
 check(demoCfg.panelSeen && demoCfg.sched.contains { $0.kind == 4 && $0.mask != 0 }, "the demo room has a panel and a light Schedule")
 

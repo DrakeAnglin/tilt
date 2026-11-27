@@ -60,14 +60,17 @@ struct SlotWrite: Equatable { var controller: String; var slot: Int; var value: 
 enum PlanProblem: Error, Equatable {
     case full(controller: String)          // every slot on it is taken
     case notRead(controller: String)       // its slots are not known (it did not answer)
+    case noLight(controller: String)       // a light Schedule on firmware that does not know it (it would run at sunset)
 }
 
 enum SchedulePlan {
-    /// Offer "When it gets light / dark" for a Schedule: a controller it covers has seen a solar panel (`panels`, per
-    /// controller, from SchedConfig.panelSeen), or it already is one, so it can be changed back. Older firmware never
-    /// reports a panel, so the app never writes a kind it would not know.
-    static func offersLight(kind: Int, targets: Set<BlindTarget>, panels: [String: Bool]) -> Bool {
-        Schedule.isLight(kind) || targets.contains { panels[$0.controller] == true }
+    /// Offer "When it gets light / dark" for a Schedule: every controller it covers knows the Light trigger and one of
+    /// them has seen a solar panel, or it already is one, so it can be changed back. `panels`: what each controller
+    /// reported as "panel" (SchedConfig.panel); one missing from it runs older firmware, which would turn the kind into
+    /// sunset (`writes` refuses that too).
+    static func offersLight(kind: Int, targets: Set<BlindTarget>, panels: [String: Int]) -> Bool {
+        if Schedule.isLight(kind) { return true }
+        return !targets.isEmpty && targets.allSatisfy { panels[$0.controller] != nil } && targets.contains { panels[$0.controller] == 1 }
     }
     /// The id for a slot written before Schedules had ids (gid 0). The same on every launch.
     static func legacyId(controller: String, slot: Int) -> UInt32 {
@@ -97,9 +100,17 @@ enum SchedulePlan {
 
     /// The slot writes that save (or delete) a Schedule: one slot on each controller it covers, the slot that
     /// already holds it if there is one, and clears for any other slot holding it. `ports`: each controller's number of
-    /// Ports (ControllerLimits); a controller not in it has the fallback.
-    static func writes(_ s: Schedule, delete: Bool = false, slots: [String: [SchedSlot]], ports: [String: Int] = [:]) throws(PlanProblem) -> [SlotWrite] {
+    /// Ports (ControllerLimits); a controller not in it has the fallback. `panels`: what each controller reported as
+    /// "panel"; a light Schedule is never written to one missing from it (older firmware would run it at sunset).
+    static func writes(_ s: Schedule, delete: Bool = false, slots: [String: [SchedSlot]], ports: [String: Int] = [:],
+                       panels: [String: Int] = [:]) throws(PlanProblem) -> [SlotWrite] {
         for t in s.targets where !delete && slots[t.controller] == nil { throw .notRead(controller: t.controller) }
+        if s.isLight && !delete {
+            for t in s.targets.sorted(by: { ($0.controller, $0.blind) < ($1.controller, $1.blind) })
+            where t.blind < (ports[t.controller] ?? ControllerLimits.fallback.ports) && panels[t.controller] == nil {
+                throw .noLight(controller: t.controller)
+            }
+        }
         var out: [SlotWrite] = []
         for c in slots.keys.sorted() {
             let mine = slots[c]!

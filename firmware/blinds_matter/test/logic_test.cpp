@@ -574,9 +574,16 @@ static void lightTests() {
   { LightSim s; s.base = SET;                                 // USB plugged in (never dark), or the panel unplugged and gone high
     s.run(SET - 6 * H, SET + 6 * H, [](uint32_t) { return 5.0f; });
     CHECK(s.fires.size() == 1 && s.fires[0].first == SET + LIGHT_WINDOW_S && s.fires[0].second == LIGHT_FELL_BACK, "never dark: one fire, fell back at the window's end"); }
-  { LightSim s; s.base = SET;                                 // a panel unplugged mid-day: 0 V from noon (dark before the window: no run counts)
+  { LightSim s; s.base = SET;                                 // a panel unplugged mid-day: 0 V from noon, the window never sees it lit
     s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return t > SET - 6 * H + M ? 0.0f : 3.0f; });
-    CHECK(s.fires.size() == 1 && s.fires[0].first == SET - LIGHT_WINDOW_S + 14 * M, "dark already when the window opens: fires once the window has 15 dark minutes"); }
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET + LIGHT_WINDOW_S && s.fires[0].second == LIGHT_FELL_BACK, "panel unplugged mid-day: one fire, fell back at the window's end"); }
+  { LightSim s; s.kind = LIGHT_KIND_LIGHT; s.base = SET - 11 * H;          // a USB cable in at dawn: light all along
+    s.run(s.base - 6 * H, s.base + 6 * H, [](uint32_t) { return 5.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == s.base + LIGHT_WINDOW_S && s.fires[0].second == LIGHT_FELL_BACK, "USB at dawn: no fire by light, fell back at the window's end"); }
+  { LightSim s; s.base = SET;                                 // lit for one minute as the window opens, then dark: a real fall
+    s.run(SET - 6 * H, SET + 6 * H, [&](uint32_t t) { return t == SET - LIGHT_WINDOW_S ? 2.0f : t > SET - 6 * H + M ? 0.0f : 3.0f; });
+    CHECK(s.fires.size() == 1 && s.fires[0].first == SET - LIGHT_WINDOW_S + 15 * M && s.fires[0].second == LIGHT_BY_LIGHT, "one lit minute inside the window arms it"); }
+  CHECK(lightLatchKept(7, 4, 7, 4) && !lightLatchKept(7, 4, 8, 4) && !lightLatchKept(7, 4, 7, 3), "an edit keeps the latch; another id or kind clears it");
   { LightSim s; s.base = SET; s.panel = false;               // no panel seen: a plain sunset slot
     s.run(SET - 6 * H + 17, SET + 6 * H, [](uint32_t) { return 0.0f; });
     CHECK(s.fires.size() == 1 && s.fires[0].first == SET + 17 && s.fires[0].second == LIGHT_SUN_TIME, "no panel seen: one fire at the base time, why = sun time"); }

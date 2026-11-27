@@ -194,7 +194,7 @@ inline uint32_t slotDayTime(time_t now, int dayOff, int minuteOfDay, uint8_t day
 
 // ---- Schedule kinds (the kind byte of a slot): 0 at a clock time, 1 at sunrise, 2 at sunset, 3 when it gets light
 // (around sunrise), 4 when it gets dark (around sunset). 3 and 4 are the Light trigger (CONTEXT.md).
-const int LIGHT_KIND_LIGHT = 3, LIGHT_KIND_DARK = 4, SCHED_KIND_MAX = 4;
+const int LIGHT_KIND_LIGHT = 3, LIGHT_KIND_DARK = 4;      // the highest kind: wire.h slotOfArgs clamps to 4
 inline bool isSunKind(int k) { return k >= 1 && k <= 4; }
 inline bool onSunrise(int k) { return k == 1 || k == 3; }
 inline bool isLightKind(int k) { return k == LIGHT_KIND_LIGHT || k == LIGHT_KIND_DARK; }
@@ -208,8 +208,12 @@ const int LIGHT_DARK_MIN = 15, LIGHT_LIT_MIN = 10;     // minutes in a row it ta
 const uint32_t LIGHT_GAP_S = 1800;             // a step gap over this (off, clock jump): nothing that passed is run late
 enum LightWhy { LIGHT_NONE = 0, LIGHT_BY_LIGHT = 1, LIGHT_FELL_BACK = 2, LIGHT_SUN_TIME = 3 };
 // One slot's memory. day: the key of the day it last fired (kept in flash, so a restart does not fire it again);
-// at/why: when and why; run: minutes in a row of the steady reading so far (not kept).
-struct LightLatch { uint32_t day, at; uint8_t why, run, pad[2]; };
+// at/why: when and why; run: minutes in a row of the steady reading so far; armed: a reading on the other side was
+// seen inside today's window, so a run that follows is a real change (run and armed are not kept over a restart).
+struct LightLatch { uint32_t day, at; uint8_t why, run, armed, pad; };
+// Does a slot keep its latch when it is written again (web.h hSched, a settings restore)? Only when it is the same
+// Schedule: the same id and kind. An edit is not a new day; another Schedule in the slot has not run.
+inline bool lightLatchKept(uint32_t oldGid, int oldKind, uint32_t newGid, int newKind) { return oldGid == newGid && oldKind == newKind; }
 // A slot's base time and day key for the day nearest `now` (yesterday, today, tomorrow). The key is the local date of
 // the sun event's day, as yyyymmdd. {0, 0}: no base (not one of its days, no place, no sunrise or sunset).
 struct LightDay { uint32_t base, key; };
@@ -231,24 +235,29 @@ inline LightDay lightDayOf(time_t now, int kind, int off, uint8_t days, double l
 }
 // One step, once a minute, for one light slot. now / prev: this step and the one before; base, key: lightDayOf;
 // v: the minute's mean input voltage; panel: a panel seen (panelSeenRule). Answers whether the slot fires now, and why.
+// A run counts only once the slot is armed: a reading on the other side inside the window. An input that was already
+// dark (or light) when the window opened, such as a panel unplugged at midday or a USB cable at dawn, falls back.
 inline LightWhy lightStep(LightLatch &l, int kind, uint32_t now, uint32_t prev, uint32_t base, uint32_t key, float v, bool panel) {
-  bool gap = prev >= now || now - prev > LIGHT_GAP_S;
-  if (gap) { l.run = 0; prev = now - 60; }                  // as schedRun: what passed while off is not run late
-  if (!base || l.day == key) { l.run = 0; return LIGHT_NONE; }
+  bool gap = prev >= now || now - prev > LIGHT_GAP_S;       // as schedRun: what passed while off is not run late
+  if (gap) l.run = l.armed = 0;
+  if (!base || l.day == key) { l.run = l.armed = 0; return LIGHT_NONE; }
+  uint32_t end = base + LIGHT_WINDOW_S;
+  bool endNow = !gap && end > prev && end <= now;
   LightWhy why = LIGHT_NONE;
   if (!panel) {
-    l.run = 0;
+    l.run = l.armed = 0;
     if (!gap && base > prev && base <= now) why = LIGHT_SUN_TIME;
-  } else if (now + LIGHT_WINDOW_S >= base && now <= base + LIGHT_WINDOW_S) {
+  } else if (now + LIGHT_WINDOW_S >= base && now <= end) {
     bool steady = kind == LIGHT_KIND_DARK ? v < LIGHT_DARK_V : v > LIGHT_LIT_V;
-    l.run = steady ? (uint8_t)(l.run < 255 ? l.run + 1 : 255) : 0;
+    if (!steady) { l.run = 0; l.armed = 1; }
+    else if (l.armed) l.run = (uint8_t)(l.run < 255 ? l.run + 1 : 255);
     if (l.run >= (kind == LIGHT_KIND_DARK ? LIGHT_DARK_MIN : LIGHT_LIT_MIN)) why = LIGHT_BY_LIGHT;
-    else if (!gap && base + LIGHT_WINDOW_S > prev && base + LIGHT_WINDOW_S <= now) why = LIGHT_FELL_BACK;
+    else if (endNow) why = LIGHT_FELL_BACK;
   } else {
-    l.run = 0;
-    if (!gap && base + LIGHT_WINDOW_S > prev && base + LIGHT_WINDOW_S <= now) why = LIGHT_FELL_BACK;   // a step past the end
+    l.run = l.armed = 0;
+    if (endNow) why = LIGHT_FELL_BACK;                      // a step just past the end
   }
-  if (why) { l.day = key; l.at = now; l.why = (uint8_t)why; l.run = 0; }
+  if (why) { l.day = key; l.at = now; l.why = (uint8_t)why; l.run = l.armed = 0; }
   return why;
 }
 // A minute's mean of readings taken every second or so. add: true when a minute just ended, with its mean in *mean.

@@ -159,8 +159,9 @@ final class AutomationStore {
     var sun: (rise: Date, set: Date)?
     var hasPlace = false
     var loading = false
-    /// Per controller: it has seen a solar panel (SchedConfig.panelSeen), so it can run the Light trigger.
-    var panels: [String: Bool] = [:]
+    /// Per controller: what it reported as "panel" (1 a solar panel seen, 0 none). A controller missing from it runs
+    /// firmware without the Light trigger (or did not answer).
+    var panels: [String: Int] = [:]
     private var slots: [String: [SchedSlot]] = [:]          // per controller, as last read
     private var limits: [String: ControllerLimits] = [:]    // per controller, as it reported them
 
@@ -170,12 +171,12 @@ final class AutomationStore {
 
     func load(_ controllers: [Controller]) async {
         loading = true; defer { loading = false }
-        slots = [:]
+        slots = [:]; panels = [:]
         for c in controllers {
             guard let cfg = try? await c.client.schedules() else { continue }
             slots[c.id] = cfg.sched
             limits[c.id] = cfg.limits
-            panels[c.id] = cfg.panelSeen
+            panels[c.id] = cfg.panel
             if let s = cfg.sun, s.count == 2, s[0] > 0 { sun = (Date(timeIntervalSince1970: s[0]), Date(timeIntervalSince1970: s[1])); hasPlace = true; Sky.remember(rise: sun!.rise, set: sun!.set) }
         }
         schedules = SchedulePlan.schedules(controllers.compactMap { c in slots[c.id].map { (c.id, $0) } })
@@ -185,9 +186,10 @@ final class AutomationStore {
     func save(_ s: Schedule, delete: Bool = false, controllers: [Controller]) async throws {
         let name = { (id: String) in controllers.first { $0.id == id }?.state?.name ?? "A controller" }
         let writes: [SlotWrite]
-        do { writes = try SchedulePlan.writes(s, delete: delete, slots: slots, ports: limits.mapValues(\.ports)) }
+        do { writes = try SchedulePlan.writes(s, delete: delete, slots: slots, ports: limits.mapValues(\.ports), panels: panels) }
         catch .full(let c) { throw TiltError("\(name(c)) already has \(limits(c).slots) schedules.") }
         catch .notRead(let c) { throw TiltError("\(name(c)) did not answer. Try again when it is reachable.") }
+        catch .noLight(let c) { throw TiltError("\(name(c)) needs a firmware update before it can run a Schedule that follows the light.") }
         for w in writes { try await controllers.first { $0.id == w.controller }?.client.setSchedule(slot: w.slot, w.value) }
         await load(controllers)
     }
@@ -220,7 +222,7 @@ struct AutomationsTab: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack(spacing: 6) {
                                         Text(s.whenText).font(.headline)
-                                        if s.ramp > 0 { Image(systemName: Schedule.onSunrise(s.kind) ? "sunrise" : "sunset").font(.footnote).foregroundStyle(Palette.warning) }
+                                        if s.ramp > 0 { Image(systemName: s.kind == 2 || s.kind == 4 ? "sunset" : "sunrise").font(.footnote).foregroundStyle(Palette.warning) }
                                     }
                                     Text("\(s.actionText) · \(s.daysText) · \(blindNames(s))").font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                                     ForEach(lastRunLines(s), id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
@@ -303,8 +305,8 @@ struct ScheduleEditor: View {
     let isNew: Bool
     /// Every Port of every controller: what "All blinds" saves.
     let everyBlind: Set<BlindTarget>
-    /// Per controller: a solar panel seen (AutomationStore.panels), for the Light trigger.
-    let panels: [String: Bool]
+    /// Per controller: what it reported as "panel" (AutomationStore.panels), for the Light trigger.
+    let panels: [String: Int]
     let done: (Schedule, Bool) -> Void
     @State private var custom = false
     @State private var all = true
