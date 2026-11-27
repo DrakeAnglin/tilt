@@ -564,7 +564,8 @@ let onbExpected = ["hub /api/net", "hub /api/backup?id=old1",
                 "hub /api/replace?old=old1&new=new1"]
 check(olog.all == onbExpected, "restore before joining, wait for it on the hub, keep it, let the hub in, take over the old one's place\n  got \(olog.all.map { String($0.prefix(60)) })")
 
-// A controller already on its Thread firmware, set up with a backup: restarted once, so the restored Home layout takes effect
+// A controller already on its Thread firmware, set up with a backup: restarted once, so its own Matter endpoints are
+// rebuilt for the restored Home layout (the hub's tiles do not wait for this)
 let tlog = Recorder()
 let thub = HubClient(transport: ScriptedDevice(name: "hub", log: tlog, address: "10.0.0.2/hub") { c in
     switch cmdPath(c) {
