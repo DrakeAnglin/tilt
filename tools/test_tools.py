@@ -566,6 +566,12 @@ class BlindsClient(unittest.TestCase):
         self.assertEqual(blinds_client.seal(v['keySalted'], v['cid'], v['boot'], int(v['ctr']), v['cmd']), v['frameSalted'])
         self.assertEqual(blinds_client.open_reply(v['key'], v['cid'], v['frame'], v['reply']), v['replyOut'])
 
+    def test_link_vectors_prints_the_file(self):
+        import subprocess, link_vectors
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'link_vectors.py')], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, link_vectors.text())
+
     def test_store_is_private(self):
         old = blinds_client.STORE
         with tempfile.TemporaryDirectory() as d:
@@ -576,6 +582,205 @@ class BlindsClient(unittest.TestCase):
                 self.assertEqual(blinds_client.load(), {'x': 1})
             finally:
                 blinds_client.STORE = old
+
+
+class FakeController:
+    """A controller on the other end of blinds_client.http: its own P-256 key, /x/hello, /x/pair, /x/ask and /x,
+    sealing and opening the way link_vectors.py does (apart from blinds_client's code)."""
+
+    def __init__(self):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        self.priv = ec.generate_private_key(ec.SECP256R1())
+        self.boot, self.cid, self.key = bytes.fromhex('a1b2c3d4'), bytes.fromhex('0102030405060708'), None
+        self.last_ctr, self.refuse, self.wrong_check, self.conflicts = 0, None, False, 0
+        self.paths, self.frames, self.bodies, self.seen = [], [], [], []
+
+    def http(self, path, data=None):
+        import base64, hashlib, hmac, json, link_vectors
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        self.paths.append(path)
+        if self.refuse and path != '/x/hello':
+            return self.refuse
+        if path == '/x/hello':
+            return 200, json.dumps({'boot': self.boot.hex(), 'fw': '2.4.0'}).encode()
+        if path in ('/x/pair', '/x/ask'):
+            body = json.loads(data)
+            self.bodies.append(body)
+            cpub = base64.b64decode(body['pub'])
+            salt = None
+            if 'inv' in body:
+                salt = bytes.fromhex('00112233')
+                if body['inv'] != 'INV1' or body['mac'] != hmac.new(salt, cpub, hashlib.sha256).hexdigest():
+                    return 403, b'bad invite'
+            dpub = self.priv.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+            shared = self.priv.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), cpub))
+            self.key = link_vectors.derive_key(shared, salt, cpub, dpub)
+            check = hmac.new(self.key, b'confirm', hashlib.sha256).hexdigest()[:16]
+            r = {'pub': base64.b64encode(dpub).decode(), 'cid': self.cid.hex(), 'check': '0' * 16 if self.wrong_check else check,
+                 'owner': path == '/x/pair' and 'inv' not in body}
+            if path == '/x/ask':
+                r.update(wait=1, code='4821')
+            return 200, json.dumps(r).encode()
+        if path == '/x':
+            self.frames.append(data)
+            if data[:8] != self.cid:
+                return 403, b'who'
+            nonce = data[8:20]
+            if self.conflicts:                   # a stale boot id: the controller restarted
+                self.conflicts -= 1
+                self.boot = bytes.fromhex('0badf00d')
+                return 409, b'stale'
+            ctr = int.from_bytes(nonce[4:], 'big')
+            if nonce[:4] != self.boot or ctr <= self.last_ctr:
+                return 409, b'replay'
+            self.last_ctr = ctr
+            cmd = AESGCM(self.key).decrypt(nonce, data[20:], b'blinds-v1' + self.cid).decode()
+            self.seen.append(cmd)
+            return 200, link_vectors.seal_reply(self.key, self.cid, nonce, bytes([7]) * 12, '{"cmd":"%s"}' % cmd)
+        return 404, b'no'
+
+
+@unittest.skipUnless(blinds_client, "needs the 'cryptography' package")
+class BlindsClientTalks(unittest.TestCase):
+    """blinds_client.py against a fake controller: pairing, asking, joining, sealed commands and the command line."""
+
+    def setUp(self):
+        import shutil
+        from unittest import mock
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+        self.c = FakeController()
+        for target, value in [('STORE', os.path.join(self.d, 'c.json')), ('http', self.c.http), ('WHO', 'mac'),
+                              ('IP', '192.0.2.1')]:
+            p = mock.patch.object(blinds_client, target, value)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def quietly(self, f, *args, **kw):
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            f(*args, **kw)
+        return said.getvalue()
+
+    def test_pair_saves_the_key_the_controller_derived(self):
+        self.assertEqual(self.quietly(blinds_client.pair, 'Mac'), 'paired as Mac (owner)\n')
+        me = blinds_client.load()['mac']
+        self.assertEqual((me['cid'], bytes.fromhex(me['key']), me['ctr']), (self.c.cid.hex(), self.c.key, 0))
+        self.assertEqual(self.c.paths, ['/x/pair'])
+        self.assertEqual(self.c.bodies[0]['name'], 'Mac')
+
+    def test_a_wrong_check_is_not_trusted_and_nothing_is_saved(self):
+        self.c.wrong_check = True
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.pair('Mac')
+        self.assertIn('not trusted', str(e.exception))
+        self.assertEqual(blinds_client.load(), {})
+
+    def test_a_refused_pairing_shows_the_status(self):
+        self.c.refuse = (403, b'owned')
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.pair('Mac')
+        self.assertEqual(str(e.exception), 'pairing refused: 403 owned')
+
+    def test_ask_posts_to_ask_and_prints_the_wait_code(self):
+        said = self.quietly(blinds_client.main, ['ask', 'Den'])
+        self.assertEqual(said, 'asked to join as Den: an owner lets it in (code 4821)\n')
+        self.assertEqual(self.c.paths, ['/x/ask'])
+
+    def test_join_sends_the_invite_and_a_mac_the_controller_accepts(self):
+        self.assertEqual(self.quietly(blinds_client.main, ['join', 'INV1', '00112233', 'Guest']), 'paired as Guest\n')
+        self.assertEqual(self.c.bodies[0]['inv'], 'INV1')
+        self.assertEqual(blinds_client.load()['mac']['key'], self.c.key.hex())    # the salted key, on both ends
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.main(['join', 'INV1', 'ffffffff'])
+        self.assertIn('403 bad invite', str(e.exception))
+
+    def test_call_opens_the_answer(self):
+        self.quietly(blinds_client.pair, 'Mac')
+        self.assertEqual(blinds_client.call('/api/s'), '{"cmd":"/api/s"}')
+        self.assertEqual(self.c.seen, ['/api/s'])
+        pkt, out = blinds_client.call('/api/dev', raw_out=True)
+        self.assertEqual((pkt, out), (self.c.frames[-1], '{"cmd":"/api/dev"}'))
+        self.assertTrue(blinds_client.call('/api/s', replay=pkt).startswith('refused: 409'))   # the controller says replay
+        self.assertEqual(len(self.c.frames), 3)
+
+    def test_a_409_is_tried_once_more_with_a_fresh_boot_id(self):
+        self.quietly(blinds_client.pair, 'Mac')
+        self.c.conflicts = 1
+        self.assertEqual(blinds_client.call('/api/s'), '{"cmd":"/api/s"}')
+        self.assertEqual([f[8:12].hex() for f in self.c.frames], ['a1b2c3d4', '0badf00d'])
+        self.c.conflicts = 2
+        self.assertEqual(blinds_client.call('/api/s'), 'refused: 409 stale')
+
+    def test_another_refusal_comes_back_as_refused(self):
+        self.quietly(blinds_client.pair, 'Mac')
+        d = blinds_client.load()
+        d['mac']['cid'] = 'ffffffffffffffff'
+        blinds_client.save(d)
+        self.assertEqual(blinds_client.call('/api/s'), 'refused: 403 who')
+        self.assertEqual(len(self.c.frames), 1)
+
+    def test_the_saved_counter_never_goes_down(self):
+        import time
+        self.quietly(blinds_client.pair, 'Mac')
+        ahead = int(time.time() * 1000) + 10 ** 9
+        d = blinds_client.load()
+        d['mac']['ctr'] = ahead
+        blinds_client.save(d)
+        blinds_client.call('/api/s')
+        self.assertEqual(blinds_client.load()['mac']['ctr'], ahead + 1)
+        self.assertEqual(self.c.last_ctr, ahead + 1)
+
+    def test_no_saved_identity_says_pair_first(self):
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.call('/api/s')
+        self.assertIn('pair first', str(e.exception))
+
+    def test_the_command_line(self):
+        import json
+        self.assertEqual(json.loads(self.quietly(blinds_client.main, ['hello', '--ip', '192.0.2.9']))['boot'], 'a1b2c3d4')
+        self.assertEqual(blinds_client.IP, '192.0.2.9')
+        self.quietly(blinds_client.main, ['--as', 'den', 'pair'])
+        self.assertEqual(list(blinds_client.load()), ['den'])
+        self.assertEqual(self.c.bodies[0]['name'], 'Mac test')
+        self.assertEqual(self.quietly(blinds_client.main, ['get', '/api/s']), '{"cmd":"/api/s"}\n')
+        self.c.refuse = (500, b'busy')
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.main(['get', '/api/s'])
+        self.assertEqual(str(e.exception), 'refused: 500 busy')
+        for args, said in [(['--ip'], '--ip needs a value'), (['get'], 'usage: blinds_client.py get'),
+                           (['join', 'x'], 'usage: blinds_client.py join'), (['fly'], 'unknown command "fly"')]:
+            with self.assertRaises(SystemExit) as e:
+                blinds_client.main(args)
+            self.assertIn(said, str(e.exception))
+
+    def test_http_talks_to_the_address(self):
+        import io, urllib.error
+        from unittest import mock
+        seen = []
+
+        class Answer(io.BytesIO):
+            status = 200
+
+        def urlopen(req, timeout):
+            seen.append((req.full_url, req.get_method(), req.data))
+            if req.data == b'bad':
+                raise urllib.error.HTTPError(req.full_url, 409, 'no', {}, io.BytesIO(b'stale'))
+            return Answer(b'hi')
+        mock.patch.stopall()                     # the real http, not the fake controller
+        with mock.patch.object(blinds_client, 'IP', '192.0.2.1/c/ab'), \
+                mock.patch.object(blinds_client.urllib.request, 'urlopen', urlopen):
+            self.assertEqual(blinds_client.http('/x/hello'), (200, b'hi'))
+            self.assertEqual(blinds_client.http('/x', b'bad'), (409, b'stale'))
+        self.assertEqual(seen, [('http://192.0.2.1/c/ab/x/hello', 'GET', None), ('http://192.0.2.1/c/ab/x', 'POST', b'bad')])
+
+    def test_the_script_runs_as_its_own_process(self):
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'blinds_client.py'), 'fly'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('unknown command "fly"', r.stderr)
 
 
 @unittest.skipUnless(blinds_client, "needs the 'cryptography' package")
