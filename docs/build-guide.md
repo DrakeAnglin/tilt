@@ -138,9 +138,10 @@ Install **Tilt** from the App Store on an iPhone or iPad on your home Wi-Fi.
 To share the blinds, the Owner invites the people they live with from the room's settings.
 
 #### Schedules that follow the light
-Make time, sunrise and sunset automations in Apple Home or Alexa ([ADR 0007](adr/0007-automations-live-in-the-home.md)).
-The Tilt app's own Schedules start **When it gets dark** or **When it gets light**, read from a solar panel. A time or
-sun Schedule made before is still shown and runs: move it to Apple Home or Alexa, then turn it off or delete it. The controller reads the panel: when its input stays dark (or light) for a few minutes within 90 minutes of
+Make time, sunrise and sunset automations in Apple Home or Alexa
+([ADR 0007](adr/0007-automations-live-in-the-home.md)). The Tilt app's own Schedules start **When it gets dark** or
+**When it gets light**, read from a solar panel. A time or sun Schedule made before is still shown and runs: move it to
+Apple Home or Alexa, then turn it off or delete it. The controller reads the panel: when its input stays dark (or light) for a few minutes within 90 minutes of
 sunset (or sunrise), the Schedule runs, once a day. Under the Schedule the app shows when it last ran and why.
 
 - It is not a brightness meter. It only sees how much light reaches the panel, so put the panel where it sees the sky,
@@ -151,7 +152,7 @@ sunset (or sunrise), the Schedule runs, once a day. Under the Schedule the app s
   goes when the panel already reads dark (or light) as the 90 minutes start, for example when it was unplugged at
   midday: it waits for a real change and otherwise runs at the end.
 - Every controller the Schedule covers needs firmware that knows these choices. The app offers them only then.
-- With no solar panel seen, it runs at sunset or sunrise, like a plain sun Schedule.
+- With no solar panel seen, it runs at sunset or sunrise.
 
 ### 9. Add to Apple Home
 Apple Home adds the Tilt Hub once, and every blind on every controller shows up through it. There is no code per

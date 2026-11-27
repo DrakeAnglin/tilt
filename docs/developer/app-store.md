@@ -64,9 +64,10 @@ about 3 minutes; trim in Photos.
 > nothing paid.
 >
 > 2. PURPOSE AND AUDIENCE: Tilt is the companion app for Tilt, a small open-source battery motor that clips onto the
-> tilt rod of ordinary horizontal blinds. It is for people who want their existing blinds to open and close on a
-> schedule, at sunrise and sunset, from Apple Home and Siri, without replacing them. The app sets up the controller,
-> moves the blinds, and keeps schedules and scenes on the controller itself, so they run when the phone is away.
+> tilt rod of ordinary horizontal blinds. It is for people who want their existing blinds to open and close from
+> Apple Home, Alexa and Siri, and on their own when it gets light or dark, without replacing them. The app sets up the
+> controller, moves the blinds, and keeps scenes and light schedules on the controller itself, so they run when the
+> phone is away.
 >
 > 3. HOW TO REVIEW (no login, no hardware needed): on the first screen tap "No controller yet? Try the Demo" (also under
 > + then Try the Demo). The demo room, "Living Room (Demo)", acts like a real one: tap Open or Close, press and hold
@@ -80,8 +81,8 @@ about 3 minutes; trim in Photos.
 > Notifications for join requests and low-battery alerts. Apple Home (HomeKit and Matter) to add blinds to the Home app.
 > Firmware update files are downloaded from the project's public GitHub Releases page. Everything else talks only to
 > the user's own controller and hub, over Bluetooth or the home Wi-Fi network. No server of ours, no analytics, no ads,
-> no AI services, no payments. Location is read once on the phone to work out sunrise and sunset and is sent only to the
-> user's own controller.
+> no AI services, no payments. Location is read once on the phone to work out sunrise and sunset (the light schedules
+> run around them) and is sent only to the user's own controller.
 >
 > 5. REGIONS: the app works the same in every region where it is offered. It is not offered in China mainland.
 >
@@ -91,10 +92,11 @@ about 3 minutes; trim in Photos.
 
 ## Metadata draft
 - **Subtitle:** Smart tilt for your blinds
-- **Description:** Tilt opens and closes your window blinds from your iPhone, Apple Home, Siri and schedules that run on
-  the controller itself, so they work even when your phone is away. Move blinds gently over minutes, set scenes, follow
-  sunrise and sunset, and share access with the people you live with. No account, no cloud server, no tracking.
-- **Keywords:** blinds, smart home, tilt, window, shades, Apple Home, schedule, sunrise, automation
+- **Description:** Tilt opens and closes your window blinds from your iPhone, Apple Home, Alexa and Siri, and on its own
+  when it gets light or dark, read from its solar panel on the controller itself, so it works even when your phone is
+  away. Move blinds gently over minutes, set scenes, and share access with the people you live with. No account, no
+  cloud server, no tracking.
+- **Keywords:** blinds, smart home, tilt, window, shades, Apple Home, Alexa, solar, automation
 - **Category:** Lifestyle (secondary: Utilities)
 
 ## Screenshots
