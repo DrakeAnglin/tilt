@@ -1,4 +1,3 @@
 # Controller firmware files the coverage gate leaves out: one per line, `<path from this folder>  # <why>`.
 # Only files where nothing can run off the chip. The rule: docs/agents/workflow.md, "Coverage".
-main/ardu.h  # the Arduino calls on ESP-IDF (GPIO, ADC, LEDC, NVS, timers): chip calls only
 main/ot_config.h  # OpenThread radio settings (macros for esp_openthread)
