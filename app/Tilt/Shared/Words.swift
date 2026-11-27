@@ -56,6 +56,13 @@ enum TiltWords {
         if b.stuck { return "Did not move" }
         return long(b.tilt)
     }
+    /// A shown blind whose sensor runs on the analog fallback (noisy near the motor): the warning on its sheet, nil if
+    /// none. It links to `sensorBenchTool`.
+    static func sensorWarning(_ b: BlindState) -> String? {
+        b.listed && b.an == 1 ? "Sensor not set to PWM: run the sensor bench tool" : nil
+    }
+    /// How to burn a sensor to PWM: the sensor bench tool in the firmware's README.
+    static let sensorBenchTool = URL(string: "https://github.com/DrakeAnglin/tilt/blob/main/firmware/README.md#as5600_setup-sensor-bench-tool")!
     /// One line for a whole room.
     static func room(_ s: ControllerState) -> String {
         let ready = s.b.filter(\.ready)
