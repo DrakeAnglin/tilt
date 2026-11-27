@@ -867,6 +867,22 @@ int main() {
   bad = hc; bad.iter = 999;
   CHECK(!homeCodeKeep(bad, sizeof bad), "too few iterations: make one");
   CHECK(manualCodeDashed("12345678901") == "1234-567-8901" && manualCodeDashed("123") == "123", "the manual code is dashed 4-3-4");
+  {
+    // The 144 bytes tools/device_identity.py writes for a hub (home_code_blob, the same hex in tools/test_tools.py):
+    // the SDK test passcode and discriminator and its verifier, salt 00..1f. The firmware has to read them as written.
+    const char *hex = "0100434825423401e8030000000f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+                      "b96170aae803346884724fe9a3b287c30330c2a660375d17bb205a8cf1aecb350457f8ab79ee253ab6a8e46bb09e54"
+                      "3ae422736de501e3db37d441fe344920d09548e4c18240630c4ff4913c53513839b7c07fcc0627a1b8573a149fcd1fa4"
+                      "66cf00";
+    CHECK(sizeof(HomeCode) == 144 && strlen(hex) == 2 * sizeof(HomeCode), "HomeCode is 144 bytes, as the Mac's tool writes it");
+    HomeCode t;
+    uint8_t *b = (uint8_t *)&t;
+    for (size_t i = 0; i < sizeof t; i++) { char h[3] = {hex[2 * i], hex[2 * i + 1], 0}; b[i] = (uint8_t)strtol(h, nullptr, 16); }
+    CHECK(homeCodeKeep(t, sizeof t), "the tool's Apple Home code is kept");
+    CHECK(t.pin == 20202021 && t.disc == 3840 && t.iter == 1000 && t.salt[0] == 0 && t.salt[31] == 0x1f,
+          "the tool's passcode, discriminator, iterations and salt land in their fields");
+    CHECK(t.verifier[0] == 0xb9 && t.verifier[32] == 0x04 && t.verifier[96] == 0xcf, "the verifier lands in its field");
+  }
 
   // ---- the Tilt Hub's alert rules: each alert once; the battery's three levels each once
   {

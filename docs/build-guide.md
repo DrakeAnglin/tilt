@@ -86,15 +86,39 @@ over Thread and sleep, and Apple Home, Alexa and the app reach the blinds throug
 | USB-C male-to-male adapter | the hub's plug ([BOM](../hardware/BOM.md#one-tilt-hub)) |
 | Printed box | printed round the ESP and the adapter ([hub box](hub-box.md)) |
 | A 5 V USB-C wall plug (1 A is plenty) | always on |
-| A label | the 8-digit setup code `build.sh` prints on its first build |
+| A label | its setup label, printed in step 2 ([Print a setup label](#print-a-setup-label)) |
 
 1. Copy `firmware/tilt_hub/main/secrets.h.example` to `secrets.h` and fill in the Wi-Fi network.
-2. `firmware/tilt_hub/build.sh -p <USB port> flash`. The first build makes the setup code: put it on the label.
+2. `tools/flash_hub.sh --usb <USB port>`. It gives the hub its own codes and writes its setup label: print it and
+   stick it on the hub. (Plain `firmware/tilt_hub/build.sh -p <USB port> flash` still works: it prints a setup code
+   to write on a label, and the app shows the Apple Home code.)
 3. Print the box round the ESP and the adapter ([hub box](hub-box.md)). Flash first: the box has no way in afterward.
 4. Plug the hub into the wall plug.
 
 Later updates come over Wi-Fi ("Update Tilt Hub" on the hub page in the app). More:
 [firmware/tilt_hub](../firmware/tilt_hub/README.md).
+
+#### Print a setup label
+`tools/flash_hub.sh --usb <USB port>` makes the hub's **Apple Home code** and its 8-digit **setup code** on the Mac,
+writes them into the hub before its first start, and keeps them in `~/.tilt/devices/` on that Mac only. It writes the
+label there as a PNG and a PDF (it prints the path): a QR and the 11 digits for Apple Home, the setup code for the
+Tilt app, and the hub's short ID.
+
+- **Once per Mac:** the label needs Pillow in the ESP-IDF Python the tool runs with:
+  `~/.espressif/python_env/idf5.5_py3.9_env/bin/python -m pip install pillow qrcode`. Without it the flash and the
+  record still work, and the tool prints the command for the label.
+- The default label is a 1 x 1 in (25 x 25 mm) square at 300 dpi. Another size: `--label-size 40x20` (mm). A size
+  too small for a QR a phone can read is refused before anything is flashed, with the smallest that works.
+- Print it again any time, with the same Python:
+  `~/.espressif/python_env/idf5.5_py3.9_env/bin/python tools/device_identity.py labels <short ID>` (or `--all`).
+- If a flash stops partway (a cable, the port), run the same command again: the codes are saved on the Mac before
+  anything is written to the hub, and the rerun finishes with the same codes. If the hub has meanwhile been given
+  another code, the rerun asks for its short ID before it wipes anything. Unplug and replug the hub after a stop.
+- A reflash or an update keeps the codes, so the label keeps working. A hub erased over USB gets the same codes back
+  from this Mac. Only the developer flag `--new-identity` makes new ones, after you type the hub's short ID.
+- A new hub can be scanned into Apple Home from its label in its first 15 minutes after power-on. Later, use **Add**
+  in the app (step 9).
+- A controller flashed with `tools/flash.sh --usb <USB port>` gets an ID label only: it has no code of its own.
 
 ### 8. Set up in the Tilt app
 Install **Tilt** from the App Store on an iPhone or iPad on your home Wi-Fi.

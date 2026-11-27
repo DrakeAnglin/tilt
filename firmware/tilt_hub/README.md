@@ -33,7 +33,8 @@ The first part of this page is what a builder needs. [For developers](#for-devel
 - **Settings backups.** Each controller's settings, schedules and blind positions are kept on the hub (fetched when
   the checksum in its status push changes). Setting up a replacement offers "Restore", and the hub moves the old
   Apple Home tile over (`/hub/replace`).
-- **Factory reset:** hold BOOT (not RST) for 10 s; the light blinks white, then fast. Keeps the setup code only.
+- **Factory reset:** hold BOOT (not RST) for 10 s; the light blinks white, then fast. Keeps only the two codes on
+  its label: the Apple Home code and the setup code.
 - **Status light** (the board's color LED, GPIO8, at full brightness; the one-color LED on GPIO15 stays dark). Off
   when all is well. Otherwise the most urgent of: blinking white (factory reset), blinking blue (being added to Apple
   Home or Alexa), flashing red (no Wi-Fi once in a home, no Thread network, Matter not running, or a controller set up with
@@ -61,9 +62,15 @@ plain `flash` keeps what the hub has learned (Thread network, people, tiles, bac
 
 ## Setup code
 
-`build.sh` makes an 8-digit code once (`main/setup_pin.h`, not in Git) and prints it: put it on a
-label on the hub. The first owner (a new hub, or after its people are reset) types it in the app; it goes into the
-key, never over the network. Five wrong codes close connecting for 5 minutes.
+The first flash from the Mac, `tools/flash_hub.sh --usb <USB port>`, makes the hub's two codes: its Apple Home code
+and its 8-digit setup code. It writes them into the hub's saved data before its first start, keeps them in
+`~/.tilt/devices/` on that Mac (never in Git) and writes a setup label with both
+([Print a setup label](../../docs/build-guide.md#print-a-setup-label)). A reflash or an update keeps them.
+
+A plain `./build.sh -p <port> flash` works too: then `build.sh` makes an 8-digit code once (`main/setup_pin.h`, not
+in Git) and prints it, and the hub makes its own Apple Home code on its first start (the app shows it). The first
+owner (a new hub, or after its people are reset) types the setup code in the app; it goes into the key, never over
+the network. Five wrong codes close connecting for 5 minutes.
 
 ## Add a controller
 
@@ -175,8 +182,8 @@ tools/flash_hub.sh
 Raise `PROJECT_VER` in `CMakeLists.txt` first. The hub has two firmware slots: the signed file goes into the spare
 one over Wi-Fi (owner-allowed, signature and version checked), the hub restarts on it on trial and keeps it once Wi-Fi
 and Apple Home have worked for a minute, otherwise it goes back by itself. About a minute in all. The spare slot is
-also where a controller's update waits while the hub sends it. The setup code lives in the hub's flash (copied there
-from `main/setup_pin.h` at its first USB flash), so update files carry no code.
+also where a controller's update waits while the hub sends it. The codes live in the hub's saved data (written by
+`tools/flash_hub.sh --usb`, or copied from `main/setup_pin.h` at its first start), so update files carry no code.
 
 ### Update a controller from the Mac
 
