@@ -47,7 +47,7 @@ White PLA for the housing and most gears, white PETG for the four parts that rub
 | Ceramic capacitor 10 µF ("106") | 1 | in the controller's capacitor kit | |
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm | [Buy once](#buy-once) | |
 | 22 AWG stranded wire, red and black | about 12 cm | [Buy once](#buy-once) | |
-| White flat 2-conductor 22 AWG (motor leads) | about 8 cm | [Buy once](#buy-once) | |
+| 2-conductor 22 AWG (motor leads; any color, the build used red and black) | about 8 cm | [Buy once](#buy-once) | |
 
 ### Motor speed
 150 RPM is the default: quiet, and strong enough for the reference blinds. The tilter gears it down 20:1, so the rod
@@ -65,17 +65,18 @@ If a faster motor overshoots (the log shows "turn-backs"), raise the stop-early 
 ### Hardware
 | Part | Per tilter | Sold as | Link |
 |---|---|---|---|
-| M3 × 25 flat-head screw | 3 (2 case, 1 sensor) | pack of 50 | [B0DKY4B3VG](https://www.amazon.com/dp/B0DKY4B3VG) |
-| M3 × 20 flat-head screw | 2 (tray; one is the cluster gear's axle) | in the M3 kit ([Buy once](#buy-once)) | |
+| M3 × 25 flat-head screw | 1 (sensor, through the lid and the AS5600) | pack of 50 | [B0DKY4B3VG](https://www.amazon.com/dp/B0DKY4B3VG) |
+| M3 × 20 flat-head screw | 4 (2 case, 2 tray; one tray bolt is the cluster gear's axle) | in the M3 kit ([Buy once](#buy-once)) | |
+| M3 × 16 flat-head screw | 2, optional and reusable: hold the motor shell on while the sensor module is not ready ([step C5](../docs/tilter-assembly.md#c5-hold-it-together)) | in the M3 kit ([Buy once](#buy-once)) | |
 | M3 × 8 flat-head screw | 1 (lid corner) | in the M3 kit ([Buy once](#buy-once)) | |
 | M3 heat-set insert, M3 × 5.7 × 4.6 (Ø4.0 hole) | 6 | pack of 100 (the boxes use them too) | [B0DQL4ZSCP](https://www.amazon.com/dp/B0DQL4ZSCP) |
 | M1.6 × 4 socket screw (holds the N20 to the motor shell) | 2 | in the M1.6 kit ([Buy once](#buy-once)) | |
 | Ø2 × 6 mm stainless dowel pin (4 planet axles, 1 worm top pin) | 5 | pack of 50 | [HARFINGTON 2 × 6 mm](https://www.amazon.com/s?k=HARFINGTON+50pcs+Dowel+Pins+M2+2mm+x+6mm+304+Stainless+Steel) |
 | PTFE grease, Super Lube 21030 | a little | [Buy once](#buy-once) | |
-| Stick-on **felt** pad, about 8 mm across and 1.5 to 2 mm tall (the same pack as the box's feet) | 6 (4 under, 1 on each side) | [Buy once](#buy-once) | |
+| Stick-on **foam** pad, about 10 mm (3/8 in) across and 2 mm thick (the same pack as the box's feet) | 6 (4 under, 1 on each side) | [Buy once](#buy-once) | |
 
-The felt pads keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use felt, not
-rubber: rubber still passes the vibration on. Where they go: [tilter build, step 9](mechanical/stl/tilter/README.md#assembly).
+The foam pads keep the tilter off the metal rail, so the rail does not pick up the motor's buzz. Use soft foam (or
+felt), not hard rubber: hard rubber passes the vibration on. Where they go: [tilter assembly, step D6](../docs/tilter-assembly.md#d6-foam-pads).
 
 ### Cord to the controller
 | Part | Per tilter | Sold as | Link |
@@ -128,7 +129,7 @@ J3 (a 6-way socket for a separate USB-C board) is not used: USB plugs into the 6
 | M3 heat-set insert | 3 | from the tilters' pack of 100 | |
 | M3 × 10 flat-head screw | 3 | in the M3 kit ([Buy once](#buy-once)) | |
 | M2 × 6 self-tapping screw (charger) | 2 | small pack | search "M2 x 6 self tapping screw" |
-| **Stick-on felt pad, about 8 mm across and 1.5 to 2 mm tall** | **4** | [Buy once](#buy-once) | |
+| **Stick-on foam pad, about 10 mm across and 2 mm thick** | **4** | [Buy once](#buy-once) | |
 
 The pads lift the box off the rail floor so it does not pinch the blind's lift cord, which runs down the middle of the
 rail: one pad in each corner, none in the middle. Where they go:
@@ -160,14 +161,14 @@ Shared supplies: one of each covers many blinds. The per-unit amounts say how fa
 
 | Part | Uses | Sold as | Link |
 |---|---|---|---|
-| M3 countersunk screw kit, 4–20 mm | M3 × 20 and M3 × 8 (3 per tilter), M3 × 10 (3 per box) | kit | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
+| M3 countersunk screw kit, 4–20 mm | M3 × 20, M3 × 16 and M3 × 8 (5 per tilter, plus 2 reusable M3 × 16), M3 × 10 (3 per box) | kit | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
 | M1.6 × 4 socket screws | 2 per tilter | kit | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) |
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm per tilter | kit | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) |
 | 22 AWG stranded wire, red and black | about 12 cm per tilter, 5 cm per controller | small roll each | search "22 AWG silicone wire red black" |
-| White flat 2-conductor 22 AWG (motor leads) | about 8 cm per tilter | roll (30 ft) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
+| 2-conductor 22 AWG (motor leads; any color, the build used red and black) | about 8 cm per tilter | roll (30 ft) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
 | Heat-shrink kit | a few pieces per tilter and controller | kit | [B01MFA3OFA](https://www.amazon.com/dp/B01MFA3OFA) |
 | PTFE grease, Super Lube 21030 | a little per tilter | tube | [B000XBH9HI](https://www.amazon.com/dp/B000XBH9HI) |
-| Stick-on felt pad, about 8 mm across and 1.5 to 2 mm tall | 6 per tilter, 4 per box | pack of 100 or more | search "felt pads 8 mm" |
+| Stick-on foam pad, 3/8 in (about 10 mm) across, 2 mm thick, black | 6 per tilter, 4 per box | pack of 261 to 504, about $6 | [B0HKVXW9MW](https://www.amazon.com/dp/B0HKVXW9MW) |
 | White PLA and white PETG filament | the tilters, the boxes and the hub box | spool each | |
 
 ## Tools

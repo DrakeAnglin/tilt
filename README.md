@@ -26,7 +26,7 @@ Only the current version of each thing is kept here. Older versions are in the G
 | [build-guide.md](docs/build-guide.md) | The whole build, in order |
 | [hardware/BOM.md](hardware/BOM.md) | Parts to buy, and how many |
 | [measure-your-blinds.md](docs/measure-your-blinds.md) | Measuring blinds that differ from the reference blinds |
-| [Tilter](hardware/mechanical/stl/tilter/README.md), [tilter wiring](docs/tilter-wiring.md) | Printing, assembling and wiring a tilter |
+| [Tilter](hardware/mechanical/stl/tilter/README.md), [sensor module](docs/tilter-wiring.md), [mechanical build](docs/tilter-assembly.md) | Printing, wiring and assembling a tilter |
 | [pcb-build.md](docs/pcb-build.md), [controller-box.md](docs/controller-box.md) | Soldering the controller PCB; the box |
 | [hub-box.md](docs/hub-box.md) | The Tilt Hub's box |
 | [firmware/README.md](firmware/README.md), [Tilt Hub](firmware/tilt_hub/README.md) | Flashing and updates |
