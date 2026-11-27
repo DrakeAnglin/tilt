@@ -31,20 +31,20 @@ the box floor.
 | 100nF | 5 | C2, C3, C4, C5, C6 | 4 |
 | ESP32-C6 SuperMini socket (5V row) | 1 | J1 | 5 |
 | ESP32-C6 SuperMini socket (TX row) | 1 | J2 | 5 |
-| USB-C breakout socket (**not used** with the 6092: leave empty, don't buy) | 1 | J3 | 5 |
 | Battery (18650, JST-XH 2-pin) | 1 | J4 | 6 |
 | Charger (JST-XH 6-pin) | 1 | J5 | 6 |
-| Solar (optional, JST-ZH 2-pin) | 1 | J8 | 6 |
 | RJ12 port 1 | 1 | J9 | 7 |
-| RJ12 port 2 | 1 | J10 | 7 |
-| RJ12 port 3 | 1 | J11 | 7 |
+| RJ12 port 2 (only if you use it) | 1 | J10 | 7 |
+| RJ12 port 3 (only if you use it) | 1 | J11 | 7 |
 | 470uF 10V | 1 | C9 | 8 |
-| 0.75A PTC | 3 | F1, F2, F3 | 9 |
+| 0.75A PTC | 1 per port you use (up to 3) | F1, F2, F3 | 9 |
 | ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |
 | Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |
-| JST-XH crimp pins on 22 AWG wire (or the optional pre-crimped leads) for the J5 harness, + heat-shrink | 4 | J5 plug | 11 |
+| JST-XH crimp pins on 22 AWG wire for the J5 harness, + heat-shrink | 4 | J5 plug | 11 |
 | 18650 cell with its JST-XH plug | 1 | J4 | 12 |
-| Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |
+
+**Optional, solar only:** the J8 header (JST-ZH 2-pin, step 6) and the panel lead with its JST-ZH plug (step 11).
+With no solar, leave J8 empty. Parts and links: [BOM, Optional](../hardware/BOM.md#optional).
 
 **RJ12 jacks and fuses:** one of each per port you use (step 7), not always three.
 
@@ -155,7 +155,7 @@ missing C2–C6 doesn't stop anything working (the readings are just noisier). *
 | C5 | 100nF | 104 | angle filter |
 | C6 | 100nF | 104 | input-power divider filter |
 
-## Step 5: ESP and USB-C sockets (3)
+## Step 5: ESP sockets (2; J3 stays empty)
 
 ![step 5](renders/pcb-build-05.png)
 
@@ -163,7 +163,7 @@ missing C2–C6 doesn't stop anything working (the readings are just noisier). *
    (chip up, USB toward end B), solder one pin at each end of each socket, check they sit flat and square, solder the
    rest, then lift the ESP back out. That way the two rows end up exactly the ESP's width apart.
 2. **J3 (6-way, for the old USB-C board): not used.** USB plugs into the charger's own USB-C (step 11), so nothing
-   plugs into J3. Leave it empty; you don't need to buy its socket.
+   plugs into J3. Leave it empty.
 
 ## Step 6: JST headers (3)
 
@@ -183,7 +183,7 @@ silkscreen outline shows those slots. That's the side the plug's two little hook
 actual plug in and hold it over the board: the cell's **red wire must sit over +**. Solder one pin, check it sits flat,
 then the rest.
 
-## Step 7: RJ12 jacks (3)
+## Step 7: RJ12 jacks (1 per port you use)
 
 ![step 7](renders/pcb-build-07.png)
 
@@ -204,7 +204,7 @@ C9, beside the jack strip. **Long leg (+) into the square pad** by the silkscree
 **shaded half is the − side**: the stripe on the can goes there. Push it right down: in the box it has 2–3 mm under
 the lid's groove.
 
-## Step 9: Fuses, then fold them (3)
+## Step 9: Fuses, then fold them (1 per port you use)
 
 ![step 9](renders/pcb-build-09.png)
 

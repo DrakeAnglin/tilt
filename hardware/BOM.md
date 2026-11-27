@@ -31,7 +31,8 @@ Links are the parts used in the reference build. Any part with the same size and
 
 Example: 7 blinds = 7 tilters, 3 controllers, 1 hub.
 
-Then add the [Buy once](#buy-once) supplies and the [tools](#tools).
+Then add the [Buy once](#buy-once) supplies and the [tools](#tools). These counts hold only what every build needs.
+Extras you may choose (solar, a cord through a wall, no crimper) are in [Optional](#optional).
 
 ## One tilter
 
@@ -49,10 +50,6 @@ White PLA for the housing and most gears, white PETG for the four parts that rub
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm | kit ([Buy once](#buy-once)) | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) |
 | 22 AWG stranded wire, red and black | about 12 cm | roll ([Buy once](#buy-once)) | [search](https://www.amazon.com/s?k=22+AWG+silicone+wire+red+black) |
 | 2-conductor 22 AWG (motor leads; any color, the build used red and black) | about 8 cm | roll ([Buy once](#buy-once)) | [B0DRTS9P8N](https://www.amazon.com/dp/B0DRTS9P8N) |
-
-**Optional fix, if a blind's angle jumps when its motor starts:** a 10 µF ceramic capacitor on the DRV8833's power
-pins ([tilter wiring](../docs/tilter-wiring.md#2-wire-it)). It comes from the controller's capacitor kit. The
-reference tilters work without it, so don't buy it on purpose.
 
 ### Motor speed
 150 RPM is the default: quiet, and strong enough for the reference blinds. The tilter gears it down 20:1, so the rod
@@ -72,7 +69,6 @@ If a faster motor overshoots (the log shows "turn-backs"), raise the stop-early 
 |---|---|---|---|
 | M3 × 25 flat-head screw | 1 (sensor, through the lid and the AS5600) | pack of 50 | [B0DKY4B3VG](https://www.amazon.com/dp/B0DKY4B3VG) |
 | M3 × 20 flat-head screw | 4 (2 case, 2 tray; one tray bolt is the cluster gear's axle). The case bolts can be M3 × 25 instead | in the M3 kit ([Buy once](#buy-once)) | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
-| M3 × 16 flat-head screw | 2, optional and reusable: hold the motor shell on while the sensor module is not ready ([step C5](../docs/tilter-assembly.md#c5-hold-it-together)) | in the M3 kit ([Buy once](#buy-once)) | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
 | M3 × 8 flat-head screw | 1 (lid corner) | in the M3 kit ([Buy once](#buy-once)) | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
 | M3 heat-set insert, M3 × 5.7 × 4.6 (Ø4.0 hole) | 6 | pack of 100 (the boxes use them too) | [B0DQL4ZSCP](https://www.amazon.com/dp/B0DQL4ZSCP) |
 | M1.6 × 4 socket screw (holds the N20 to the motor shell) | 2 | in the M1.6 kit ([Buy once](#buy-once)) | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) |
@@ -92,9 +88,6 @@ pads, not hard rubber: hard rubber passes the vibration on. Where they go: [tilt
 Each tilter needs one cord; pick the length by how far its blind is from the controller. Check every cord before
 use: pin 1 must beep to pin 1 ([tilter wiring](../docs/tilter-wiring.md)).
 
-**Optional, a cord through a wall:** a 5/8 in hole and one printed [wall plug](../docs/wall-plug.md) on each side
-(white PLA, about 1.1 g each).
-
 ## One controller
 
 ### Boards and battery
@@ -113,21 +106,16 @@ References match the [PCB build guide](../docs/pcb-build.md).
 | RJ12 PCB jack | Amphenol **87180-066LF** | 1 per port you use (J9–J11, up to 3) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=87180-066LF) |
 | Resettable fuse 0.75 A, radial, 5.1 mm pitch | Bel Fuse **0ZRE0075FF1A** | 1 per port you use (F1–F3, up to 3) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=0ZRE0075FF1A) |
 | Electrolytic 470 µF, 10 V or more, 8 mm, 3.5 mm pitch | Panasonic EEU-FR1A471 | 1 (C9) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=EEU-FR1A471) |
-| Zener 6.2 V 3 W (only this one; no 1 W zener) | onsemi **1N5920BRLG** | 1 (D4) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=1N5920BRLG) |
+| Zener 6.2 V 3 W | onsemi **1N5920BRLG** | 1 (D4) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=1N5920BRLG) |
 | Schottky diode | **1N5819** | 3 (D1–D3) | pack | [B0FC2CWKPL](https://www.amazon.com/dp/B0FC2CWKPL) |
 | JST-XH header, 2-pin, vertical | **B2B-XH-A(LF)(SN)** | 1 (J4, battery) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=B2B-XH-A%28LF%29%28SN%29) |
 | JST-XH header, 6-pin, vertical | **B6B-XH-A(LF)(SN)** | 1 (J5, charger) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=B6B-XH-A%28LF%29%28SN%29) |
 | JST-XH 6-pin housing | **XHP-6** | 1 | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=XHP-6) |
 | JST-XH crimp pins, for 22 AWG wire | JST **SXH-001T-P0.6** | 4 (J5 plug: 2 splice, GND, PWR) | bag ([Buy once](#buy-once)) | [DigiKey](https://www.digikey.com/en/products/result?keywords=SXH-001T-P0.6) |
-| Optional, only with no JST crimper: pre-crimped JST-XH leads, 6", crimp both ends (cut in half = 2 leads), in place of the crimp pins and wire | **ASXHSXH22K152** | 2 (4 half leads) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=ASXHSXH22K152) |
-| JST-ZH header, 2-pin, vertical (solar, optional) | **B2B-ZR(LF)(SN)** | 1 (J8) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=B2B-ZR%28LF%29%28SN%29) |
 | Female header socket, 10-way | Sullins **PPTC101LFBN-RC** | 2 (J1, J2: ESP) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=PPTC101LFBN-RC) |
 | Resistors, 1/4 W metal film | 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | kit ([Buy once](#buy-once)) | [B072BL2VX1](https://www.amazon.com/dp/B072BL2VX1) |
 | Ceramic capacitors | 100 nF ×5, 10 µF ×1 | 6 | kit ([Buy once](#buy-once)) | [B0C1V8Q93P](https://www.amazon.com/dp/B0C1V8Q93P) |
-| 22 AWG stranded wire | about 30 cm (the J5 harness; 5 cm with the pre-crimped leads) | | the red and black rolls ([Buy once](#buy-once)) | [search](https://www.amazon.com/s?k=22+AWG+silicone+wire+red+black) |
-
-**Not used, don't buy:** J3 (a 6-way socket, Sullins PPTC061LFBN-RC, for a separate USB-C board). USB plugs into the
-6092's own USB-C, so J3 stays empty.
+| 22 AWG stranded wire | about 30 cm (the J5 harness) | | the red and black rolls ([Buy once](#buy-once)) | [search](https://www.amazon.com/s?k=22+AWG+silicone+wire+red+black) |
 
 ### Box
 | Part | Per box | Sold as | Link |
@@ -141,17 +129,6 @@ References match the [PCB build guide](../docs/pcb-build.md).
 The pads lift the box off the rail floor so it does not pinch the blind's lift cord, which runs down the middle of the
 rail: one pad in each corner, none in the middle. Where they go:
 [controller box, step 8](../docs/controller-box.md#assembly).
-
-### Solar (optional, on hold)
-Don't buy these for a normal build. Solar is on hold: v3 gets a DC jack instead ([#8](https://github.com/DrakeAnglin/tilt/issues/8)). The v2 board takes a
-panel on J8.
-
-| Part | Per controller | Sold as | Link |
-|---|---|---|---|
-| 6 V 0.8 W mono ETFE solar panel, 70 × 70 mm | 1 to 6, wired in parallel | 3-pack | [B0H1LQFFPN](https://www.amazon.com/dp/B0H1LQFFPN) |
-| Solar housing: tray sections + end cap (1 to 6 panels in a row, printed) | 1 | | [docs/solar-housing.md](../docs/solar-housing.md) |
-| Double-sided tape, for the housing's ends on the window | about 20 cm | 1 roll | [search](https://www.amazon.com/s?k=clear+double+sided+mounting+tape) |
-| JST-ZH 1.5 mm 2-pin plugs | 1 | pack of 20 + 20 | [B0D9SMKFNS](https://www.amazon.com/dp/B0D9SMKFNS) |
 
 ## One Tilt Hub
 Every home needs one. One hub serves every controller, and it stays plugged in.
@@ -169,7 +146,7 @@ per-unit amounts say how far a pack goes.
 
 | Part | Uses | Sold as | Link |
 |---|---|---|---|
-| M3 countersunk screw kit, 4–20 mm | M3 × 20, M3 × 16 and M3 × 8 (5 per tilter, plus 2 reusable M3 × 16), M3 × 10 (3 per box) | kit | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
+| M3 countersunk screw kit, 4–20 mm | M3 × 20 and M3 × 8 (5 per tilter), M3 × 10 (3 per box) | kit | [B0DZCFNKHZ](https://www.amazon.com/dp/B0DZCFNKHZ) |
 | M1.6 × 4 socket screws | 2 per tilter | kit | [B0DK9TQVT4](https://www.amazon.com/dp/B0DK9TQVT4) |
 | 30 AWG silicone stranded wire, 6 colors | about 40 cm per tilter | kit | [B07G2SWB19](https://www.amazon.com/dp/B07G2SWB19) |
 | 22 AWG stranded wire, red and black | about 12 cm per tilter, 30 cm per controller | small roll each | [search](https://www.amazon.com/s?k=22+AWG+silicone+wire+red+black) |
@@ -182,10 +159,38 @@ per-unit amounts say how far a pack goes.
 | JST-XH crimp pins, SXH-001T-P0.6 | 4 per controller | bag | [DigiKey](https://www.digikey.com/en/products/result?keywords=SXH-001T-P0.6) |
 | White PLA and white PETG filament | the tilters, the boxes and the hub box | spool each | [PLA](https://www.amazon.com/s?k=white+PLA+filament+1.75mm), [PETG](https://www.amazon.com/s?k=white+PETG+filament+1.75mm) |
 
+## Optional
+Only what you choose. None of it is in the counts above.
+
+### Solar: yes or no
+Solar is on hold: v3 gets a DC jack instead ([#8](https://github.com/DrakeAnglin/tilt/issues/8)). With **no** solar, buy
+none of this and leave J8 empty. With **yes**, the v2 board takes a panel on J8:
+
+| Part | Per controller | Sold as | Link |
+|---|---|---|---|
+| JST-ZH header, 2-pin, vertical, JST **B2B-ZR(LF)(SN)** (J8 on the PCB) | 1 | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=B2B-ZR%28LF%29%28SN%29) |
+| 6 V 0.8 W mono ETFE solar panel, 70 × 70 mm | 1 to 6, wired in parallel | 3-pack | [B0H1LQFFPN](https://www.amazon.com/dp/B0H1LQFFPN) |
+| Solar housing: tray sections + end cap (1 to 6 panels in a row, printed) | 1 | | [docs/solar-housing.md](../docs/solar-housing.md) |
+| Double-sided tape, for the housing's ends on the window | about 20 cm | 1 roll | [search](https://www.amazon.com/s?k=clear+double+sided+mounting+tape) |
+| JST-ZH 1.5 mm 2-pin plugs | 1 | pack of 20 + 20 | [B0D9SMKFNS](https://www.amazon.com/dp/B0D9SMKFNS) |
+
+### No JST crimper
+Pre-crimped JST-XH leads, 6", crimped both ends, **ASXHSXH22K152**: 2 per controller, cut in half for the 4 J5 plug
+wires, in place of the crimp pins and most of the wire ([PCB build, step 11](../docs/pcb-build.md#step-11-the-charger-the-battery-and-solar)).
+[DigiKey](https://www.digikey.com/en/products/result?keywords=ASXHSXH22K152).
+
+### A cord through a wall
+A 5/8 in hole and one printed [wall plug](../docs/wall-plug.md) on each side (white PLA, about 1.1 g each). Tools: a
+drill and a 5/8 in bit.
+
+### Fix: a blind's angle jumps when its motor starts
+A 10 µF ceramic capacitor ("106") on the DRV8833's power pins ([tilter wiring](../docs/tilter-wiring.md#2-wire-it)).
+Take it from the controller's capacitor kit. The reference tilters work without it.
+
 ## Tools
 Soldering iron (also presses the heat-set inserts), multimeter with beep mode, flush cutters, wire strippers, a
 crimper for JST-XH pins (an open-barrel crimper, such as an Engineer PA-09 or [IWISS SN-28B](https://www.amazon.com/s?k=IWISS+SN-28B+crimper)), a USB-C cable to flash
-the ESP. No crimper? Use the optional pre-crimped XH leads for the J5 plug. Only for a cord through a wall: a drill and a 5/8 in bit.
+the ESP. No crimper? See [Optional](#optional).
 Handy: a USB-C power meter ([B0DF2LDKFC](https://www.amazon.com/dp/B0DF2LDKFC)) for charge and motor current.
 
 ## Check on arrival

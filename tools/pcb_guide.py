@@ -599,15 +599,19 @@ def md():
     groups = {}
     for k, (title, refs, _) in enumerate(STEPS, 1):
         for r in refs:
-            groups.setdefault(val(r), []).append((r, k))
-    for v, lst in groups.items():
-        a('| %s | %d | %s | %s |' % (v + (' (**not used** with the 6092: leave empty, don\'t buy)' if any(r == 'J3' for r, _ in lst) else ''), len(lst),
+            if r not in ('J3', 'J8'):       # J3: not used with the 6092; J8: solar only (listed under the table)
+                groups.setdefault(val(r), []).append((r, k))
+    for v, lst in groups.items():           # one jack and one fuse per port you use (step 7)
+        qty = '1 per port you use (up to 3)' if v == '0.75A PTC' else str(len(lst))
+        a('| %s | %s | %s | %s |' % (v + (' (only if you use it)' if v in ('RJ12 port 2', 'RJ12 port 3') else ''), qty,
                                    ', '.join(r for r, _ in lst), ', '.join(sorted({str(k) for _, k in lst}))))
     a('| ESP32-C6 SuperMini (male pins on, flashed on the bench) | 1 | plugs into J1 / J2 | 13 |')
     a('| Adafruit 6092 charger (bq25185), charging only, + 3-wire harness (6-pin XH housing) | 1 | J5 | 11 |')
-    a('| JST-XH crimp pins on 22 AWG wire (or the optional pre-crimped leads) for the J5 harness, + heat-shrink | 4 | J5 plug | 11 |')
+    a('| JST-XH crimp pins on 22 AWG wire for the J5 harness, + heat-shrink | 4 | J5 plug | 11 |')
     a('| 18650 cell with its JST-XH plug | 1 | J4 | 12 |')
-    a('| Solar panel lead with a JST-ZH 2-pin plug (optional) | 1 | J8 | 11 |')
+    a('')
+    a('**Optional, solar only:** the J8 header (JST-ZH 2-pin, step 6) and the panel lead with its JST-ZH plug (step 11).')
+    a('With no solar, leave J8 empty. Parts and links: [BOM, Optional](../hardware/BOM.md#optional).')
     a('')
     a('**RJ12 jacks and fuses:** one of each per port you use (step 7), not always three.')
     a('')
@@ -716,7 +720,7 @@ def md():
         a('| %s | %s | %s | %s |' % (r, val(r), '106' if val(r) == '10uF' else '104', NOTE[r][1]))
     a('')
     # ---- step 5
-    a('## Step 5: ESP and USB-C sockets (3)')
+    a('## Step 5: ESP sockets (2; J3 stays empty)')
     a('')
     a('![step 5](renders/pcb-build-05.png)')
     a('')
@@ -724,7 +728,7 @@ def md():
     a('   (chip up, USB toward end B), solder one pin at each end of each socket, check they sit flat and square, solder the')
     a('   rest, then lift the ESP back out. That way the two rows end up exactly the ESP\'s width apart.')
     a('2. **J3 (6-way, for the old USB-C board): not used.** USB plugs into the charger\'s own USB-C (step 11), so nothing')
-    a('   plugs into J3. Leave it empty; you don\'t need to buy its socket.')
+    a('   plugs into J3. Leave it empty.')
     a('')
     # ---- step 6
     a('## Step 6: JST headers (3)')
@@ -746,7 +750,7 @@ def md():
     a('then the rest.')
     a('')
     # ---- step 7
-    a('## Step 7: RJ12 jacks (3)')
+    a('## Step 7: RJ12 jacks (1 per port you use)')
     a('')
     a('![step 7](renders/pcb-build-07.png)')
     a('')
@@ -769,7 +773,7 @@ def md():
     a('the lid\'s groove.')
     a('')
     # ---- step 9
-    a('## Step 9: Fuses, then fold them (3)')
+    a('## Step 9: Fuses, then fold them (1 per port you use)')
     a('')
     a('![step 9](renders/pcb-build-09.png)')
     a('')
