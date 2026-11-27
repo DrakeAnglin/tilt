@@ -79,7 +79,6 @@ static void alertUpdateFailed(int c, const char *why) {     // from the update t
   alertRaise(t, "update", 9, name, why);
 }
 // The hub's own new firmware went back to the old one (it did not work): tell its owners once per version.
-static uint8_t htopic[16];
 static void alertHubUpdate() {
   const esp_partition_t *bad = esp_ota_get_last_invalid_partition();
   esp_app_desc_t d;

@@ -8,6 +8,7 @@
 #   firmware/tilt_hub/test/ctrl_link_test.cpp    the hub's link to one controller
 #   firmware/blinds_matter/test/pair_test.cpp    the key exchange in Pairing both firmwares share (needs mbedtls)
 #   firmware/blinds_matter/test/controller_test.cpp  the controller's own code on a stand-in board (test/host_esp)
+#   firmware/tilt_hub/test/hub_board_test.cpp    the Tilt Hub's own code on the stand-in board (test/host_esp; needs cJSON)
 #   (the two link tests use firmware/blinds_matter/test/host_mbedtls, a stand-in for mbedtls)
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -41,6 +42,11 @@ elif [ -f "$IDF_MBED/library/ecdsa.c" ]; then
 cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/ecdh.c" -o "$OUT/mbed_ecdh.o"
 cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/hkdf.c" -o "$OUT/mbed_hkdf.o"
 cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/base64.c" -o "$OUT/mbed_base64.o"
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/gcm.c" -o "$OUT/mbed_gcm.o"
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/aes.c" -o "$OUT/mbed_aes.o"
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/aesce.c" -o "$OUT/mbed_aesce.o"
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/cipher.c" -o "$OUT/mbed_cipher.o"
+cc -O1 -I"$IDF_MBED/include" -DMBEDTLS_USER_CONFIG_FILE='"mbedtls_host.h"' -I. -c "$IDF_MBED/library/cipher_wrap.c" -o "$OUT/mbed_cipher_wrap.o"
   MBED="-I$IDF_MBED/include -DMBEDTLS_USER_CONFIG_FILE=\"mbedtls_host.h\" -I. $OUT/mbed_*.o"
 else
   echo "hub test: no mbedtls. Install it (Mac: brew install mbedtls; Linux: apt-get install libmbedtls-dev) or ESP-IDF." >&2
@@ -54,3 +60,7 @@ c++ -std=c++17 -Wall -Wextra -O1 $HUB_INC -o "$OUT/pair_test" ../../blinds_matte
 # shellcheck disable=SC2086
 c++ -std=c++17 -Wall -Wextra -O1 -pthread -DTILT_DEVLOG=1 -I ../../blinds_matter/test/host_esp -I ../../blinds_matter/main -I ../main -o "$OUT/controller_test" ../../blinds_matter/test/controller_test.cpp $MBED
 "$OUT/controller_test"
+python3 ../../../tools/host_cjson.py "$OUT"
+# shellcheck disable=SC2086
+c++ -std=c++17 -Wall -Wextra -O1 -pthread -I host_esp -I ../../blinds_matter/test/host_esp $HUB_INC -o "$OUT/hub_board_test" hub_board_test.cpp @"$OUT/cjson.args" $MBED
+"$OUT/hub_board_test" ../../blinds_matter/test/wire/link.json

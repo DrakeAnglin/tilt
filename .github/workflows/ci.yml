@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libmbedtls-dev clang llvm   # mbedtls: the hub test; clang, llvm: coverage
+      - run: sudo apt-get update && sudo apt-get install -y libmbedtls-dev libcjson-dev clang llvm   # mbedtls: the hub tests; cjson: the hub board test; clang, llvm: coverage
       - run: tools/firmware_tests.sh
       - name: Coverage
         run: tools/coverage.sh firmware coverage

@@ -1,7 +1,22 @@
 // What the Tilt Hub keeps about each controller, in memory and in flash: Saved, Ctrl, the link state (ctrl_link.h),
 // the NVS handle and the state lock, save and load. Part of hub.cpp: included once, in order (one compiled file).
+// The first part: it includes what it uses by its SDK name, so it compiles with nothing before it (on the Mac too).
 #pragma once
+#include <cstring>
+#include <string>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <freertos/queue.h>
+#include <nvs.h>
+#include <esp_timer.h>
+#include <esp_random.h>
+#include <lwip/sockets.h>
+#include "logic.h"                               // PORTS (the controller's own rules)
+#include "ctrl_link.h"                           // CtrlLink, KeyState
+const uint16_t HUB_PORT = 49100;
+const int MAX_CTRL = 4;                          // PORTS: logic.h
 static uint32_t ms() { return (uint32_t)(esp_timer_get_time() / 1000); }
+static int rng(void *, unsigned char *b, size_t n) { esp_fill_random(b, n); return 0; }
 
 // ---- what the hub knows about each controller (the part in flash: Saved)
 struct Saved {
@@ -64,9 +79,6 @@ static volatile uint32_t shareUntil = 0;          // that code's pairing window 
 static volatile bool inHome = false;             // added to Apple Home (or another Matter home)
 static std::string homesJson();                  // the homes it is in, read fresh (below)
 static std::string shareCodeJson();              // a one-time code for another home app (below)
-// A home app is adding the hub right now (Matter fail-safe armed): its pairing window must not be closed. Call with
-// the CHIP stack lock held.
-static bool homeBeingAdded() { return chip::Server::GetInstance().GetFailSafeContext().IsFailSafeArmed(); }
 static const char *BUSY_JSON = "{\"ok\":0,\"err\":\"a home app is adding the Tilt Hub right now: try again in a minute\"}";
 static SemaphoreHandle_t stateMx;              // ctrls[] (not the per-controller request lock)
 static nvs_handle_t nv;

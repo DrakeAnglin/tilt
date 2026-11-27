@@ -4,6 +4,9 @@
 static std::string ctrlCommand(int c, const std::string &cmd);   // hub_ctrl.h
 static std::string hubIp();                                       // hub_api.h
 static void announce(int c);                                      // hub_api.h
+// A home app is adding the hub right now (Matter fail-safe armed): its pairing window must not be closed. Call with
+// the CHIP stack lock held.
+static bool homeBeingAdded() { return chip::Server::GetInstance().GetFailSafeContext().IsFailSafeArmed(); }
 // ---- Matter: one bridged Window covering per blind
 static node_t *gNode;
 static endpoint_t *aggregator;
