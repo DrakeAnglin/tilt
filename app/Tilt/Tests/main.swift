@@ -191,10 +191,12 @@ check(fromFixture?.kind == 4 && fromFixture?.lastRun["den"] == LastRun(at: Date(
 // the firmware's link_test.cpp): this app seals, opens and derives keys the same way
 let lv = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: wireDir.appendingPathComponent("link.json")))
 func lvData(_ k: String) -> Data { Data(hex: lv[k] ?? "") ?? Data() }
-let lvInfo = Data("blinds-v1".utf8) + lvData("cpub") + lvData("dpub")
-let lvKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: lvData("shared")), info: lvInfo, outputByteCount: 32)
-let lvSalted = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: lvData("shared")), salt: Data((lv["salt"] ?? "").utf8), info: lvInfo, outputByteCount: 32)
-check(lvKey.withUnsafeBytes { Data($0) } == lvData("key") && lvSalted.withUnsafeBytes { Data($0) } == lvData("keySalted"), "link vectors: the pairing key, with and without the setup code")
+// The app's own derivation (Secure.pairingKey, what Secure.pair uses), not a copy of its formula
+let lvKey = Secure.pairingKey(shared: lvData("shared"), phone: lvData("cpub"), controller: lvData("dpub"), salt: Data()).key
+let lvSaltedKeys = Secure.pairingKey(shared: lvData("shared"), phone: lvData("cpub"), controller: lvData("dpub"), salt: Data((lv["salt"] ?? "").utf8))
+let lvSalted = lvSaltedKeys.key
+check(lvKey.withUnsafeBytes { Data($0) } == lvData("key") && lvSalted.withUnsafeBytes { Data($0) } == lvData("keySalted"), "link vectors: the Pairing key, with and without the Setup code")
+check(lvSaltedKeys.check.withUnsafeBytes { Data($0) } == lvData("key"), "link vectors: the Pairing check key is made without the Setup code")
 let lvFrame = try Frame.seal(lv["cmd"] ?? "", key: lvKey, cid: lvData("cid"), boot: lvData("boot"), counter: UInt64(lv["ctr"] ?? "") ?? 0)
 let lvSaltedFrame = try Frame.seal(lv["cmd"] ?? "", key: lvSalted, cid: lvData("cid"), boot: lvData("boot"), counter: UInt64(lv["ctr"] ?? "") ?? 0)
 check(lvFrame.packet == lvData("frame") && lvSaltedFrame.packet == lvData("frameSalted"), "link vectors: a sealed command")
@@ -962,6 +964,146 @@ do {
     check(no.next == .denied && no.effects.isEmpty, "not paired while waiting: turned down")
     check(poll(.notPaired, hubbed).next == .removed, "not paired once in: removed")
 }
+
+// ---- Pairing (Shared/Secure.swift), against a fake controller side: no network
+/// A controller's half of Pairing, as firmware sec.h does it: its own key pair, the Pairing key from the shared secret
+/// (salted with the Setup code, if any), and the check made with the key without the Setup code.
+final class PairingSide: @unchecked Sendable {
+    let me = P256.KeyAgreement.PrivateKey(), salt: Data, extra: [String: Any], badCheck: Bool
+    var key = Data(), plainKey = Data(), asked: [String: String] = [:]
+    init(salt: Data = Data(), extra: [String: Any] = [:], badCheck: Bool = false) { self.salt = salt; self.extra = extra; self.badCheck = badCheck }
+    func answer(_ body: Data) -> (Int, Data) {
+        asked = (try? JSONSerialization.jsonObject(with: body)) as? [String: String] ?? [:]
+        let phone = Data(base64Encoded: asked["pub"] ?? "") ?? Data()
+        let shared = try! me.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: phone)).withUnsafeBytes { Data($0) }
+        let info = Data("blinds-v1".utf8) + phone + me.publicKey.x963Representation
+        let salted = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: shared), salt: salt, info: info, outputByteCount: 32)
+        let plain = HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: shared), info: info, outputByteCount: 32)
+        key = salted.withUnsafeBytes { Data($0) }; plainKey = plain.withUnsafeBytes { Data($0) }
+        let check = Data(HMAC<SHA256>.authenticationCode(for: Data("confirm".utf8), using: plain)).prefix(8).hex
+        var out: [String: Any] = ["pub": me.publicKey.x963Representation.base64EncodedString(), "cid": "0102030405060708", "check": badCheck ? "0000000000000000" : check]
+        out.merge(extra) { $1 }
+        return (200, try! JSONSerialization.data(withJSONObject: out))
+    }
+}
+func bytes(_ k: SymmetricKey) -> Data { k.withUnsafeBytes { Data($0) } }
+func thrown(_ what: () async throws -> Any) async -> String? {
+    do { _ = try await what(); return nil } catch { return error.localizedDescription }
+}
+
+let guestSide = PairingSide(extra: ["owner": 0, "wait": 1, "topic": "tp", "blindName": "Left"])
+let guestPair = try await Secure.pair(phoneName: "Sam") { guestSide.answer($0) }
+check(bytes(guestPair.key) == guestSide.key && guestPair.cid.hex == "0102030405060708", "Pairing: the phone has the key the controller worked out")
+check(!guestPair.owner && guestPair.waiting && guestPair.topic == "tp" && guestPair.blindName == "Left" && guestSide.asked["name"] == "Sam", "Pairing: owner, waiting, topic and blindName as answered, the phone's name sent")
+let ownerSide = PairingSide(extra: ["owner": 1])
+let ownerPair = try await Secure.pair(phoneName: "Alex") { ownerSide.answer($0) }
+check(ownerPair.owner && !ownerPair.waiting && ownerPair.topic == "" && ownerPair.blindName == "", "Pairing: an Owner, nothing else said")
+let codeSide = PairingSide(salt: Data("12345678".utf8))
+let codePair = try await Secure.pair(phoneName: "Alex", salt: Data("12345678".utf8)) { codeSide.answer($0) }
+check(bytes(codePair.key) == codeSide.key && codeSide.key != codeSide.plainKey, "Pairing with a Setup code: the salted key, not the plain one, and the check still passes")
+check(await thrown { try await Secure.pair(phoneName: "Alex") { PairingSide(badCheck: true).answer($0) } } == "The controller's key did not match. Pairing was cancelled.", "a wrong check cancels Pairing")
+check(await thrown { try await Secure.pair(phoneName: "Alex") { _ in (403, Data(#"{"err":"only an owner can add phones"}"#.utf8)) } } == "only an owner can add phones", "a refusal: the controller's reason")
+check(await thrown { try await Secure.pair(phoneName: "Alex") { _ in (500, Data()) } } == "Pairing was refused.", "a status that is not 200 and no reason: Pairing was refused")
+check(await thrown { try await Secure.pair(phoneName: "Alex") { _ in (200, Data(#"{"err":"busy"}"#.utf8)) } } == "busy", "200 without a key: the controller's reason")
+for how in [Secure.Joining.first, .ask, .recover] {
+    let side = PairingSide(), sent = Cell<[String]>([])
+    _ = try await Secure.pair(host: "10.0.0.5", phoneName: "Sam", how: how) { host, path, body in sent.value.append("\(host)\(path)"); return side.answer(body ?? Data()) }
+    check(sent.value == ["10.0.0.5" + how.rawValue], "Pairing \(how) posts to \(how.rawValue)")
+}
+check(Secure.Joining.first.rawValue == "/x/pair" && Secure.Joining.ask.rawValue == "/x/ask" && Secure.Joining.recover.rawValue == "/x/recover", "the three ways in")
+
+// hello and recovery
+let helloJSON = #"{"id":"aa11","name":"Den","fw":"2.3.0","boot":"a1b2c3d4","owned":1,"net":"thread","hub":1}"#
+let gotHello = try await Secure.hello("h") { host, path, body in (host == "h" && path == "/x/hello" && body == nil ? 200 : 500, Data(helloJSON.utf8)) }
+check(gotHello.id == "aa11" && gotHello.boot == "a1b2c3d4" && gotHello.net == "thread" && gotHello.img == nil, "a controller's hello decodes")
+check(await thrown { try await Secure.hello("h") { _, _, _ in (404, Data(helloJSON.utf8)) } } == "That is not a Tilt controller.", "a 404 hello: not a Tilt controller")
+check(await thrown { try await Secure.hello("h") { _, _, _ in (200, Data("<html>".utf8)) } } == "That is not a Tilt controller.", "a hello that is not JSON: not a Tilt controller")
+let recSent = Cell<[String]>([])
+let recOn = try await Secure.recovery("h") { _, path, _ in recSent.value.append(path); return (200, Data(#"{"on":1,"step":2,"left":40}"#.utf8)) }
+check(recOn?.step == 2 && recOn?.left == 40 && recSent.value == ["/x/recstate"], "a recovery under way: its step and seconds left")
+check(try await Secure.recovery("h") { _, _, _ in (200, Data(#"{"on":0,"step":0,"left":0}"#.utf8)) } == nil, "no recovery running: nil")
+check(await thrown { try await Secure.recovery("h") { _, _, _ in (504, Data()) } } == "No answer about the recovery.", "no answer about the recovery throws")
+
+// Secure.http and HTTPUploader on a stub session: the request as sent, no network
+final class StubHTTP: URLProtocol {
+    nonisolated(unsafe) static var seen: [(method: String, url: String, type: String?, body: Data)] = []
+    nonisolated(unsafe) static var status = 200
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        var body = request.httpBody ?? Data()
+        if body.isEmpty, let s = request.httpBodyStream {
+            s.open(); var buf = [UInt8](repeating: 0, count: 4096)
+            while case let n = s.read(&buf, maxLength: buf.count), n > 0 { body.append(buf, count: n) }
+            s.close()
+        }
+        Self.seen.append((request.httpMethod ?? "", request.url?.absoluteString ?? "", request.value(forHTTPHeaderField: "Content-Type"), body))
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: nil, headerFields: nil)!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("answer".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+let stubSession = URLSession(configuration: { let c = URLSessionConfiguration.ephemeral; c.protocolClasses = [StubHTTP.self]; return c }())
+let (getSt, getD) = try await Secure.http("10.0.0.5", "/x/hello", session: stubSession)
+check(getSt == 200 && getD == Data("answer".utf8) && StubHTTP.seen.last?.method == "GET" && StubHTTP.seen.last?.url == "http://10.0.0.5/x/hello" && StubHTTP.seen.last?.body.isEmpty == true, "http: a GET with no body")
+StubHTTP.status = 409
+let (postSt, _) = try await Secure.http("10.0.0.5", "/x", body: Data([1, 2, 3]), session: stubSession)
+check(postSt == 409 && StubHTTP.seen.last?.method == "POST" && StubHTTP.seen.last?.body == Data([1, 2, 3]) && StubHTTP.seen.last?.type == "application/octet-stream", "http: a POST with the body as octets, the status passed back")
+StubHTTP.status = 200
+check(await thrown { try await Secure.hello("[") } == "That address is not valid.", "an address that is not a URL (the real way, no network)")
+let upAnswer = try await HTTPUploader(session: stubSession).upload(Data("firmware".utf8), to: "10.0.0.2/hub/api/update", timeout: 5)
+check(upAnswer == Data("answer".utf8) && StubHTTP.seen.last?.method == "POST" && StubHTTP.seen.last?.url == "http://10.0.0.2/hub/api/update" && StubHTTP.seen.last?.body == Data("firmware".utf8) && StubHTTP.seen.last?.type == "application/octet-stream", "an upload posts the file and returns the answer")
+check(await thrown { try await HTTPUploader(session: stubSession).upload(Data(), to: "[", timeout: 5) } == "The address is not valid.", "an upload to a bad address throws")
+
+// ---- the secured link (Shared/Secure.swift Link), against a fake controller that opens and seals like sec.h
+final class SealedSide: @unchecked Sendable {
+    private let lock = NSLock()
+    private var statuses: [Int], boots: [String]
+    private(set) var log: [String] = []
+    init(statuses: [Int] = [], boots: [String] = ["a1b2c3d4"]) { self.statuses = statuses; self.boots = boots }
+    func send(_ host: String, _ path: String, _ body: Data?) -> (Int, Data) {
+        lock.lock(); defer { lock.unlock() }
+        if path == "/x/hello" {
+            let boot = boots.count > 1 ? boots.removeFirst() : boots[0]
+            log.append("\(host) hello")
+            return (200, Data(#"{"id":"aa11","name":"Den","fw":"2.3.0","boot":"\#(boot)","owned":1}"#.utf8))
+        }
+        let p = Data(body ?? Data()), cid = p.prefix(8), nonce = p.dropFirst(8).prefix(12)
+        let box = try! AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: nonce), ciphertext: p.dropFirst(20).dropLast(16), tag: p.suffix(16))
+        let command = String(decoding: try! AES.GCM.open(box, using: fkey, authenticating: Data("blinds-v1".utf8) + cid), as: UTF8.self)
+        log.append("\(host) \(command) @\(Data(nonce.prefix(4)).hex)")
+        let st = statuses.isEmpty ? 200 : statuses.removeFirst()
+        guard st == 200 else { return (st, Data()) }
+        let rn = AES.GCM.Nonce()
+        let reply = try! AES.GCM.seal(Data(#"{"ok":1,"did":"\#(command)"}"#.utf8), using: fkey, nonce: rn, authenticating: Data("blinds-v1r".utf8) + cid + nonce)
+        return (200, Data(rn) + reply.ciphertext + reply.tag)
+    }
+}
+func linkTo(_ side: SealedSide) -> Link { Link(host: "h1", cid: fcid, key: fkey, send: { side.send($0, $1, $2) }) }
+let side1 = SealedSide(), link1 = linkTo(side1)
+let reply1 = try await link1.call("/api/s")
+_ = try await link1.call("/api/cfg")
+check(String(decoding: reply1, as: UTF8.self) == #"{"ok":1,"did":"/api/s"}"#, "Link: the command is sealed and the reply opened")
+check(side1.log == ["h1 hello", "h1 /api/s @a1b2c3d4", "h1 /api/cfg @a1b2c3d4"], "Link: hello asked once for the boot id (\(side1.log))")
+let side409 = SealedSide(statuses: [409], boots: ["a1b2c3d4", "0a0b0c0d"])
+_ = try await linkTo(side409).call("/api/s")
+check(side409.log == ["h1 hello", "h1 /api/s @a1b2c3d4", "h1 hello", "h1 /api/s @0a0b0c0d"], "Link: on 409 it asks hello again and sends with the new boot id (\(side409.log))")
+check(await thrown { try await linkTo(SealedSide(statuses: [409, 409])).call("/api/s") } == "The controller refused the command.", "Link: 409 twice is refused")
+check(await thrown { try await linkTo(SealedSide(statuses: [500])).call("/api/s") } == "The controller refused the command.", "Link: another status is refused")
+for (st, problem) in [(401, LinkProblem.notPaired), (410, .notPaired), (403, .waiting)] {
+    do { _ = try await linkTo(SealedSide(statuses: [st])).call("/api/s"); check(false, "Link: \(st) throws") }
+    catch { check((error as? LinkProblem) == problem, "Link: \(st) is \(problem)") }
+}
+check(await thrown { try await linkTo(SealedSide(boots: ["a1b2"])).call("/api/s") } == "The controller gave a bad answer.", "Link: a boot id that is not 4 bytes")
+check(await thrown { try await linkTo(SealedSide(boots: ["zz"])).call("/api/s") } == "The controller gave a bad answer.", "Link: a boot id that is not hex")
+let sideMove = SealedSide(), linkMove = linkTo(sideMove)
+_ = try await linkMove.call("/api/s")
+await linkMove.move(to: "h1"); _ = try await linkMove.call("/api/s")
+await linkMove.move(to: "h2"); _ = try await linkMove.call("/api/s")
+let movedHost = await linkMove.host
+check(sideMove.log.filter { $0.hasSuffix("hello") } == ["h1 hello", "h2 hello"] && sideMove.log.last == "h2 /api/s @a1b2c3d4" && movedHost == "h2","Link: a new address asks hello again; the same one does not")
+check(LinkProblem.waiting.localizedDescription == "Waiting for an owner to approve this phone." && LinkProblem.notPaired.localizedDescription == "This phone is no longer paired with the controller.", "the two link problems' words")
 
 print("\(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)
