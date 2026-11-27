@@ -410,11 +410,19 @@ def optional_text(parts, plan):
     return '\n'.join(out) + '\n'
 
 
-def counts(pairs):
+def counts(pairs, parts, covered=True):
+    """['KEY=N', ...] -> {KEY: N}. N is a whole number, or "kit"/"plenty" for --have."""
     out = {}
     for pair in pairs or []:
         key, _, n = pair.partition('=')
-        out[key] = n if n in COVERED else int(n)
+        if key not in parts:
+            raise ValueError(f'no part {key!r}; `parts` lists the keys')
+        if covered and n in COVERED:
+            out[key] = n
+        elif n.isdigit():
+            out[key] = int(n)
+        else:
+            raise ValueError(f'{pair!r}: the count must be a whole number' + (' or kit/plenty' if covered else ''))
     return out
 
 
@@ -448,10 +456,10 @@ def main(argv=None, parts=None):
     try:
         sets = [(int(s.split(':')[0]), s.endswith(':middle')) for s in a.sets]
         plan = Plan(sets, a.hub, a.solar, not a.no_crimper)
+        rows = order(parts, plan, counts(a.have, parts), counts(a.on_order, parts, covered=False))
     except ValueError as e:
         print(f'inventory: {e}', file=sys.stderr)
         return 2
-    rows = order(parts, plan, counts(a.have), counts(a.on_order))
     if a.command == 'order':
         print(order_table(rows), end='')
         return 0

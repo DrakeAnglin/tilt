@@ -122,7 +122,7 @@ References match the [PCB build guide](../docs/pcb-build.md).
 | JST-XH header, 6-pin, vertical | **B6B-XH-A(LF)(SN)** | 1 (J5, charger) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=B6B-XH-A%28LF%29%28SN%29) |
 | JST-XH 6-pin housing | **XHP-6** | 1 | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=XHP-6) |
 | JST-XH crimp pins, for 22 AWG wire | JST **SXH-001T-P0.6** | 4 (J5 plug: 2 splice, GND, PWR) | bag ([Buy once](#buy-once)) | [DigiKey](https://www.digikey.com/en/products/result?keywords=SXH-001T-P0.6) |
-| 2.54 mm female header, 2 × 10 pins (two single-row 10-pin sockets, any brand) | for example Sullins **PPTC101LFBN-RC** | 2 (J1, J2: ESP) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=PPTC101LFBN-RC) |
+| 2.54 mm female header, 2 × 10 pins: two single-row 10-pin sockets, any brand | for example Sullins **PPTC101LFBN-RC** | 2 (J1, J2: ESP) | each | [DigiKey](https://www.digikey.com/en/products/result?keywords=PPTC101LFBN-RC) |
 | Resistors, 1/4 W metal film | 1 MΩ ×4, 1 kΩ ×3, 220 Ω ×6, 10 Ω ×3, 100 kΩ ×3 | 19 | kit ([Buy once](#buy-once)) | [B072BL2VX1](https://www.amazon.com/dp/B072BL2VX1) |
 | Ceramic capacitors | 100 nF ×5, 10 µF ×1 | 6 | kit ([Buy once](#buy-once)) | [B0C1V8Q93P](https://www.amazon.com/dp/B0C1V8Q93P) |
 | 22 AWG stranded wire | about 30 cm (the J5 harness) | | the red and black rolls ([Buy once](#buy-once)) | [search](https://www.amazon.com/s?k=22+AWG+silicone+wire+red+black) |

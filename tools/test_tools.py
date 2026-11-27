@@ -1399,6 +1399,8 @@ Soldering iron.
                 self.assertTrue(o.getvalue())
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(inventory.main(['order', '--set', '5']), 2)
+                for bad in (['--have', 'NOPE=1'], ['--have', 'B0F83XS7PW=lots'], ['--on-order', 'B0F83XS7PW=kit']):
+                    self.assertEqual(inventory.main(['order', '--set', '1'] + bad), 2)
 
 
 if __name__ == '__main__':
