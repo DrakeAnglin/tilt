@@ -39,10 +39,15 @@ The files are `hardware/mechanical/stl/solar/solar_<piece>.stl` (wires out the r
 
 1. **Wire the panels in parallel.** Solder each panel's red to the next one's + pad and its black to the − pad.
    Check each panel in the sun first (+6 to 7 V, red on +). The panel with the plug goes in last (at the cap end).
+   - **Tape them together.** Lay the panels face down in a row and run a strip of tape across each seam on the back.
+     Then they slide in as one strip, and the wires between them don't get pulled while you put them in.
+   - **Optional:** use the two-core paired wire between the panels for a cleaner look.
+
+   ![three panels wired in parallel and taped together on the back](photos/solar/panels-taped.jpg)
 2. **Join the sections.** Press the `add` section down onto the `start` section's two round tabs.
-3. **Slide the panels in from the cap end**, face up, under the 45 degree lips along the top and bottom. Push each one
-   all the way along. Lay the wires in the 10 mm channel behind them (10 to 20 mm below the panels' top edge, over
-   the solder bumps).
+3. **Slide the panels in from the cap end**, face up, under the 45 degree lips along the top and bottom. Taped
+   together, they go in as one strip: push it all the way along. Lay the wires in the 10 mm channel behind them
+   (10 to 20 mm below the panels' top edge, over the solder bumps).
 4. **Drop the cap on.** Lay the two wires in the small slot on the cap's back, then press the cap down onto the last
    section's tabs. It locks the panels in.
 5. **Tape it to the window.** Double-sided tape on the window face of the left end and of the cap (15 mm pads; the
