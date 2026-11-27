@@ -125,7 +125,8 @@ Port 1 is at end A with USB-C and the solar jack. Ports 2 and 3 sit on a section
 ### 7. No power monitor chip
 Rev 3 had an INA3221 current monitor. It is out: with a 0.1 Ω shunt it resolves 0.4 mA, so it cannot see the idle
 drain that matters (0.5 mA), and it costs a chip, three shunts and two pins. v3 gives the ESP four plain signals
-instead, which cover what [#23](https://github.com/DrakeAnglin/tilt/issues/23) asks for:
+instead. They cover most of what [#23](https://github.com/DrakeAnglin/tilt/issues/23) asks for, with one gap,
+named under the table:
 
 | Signal | Pin | Tells the firmware |
 |---|---|---|
@@ -133,6 +134,11 @@ instead, which cover what [#23](https://github.com/DrakeAnglin/tilt/issues/23) a
 | Solar jack voltage, before its diode | GPIO0 | a panel is lit (Light Schedules); solar or USB |
 | Charging (the chip's status line) | GPIO8 | the chip is charging. Charging with a dark panel means USB |
 | Charge enable (to the chip) | GPIO15 | stop charging when hot; restart after the 6-hour stop |
+
+**The gap: USB while a panel is lit.** The ESP has no pin left for a USB voltage sense (GPIO9
+cannot take one: it must be high at start-up). So: charging with a dark panel is USB for certain (`src` 2);
+charging with a lit panel may be solar, USB or both, so the firmware sends "not sure" (`src` 3), as v2.2 does by
+day. That falls short of #23's "for certain" whenever a panel is lit.
 
 The chip's second status line (fault) drives a light only: the ESP has no pin left for it. A fault and a normal
 charge both pull the charging line low, so the firmware tells them apart by time and by the cell voltage.
