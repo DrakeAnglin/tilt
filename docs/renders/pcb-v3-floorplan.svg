@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -16 156 84" width="1248" height="672" font-family="Helvetica, Arial, sans-serif">
+  <!-- Controller PCB v3 floor plan, top view, 1 unit = 1 mm. X along the rail (end A left), Y across (0 = room side). -->
+  <rect x="-12" y="-16" width="156" height="84" fill="#ffffff"/>
+  <path d="M0,0 H107 V18.5 H110 V0 H129 V47 H110 V28.5 H107 V47 H0 Z" fill="#e7f1e4" stroke="#2f6b2f" stroke-width="0.5"/>
+  <rect x="24" y="25.8" width="77.1" height="20.7" fill="#3a3a3a" stroke="#111" stroke-width="0.4"/>
+  <rect x="28" y="27" width="69" height="18.3" rx="3" fill="#f6e3a8" stroke="#8a6d1a" stroke-width="0.4"/>
+  <text x="62.5" y="37.3" font-size="3.4" text-anchor="middle" fill="#5a4710">18650 cell in its holder (drops in from above)</text>
+  <text x="30" y="43.5" font-size="3" fill="#5a4710">+</text>
+  <text x="93" y="43.5" font-size="3" fill="#5a4710">−</text>
+  <rect x="-3" y="1.2" width="17.3" height="13.2" fill="#d9d9d9" stroke="#444" stroke-width="0.4"/>
+  <text x="5.6" y="8.8" font-size="3" text-anchor="middle">Port 1</text>
+  <rect x="-1" y="16.5" width="7.4" height="9" fill="#cfd8ea" stroke="#444" stroke-width="0.4"/>
+  <text x="8" y="22" font-size="2.8">USB-C</text>
+  <rect x="0" y="28" width="3.5" height="4.8" fill="#e8c9c9" stroke="#444" stroke-width="0.4"/>
+  <text x="5" y="31.5" font-size="2.8">reset</text>
+  <rect x="-1" y="35" width="9" height="6.3" fill="#cfd8ea" stroke="#444" stroke-width="0.4"/>
+  <text x="9.5" y="39.2" font-size="2.8">solar jack</text>
+  <rect x="23" y="3" width="26" height="18" fill="#dfe6f5" stroke="#444" stroke-width="0.4"/>
+  <text x="36" y="11.5" font-size="3" text-anchor="middle">ESP32-C6 SuperMini</text>
+  <text x="36" y="15.5" font-size="2.6" text-anchor="middle">on sockets</text>
+  <rect x="52" y="2" width="22" height="21" fill="#f3dede" stroke="#444" stroke-width="0.4" stroke-dasharray="1.2 0.8"/>
+  <text x="63" y="8.5" font-size="2.8" text-anchor="middle">charger chip,</text>
+  <text x="63" y="12.1" font-size="2.8" text-anchor="middle">3.3 V regulator,</text>
+  <text x="63" y="15.7" font-size="2.8" text-anchor="middle">cell guard</text>
+  <text x="63" y="20" font-size="2.4" text-anchor="middle">(factory-soldered)</text>
+  <rect x="77" y="2" width="26" height="21" fill="#f3dede" stroke="#444" stroke-width="0.4" stroke-dasharray="1.2 0.8"/>
+  <text x="90" y="8.5" font-size="2.8" text-anchor="middle">port fuses,</text>
+  <text x="90" y="12.1" font-size="2.8" text-anchor="middle">sensor switches,</text>
+  <text x="90" y="15.7" font-size="2.8" text-anchor="middle">470 µF</text>
+  <rect x="114.7" y="1.2" width="17.3" height="13.2" fill="#d9d9d9" stroke="#444" stroke-width="0.4"/>
+  <text x="123.3" y="8.8" font-size="3" text-anchor="middle">Port 2</text>
+  <rect x="114.7" y="16.7" width="17.3" height="13.2" fill="#d9d9d9" stroke="#444" stroke-width="0.4"/>
+  <text x="123.3" y="24.3" font-size="3" text-anchor="middle">Port 3</text>
+  <line x1="108.5" y1="-6" x2="108.5" y2="53" stroke="#c0392b" stroke-width="0.5" stroke-dasharray="2 1.2"/>
+  <text x="108.5" y="-8" font-size="3" text-anchor="middle" fill="#c0392b">cut here for a 1-blind board</text>
+  <line x1="0" y1="51" x2="107" y2="51" stroke="#333" stroke-width="0.3"/>
+  <line x1="0" y1="49" x2="0" y2="53" stroke="#333" stroke-width="0.3"/><line x1="107" y1="49" x2="107" y2="53" stroke="#333" stroke-width="0.3"/>
+  <text x="53.5" y="54.6" font-size="3" text-anchor="middle">about 107 mm cut down to 1 port</text>
+  <line x1="0" y1="58" x2="129" y2="58" stroke="#333" stroke-width="0.3"/>
+  <line x1="0" y1="56" x2="0" y2="60" stroke="#333" stroke-width="0.3"/><line x1="129" y1="56" x2="129" y2="60" stroke="#333" stroke-width="0.3"/>
+  <text x="64.5" y="62.5" font-size="3" text-anchor="middle">about 129 mm with 3 ports</text>
+  <line x1="137" y1="0" x2="137" y2="47" stroke="#333" stroke-width="0.3"/>
+  <line x1="135" y1="0" x2="139" y2="0" stroke="#333" stroke-width="0.3"/><line x1="135" y1="47" x2="139" y2="47" stroke="#333" stroke-width="0.3"/>
+  <text x="141" y="24.5" font-size="3" transform="rotate(90 141 24.5)" text-anchor="middle">47 mm</text>
+  <text x="-9" y="-10" font-size="3.2" fill="#333">End A</text>
+  <text x="124" y="-10" font-size="3.2" fill="#333">End B</text>
+</svg>

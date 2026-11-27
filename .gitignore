@@ -40,6 +40,8 @@ DerivedData/
 
 # Scratch / run artifacts (not source)
 /result.json
+# A builder's own parts list (the inventory skill): counts, orders and dates stay on this computer
+/inventory.md
 firmware/blinds-settings-backup.json
 
 # App Store screenshots: made again with the demo room (see docs/developer/app-store.md)

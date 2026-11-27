@@ -19,12 +19,13 @@ protocol FirmwareUploader: Sendable {
     func upload(_ file: Data, to address: String, timeout: TimeInterval) async throws -> Data
 }
 struct HTTPUploader: FirmwareUploader {
+    var session = URLSession.shared
     func upload(_ file: Data, to address: String, timeout: TimeInterval) async throws -> Data {
         guard let url = URL(string: "http://\(address)") else { throw TiltError("The address is not valid.") }
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        return try await URLSession.shared.upload(for: req, from: file).0
+        return try await session.upload(for: req, from: file).0
     }
 }
 

@@ -84,7 +84,30 @@ extension HubRecord: Codable {
     }
 }
 
+/// Where the keys are kept, by account name: the system Keychain in the app, an in-memory one in the tests.
+/// Static, like the Keychain itself: one per program.
+protocol KeyStore {
+    static func save(_ account: String, _ data: Data)
+    static func load(_ account: String) -> Data?
+    static func delete(_ account: String)
+}
+/// The keys, for every caller. `store` is the system Keychain except in tests.
 enum Keychain {
+    nonisolated(unsafe) static var store: any KeyStore.Type = SystemKeychain.self
+    static func save(_ account: String, _ data: Data) { store.save(account, data) }
+    static func load(_ account: String) -> Data? { store.load(account) }
+    static func delete(_ account: String) { store.delete(account) }
+}
+/// Keys only in memory, gone when the program ends (tests).
+enum MemoryKeychain: KeyStore {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var items: [String: Data] = [:]
+    static func save(_ account: String, _ data: Data) { lock.lock(); items[account] = data; lock.unlock() }
+    static func load(_ account: String) -> Data? { lock.lock(); defer { lock.unlock() }; return items[account] }
+    static func delete(_ account: String) { lock.lock(); items[account] = nil; lock.unlock() }
+}
+/// The system Keychain, on this device only.
+enum SystemKeychain: KeyStore {
     private static let service = "app.tilt.blinds.keys"
     static func save(_ account: String, _ data: Data) {
         delete(account)
@@ -120,8 +143,10 @@ enum TiltActions {
         var reached = 0
         for (_, client) in clients() { if (try? await action(client)) != nil { reached += 1 } }
         if reached == 0 { throw TiltError("Tilt could not reach your blinds. Is this iPhone on your home Wi-Fi?") }
-        WidgetCenter.shared.reloadAllTimelines()
+        reloadWidgets()
     }
+    /// Shows the new positions on the widget; tests count the calls instead of calling WidgetKit.
+    nonisolated(unsafe) static var reloadWidgets: () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
     /// One line for a room, for the widget.
     static func words(_ s: ControllerState) -> String { TiltWords.short(s) }
 }

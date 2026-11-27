@@ -16,6 +16,7 @@ import bambu_project  # noqa: E402
 import check_docs  # noqa: E402
 import coverage_gate  # noqa: E402
 import firmware_size  # noqa: E402
+import inventory  # noqa: E402
 import netlist  # noqa: E402
 import orient  # noqa: E402
 import release_ci  # noqa: E402
@@ -1262,6 +1263,181 @@ class CoverageGate(unittest.TestCase):
         self.assertIsInstance(changed, dict)
         self.assertEqual(self.G.diff_lines('+++ /dev/null\n@@ -1,3 +0,0 @@\n+++ b/a.py\n@@ -2 +2 @@\n@@ -9,2 +8,0 @@\n'),
                          {'a.py': {2}})
+
+
+class Inventory(unittest.TestCase):
+    """tools/inventory.py: the inventory skill's order list, worked out from the real BOM."""
+    BOM = """# Bill of materials
+## One tilter
+### Printed
+| Part | Per tilter | Sold as | Link |
+|---|---|---|---|
+| Housing | 1 | | [build](mechanical/stl/tilter/README.md) |
+### Electronics
+| Part | Per tilter | Sold as | Link |
+|---|---|---|---|
+| Motor; see [speed](#motor-speed) | 1 | 3-pack | [A1](https://www.amazon.com/dp/MOTOR1) |
+| Wire | about 40 cm | kit ([Buy once](#buy-once)) | [W](https://www.amazon.com/dp/WIRE1) |
+### Hardware
+| Part | Per tilter | Sold as | Link |
+|---|---|---|---|
+| M3 × 20 screw | 4 (2 case, 2 tray) | in the M3 kit ([Buy once](#buy-once)) | [K](https://www.amazon.com/dp/KIT1) |
+| M3 × 8 screw | 1 (lid corner) | in the M3 kit | [K](https://www.amazon.com/dp/KIT1) |
+| Insert | 6 | pack of 100 | [I](https://www.amazon.com/dp/INS1) |
+### Cord to the controller
+| Part | Per tilter | Sold as | Link |
+|---|---|---|---|
+| Cord, 3.3 ft | 1 | 2-pack | [C3](https://www.amazon.com/dp/CORD3) |
+| Cord, 6.6 ft | 1 | 2-pack | [C6](https://www.amazon.com/dp/CORD6) |
+| Cord, 10 ft | 1 | 2-pack | [C10](https://www.amazon.com/dp/CORD10) |
+## One controller
+### Parts on the PCB
+| Part | Exact part (or equivalent) | Per board | Sold as | Link |
+|---|---|---|---|---|
+| Jack | Amphenol **87180-066LF** | 1 per port you use (J9–J11, up to 3) | each | [DigiKey](https://www.digikey.com/x?k=87180) |
+| Electrolytic | Panasonic EEU-FR1A471 | 1 (C9) | each | [DigiKey](https://www.digikey.com/x?k=EEU) |
+| Resistors | 1 MΩ ×2 | 2 | kit ([Buy once](#buy-once)) | [R](https://www.amazon.com/dp/RES1) |
+| JST-XH crimp pins | JST **SXH-001T-P0.6** | 4 (J5 plug) | bag ([Buy once](#buy-once)) | [DigiKey](https://www.digikey.com/x?k=SXH) |
+| ESP32-C6 SuperMini | | 1 | 5-pack | [E](https://www.amazon.com/dp/ESP1) |
+### Box
+| Part | Per box | Sold as | Link |
+|---|---|---|---|
+| Tray | 1 each | | [box](../docs/controller-box.md) |
+| Insert | 3 | from the tilters' pack of 100 | [I](https://www.amazon.com/dp/INS1) |
+| M2 screw | 2 | any small pack | [search](https://www.amazon.com/s?k=M2) |
+## One Tilt Hub
+| Part | Per hub | Sold as | Link |
+|---|---|---|---|
+| ESP32-C6 SuperMini, **no pins soldered** | 1 | from the controllers' 5-pack | [E](https://www.amazon.com/dp/ESP1) |
+| Wall plug | 1 | each | any |
+## Buy once
+| Part | Uses | Sold as | Link |
+|---|---|---|---|
+| M3 screw kit | 5 per tilter | kit | [K](https://www.amazon.com/dp/KIT1) |
+| Resistor kit | 2 per controller | kit | [R](https://www.amazon.com/dp/RES1) |
+| Heat-shrink kit | a few | kit | [H](https://www.amazon.com/dp/HEAT1) |
+## Optional
+### Solar: yes or no
+| Part | Per controller | Sold as | Link |
+|---|---|---|---|
+| Solar panel | 1 to 6 | 3-pack | [P](https://www.amazon.com/dp/SUN1) |
+| Tape | about 20 cm | 1 roll | any |
+### No JST crimper
+Leads, **ASXH22**: 2 per controller, in place of the crimp pins. [DigiKey](https://www.digikey.com/x?k=ASXH).
+## Tools
+Soldering iron.
+"""
+    GUIDE = """## Parts for one board
+
+| Part | Qty | References | Step |
+|---|---|---|---|
+| 1M | 2 | R1, R2 | 1 |
+| ESP32-C6 SuperMini (male pins on) | 1 | plugs into J1 / J2 | 13 |
+
+## Which parts
+"""
+
+    def setUp(self):
+        self.parts = inventory.parse(self.BOM, self.GUIDE)
+
+    def rows(self, plan, **kw):
+        return {r[0].key: r[1:] for r in inventory.order(self.parts, plan, **kw)}
+
+    def test_rows_with_one_link_are_one_part(self):
+        kit = self.parts['KIT1']
+        self.assertEqual((kit.name, kit.pack, kit.per), ('M3 screw kit', 'kit', {'tilter': 5}))
+        self.assertEqual(self.parts['INS1'].per, {'tilter': 6, 'controller': 3})
+        self.assertEqual(self.parts['ESP1'].per, {'controller': 1, 'hub': 1})
+        self.assertNotIn('housing', ' '.join(self.parts))          # printed parts are made, not bought
+        self.assertEqual(self.parts['87180-066LF'].where['controller'], 'J9, J10, J11')
+        self.assertEqual(self.parts['EEU-FR1A471'].where['controller'], 'C9')
+        self.assertEqual(self.parts['RES1'].where['controller'], 'R1, R2')
+        self.assertEqual(self.parts['ESP1'].where['controller'], 'J1, J2')
+        self.assertEqual(self.parts['ASXH22'].optional, 'no-crimper')
+
+    def test_two_sets_of_three(self):
+        rows = self.rows(inventory.Plan([(3, False), (3, False)]))
+        self.assertEqual(rows['MOTOR1'], (2, 3, 0, 6, 0))
+        self.assertEqual(rows['INS1'], (1, 100, 0, 42, 58))
+        self.assertEqual(rows['87180-066LF'][:4], (6, 1, 0, 6))    # one jack per used port, not 3 per controller
+        self.assertEqual([rows[k][3] for k in ('CORD3', 'CORD6', 'CORD10')], [2, 2, 2])
+        self.assertEqual(rows['ESP1'][3], 3)                       # 2 controllers + the hub
+        self.assertEqual(rows['KIT1'], (1, 'kit', 0, 30, '–'))
+        self.assertEqual(rows['HEAT1'][:4], (1, 'kit', 0, 1))
+        self.assertNotIn('SUN1', rows)
+        self.assertNotIn('ASXH22', rows)
+
+    def test_cords_follow_the_rule(self):
+        self.assertEqual(inventory.Plan([(1, False), (2, False), (3, True)]).cords(), {'3.3': 3, '6.6': 3, '10': 0})
+        with self.assertRaises(ValueError):
+            inventory.Plan([(4, False)])
+
+    def test_have_and_on_order(self):
+        plan = inventory.Plan([(3, False)], hub=0)
+        rows = self.rows(plan, have={'MOTOR1': 2, 'RES1': 'kit', 'KIT1': 'plenty'}, on_order={'CORD3': 2})
+        self.assertEqual(rows['MOTOR1'], (1, 3, 2, 3, 2))
+        for covered in ('RES1', 'KIT1', 'CORD3'):
+            self.assertNotIn(covered, rows)
+        self.assertEqual(rows['ESP1'][3], 1)
+        self.assertNotIn('wall-plug', rows)
+
+    def test_options(self):
+        rows = self.rows(inventory.Plan([(2, False)], solar=4, crimper=False))
+        self.assertEqual(rows['SUN1'][:4], (2, 3, 0, 4))
+        self.assertEqual(rows['ASXH22'][3], 2)
+        self.assertNotIn('SXH-001T-P0.6', rows)
+        self.assertIn('tape', ' '.join(rows))
+
+    def test_output(self):
+        plan = inventory.Plan([(3, True)])
+        table = inventory.order_table(inventory.order(self.parts, plan))
+        self.assertIn('| ☐ | [Motor](https://www.amazon.com/dp/MOTOR1) | Amazon | 1 | 3 | 0 | 3 | 0 |', table)
+        self.assertIn('| ☐ | Wall plug | any |', table)
+        self.assertEqual(inventory.order_table([]), '**Nothing left to order.**\n')
+        stock = inventory.stock_tables(self.parts, plan)
+        self.assertIn('6 (+3 per controller)', stock)
+        self.assertIn('about 40 cm per tilter', stock)
+        self.assertIn('1 per used port', stock)
+        self.assertIn('3.3 ft + 6.6 ft + 6.6 ft', inventory.plan_text(plan))
+        self.assertIn('| [Solar panel](https://www.amazon.com/dp/SUN1) | no |', inventory.optional_text(self.parts, plan))
+
+    def test_real_bom_two_sets_of_three(self):
+        parts = inventory.load()
+        rows = {r[0].key: r for r in inventory.order(parts, inventory.Plan([(3, False), (3, False)]))}
+        need = {k: r[4] for k, r in rows.items()}
+        self.assertEqual((need['87180-066LF'], need['0ZRE0075FF1A'], need['B0GD19KJ4B']), (6, 6, 3))
+        self.assertEqual([need[k] for k in ('B0C1VHVJTS', 'B0C1VJN3DL', 'B0C1VK4W51')], [2, 2, 2])
+        self.assertEqual(need['B0F83XS7PW'], 6)
+        for part, packs, pack, _, need_, spare in rows.values():
+            self.assertTrue(part.url or part.store == 'any', part.name)
+            if isinstance(pack, int):
+                self.assertEqual(packs * pack - need_, spare, part.name)
+        self.assertFalse([p for p in parts.values() if p.optional and p.key in need])
+
+    def test_cli(self):
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, 'inventory.md')
+            args = ['new', '--set', '3', '--set', '2', '--have', 'B072BL2VX1=kit', '--on-order', 'B0F83XS7PW=3']
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(inventory.main(args + ['--out', out]), 0)
+            with open(out) as f:
+                text = f.read()
+            for heading in ('## Contents', '## How to use', '## Plan', '## Orders', '### On order', '### To order',
+                            '## Stock', '### Bench tools', '## Optional parts', '## Notes', '## Log'):
+                self.assertIn(heading, text)
+            self.assertNotIn('{{', text)
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(inventory.main(args + ['--out', out]), 1)    # never overwrites
+            for argv in (['parts'], ['order', '--set', '1'], ['new', '--set', '1']):
+                with contextlib.redirect_stdout(io.StringIO()) as o:
+                    self.assertEqual(inventory.main(argv), 0)
+                self.assertTrue(o.getvalue())
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(inventory.main(['order', '--set', '5']), 2)
+                for bad in (['--have', 'NOPE=1'], ['--have', 'B0F83XS7PW=lots'], ['--on-order', 'B0F83XS7PW=kit']):
+                    self.assertEqual(inventory.main(['order', '--set', '1'] + bad), 2)
 
 
 if __name__ == '__main__':

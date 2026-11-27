@@ -40,7 +40,7 @@ For people working on Tilt itself. You do not need any of this to build one.
 | [CONTEXT.md](CONTEXT.md) | The words used everywhere |
 | [docs/adr](docs/adr) | Decisions on record |
 | [docs/developer](docs/developer/README.md) | App Store notes, firmware releases, security hardening, the agent workflow |
-| [pcb-v3-concept.md](docs/pcb-v3-concept.md) | The next PCB (on hold) |
+| [pcb-v3-concept.md](docs/pcb-v3-concept.md) | The next PCB (design proposal) |
 
 ### What is in here
 | Folder | What |
@@ -79,10 +79,10 @@ Fusion scripts run through the FusionBridge add-in: `python3 hardware/mechanical
 
 | Area | Line coverage |
 |---|---|
-| Tilt app | at least 16% |
+| Tilt app | at least 21% |
 | controller firmware | at least 31% |
 | Tilt Hub firmware | at least 10% |
-| tools | at least 73% |
+| tools | at least 76% |
 
 Every pull request covers at least 90% of the lines it changes in our own code, and no area may drop under its floor (`tools/coverage-floors.txt`). The live numbers: the `coverage` job of the [latest CI run on main](https://github.com/DrakeAnglin/tilt/actions/workflows/ci.yml?query=branch%3Amain). The rule: [docs/agents/workflow.md](docs/agents/workflow.md#coverage).
 <!-- coverage:end -->
