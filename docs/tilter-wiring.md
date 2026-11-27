@@ -20,7 +20,7 @@ before the [mechanical build](tilter-assembly.md).
 | Ceramic capacitor 10 µF (106) | 1 |
 | **22 AWG** stranded: 1 red, 1 black, ~6 cm each (battery +, GND to the driver) | 2 |
 | **30 AWG** silicone, ~6 cm each: green, yellow, blue ×2, white, black | 6 |
-| White 22 AWG two-conductor pair, ~8 cm (motor leads) | 1 |
+| Red and black 22 AWG two-conductor pair, ~8 cm (motor leads) | 1 |
 | Heat-shrink (small) | a few |
 
 ## 1. Prepare the boards (before any wiring)
@@ -76,7 +76,7 @@ the module; strip 2–3 mm, tin, solder, heat-shrink where bare wire could touch
 | 7 | RJ12 **pin 4** (angle) | AS5600 **OUT** | **white**, 30 AWG |
 | 8 | RJ12 **pin 3** (GND) | AS5600 **GND** | **black**, 30 AWG (second wire on the same pad) |
 | 9 | 10 µF capacitor | DRV8833 **VCC** and **GND** | its own legs, right on those two pins (any way round) |
-| 10 | DRV8833 **OUT1** and **OUT2** | N20 motor tabs | white 22 AWG pair, ~8 cm. **Leave the motor ends loose** until final assembly |
+| 10 | DRV8833 **OUT1** and **OUT2** | N20 motor tabs | red and black 22 AWG pair, ~8 cm. **Leave the motor ends loose** until final assembly |
 
 Why two wires from pins 3 and 5: GND is split so the motor's current returns on its own wire, not through the
 sensor's; EN both powers the sensor and wakes the driver, so it goes to both. Leave **IN3, IN4, OUT3, OUT4, ULT** on
@@ -84,7 +84,7 @@ the driver and **SCL, SDA** on the sensor empty.
 
 📷 **Photo S3:** the RJ12 breakout with its eight leads, pins readable.
 
-📷 **Photo S4:** the finished module laid flat: breakout, driver, sensor, white pair loose.
+📷 **Photo S4:** the finished module laid flat: breakout, driver, sensor, red and black motor pair loose.
 
 ## 3. Check before plugging in
 Meter in beep mode, nothing connected:
@@ -95,7 +95,7 @@ Meter in beep mode, nothing connected:
 - DRV8833 EEP to VCC: megohms or open (no jumper, no pull-up). Nothing on ULT.
 
 ## 4. Final assembly
-In the [mechanical build](tilter-assembly.md), steps D1 and D3: solder the white pair's free ends to the N20's two
+In the [mechanical build](tilter-assembly.md), steps D1 and D3: solder the red and black pair's free ends to the N20's two
 tabs (either way round: the controller learns the motor's direction on its first moves), then fit the boards into
 the tray.
 
