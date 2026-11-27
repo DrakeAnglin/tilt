@@ -381,6 +381,10 @@ class FirmwareBuildCI(unittest.TestCase):
 class FirmwareSize(unittest.TestCase):
     """The app-slot headroom check CI runs after each firmware build (tools/firmware_size.py)."""
 
+    def test_share_used_throwaway(self):
+        self.assertEqual(firmware_size.share_used(1, 0), 0.0)
+        self.assertEqual(firmware_size.share_used(1, 4), 25.0)
+
     def table(self, firmware):
         return open(os.path.join(HERE, '..', 'firmware', firmware, 'partitions.csv')).read()
 
