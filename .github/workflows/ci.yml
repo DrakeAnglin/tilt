@@ -111,9 +111,21 @@ jobs:
         run: |
           X=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
           sudo xcode-select -s "$X" && xcodebuild -version
+      # The scripts' temporary folders go in one known place, so a failed Xcode run's full log can be kept.
+      - run: mkdir -p "$RUNNER_TEMP/app-tests"
       - run: tools/app_tests.sh
+        env:
+          TMPDIR: ${{ runner.temp }}/app-tests
       - name: Coverage
         run: tools/coverage.sh app coverage
+        env:
+          TMPDIR: ${{ runner.temp }}/app-tests
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/app-tests/**/xcodebuild.log
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
