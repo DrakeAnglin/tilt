@@ -1,5 +1,5 @@
 // Stand-in for ESP-IDF's esp_adc/adc_oneshot.h on the host board (host_board.h). ADC1's channels are GPIO 0 to 6, as
-// on the ESP32-C6. A raw reading here is the pin's millivolts (host::setMilliVolts); calibration passes it on.
+// on the ESP32-C6. A raw reading here is the pin's millivolts (host::adcRead); calibration passes it on.
 // With no unit (adc_oneshot_new_unit not called) a read fails and leaves the raw value alone, as on the chip. Tests only.
 #pragma once
 #include "../esp_err.h"
@@ -29,6 +29,6 @@ inline esp_err_t adc_oneshot_config_channel(adc_oneshot_unit_handle_t h, adc_cha
 }
 inline esp_err_t adc_oneshot_read(adc_oneshot_unit_handle_t h, adc_channel_t ch, int *raw) {
   if (!h) return ESP_ERR_INVALID_ARG;
-  *raw = host::board().mv.count(ch) ? host::board().mv[ch] : 0;
+  *raw = host::adcRead(ch);                            // the channel is the pin (GPIO 0 to 6)
   return ESP_OK;
 }

@@ -4,11 +4,17 @@
 // Tests only, and one test program per board: it defines functions (time, settimeofday) and keeps its state here.
 //
 // What a test can do (namespace host):
-//   the clock      advanceMs / advanceUs move it; vTaskDelay and esp_rom_delay_us move it too
+//   the clock      advanceMs / advanceUs move it; vTaskDelay and esp_rom_delay_us move it too. onClock(hook): a hook
+//                  that runs whenever it moves (what is plugged into the board moves with it: host_tilter.h); the
+//                  hook gets the time it moves to and may stop at times on the way (setUs), never back
+//   another task   duringDelay(fn): fn runs inside the next vTaskDelay (what another task does while the code waits)
 //   the wall clock setWallClock(epoch) or settimeofday(); 0 = not set (the Mac's clock is never read or set)
 //   flash          kept in memory by namespace and key; survives restart(), wipeFlash() clears it
 //                  (putFlashStr / flashStr: a string as nvs_set_str keeps it)
-//   pins           the mode and level last written (pinTrace: the history), the millivolts on an ADC pin, LEDC duty
+//   pins           the mode and level last written (pinTrace: the history; onLevel(hook): a hook that runs at each
+//                  level written), the millivolts on an ADC pin, LEDC duty.
+//                  An ADC read asks the pin's source first (adcSource: what is plugged into it), then the readings
+//                  queued on the pin (queueMilliVolts, one per read), then the millivolts set (setMilliVolts)
 //   reset reason   setResetReason: what esp_reset_reason() says after the next start
 //   mutexes        know if they are held; a give with no take or a second take is a fault
 //   restart()      clears the board (clock to 0, pins, LEDC, mutexes, wall clock), keeps flash, and runs every
@@ -22,6 +28,7 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -39,6 +46,12 @@ struct Board {
   std::map<std::string, std::map<std::string, char>> kind;    // a value that is not a blob: 's' a string, 'u' a u32 (none: a u8)
   std::vector<std::string> handles;                    // nvs_handle_t n is the namespace handles[n - 1]
   std::map<int, int> mode, level, mv;                  // per pin: GPIO mode (0 off, 1 out), level, millivolts on it
+  std::map<int, std::deque<int>> mvQueue;              // per pin: readings for the next ADC reads, one each
+  std::function<bool(int pin, int *mv)> adcSource;     // asked first on every ADC read: true = it answered
+  std::function<void(int64_t toUs)> clockHook;         // runs when the clock moves (onClock)
+  std::function<void(int pin)> levelHook;              // runs when a pin's level is written (onLevel)
+  bool inClock = false;
+  std::function<void()> delayHook;                     // runs inside the next vTaskDelay (duringDelay)
   std::map<int, std::string> trace;                    // per pin: "O" made an output, "I" let go, "1"/"0" a level
   std::map<int, int> chanPin, duty, pendingDuty;       // LEDC: channel -> pin, channel -> duty (applied, set)
   bool ledcTimer = false;
@@ -63,8 +76,17 @@ inline int takeFaults() { int n = board().faults; board().faults = 0; return n; 
 
 // ---- clock
 inline int64_t nowUs() { return board().us; }
-inline void advanceUs(int64_t us) { board().us += us; }
-inline void advanceMs(int64_t ms) { board().us += ms * 1000; }
+inline void clockTo(int64_t to) {
+  Board &b = board();
+  if (b.clockHook && !b.inClock) { b.inClock = true; b.clockHook(to); b.inClock = false; }
+  if (b.us < to) b.us = to;
+}
+inline void advanceUs(int64_t us) { clockTo(board().us + us); }
+inline void advanceMs(int64_t ms) { clockTo(board().us + ms * 1000); }
+inline void setUs(int64_t us) { if (us > board().us) board().us = us; }   // for a clock hook: a stop on the way
+inline void onClock(std::function<void(int64_t)> hook) { board().clockHook = hook; }
+inline void onLevel(std::function<void(int)> hook) { board().levelHook = hook; }
+inline void duringDelay(std::function<void()> fn) { board().delayHook = fn; }
 inline void setWallClock(time_t t) { board().wallAt = t; board().wallSetUs = board().us; }
 inline time_t wallClock() { Board &b = board(); return b.wallAt ? b.wallAt + (time_t)((b.us - b.wallSetUs) / 1000000) : 0; }
 
@@ -100,6 +122,16 @@ inline std::string flashStr(const char *ns, const char *key) {   // "" when ther
 
 // ---- pins
 inline void setMilliVolts(int pin, int mv) { board().mv[pin] = mv; }
+inline void queueMilliVolts(int pin, std::vector<int> mvs) { for (int v : mvs) board().mvQueue[pin].push_back(v); }
+inline void adcSource(std::function<bool(int, int *)> src) { board().adcSource = src; }
+inline int adcRead(int pin) {                          // what an ADC read of the pin gives, in millivolts
+  Board &b = board();
+  int v = 0;
+  if (b.adcSource && b.adcSource(pin, &v)) return v;
+  auto q = b.mvQueue.find(pin);
+  if (q != b.mvQueue.end() && !q->second.empty()) { v = q->second.front(); q->second.pop_front(); return v; }
+  return b.mv.count(pin) ? b.mv[pin] : 0;
+}
 inline int pinModeOf(int pin) { return board().mode.count(pin) ? board().mode[pin] : -1; }   // -1: never set
 inline int pinLevel(int pin) { return board().level.count(pin) ? board().level[pin] : -1; }
 inline std::string pinTrace(int pin) { return board().trace[pin]; }
@@ -122,6 +154,8 @@ inline void restart() {
   b.mode.clear();
   b.level.clear();
   b.trace.clear();
+  b.mvQueue.clear();
+  b.delayHook = nullptr;
   b.chanPin.clear();
   b.duty.clear();
   b.pendingDuty.clear();

@@ -15,8 +15,15 @@ inline esp_err_t gpio_config(const gpio_config_t *c) {
     }
   return ESP_OK;
 }
+inline esp_err_t gpio_set_direction(gpio_num_t pin, gpio_mode_t mode) {
+  bool out = mode == GPIO_MODE_OUTPUT;
+  host::board().mode[pin] = out ? 1 : 0;
+  host::board().trace[pin] += out ? "O" : "I";
+  return ESP_OK;
+}
 inline esp_err_t gpio_set_level(gpio_num_t pin, uint32_t level) {
   host::board().level[pin] = level ? 1 : 0;
   host::board().trace[pin] += level ? "1" : "0";
+  if (host::board().levelHook) host::board().levelHook(pin);
   return ESP_OK;
 }

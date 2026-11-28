@@ -13,3 +13,10 @@ typedef unsigned UBaseType_t;
 #define portTICK_PERIOD_MS (1000 / configTICK_RATE_HZ)
 #define portMAX_DELAY ((TickType_t)0xffffffffUL)
 #define pdMS_TO_TICKS(ms) ((TickType_t)(((TickType_t)(ms) * (TickType_t)configTICK_RATE_HZ) / (TickType_t)1000U))
+// A critical section: one task and no interrupts here, so it only checks that every enter has its exit (a second
+// enter of the same lock, or an exit with no enter, is a fault).
+typedef struct { int held; } portMUX_TYPE;
+#define portMUX_INITIALIZER_UNLOCKED {0}
+inline void portENTER_CRITICAL(portMUX_TYPE *m) { if (m->held++) host::fault("portENTER_CRITICAL on a lock already held"); }
+inline void portEXIT_CRITICAL(portMUX_TYPE *m) { if (m->held-- <= 0) { m->held = 0; host::fault("portEXIT_CRITICAL with no enter"); } }
+#define IRAM_ATTR

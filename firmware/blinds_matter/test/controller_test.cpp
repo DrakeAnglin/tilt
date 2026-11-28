@@ -1,10 +1,13 @@
 // Tests for the controller's own code on the host board (test/host_esp/host_board.h): main/store.h, main/power.h,
-// main/lock.h, and with them main/ardu.h and main/config.h, run on the Mac: tools/firmware_tests.sh. The real files
-// run unchanged; the include path picks the stand-in SDK headers in test/host_esp. Built with TILT_DEVLOG, so the dev
-// build's power log and light log are tested too.
+// main/lock.h, main/motion.h (with main/pwmin.h, main/request.h, main/handwatch.h and main/tilter.h), and with them
+// main/ardu.h and main/config.h, run on the Mac: tools/firmware_tests.sh. The real files run unchanged; the include
+// path picks the stand-in SDK headers in test/host_esp, and a stand-in tilter sits on each port behind the pins
+// (test/host_esp/host_tilter.h). Built with TILT_DEVLOG, so the dev build's power log and light log are tested too.
 #include "../main/store.h"
 #include "../main/power.h"
 #include "../main/lock.h"
+#include "../main/motion.h"
+#include "host_tilter.h"
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -13,8 +16,42 @@ static int passed = 0, failed = 0;
 #define CHECK(cond, what) do { if (cond) passed++; else { failed++; printf("FAIL line %d: %s\n", __LINE__, what); } } while (0)
 static bool near(double a, double b, double tol) { return fabs(a - b) <= tol; }
 
+// app_main.cpp's: someone has the app open. Its real body comes under test with app_main.cpp (#267).
+static bool uiOn = false;
+bool uiActive() { return uiOn; }
+
+// motion.h and pwmin.h: every global back to its start value.
+static void motionStartValues() {
+  for (auto &b : bs) b = BlindState();
+  for (auto &m : mvs) m = Move();
+  cur = &mvs[0];
+  for (bool &m : motOn) m = false;
+  motorsHeld = false;
+  for (int p = 0; p < PORTS; p++) { capLast[p] = 0; capLastMs[p] = 0; }
+  pwmSaved = 0;
+  hand = HandWatch();
+  sensorPort = -1;
+  traceN = 0;
+  traceT0 = traceLast = 0;
+  traceTgt = NAN;
+  tracePort = -1;
+  for (auto &r : ramp) r = Ramp{};
+  capTimer = nullptr;
+  capRunning = false;
+  capRes = 80000000;
+  capMux.held = 0;
+  for (int k = 0; k < CAP_N; k++) {
+    capChan[k] = nullptr;
+    capRise[k] = capFall[k] = capHigh[k] = capPeriod[k] = capFrames[k] = capNom[k] = capBad[k] = 0;
+    capHaveRise[k] = capHaveFall[k] = false;
+    capAt[k] = 0;
+  }
+  uiOn = false;
+}
+
 // A restart puts every global of the firmware back to its start value, as the chip does; flash stays.
 static void firmwareStartValues() {
+  motionStartValues();
   memset(&cfg, 0, sizeof cfg);
   memset(&stats, 0, sizeof stats);
   memset(movesStalled, 0, sizeof movesStalled);
@@ -489,6 +526,67 @@ static void testUnlocked() {
   CHECK(host::takeFaults() == 1, "the board: a second take is a fault");
 }
 
+// ---- motion (motion.h, with pwmin.h, tilter.h, handwatch.h, request.h), on the stand-in tilters (host_tilter.h)
+// "Blind 1" is port 0 with a tilter plugged in and Marks set: up 200, open 290, down 20 (so tilt 50 is 245 degrees).
+static void lockedDo(const std::function<void()> &fn) { xSemaphoreTake(mx, portMAX_DELAY); fn(); xSemaphoreGive(mx); }
+// The blinds task's pass, for ms milliseconds: the lock held, motionTick once a millisecond, the clock moved 1 ms.
+static void run(uint32_t ms) {
+  for (uint32_t i = 0; i < ms; i++) { lockedDo(motionTick); host::advanceMs(1); }
+}
+static bool runUntil(const std::function<bool()> &done, uint32_t maxMs) {
+  for (uint32_t i = 0; i < maxMs; i++) { if (done()) return true; run(1); }
+  return done();
+}
+static bool settled() { return !moving() && !bs[0].queued && !bs[1].queued && !bs[2].queued; }
+static void unplugAll() { for (int p = 0; p < PORTS; p++) host::unplug(p); }
+// A start of the controller with the motion code, and every port empty.
+static void motionStart() {
+  unplugAll();
+  firstStart();
+  adcBegin();
+  lockBegin();
+  host::setMilliVolts(PIN_VIN, 3300);            // the rail, as probeVdd measures it
+  vbatRest = vbat = 3.9f;
+  syncMode = 0;
+  motionBegin();
+}
+static void setMarks(int p, float up = 200, float open = 290, float down = 20) {
+  cfg.b[p].up = up; cfg.b[p].open = open; cfg.b[p].down = down;
+}
+// Blind p: a tilter plugged in with its rod at deg, a quick motor, Marks set, and read once.
+static host::HostTilter &blind(int p, float deg, bool pwm = false) {
+  host::HostTilter &t = pwm ? host::plugPwm(p, deg) : host::plugAnalog(p, deg);
+  t.degPerS = 15;
+  setMarks(p);
+  pulseRead(p);
+  return t;
+}
+static std::string logFrom(uint32_t seq) {          // the event log's lines since logSeq was seq
+  std::string s;
+  for (uint32_t i = seq; i < logSeq; i++) { s += logLines[i % LOG_N]; s += "\n"; }
+  return s;
+}
+static bool has(const std::string &s, const char *what) { return s.find(what) != std::string::npos; }
+static int count(const std::string &s, const char *what) {
+  int n = 0;
+  for (size_t at = s.find(what); at != std::string::npos; at = s.find(what, at + 1)) n++;
+  return n;
+}
+
+// The bug: a stop in the same millisecond a move started read a sensor only just switched on, never woken.
+static void testStopAtStart() {
+  motionStart();
+  blind(0, 260);
+  float before = bs[0].tilt;
+  uint32_t seq = logSeq;
+  lockedDo([] { startTilt(0, 50); });
+  int reads = host::tilter(0).angleReads;
+  lockedDo(moveStop);
+  CHECK(host::tilter(0).angleReads == reads, "a stop as the move starts: the sensor is not read");  CHECK(!has(logFrom(seq), "gave no reading"), "a stop as the move starts: no \"gave no reading\" line");
+  CHECK(bs[0].tilt == before, "a stop as the move starts: the Current tilt is as before");
+  CHECK(!strcmp(bs[0].last, "stopped") && !moving(), "a stop as the move starts: it ends \"stopped\"");
+}
+
 int main() {
   host::onRestart(firmwareStartValues);
   setenv("TZ", "CST6CDT,M3.2.0,M11.1.0", 1);
@@ -515,6 +613,7 @@ int main() {
   testPwm();
   testPreferences();
   testUnlocked();
+  testStopAtStart();
   failed += host::takeFaults();
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;

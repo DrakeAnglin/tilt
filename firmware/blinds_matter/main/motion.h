@@ -314,7 +314,7 @@ void stopAll(const char *why) {
     if (mvs[i].kind == MV_NONE) continue;
     Use u(i);
     Tilter &t = tilters[i];
-    if (MVX.st == MS_WAKE) { MVX.noted = t.note(t.angle()); finishMove(MVX, t, why); continue; }
+    if (MVX.st == MS_WAKE) { stopNow(MVX, t, why); continue; }   // read only if its sensor has been woken (tilter.h)
     if (MVX.st != MS_SETTLE || !MVX.why) { MVX.nudges = MAX_NUDGES + 1; toSettle(MVX, t, why); }
   }
 }
