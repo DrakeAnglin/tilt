@@ -37,7 +37,13 @@ xcodebuild test -project Tilt.xcodeproj -scheme Tilt -destination "id=$TSIM" -de
 RC=$?
 set -e
 grep -E "^Test Case '.*' (passed|failed)|error:" "$OUT/xcodebuild.log" || true
-if [ "$RC" != 0 ]; then echo "xcodebuild failed ($RC); the end of its log:"; tail -40 "$OUT/xcodebuild.log"; fi
+if [ "$RC" != 0 ]; then
+  echo "xcodebuild failed ($RC); the end of its log:"; tail -40 "$OUT/xcodebuild.log"
+  # A compile error can be in the result bundle only, not in the log.
+  for R in "$OUT"/xcode/Logs/Test/*.xcresult; do
+    [ -d "$R" ] && xcrun xcresulttool get build-results --path "$R" 2>/dev/null | grep -E '"(message|sourceURL)"' | head -40 || true
+  done
+fi
 tail -1 "$OUT/xcodebuild.log"
 rm -rf "$OUT/xcode"
 exit "$RC"
