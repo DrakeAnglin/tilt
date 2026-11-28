@@ -13,10 +13,10 @@ One run takes **one issue**. Do not stop to ask the owner anything: decide, or h
 
 1. **One run at a time.** The lock is `~/.claude/tilt-issue-loop.lock`: one line, the time and the session id of the run that holds it. Your own session id comes from `mcp__ccd_session_mgmt__get_session` with `self` (load it with ToolSearch); without that tool, write `none`.
    - No lock: take it.
-   - A lock with a session id: look that session up with `mcp__ccd_session_mgmt__get_session`. Running (`isRunning` true): another run is going: stop now, say "Loop busy", nothing else. Not running, or not found: that run ended without removing it. Take the lock; step 1 ("Finish first") picks up its issue.
+   - A lock with a session id: look that session up with `mcp__ccd_session_mgmt__get_session`. Running (`isRunning` true): another run is going: stop now, say "Loop busy", nothing else. Not running is not enough on its own, because a runner waiting for a background agent also reads as not running. The run is over only when all three hold: the session is not running (or not found), the lock's time is more than 45 minutes old, and no file in its worktree (`.claude/worktrees/issue-<n>-loop` of the open `agent-loop` issue, `find <worktree> -newermt '-45 minutes' -print -quit` prints nothing) changed in the last 45 minutes. Then take the lock; step 1 ("Finish first") picks up its issue. Otherwise: "Loop busy".
    - A lock with `none`, or no way to look the session up: busy when it is less than 3 hours old, as before.
 
-   Take it with `echo "$(date -u +%FT%TZ) <your session id>" > ~/.claude/tilt-issue-loop.lock`, and write it again (same line, new time) each time you refresh the claim. Remove it as the last thing you do, however the run ends.
+   Take it with `echo "$(date -u +%FT%TZ) <your session id>" > ~/.claude/tilt-issue-loop.lock`, and write it again (same line, new time) each time you refresh the claim. Before you write it, read it: when it names another session, a newer run took over from you. Stop at once: change nothing more, say "Taken over", and end. Remove it as the last thing you do, however the run ends.
 2. `git fetch origin`. Never pull, switch branch or edit in the main checkout: the owner and other agents use it.
 
 ## 1. Pick
@@ -120,7 +120,7 @@ Remove the lock. Leave the worktree (`ExitWorktree`, `keep`; `tools/agent/clean_
 
 ## Never end a turn early
 
-Your turn ends only at step 8. A finished scheduled session is never woken again, so a run that ends its turn to "wait for" an agent or for CI leaves the issue and the lock with nobody working on them. When an agent replies that it is waiting (for CI or for its own background work), wait yourself: `gh pr checks <pr> --watch` in the foreground (10-minute timeout, run it again until done), then continue that agent with the result.
+Your turn ends only at step 8, or while an agent you started is still working (its report wakes you). Nothing else wakes a scheduled session: a run that ends its turn to "wait for" CI, or for an agent that already replied, leaves the issue and the lock with nobody working on them. When an agent replies that it is waiting (for CI or for its own background work), wait yourself: `gh pr checks <pr> --watch` in the foreground (10-minute timeout, run it again until done), then continue that agent with the result.
 
 ## If a stage goes wrong
 
