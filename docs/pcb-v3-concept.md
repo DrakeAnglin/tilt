@@ -14,7 +14,9 @@ diode has a maker's datasheet, linked in [the parts table](#parts-and-their-data
 One board, 47 mm wide, that carries everything: the cell, the charger, USB-C, the solar jack, the ESP32-C6 and the
 ports. No wires, no harness, no separate charger board.
 
-![floor plan](renders/pcb-v3-floorplan.svg)
+![the board with its tall parts](renders/pcb-v3-fit-3port-board.png)
+
+A mock-up from the [fit study](#fit-study-the-board-in-the-box): the real board is not drawn yet.
 
 | | v2.2 today | v3 |
 |---|---|---|
@@ -27,7 +29,7 @@ ports. No wires, no harness, no separate charger board.
 | One blind | same long board | cut the end section off: about 22 mm shorter |
 | USB or solar | cannot tell | each has its own sense line |
 | Soldering | about 45 through-hole parts + a crimped harness | about 60 parts, 6 of them small surface-mount parts |
-| Box (estimate) | 157 mm long, 23 mm tall | about 134 mm long, or about 112 mm for one blind; same height, or about 1 mm more on the cell side |
+| Box | 157.4 × 51.8 × 23.0 mm | 134.8 × 51.8 × 23.0 mm, or 114.8 mm long for one blind. Same width, height, bevels and rod groove |
 | Cost per board, 3 ports, no ESP or cell | about $21 | about $16–18 |
 
 ## Decisions and why
@@ -101,18 +103,24 @@ lies on v2.2, between a fixed contact (+) and a spring contact (−) soldered to
 - **Why not a holder on top of the board:** it was the first choice (Keystone 1043P). The review put it in the box
   numbers: the holder stands 18 mm above the board and its inner edge is under the tilt rod's groove, so it cuts
   into the groove. The groove may not move, so the holder is out.
-- **The contacts are not picked yet.** They must be board-mount parts with a drawing, with the contact point about
-  6 to 7 mm above the board, and about 4 mm of spring travel for cells from 65 to 69 mm. Contacts made for AA cells
-  are the right height, but they must be leaf contacts of 20 mΩ or less (a coil spring can be 100 mΩ, in the
-  motors' path). This is the first thing settled in the CAD ([open items](#open-items-before-the-layout)).
-  If no pair fits, the fallback is the cell with a lead, as today.
-- **A cell put in backwards:** the box gets a printed gate in front of the + contact that only a button top
-  reaches. Behind that, the board has a 3 A resettable fuse in the cell's + lead and a diode (1N5822) across the
+- **The contacts:** Keystone 596 (a fixed button, +) and Keystone 590 (a leaf spring, −). Both are board-mount parts
+  from Keystone's catalog, made for AA cells, which puts their contact 6 to 7 mm above the board: the height of this
+  cell's center.
+- **They take one length of cell: protected button-top cells of 68 to 70 mm**, the common size. The leaf is pressed
+  1.3 to 3.3 mm over that range.
+- **One change to the parts:** each has three legs, and the middle one sits right under the cell's end, where the
+  board has to be cut away. The middle leg is clipped off and the contact stands on its two outer legs and its base.
+  On paper that holds; it is the first thing to prove with sample parts ([open items](#open-items-before-the-layout)).
+- A finger notch in the box's back wall lets the cell be lifted out.
+- If the contacts fail their test, the fallback is the cell with a lead, as today.
+- **A cell put in backwards:** the board has a 3 A resettable fuse in the cell's + lead and a diode (1N5822) across the
   board side of it. A backwards cell is shorted through the diode, and the fuse or the cell's own protection opens.
   The chips see about −0.6 V for a moment instead of −4 V. That is still past their −0.3 V rating, so this has to
   pass a bench test before it is trusted.
-- **A cell with a lead** plugs into a 2-pin JST-XH header on the same guarded line. One or the other: never a cell
-  in the notch and a second one on the header.
+- A thin printed gate in front of the + contact, which a button top passes and a flat end does not, may still be
+  possible. It is tried with the sample parts, as an extra.
+- **A cell with a lead** (about 66 mm) lies in the same notch and plugs into a 2-pin JST-XH header on the same
+  guarded line; it does not reach the contacts. One or the other: never two cells.
 - Protected cells only, as today.
 
 ### 6. One cell, not two
@@ -133,8 +141,8 @@ no longer than 69 mm.
 Port 1 is at end A with USB-C and the solar jack. Ports 2 and 3 sit on a section at end B, joined to the board by a
 10 mm neck with a printed **cut line**.
 
-- **For one blind:** cut the neck with a small saw and file the edge. The board is then about 107 mm instead of
-  129 mm, and goes in the short box. Leave out the fuses and jacks for ports 2 and 3.
+- **For one blind:** cut the neck with a small saw and file the edge. The board is then 109.6 mm instead of
+  129.6 mm, and goes in the short box. Leave out the fuses and jacks for ports 2 and 3.
 - The end section has its own screw hole, so a cord pushed into its jacks does not lever on the neck. The copper
   stays 0.5 mm back from the cut line.
 - **For two blinds:** keep the section, fit one jack. Same box as three.
@@ -211,8 +219,9 @@ Numbers are from the datasheet named, read 2026-11-27. "Stock" parts are already
 | Charger | TI **BQ21040DBVR** (SOT-23-6) | [bq21040.pdf](https://www.ti.com/lit/ds/symlink/bq21040.pdf) | input 4.45–6.45 V, off above 6.5–6.8 V, survives 30 V; holds a weak input at 4.3 V; 540 / R for the current, 800 mA max; 1 µA from the cell; 10 h timer; temperature input for a 10 k sensor |
 | 3.3 V regulator | Richtek **RT9080-33GJ5** (TSOT-23-5) | [DS9080](https://www.richtek.com/assets/product_file/RT9080/DS9080-09.pdf) | 600 mA; dropout 310 mV typical, 530 max at 600 mA; 2 µA idle; 5.5 V max in; 1 µF in and out; enable pin |
 | Sensor switch ×3 | Alpha & Omega **AO3401A** (SOT-23) | [AO3401A](https://www.aosmd.com/pdfs/datasheet/AO3401A.pdf) | 85 mΩ at 2.5 V drive |
-| Cell contacts (+ and spring −) | **not picked** | needed before layout | board-mount leaf contacts, 20 mΩ or less, contact point 6 to 7 mm above the board, about 4 mm travel |
-| Cell fuse | radial resettable fuse, about 3 A hold, 16 V or more: **not picked** | needed before layout | holds 2 A or more at 60 °C; 50 mΩ or less |
+| Cell contact + | Keystone **596** (button) | [catalog p. 11](https://www.keyelco.com/userAssets/file/M65p11.pdf), [holes p. 35](https://www.keyelco.com/userAssets/file/M65p35.pdf) | plate 9.1 × 11.4 mm, button 7.0 mm above the board; middle leg clipped |
+| Cell contact − | Keystone **590** (leaf) | same pages | leaf reaches 4.1 mm; spacing = cell + 2.3 mm; middle leg clipped. Force and resistance are not published: measured on samples |
+| Cell fuse | radial resettable fuse, about 3 A hold, 16 V or more: **not picked** | needed at the schematic | holds 2 A or more at 60 °C; 50 mΩ or less; must fit 10 × 3.5 × 15 mm standing |
 | Backwards-cell diode | **1N5822** (3 A Schottky) | onsemi 1N5820 series | to read at the schematic: surge rating |
 | USB-C socket | GCT **USB4125-GF-A** | [drawing](https://gct.co/files/drawings/usb4125.pdf) | power only; 6 pads plus 4 through-hole shell tabs; both CC pins brought out for the 5.1 k resistors; 3 A |
 | Solar jack | Same Sky (CUI) **PJ-007** | [pj-007.pdf](https://www.sameskydevices.com/product/resource/pj-007.pdf) | for a 3.5 × 1.35 mm plug; through-hole; 7.4 mm high; 24 V |
@@ -223,7 +232,7 @@ Numbers are from the datasheet named, read 2026-11-27. "Stock" parts are already
 | ESP32-C6 chip | Espressif | [datasheet](https://documentation.espressif.com/esp32-c6_datasheet_en.html) | 3.0–3.6 V supply; start-up pins; transmit peaks up to about 315 mA |
 | ESP32-C6 SuperMini board | no maker's datasheet | bench-measured | pin order as on v2.2 |
 | RJ12 jack | Amphenol **87180-066LF** | stock | as v2.2 |
-| Port fuse | Bel **0ZRE0075FF1A** (stock), or a lower-resistance 16–30 V type on the same holes | stock | the Bel is 0.3 to 0.8 Ω, which costs a starting motor up to 0.4 V. A better part is picked at the schematic |
+| Port fuse ×3 | radial resettable fuse, about 1.1 A hold, 16–30 V: **not picked** | needed at the schematic | 0.3 Ω or less after a trip; must fit 7.5 × 3.1 × 13 mm standing. The Bel fuses in stock are too wide and too high in resistance |
 | Diodes, 470 µF, JST-XH header, sockets | 1N5819 and the rest | stock | as v2.2 |
 | Resistors, capacitors, lights | from the kits | | |
 
@@ -248,10 +257,11 @@ board with US duty, which is why rev 4 was dropped.
 
 ## Open items before the layout
 
-1. **The cell in the box CAD, first.** Pick the two contacts from real drawings and place the board, the cell on its
-   saddles and the contacts in the box CAD: contact height against the cell's center, spring travel for 65 to 69 mm
-   cells, the printed + gate, the rod groove untouched, the three screw posts and the end section's screw. Nothing
-   else is drawn until this fits.
+1. **Sample parts for the cell contacts, first.** One Keystone 596 and one 590, middle legs clipped, soldered to
+   a scrap board: push on the button with about 3 kg, put a cell in and out 50 times; nothing may rock or lift.
+   Measure how far the 596's button stands out and how far the 590's leaf reaches, then the resistance through both
+   contacts with a 68 mm and a 70 mm cell (20 mΩ is the aim). Only then are the two footprints and the notch's ends
+   fixed. Everything else on the board can be drawn before that.
 2. **Bench test: the SuperMini fed at its 3V3 pin.** 3.3 V from a bench supply into 3V3, 5V pin empty. Check that it
    runs Thread and Bluetooth, measure its sleep current (the 0.5 mA target depends on it), check that plugging USB
    into the ESP at the same time does no harm, and that GPIO8 and GPIO15 read an on/off line with the lights on them.
@@ -272,12 +282,41 @@ board with US duty, which is why rev 4 was dropped.
    both plugs; the ESP 1.5 mm nearer the room side than on v2.2, clear of the rod groove; copper round the charger
    chip for heat, and the temperature sensor by the cell, away from it.
 
+## Fit study: the board in the box
+
+Built in Fusion from a mock-up of the board (its outline and every tall part), before the board is drawn
+(`hardware/mechanical/fusion/ControllerV3/ControllerV3.py`, run by `tools/fusion_controller_v3.py`). It is not a
+print file yet.
+
+![open](renders/pcb-v3-fit-3port-open.png)
+![lid lifted](renders/pcb-v3-fit-3port-exploded.png)
+![in the rail, from end A](renders/pcb-v3-fit-3port-in-rail-end.png)
+![the one-blind box](renders/pcb-v3-fit-1port-open.png)
+
+| Check, both lengths | Result |
+|---|---|
+| Box | 134.8 mm (3 ports) or 114.8 mm (1 port) × 51.8 × 23.0 mm. v2.2 is 157.4 mm long |
+| Parts against each other, the tray and the lid | no collisions |
+| Nothing outside the box's outside shape | none |
+| Rod groove | same center, floor height and radius as v2.2; the rod clears it |
+| Tilting into the rail | the rail's walls spread 0.2 mm, the same as v2.2 |
+| Cell | 0.3 mm under the lid, 3.7 mm from the groove, 1.1 mm from the board's edge |
+| Putting the board in | end A first, end B up 1°, slide 2.5 mm into end wall A, drop |
+| Printed parts | tray and lid are each one piece |
+| A cable in the ESP's own USB, lid off | clear path |
+
+What is different from the v2.2 box: the tray's end wall B is only a low sill, and the rest of that wall is part of
+the lid, with the windows for jacks 2 and 3 open downward. That is what lets a board with jacks at both ends go in.
+
+Not proven by this study: the contacts on two legs (sample test), the fuses (not picked; they must fit the sizes in
+the parts table), the ESP board's exact size, and anything about the real copper. Lifting the cell out by hand and
+the lid's end wall are checked on the first print.
+
 ## What gets made before any order
 
 1. Schematic and KiCad board, generated like v2 (`hardware/pcb`), DRC and ERC clean, with a 3D model of the board
-   and its parts.
-2. The box built round that 3D model, in both lengths, with the fit checks: nothing collides, nothing pokes through
-   a wall, the rod groove unchanged, the box tilts into the rail.
+   and its parts, to the outline of the fit study.
+2. The fit study run again with that 3D model in place of the mock-up, in both lengths, and the print files.
 3. Pictures of the board and of the board in the box.
 4. A printed box and a printed dummy board, tried in a real headrail.
 5. An outside review of the schematic, the board and the fit, as was done for this design (three rounds, by a
