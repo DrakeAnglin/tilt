@@ -1,6 +1,7 @@
 // Tests for the controller's own code on the host board (test/host_esp/host_board.h): main/store.h, main/power.h,
-// main/lock.h, main/motion.h (with main/pwmin.h, main/request.h, main/handwatch.h and main/tilter.h), main/web.h's
-// secured channel and people rules (main/sec.h, main/api.h, main/people.h, main/update.h, main/fwkey.h), and with them
+// main/lock.h, main/motion.h (with main/pwmin.h, main/request.h, main/handwatch.h and main/tilter.h), main/web.h with
+// every command in main/routes.h and the once-a-second work (webTick, main/schedules.h, main/scenes.h), the secured
+// channel and people rules (main/sec.h, main/api.h, main/people.h, main/update.h, main/fwkey.h), and with them
 // main/ardu.h and main/config.h, run on the Mac with real mbedtls: tools/firmware_tests.sh. The real files run
 // unchanged; the include path picks the stand-in SDK headers in test/host_esp, and a stand-in tilter sits on each port
 // behind the pins (test/host_esp/host_tilter.h). A test phone (test/sim_phone.h) pairs, seals commands and opens the

@@ -81,7 +81,7 @@ Fusion scripts run through the FusionBridge add-in: `python3 hardware/mechanical
 | Area | Line coverage |
 |---|---|
 | Tilt app | at least 23% |
-| controller firmware | at least 64% |
+| controller firmware | at least 76% |
 | Tilt Hub firmware | at least 17% |
 | tools | at least 99% |
 
