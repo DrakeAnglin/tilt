@@ -109,8 +109,10 @@ struct AppBackground: View {
         TimelineView(.periodic(from: .now, by: 120)) { t in
             let look = Sky.look(at: t.date)
             if scheme == .dark {
-                let deep = Sky.night.top, n = look.stars
-                let a = Color(deep + (look.top * 0.45 - deep) * (0.5 + 0.5 * n))
+                let deep: RGB = Sky.night.top, n: Double = look.stars
+                // In steps with their types written out: Xcode 26's compiler gives up on the one-line form.
+                let toward: RGB = look.top * 0.45 - deep, k: Double = 0.5 + 0.5 * n
+                let a = Color(deep + toward * k)
                 let b = Color(look.mid * (0.34 + 0.5 * n))
                 let c = Color(look.low * (0.50 + 0.4 * n))
                 ZStack {
