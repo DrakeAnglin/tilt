@@ -144,13 +144,16 @@ def code_lines(path, text):
 
 
 def test_counts(log):
-    """-> (passed, failed) from test output: the firmware and app tests' `N passed, M failed`, unittest's summary."""
+    """-> (passed, failed) from test output: the firmware and app tests' `N passed, M failed`, unittest's summary, and
+    xcodebuild's `Test Case '…' passed|failed`, one per test (its `Executed N tests` lines repeat per suite)."""
     passed = failed = 0
     for p, f in re.findall(r'(\d+) passed, (\d+) failed', log):
         passed, failed = passed + int(p), failed + int(f)
     for m in re.finditer(r'^Ran (\d+) tests? in .*$\s*^(OK|FAILED)(?: \(([^)]*)\))?', log, re.M):
         bad = sum(int(v) for k, v in re.findall(r'(\w+)=(\d+)', m.group(3) or '') if k in ('failures', 'errors'))
         passed, failed = passed + int(m.group(1)) - bad, failed + bad
+    for result in re.findall(r"^Test Case '[^']*' (passed|failed) ", log, re.M):
+        passed, failed = passed + (result == 'passed'), failed + (result == 'failed')
     return passed, failed
 
 

@@ -1,0 +1,22 @@
+#!/bin/sh
+# Stand-in for xcodebuild while tools/coverage.sh runs the app tests: the same run with Xcode's code coverage on, then
+# a copy of the run's Coverage.profdata and of the three built binaries (the app, TiltWidget, TiltAlerts) in
+# $TILT_COVERAGE_OUT/xcode for llvm-cov (tools/app_tests.sh deletes its build folder when it ends). The real xcodebuild
+# is found on the PATH from before this folder was put in front.
+DD=""; PREV=""
+for A in "$@"; do [ "$PREV" = -derivedDataPath ] && DD=$A; PREV=$A; done
+REAL=$(PATH=$TILT_COVERAGE_PATH command -v xcodebuild) || { echo "coverage: no xcodebuild" >&2; exit 1; }
+# Xcode writes the app's counts itself: coverage.sh's profile path for the test programs would take them away.
+env -u LLVM_PROFILE_FILE -u SIMCTL_CHILD_LLVM_PROFILE_FILE "$REAL" "$@" -enableCodeCoverage YES
+RC=$?
+if [ -n "$DD" ]; then
+  X="$TILT_COVERAGE_OUT/xcode"
+  mkdir -p "$X"
+  P=$(ls -t "$DD"/Build/ProfileData/*/Coverage.profdata 2>/dev/null | head -1)
+  [ -n "$P" ] && cp "$P" "$X/Coverage.profdata"
+  APP="$DD/Build/Products/Debug-iphonesimulator/Tilt.app"
+  for B in "$APP/Tilt" "$APP/PlugIns/TiltWidget.appex/TiltWidget" "$APP/PlugIns/TiltAlerts.appex/TiltAlerts"; do
+    [ -f "$B" ] && cp "$B" "$X/$(basename "$B")"
+  done
+fi
+exit "$RC"
