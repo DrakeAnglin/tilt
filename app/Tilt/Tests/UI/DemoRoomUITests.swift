@@ -28,6 +28,13 @@ final class DemoRoomUITests: XCTestCase {
         XCTAssertTrue(says(app, "Open").waitForExistence(timeout: 20), "the room says Open")
     }
 
+    func testDeveloperModeIsOfferedInADeveloperBuild() {
+        let app = launch()
+        XCTAssertTrue(room(app).waitForExistence(timeout: 20))
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertTrue(app.switches["Developer Mode"].waitForExistence(timeout: 10), "hidden only with -demo")
+    }
+
     func testNothingIsKeptFromTheLastRun() {
         var app = launch()
         XCTAssertTrue(room(app).waitForExistence(timeout: 20))
