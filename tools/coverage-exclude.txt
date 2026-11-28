@@ -7,3 +7,4 @@ fusion_solar.py  # runs only inside Fusion 360 (its adsk API and the app object,
 fusion_thin.py  # runs only inside Fusion 360 (its adsk API and the app object, through fusion.py exec)
 fusion_tilter.py  # runs only inside Fusion 360 (the app object and fusion_kit's load_script, through fusion.py exec)
 pcb_guide.py  # runs only inside KiCad's Python (needs its pcbnew module and the board file loaded through it)
+fusion_controller_v3.py  # runs only inside Fusion 360 (its adsk API and the app object, through fusion.py exec)
