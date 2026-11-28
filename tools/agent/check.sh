@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run every test an agent can run on this Mac before opening a pull request. Same tests as CI, then the same
 # coverage gate as CI (docs/agents/workflow.md, "Coverage").
-#   tools/agent/check.sh          firmware + tools, and the app tests if app files changed
+#   tools/agent/check.sh          firmware + tools, and the app tests (test programs and Xcode tests) if app files changed
 #   tools/agent/check.sh --all    everything
 set -e
 cd "$(dirname "$0")/../.."

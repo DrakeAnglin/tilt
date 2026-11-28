@@ -59,7 +59,7 @@ struct SettingsTab: View {
                     Text(cloud == false ? "Sign in to iCloud in the Settings app to be told when someone asks to join your blinds, even when Tilt is closed." : "Your display name is what other people see in People and when you ask to join their blinds. iCloud tells you when someone asks to join yours.")
                 }
                 // Never in an App Store build; also hidden when launched with "-demo" for App Store screenshots.
-                if developerBuild && !ProcessInfo.processInfo.arguments.contains("-demo") {
+                if developerBuild && !Launch.current.demo {
                     Section {
                         Toggle(isOn: $devMode) { Label("Developer Mode", systemImage: "chevron.left.forwardslash.chevron.right") }
                         if devMode {

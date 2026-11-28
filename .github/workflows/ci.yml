@@ -30,8 +30,8 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          # The app tests need a Mac (10x the minutes), so they run only when the app, the shared wire fixture or the
-          # coverage tools changed. On main they always run, so main always has all four coverage numbers.
+          # The app tests (the two test programs and the Xcode tests) need a Mac (10x the minutes), so they run only
+          # when the app, the shared wire fixture or the coverage tools changed. On main they always run, so main always has all four coverage numbers.
           if FILES=$(git diff --name-only "$BASE" HEAD 2>/dev/null); then
             if [ "$GITHUB_EVENT_NAME" = push ] ||
                echo "$FILES" | grep -qE '^(app/|firmware/blinds_matter/test/wire|tools/app_tests\.sh|tools/coverage(\.sh|_gate\.py|-floors\.txt|-bin/)|\.github/workflows/)'; then
@@ -103,6 +103,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - run: tools/app_tests.sh

@@ -155,7 +155,7 @@ final class AppModel {
     /// The name other people see for this person. It comes from Sign in with Apple or is typed once (iOS does not tell
     /// apps who owns the phone), and follows the person to their other devices through iCloud.
     static var savedName: String? {
-        let n = UserDefaults.standard.string(forKey: Prefs.myName) ?? NSUbiquitousKeyValueStore.default.string(forKey: Prefs.myName)
+        let n = UserDefaults.standard.string(forKey: Prefs.myName) ?? (Launch.current.testRun ? nil : NSUbiquitousKeyValueStore.default.string(forKey: Prefs.myName))
         return n.flatMap { $0.isEmpty || $0 == UIDevice.current.name || $0 == "iPhone" ? nil : $0 }      // a device name is not a person's name
     }
     /// Always fitted to what a controller and the Tilt Hub keep (NameRule.phoneBytes), so Pairing, the join notice and
@@ -198,7 +198,7 @@ final class AppModel {
     }
     func startAll() {
         (controllers + waiting).forEach { $0.start() }
-        Task { await FirmwareUpdates.shared.check() }
+        if !Launch.current.testRun { Task { await FirmwareUpdates.shared.check() } }      // a test run asks nothing of the network
         // Away from home too: did an owner remove this phone? (The owner's phone leaves a note in iCloud.)
         for c in controllers where c.record.host != Demo.host {
             guard let k = Keychain.load(c.id) else { continue }

@@ -5,7 +5,7 @@ import UserNotifications
 /// iCloud's notices arrive as push notifications: the app has to register for them.
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        application.registerForRemoteNotifications()
+        if !Launch.current.testRun { application.registerForRemoteNotifications() }
         return true
     }
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {}
@@ -21,15 +21,23 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct TiltApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var model = AppModel()
-    @State private var discovery = Discovery()
-    @State private var hub = HubWatch.shared
+    @State private var model: AppModel
+    @State private var discovery: Discovery
+    @State private var hub: HubWatch
     @Environment(\.scenePhase) private var phase
-    init() { UNUserNotificationCenter.current().delegate = NoticePresenter.shared }
+    private let launch = Launch.current
+    init() {
+        // Before the model, Discovery and the hub are made, so in a test run none of them reads what an earlier run left.
+        launch.startFresh()
+        _model = State(initialValue: AppModel())
+        _discovery = State(initialValue: Discovery())
+        _hub = State(initialValue: HubWatch.shared)
+        UNUserNotificationCenter.current().delegate = NoticePresenter.shared
+    }
 
     var body: some Scene {
         WindowGroup {
-            if developerBuild && ProcessInfo.processInfo.arguments.contains("-slatdemo") {
+            if launch.slatDemo {
                 HStack { SlatView(tilt: -100); SlatView(tilt: -55); SlatView(tilt: 55); SlatView(tilt: 100) }.frame(height: 260).padding(8).frame(maxHeight: .infinity).background(AppBackground())
             } else {
             RootView()
@@ -37,7 +45,8 @@ struct TiltApp: App {
                 .environment(discovery)
                 .environment(hub)
                 .onChange(of: phase, initial: true) { _, p in
-                    if p == .active { model.startAll(); discovery.start(); hub.start() } else if p == .background { model.stopAll(); discovery.stop(); hub.stop(); BatteryAlerts.scheduleRefresh() }
+                    // A test run asks nothing of Bonjour.
+                    if p == .active { model.startAll(); if !launch.testRun { discovery.start(); hub.start() } } else if p == .background { model.stopAll(); discovery.stop(); hub.stop(); BatteryAlerts.scheduleRefresh() }
                 }
                 .onChange(of: discovery.found) { _, f in model.noteFound(f) }
                 .alert("Tilt Hub", isPresented: Binding(get: { hub.notice != nil }, set: { if !$0 { hub.notice = nil } })) { Button("OK") {} } message: { Text(hub.notice ?? "") }
@@ -50,12 +59,14 @@ struct TiltApp: App {
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(Prefs.appearance) private var appearance = 0
-    @State private var splash = true
+    /// No splash and no name sheet in a test run: the tests start on the Blinds tab.
+    @State private var splash = !Launch.current.testRun
     @State private var later: Set<String> = []
-    /// Developer builds, for screenshots: "-tab 1" starts on Automations, "-demo" adds the demo room.
+    /// Developer builds, for screenshots: "-tab 1" starts on Automations, "-demo" adds the demo room (every launch
+    /// switch: Launch.swift).
     @State private var tab = developerBuild ? UserDefaults.standard.integer(forKey: "tab") : 0
     @State private var join: JoinAsk?
-    @State private var needName = asksForName(saved: AppModel.savedName, skipped: UserDefaults.standard.bool(forKey: Prefs.nameSkipped))
+    @State private var needName = !Launch.current.testRun && asksForName(saved: AppModel.savedName, skipped: UserDefaults.standard.bool(forKey: Prefs.nameSkipped))
     /// Requests to join the controllers this phone owns.
     private var pending: [JoinAsk] { model.controllers.flatMap { c in c.requests.map { JoinAsk(controller: c, phone: $0) } } }
     /// Show the next request that has not been answered or swiped away.
@@ -63,7 +74,7 @@ struct RootView: View {
         if let j = join { if pending.contains(where: { $0.id == j.id }) { return }; join = nil }
         if !splash, !needName { join = pending.first { !later.contains($0.id) }; if let j = join { later.insert(j.id) } }
     }
-    @State private var wizardDemo = developerBuild && ProcessInfo.processInfo.arguments.contains("-wizarddemo")
+    @State private var wizardDemo = Launch.current.wizardDemo
 
     var body: some View {
         // Tapping the Blinds tab while already on it goes back to the home page (all rooms).
@@ -78,7 +89,7 @@ struct RootView: View {
         .sheet(isPresented: Binding(get: { !splash && wizardDemo && model.controllers.first != nil }, set: { if !$0 { wizardDemo = false } })) {
             if let c = model.controllers.first { SetupWizard(controller: c, index: 0, name: c.state?.b.first?.name ?? "Blind 1") }
         }
-        .onAppear { if developerBuild && ProcessInfo.processInfo.arguments.contains("-demo") { model.addDemo() } }
+        .onAppear { if Launch.current.demo || Launch.current.testRun { model.addDemo() } }
         .preferredColorScheme(appearance == 1 ? .light : appearance == 2 ? .dark : nil)
         // First time: who is this? (So other people see a name, not "iPhone".)
         .sheet(isPresented: Binding(get: { !splash && needName }, set: { if !$0 { needName = false } })) { WelcomeSheet { needName = false }.presentationDetents([.height(470)]).interactiveDismissDisabled() }
