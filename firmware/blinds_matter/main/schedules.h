@@ -86,7 +86,10 @@ void lightRun(uint32_t now) {
 void schedRun() {
   if (!timeValid()) return;
   uint32_t now = time(nullptr);
-  if (lastSched > now || now - lastSched > 1800) lastSched = now - 90;
+  // The clock just set (or a long gap): the last 90 seconds still run. The clock set back (the Tilt Hub's time, a
+  // little off): from now on, so a Schedule that just ran does not run again at once.
+  if (lastSched > now) lastSched = now;
+  else if (now - lastSched > 1800) lastSched = now - 90;
   for (int i = 0; i < SCHEDS; i++) {
     Sched &s = cfg.sched[i];
     if (!s.on || isLightKind(sx.x[i].kind)) continue;     // light slots: lightRun
