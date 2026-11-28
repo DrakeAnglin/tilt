@@ -41,6 +41,7 @@ const uint32_t WAKE_LOST_MS = 300, LOST_STOP_MS = 1000;
 const float SEEK_STEP_DEG = 2.5f, SEEK_START_DEG = 5.0f;
 const uint32_t SEEK_STALL_MS = 1200;
 enum { MV_NONE, MV_TILT, MV_ANGLE, MV_JOG };
+// MS_PULSE is no longer used (nothing sets it); it stays so the move recording's state numbers (/api/trace) stay.
 enum { MS_WAKE, MS_RUN, MS_SETTLE, MS_PULSE, MS_POST, MS_LOOK };
 struct Move {
   int kind = MV_NONE, port = -1, st = MS_WAKE;
@@ -103,7 +104,7 @@ struct Tilter {
   virtual bool wake() = 0;                      // sensor on: is a tilter plugged in?
   virtual float angle() = 0;                    // the Angle now (degrees); reads high while the motor runs
   virtual bool noReading() = 0;                 // no fresh reading (passing its zero, or lost): the last angle() was a guess
-  virtual bool lost() { return false; }         // a dropout: the sensor gave nothing, and the last angle() is only the last good one
+  virtual bool lost() = 0;                      // a dropout: the sensor gave nothing, and the last angle() is only the last good one
   virtual float note(float a) = 0;              // a true reading (motor stopped): the Current tilt. Returns the angle kept (NAN: no tilter)
   virtual void motor(int dir, int duty) = 0;    // dir -1 / 0 (brake) / +1, duty percent
   virtual TiltSettings settings() = 0;
@@ -339,9 +340,6 @@ inline void moveTick(Move &m, Tilter &t, uint32_t now) {   // 100 times a second
     a = now5;
     if (tryFlip(m, t, a)) return;               // the motor took it the wrong way: turn round (once)
     endMove(m, t, "stopped: it went the wrong way both ways");   // the old direction is put back (finishMove)
-  } else if (m.st == MS_PULSE) {
-    t.trace(now, t.angle(), m);
-    if ((int32_t)(now - m.deadline) >= 0) toSettle(m, t, nullptr);
   } else if (m.st == MS_POST) {               // stopped: keep watching for a moment (the rod springs back a little)
     float a = settledRead(m, t, now);
     if (now - m.ts < POST_MS) return;

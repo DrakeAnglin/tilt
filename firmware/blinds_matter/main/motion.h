@@ -314,7 +314,7 @@ void stopAll(const char *why) {
     if (mvs[i].kind == MV_NONE) continue;
     Use u(i);
     Tilter &t = tilters[i];
-    if (MVX.st == MS_WAKE) { MVX.noted = t.note(t.angle()); finishMove(MVX, t, why); continue; }
+    if (MVX.st == MS_WAKE) { stopNow(MVX, t, why); continue; }   // read only if its sensor has been woken (tilter.h)
     if (MVX.st != MS_SETTLE || !MVX.why) { MVX.nudges = MAX_NUDGES + 1; toSettle(MVX, t, why); }
   }
 }
@@ -368,10 +368,12 @@ void cfgApply(const Settings &n) {
 }
 
 bool uiActive();                               // app_main.cpp
+// The blinds task's pacing: the last move tick (100 Hz), the last idle read and whose turn is next, the last watch read.
+struct TickTimes { uint32_t move = 0, idle = 0, watch = 0; int idlePort = 0; } tickTimes;
 void motionTick() {
   uint32_t now = millis();
-  static uint32_t lastT = 0, lastIdle = 0;
-  static int idlePort = 0;
+  uint32_t &lastT = tickTimes.move, &lastIdle = tickTimes.idle;
+  int &idlePort = tickTimes.idlePort;
   if (!moving()) {
     for (int i = 0; i < PORTS; i++)
       if (bs[i].queued) { bs[i].queued = false; const char *e = startTilt(i, bs[i].qTilt); if (e) { strlcpy(bs[i].last, e, sizeof bs[i].last); bs[i].target = NAN; } return; }
@@ -409,7 +411,7 @@ void watchSync(int p) {                        // the watch's sensor on for blin
   sensorPort = p;
 }
 void watchTick(uint32_t now, int p) {          // from motionTick, only while nothing moves
-  static uint32_t last = 0;
+  uint32_t &last = tickTimes.watch;
   watchSync(p);
   if (now - last < 100) return;
   last = now;

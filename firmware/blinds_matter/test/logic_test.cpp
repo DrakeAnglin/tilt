@@ -8,6 +8,7 @@
 #include "../main/tilter.h"
 #include "../main/wire.h"
 #include "../../tilt_hub/main/alert_rules.h"
+#include "sim_rod.h"
 #include <cstdio>
 #include <ctime>
 #include <fstream>
@@ -95,17 +96,14 @@ static void requestTests() {
     CHECK(s.log.empty() && r.started == 0, "hand, follow off: nobody follows"); }
   { RecMoves s; s.fol = true; s.cur[0] = 48; s.cur[2] = NAN; MoveResult r = moveRequest(moveAsk(FROM_HAND, 1, 50), s);
     CHECK(s.log == "n2:50 " && r.started == 1, "hand: the others follow, unless already there; gentle moves kept"); }
+  { MoveAsk a = moveAsk(FROM_APP, -1, 0); a.from = (MoveFrom)7;
+    CHECK(!movePicks(a, true, 0) && !movePicks(a, false, 2), "movePicks: a MoveFrom outside the four picks no blind"); }
 }
 
 // A simulated Tilter: a rod turned through gear play, an Angle that reads 3 degrees high while the motor runs, hard
 // stops, a PWM sensor's blind spot near its zero, and a hand that can turn the wand.
-struct SimTilter : Tilter {
+struct SimTilter : Tilter, Rod {   // the rod, gear play, speed, hard stops and motor direction: test/sim_rod.h
   uint32_t t = 0;
-  float rod = 290, gear = 290;  // the rod's true angle; where the motor side of the gear play is
-  float play = 5;               // gear play, degrees of rod turn
-  float degPerS = 2.5f;         // at full duty
-  int phys = 1;                 // +1: motor "forward" makes the angle rise
-  float lo = -1e9f, hi = 1e9f;  // hard stops (unwrapped degrees)
   float blindLo = -1, blindHi = -1;  // the sensor sees nothing while the rod is past blindLo or before blindHi (reads 0); -1 = never
   uint32_t wandAt = 0; float wandBy = 0;   // a hand turns the wand this much at this time
   uint32_t handAt = 0, handMs = 0; float handRate = 0;   // a hand turning the wand steadily (deg/s) for a while
@@ -116,7 +114,6 @@ struct SimTilter : Tilter {
   uint32_t motorAfterHand = 0;  // ms the motor ran once the hand started
   uint32_t dropAt = 0, dropMs = 0;   // the sensor gives nothing for a while (a dropout: Dining, 2026-11-25)
   ReadingJudge judge;           // the controller's own rule (logic.h) for what a reading at a rail is
-  float rodMin = 1e9f, rodMax = -1e9f;   // how far the rod went, either way
   int dir = 0, duty = 0;
   int8_t sign = 1;
   TiltMemory mem;
@@ -129,15 +126,8 @@ struct SimTilter : Tilter {
     if (wandAt && t >= wandAt) { rod += wandBy; gear += wandBy; wandAt = 0; }
     if (handMs && t >= handAt && t < handAt + handMs) { rod += handRate * dt / 1000.0f; gear += handRate * dt / 1000.0f; }
     if (handMs && t >= handAt && dir) motorAfterHand += dt;
-    gear += phys * dir * degPerS * duty / 100.0f * dt / 1000.0f;
-    if (gear > rod + play / 2) rod = gear - play / 2;
-    if (gear < rod - play / 2) rod = gear + play / 2;
-    if (rod > hi) rod = hi;
-    if (rod < lo) rod = lo;
-    gear = std::min(std::max(gear, rod - play / 2), rod + play / 2);
-    rodMin = std::min(rodMin, rod); rodMax = std::max(rodMax, rod);
+    turn(dir, duty, dt);
   }
-  float wrapped() { return fmodf(fmodf(rod, 360.0f) + 360.0f, 360.0f); }
   bool inBlind() { float a = wrapped(); return blindLo >= 0 && (a >= blindLo || a <= blindHi); }
   uint32_t ms() override { return t; }
   bool wake() override { return true; }
@@ -340,6 +330,25 @@ static void tilterTests() {
     CHECK(s.endMsg == "reached" && !s.last.stalled && near(t, 100, 5), "no reading at the sensor's zero is not a stall"); }
   { SimTilter s; s.rod = s.gear = 244; s.go(50);
     CHECK(s.endMsg == "already there" && s.dir == 0, "already there: the motor never runs"); }
+  { SimTilter s; s.degPerS = 15; s.lo = 250; s.spikeEvery = 3; s.spikeBy = 2;   // jitter at the stop (+-1.5 degrees)
+    Move m; moveFresh(m, MV_JOG, 0, s.t); m.jogDir = -1; m.pct = 100; m.seek = true; m.deadline = s.t + 30000;
+    uint32_t atStop = 0;
+    while (m.kind != MV_NONE && s.t < 40000) { s.step(10); moveTick(m, s, s.t); if (!atStop && s.rod <= 250.01f) atStop = s.t; }
+    CHECK(s.endMsg == "jog: stalled" && s.last.stalled && near(s.rod, 250, 0.01), "a seek with jitter at the stop: it ends \"jog: stalled\" at the stop");
+    CHECK(atStop && s.last.runMs >= atStop - 20 + SEEK_STALL_MS - 300, "a seek: not before it got there"); }
+  // Bad readings while the motor runs (away from the Target by 20 degrees): each time the move stops to look, the
+  // blind is where it should be, so it carries on; the fifth time it gives up.
+  { SimTilter s; s.glitchAt = 0; s.glitchMs = 1000000; s.glitchBy = 20; s.go(50);
+    CHECK(s.endMsg == "stopped: the sensor reads unsteadily" && s.last.looks == 5, "bad readings that send a move to look five times: it stops"); }
+  // The motor does nothing (degPerS 0) and a slow hand turns the wand away from the Target: farther both ways.
+  { SimTilter s; s.degPerS = 0; s.handAt = 0; s.handMs = 1000000; s.handRate = 6; s.go(50);
+    CHECK(s.endMsg == "stopped: it went the wrong way both ways" && s.last.flipped, "farther from the Target both ways: it stops and says so");
+    CHECK(s.sign == 1 && s.keeps == 0, "and the old motor direction is put back"); }
+  { SimTilter s; s.degPerS = 15; s.sign = 2; s.phys = -1;                 // stored +1, the motor turns it the other way
+    Move m; moveFresh(m, MV_JOG, 0, s.t); m.jogDir = 1; m.pct = 100; m.deadline = s.t + 1500;
+    while (m.kind != MV_NONE && s.t < 10000) { s.step(10); moveTick(m, s, s.t); }
+    CHECK(s.endMsg == "jog" && s.sign == -2 && s.keeps == 1 && s.log.find("motor direction learned (-1)") != std::string::npos,
+          "a jog of over 4 degrees against the stored direction: learned, kept once"); }
 }
 
 // Follow and the watch (handwatch.h), driven the way motionTick drives it: with no watch, an idle look at one blind
@@ -426,6 +435,19 @@ static void handWatchTests() {
     CHECK(s.follows == 0, "follow: the turn before the motor moved it is not followed"); }
   { HandWatch h; h.reading(0, NAN, 100, false, 100); h.reading(0, NAN, 200, false, 500);
     CHECK(h.tick(600).watchPort < 0 && std::isnan(h.ref[0]), "follow: a blind that cannot move is never watched"); }
+  { HandWatch h; h.reading(0, 0, 290, false, 1000);                // where the controller left it: tilt 0
+    h.marked(0, 2000);
+    CHECK(h.tick(2000).watchPort == 0 && std::isnan(h.ref[0]), "marked: the blind is watched, where it was left is not known");
+    h.tick(10000);                                                 // the watch ends
+    h.reading(0, 90, 209, false, 30000);                           // its next reading, far away, after Setup's quiet time
+    HandWatchNow n = h.tick(30000);
+    CHECK(n.watchPort < 0 && n.followFrom < 0 && near(h.ref[0], 90, 0.01), "marked: its next reading, however far, starts no follow"); }
+  { HandWatch h; h.reading(0, 0, 290, false, 1000); h.reading(1, 0, 290, false, 1000);
+    h.forget(0); h.forget(-1); h.forget(3);
+    h.reading(0, 90, 209, false, 2000);
+    CHECK(h.tick(2000).watchPort < 0 && near(h.ref[0], 90, 0.01), "forget: the next plain reading starts no watch");
+    h.reading(1, 90, 209, false, 2000);
+    CHECK(h.tick(2000).watchPort == 1, "forget of port -1 or 3: nothing (blind 2 still knows where it was left)"); }
 }
 
 // Settings that change under a running move (motion.h cfgApply), and the one Current tilt everyone is told.
