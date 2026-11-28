@@ -80,8 +80,7 @@ final class SceneStore {
         if s.tilts.keys.contains(where: { read[$0.controller] == nil }) { _ = await refresh(controllers) }
         let writes: [SceneWrite]
         do { writes = try ScenePlan.writes(s, delete: delete, read: read, localOnly: localOnly, ports: ports) }
-        catch .full(let c) { throw TiltError("\(name(c)) already has \(ScenePlan.perController) scenes.") }
-        catch .notRead(let c) { throw TiltError("\(name(c)) did not answer. Try again when it is reachable.") }
+        catch { throw ScenePlan.problem(error, name: name) }
         edits += 1
         do {
             for w in writes {

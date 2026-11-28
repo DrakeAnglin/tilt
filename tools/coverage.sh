@@ -3,7 +3,9 @@
 #   tools/coverage.sh <app|firmware|tools> <out dir>
 # Leaves <out dir>/<area>.lcov and the test output <out dir>/<area>.log, and exits with the tests' own status.
 #   firmware  tools/firmware_tests.sh (both firmwares), built with clang's coverage by the c++ stand-in in coverage-bin/
-#   app       tools/app_tests.sh (the Mac and the iPhone simulator test programs), through the swiftc stand-in
+#   app       tools/app_tests.sh: the Mac and the iPhone simulator test programs, through the swiftc stand-in, and the
+#             Xcode tests (TiltTests, TiltUITests), through the xcodebuild stand-in. One LLVM record per binary: the
+#             gate adds up records of the same file, so Shared files count from every run.
 #   tools     tools/test_tools.py and tools/agent/test_agent.py under coverage.py (settings: tools/.coveragerc)
 # The test scripts are not changed: the stand-ins on PATH add the coverage flags. The plain test runs in CI still say
 # pass or fail; this is an extra run of the same tests. For firmware and app, TILT_COVERAGE_TESTS runs another script
@@ -51,7 +53,18 @@ compiled() {
         echo 1 >"$W/rc"
       }
     done
-  else
+  fi
+  # The Xcode tests (app only): Xcode merged their counts itself; one export per binary the xcodebuild stand-in kept.
+  if [ -f "$W/xcode/Coverage.profdata" ]; then
+    for B in "$W"/xcode/*; do
+      [ "$B" = "$W/xcode/Coverage.profdata" ] && continue
+      # shellcheck disable=SC2086
+      $COV export -format=lcov -instr-profile="$W/xcode/Coverage.profdata" "$B" >>"$OUTDIR/$AREA.lcov" 2>>"$W/llvm-cov.err" || {
+        echo "coverage: llvm-cov could not read $(basename "$B"): $(cat "$W/llvm-cov.err")" >&2
+        echo 1 >"$W/rc"
+      }
+    done
+  elif ! ls "$W"/prof/*.profraw >/dev/null 2>&1; then
     echo "coverage: no counts were written (did the tests start?)" >&2
   fi
 }

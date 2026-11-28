@@ -2329,10 +2329,115 @@ class CoverageGate(unittest.TestCase):
         self.assertEqual(cov.get(6), 0, cov)
         self.assertEqual(cov.get(9), 0, cov)
 
+    def llvm_tools(self):
+        """-> (clang++, llvm-profdata command) or a skip: what the fake xcodebuild needs to build with coverage."""
+        import glob, shutil, subprocess
+        if not shutil.which('clang++'):
+            self.skipTest('needs clang++ (CI has it)')
+        if shutil.which('xcrun') and subprocess.run(['xcrun', '-f', 'llvm-profdata'], capture_output=True).returncode == 0:
+            return 'xcrun llvm-profdata'
+        found = shutil.which('llvm-profdata') or (sorted(glob.glob('/usr/bin/llvm-profdata-*')) or [None])[-1]
+        if not found:
+            self.skipTest('needs llvm-profdata (CI has it)')
+        return found
+
+    def app_coverage(self, tmp, xcode_rc=None, swift_program=False):
+        """Runs tools/coverage.sh app with a stand-in test script in tmp. xcode_rc: the script also runs a fake
+        xcodebuild that builds fx.h's program with coverage into its derived data, then exits with xcode_rc.
+        -> (the run, {repo-relative path: {line: hits}}, the fake's arguments or None)."""
+        import subprocess
+        profdata = self.llvm_tools()
+        with open(os.path.join(tmp, 'fx.h'), 'w') as f:
+            f.write('#pragma once\ninline int used(int x) {\n  return x + 1;\n}\ninline int unused(int x) {\n'
+                    '  return x * 2;\n}\n')
+        with open(os.path.join(tmp, 'fx.cpp'), 'w') as f:
+            f.write('#include <cstdio>\n#include "fx.h"\nint main() { std::printf("used %d\\n", used(0)); }\n')
+        fake = os.path.join(tmp, 'fakebin')
+        os.makedirs(fake)
+        with open(os.path.join(fake, 'xcodebuild'), 'w') as f:
+            f.write('#!/bin/sh\necho "$@" >"%s/xcode.args"\nDD=""; PREV=""\n'
+                    'for A in "$@"; do [ "$PREV" = -derivedDataPath ] && DD=$A; PREV=$A; done\n'
+                    'APP="$DD/Build/Products/Debug-iphonesimulator/Tilt.app"\n'
+                    'mkdir -p "$APP" "$DD/Build/ProfileData/0A1B"\n'
+                    'clang++ -std=c++17 -fprofile-instr-generate -fcoverage-mapping -O0 -o "$APP/Tilt" "%s/fx.cpp"\n'
+                    'LLVM_PROFILE_FILE="$DD/run.profraw" "$APP/Tilt"\n'
+                    '%s merge -sparse -o "$DD/Build/ProfileData/0A1B/Coverage.profdata" "$DD/run.profraw"\n'
+                    "echo \"Test Case '-[TiltTests.FxTests testUsed]' passed (0.001 seconds).\"\n"
+                    'exit %d\n' % (tmp, tmp, profdata, xcode_rc or 0))
+        os.chmod(os.path.join(fake, 'xcodebuild'), 0o755)
+        script = os.path.join(tmp, 'tests.sh')
+        with open(script, 'w') as f:
+            f.write('#!/bin/sh\nset -e\ncd "%s"\nOUT=$(mktemp -d)\n' % tmp)
+            if swift_program:
+                with open(os.path.join(tmp, 'main.swift'), 'w') as m:
+                    m.write('print("1 passed, 0 failed")\n')
+                f.write('swiftc -o "$OUT/prog" main.swift\n"$OUT/prog"\n')
+            if xcode_rc is not None:
+                f.write('xcodebuild test -scheme Tilt -derivedDataPath "$OUT/xcode"\n')
+            f.write('rm -rf "$OUT"\n')
+        os.chmod(script, 0o755)
+        out = os.path.join(tmp, 'out')
+        r = subprocess.run([os.path.join(HERE, 'coverage.sh'), 'app', out], capture_output=True, text=True,
+                           env=dict(os.environ, TILT_COVERAGE_TESTS=script, PATH=fake + os.pathsep + os.environ['PATH']))
+        cov = {}
+        if os.path.exists(os.path.join(out, 'app.lcov')):
+            with open(os.path.join(out, 'app.lcov')) as f:
+                cov = self.G.parse_lcov(f.read(), tmp)
+        args = os.path.join(tmp, 'xcode.args')
+        return r, cov, (open(args).read() if os.path.exists(args) else None)
+
+    def test_app_coverage_reads_the_xcode_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = os.path.realpath(tmp)
+            r, cov, args = self.app_coverage(tmp, xcode_rc=0)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn('-enableCodeCoverage YES', args)
+            self.assertGreater(cov['fx.h'][3], 0, cov)
+            self.assertEqual(cov['fx.h'].get(6), 0, cov)
+            with open(os.path.join(tmp, 'out', 'app.log')) as f:
+                self.assertEqual(self.G.test_counts(f.read()), (1, 0))
+
+    def test_app_coverage_fails_when_xcodebuild_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = os.path.realpath(tmp)
+            r, cov, _ = self.app_coverage(tmp, xcode_rc=65)
+            self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertGreater(cov['fx.h'][3], 0, cov)        # the counts of a failed run still count
+
+    def test_app_coverage_with_no_xcode_run(self):
+        import shutil
+        if not shutil.which('swiftc'):
+            self.skipTest('needs swiftc (the Mac has it)')
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = os.path.realpath(tmp)
+            r, cov, args = self.app_coverage(tmp, swift_program=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIsNone(args)
+            self.assertEqual(list(cov), ['main.swift'])
+            self.assertFalse(os.path.exists(os.path.join(tmp, 'out', 'app.work', 'xcode')))
+
     def test_test_counts(self):
         self.assertEqual(self.G.test_counts('12 passed, 0 failed\nota: 12 passed, 0 failed\niPhone: 3 passed, 1 failed\n'), (27, 1))
         log = '....\n------\nRan 40 tests in 1.2s\n\nFAILED (failures=2, errors=1)\nRan 1 test in 0.1s\n\nOK\n'
         self.assertEqual(self.G.test_counts(log), (38, 3))
+
+    XCODE_LOG = ("Test Suite 'LaunchTests' started at 2026-11-27 10:00:00.000.\n"
+                 "Test Case '-[TiltTests.LaunchTests testDemo]' started.\n"
+                 "Test Case '-[TiltTests.LaunchTests testDemo]' passed (0.001 seconds).\n"
+                 "Test Case '-[TiltTests.LaunchTests testTestRun]' passed (0.002 seconds).\n"
+                 "Test Case '-[TiltTests.KeychainTests testSave]' passed (0.010 seconds).\n"
+                 "/x/KeychainTests.swift:9: error: -[TiltTests.KeychainTests testDelete] : XCTAssertNil failed\n"
+                 "Test Case '-[TiltTests.KeychainTests testDelete]' failed (0.020 seconds).\n"
+                 "\t Executed 4 tests, with 1 failure (0 unexpected) in 0.033 (0.040) seconds\n"
+                 "Test Suite 'All tests' failed at 2026-11-27 10:00:01.000.\n"
+                 "\t Executed 4 tests, with 1 failure (0 unexpected) in 0.033 (0.041) seconds\n")
+
+    def test_test_counts_one_per_xcode_test_case(self):
+        self.assertEqual(self.G.test_counts(self.XCODE_LOG), (3, 1))
+
+    def test_test_counts_adds_the_test_programs_and_xcode(self):
+        log = '12 passed, 0 failed\niPhone: 3 passed, 1 failed\n' + self.XCODE_LOG
+        self.assertEqual(self.G.test_counts(log), (18, 2))
 
     def results(self):
         r = self.run_gate(8)

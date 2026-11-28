@@ -28,6 +28,7 @@ final class BleSetup: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private var readBack: CheckedContinuation<Data, Error>?
 
     func start() {
+        guard !Launch.current.testRun else { return }          // a test run asks nothing of Bluetooth
         if let central { if central.state == .poweredOn { central.scanForPeripherals(withServices: [Self.svc]) } }
         else { central = CBCentralManager(delegate: self, queue: .main) }
     }
