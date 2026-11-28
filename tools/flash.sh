@@ -26,7 +26,7 @@ HUB=${2:-${TILT_HUB:-192.168.50.122}}
 cd "$(dirname "$0")/../firmware/blinds_matter"
 ask() { "$PY" ../../tools/blinds_client.py --ip "$HUB/c/$ID" --as "${TILT_AS:-dining-owner}" get "$1"; }
 # Progress from the hub's own list (sealed: the public /hub page shows no controllers).
-member() { "$PY" ../../tools/blinds_client.py --ip "$HUB/hub" --as hub-owner get /api/info 2>/dev/null | "$PY" -c "import sys,json; m=[c for c in json.load(sys.stdin)['c'] if c['id']=='$ID']; print(*(m and [m[0].get('ota',0), m[0].get('otaPct',0), m[0].get('otaErr','')] or ['?']))"; }
+member() { "$PY" ../../tools/blinds_client.py --ip "$HUB/hub" --as hub-owner get /api/info 2>/dev/null | "$PY" ../../tools/bench_json.py ota-progress "$ID"; }
 
 echo "building"
 ./build.sh > build.log 2>&1 || { grep -n "error:" build.log | head; exit 1; }
@@ -62,7 +62,7 @@ for i in $(seq 1 40); do
   case $H in *'"boot":"'"$PREBOOT"'"'*|"") ;; *)
     echo "running $(echo "$H" | sed -n 's/.*"fw":"\([^"]*\)".*/\1/p') (kept by itself after a minute on the hub)"
     # Tell it which key is the hub's (the app does this too when it is open), so it trusts the hub's messages.
-    HC=$("$PY" ../../tools/blinds_client.py --ip "$HUB/hub" --as hub-owner get /api/info 2>/dev/null | "$PY" -c "import sys,json; print(next((c.get('hubCid','') for c in json.load(sys.stdin)['c'] if c['id']=='$ID'), ''))" 2>/dev/null)
+    HC=$("$PY" ../../tools/blinds_client.py --ip "$HUB/hub" --as hub-owner get /api/info 2>/dev/null | "$PY" ../../tools/bench_json.py hub-cid "$ID" 2>/dev/null)
     [ -n "$HC" ] && ask "/api/hubkey?cid=$HC" >/dev/null && echo "hub key marked"
     exit 0;; esac
 done

@@ -152,10 +152,14 @@ def main(only=None, out=OUT):
     print('PETG:', ', '.join(p for p in order if p in PETG))
 
 
-
-if __name__ == '__main__':
+def all_projects():
+    """The PLA+PETG project and the PLA-only and PETG-only ones."""
     LAYOUT.update(pack(rows('PLA')))
     LAYOUT.update(pack(rows('PETG')))
     main(None, OUT)
     main('PLA', OUT.replace('PLA_PETG', 'PLA_only'))
     main('PETG', OUT.replace('PLA_PETG', 'PETG_only'))
+
+
+if __name__ == '__main__':
+    all_projects()

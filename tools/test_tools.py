@@ -52,6 +52,204 @@ class ReleaseFirmware(unittest.TestCase):
         self.assertEqual(l['stable']['version'], '2.3.0')        # a beta never touches stable
 
 
+def openssl_key(d):
+    """A throwaway P-256 key pair in folder d: (private key file, public key file)."""
+    import subprocess
+    key, pub = os.path.join(d, 'k.pem'), os.path.join(d, 'p.pem')
+    subprocess.run(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', key], check=True)
+    subprocess.run(['openssl', 'ec', '-in', key, '-pubout', '-out', pub], check=True, capture_output=True)
+    return key, pub
+
+
+def openssl_verifies(pub, data, raw_sig):
+    """openssl's own check of an r | s signature over data."""
+    import subprocess
+    with tempfile.NamedTemporaryFile() as s:
+        s.write(release_ci.raw_to_der(raw_sig))
+        s.flush()
+        return subprocess.run(['openssl', 'dgst', '-sha256', '-verify', pub, '-signature', s.name], input=data,
+                              capture_output=True).returncode == 0
+
+
+def esp_image(seed, size=3000):
+    """Bytes shaped like an ESP-IDF image: anything, then its SHA-256 (esptool appends it)."""
+    import hashlib, random
+    body = bytes(random.Random(seed).randrange(256) for _ in range(size - 32))
+    return body + hashlib.sha256(body).digest()
+
+
+class ReleaseFirmwareBuild(unittest.TestCase):
+    """release_firmware.py end to end, in a temp folder: a test key, a fake build, the detools stand-in."""
+
+    def setUp(self):
+        import shutil, types
+        from unittest import mock
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+        self.key, self.pub = openssl_key(self.d)
+        root = os.path.join(self.d, 'repo')
+        self.fw, self.hub, self.out = (os.path.join(root, 'firmware', x) for x in ('blinds_matter', 'tilt_hub', 'releases'))
+        for f in (self.fw, self.hub):
+            os.makedirs(os.path.join(f, 'main'))
+        with open(os.path.join(self.fw, 'main', 'web.h'), 'w') as f:
+            f.write('#define FW_VERSION "2.4.0-beta1"\n')
+        with open(os.path.join(self.hub, 'CMakeLists.txt'), 'w') as f:
+            f.write('set(PROJECT_VER "0.3.9")\n')
+        # The stand-in for detools that firmware/blinds_matter/test/make_ota_files.py uses: the "patch" is the new image.
+        detools = types.ModuleType('detools')
+        detools.create_patch = lambda base, new, out, compression=None: out.write(new.read())
+        patches = [mock.patch.object(release_firmware, t, v) for t, v in
+                   [('KEY', self.key), ('ROOT', root), ('FW', self.fw), ('OUT', self.out)]]
+        patches.append(mock.patch.dict(sys.modules, {'detools': detools}))
+        self.builds, self.build_fails, self.image = [], False, esp_image(1)
+        real_run = release_firmware.subprocess.run
+
+        def run(cmd, **kw):                      # build.sh writes the image; openssl is the real one
+            if not cmd[0].endswith('build.sh'):
+                return real_run(cmd, **kw)
+            self.builds.append((cmd, kw['cwd'], kw['env'].get('BUILD_DIR')))
+            if not self.build_fails:
+                name = 'tilt_hub.bin' if kw['cwd'] == self.hub else 'blinds_matter.bin'
+                os.makedirs(os.path.join(kw['cwd'], 'build-release'), exist_ok=True)
+                with open(os.path.join(kw['cwd'], 'build-release', name), 'wb') as f:
+                    f.write(self.image)
+            return types.SimpleNamespace(returncode=1 if self.build_fails else 0)
+        patches.append(mock.patch.object(release_firmware.subprocess, 'run', run))
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def main(self, *args):
+        import contextlib, io
+        from unittest import mock
+        with mock.patch.object(sys, 'argv', ['release_firmware.py', *args]), \
+                contextlib.redirect_stdout(io.StringIO()) as said:
+            release_firmware.main()
+        return said.getvalue()
+
+    def write(self, path, data):
+        with open(path, 'wb' if isinstance(data, bytes) else 'w') as f:
+            f.write(data)
+
+    def listing(self):
+        import json
+        with open(os.path.join(self.out, 'firmware.json')) as f:
+            return json.load(f)
+
+    def test_a_signed_file_is_image_signature_and_tag_and_openssl_accepts_it(self):
+        signed = self.image + release_firmware.sign(self.image) + b'TILTSIG1'
+        self.assertEqual(len(signed), len(self.image) + 72)
+        self.assertTrue(openssl_verifies(self.pub, self.image, signed[-72:-8]))
+        self.assertFalse(openssl_verifies(self.pub, self.image + b'x', signed[-72:-8]))
+        self.assertEqual(release_firmware.image_of(signed), self.image)
+        self.assertEqual(release_firmware.image_of(self.image), self.image)
+
+    def test_a_patch_names_its_base_and_carries_both_signatures(self):
+        base, new = esp_image(2), esp_image(3)
+        p = release_firmware.make_patch(base, new)
+        self.assertEqual(p[:4], (0xfccdde10).to_bytes(4, 'little'))
+        self.assertEqual(p[4:36], base[-32:])
+        self.assertEqual(p[36:64], bytes(28))
+        self.assertTrue(p.endswith(b'TILTDLT1'))
+        body, sig = release_ci.signed_part(p)
+        self.assertTrue(openssl_verifies(self.pub, body, sig))
+        self.assertEqual(body[64:-64], new)                           # what the stand-in detools wrote
+        self.assertTrue(openssl_verifies(self.pub, new, body[-64:]))   # the new image's own signature
+
+    def test_a_secret_in_the_image_stops_the_release(self):
+        self.write(os.path.join(self.fw, 'main', 'secrets.h'), '#define WIFI_PASS "hunter22"\n#define X "ab"\n')
+        release_firmware.check_no_secrets(b'nothing here, ab')          # values under 4 characters do not count
+        with self.assertRaises(SystemExit) as e:
+            release_firmware.check_no_secrets(b'...hunter22...')
+        self.assertIn('secrets.h', str(e.exception.code))
+        self.image = esp_image(4) + b'hunter22'
+        with self.assertRaises(SystemExit):
+            self.main('beta')
+        self.assertFalse(os.path.exists(os.path.join(self.out, 'firmware.json')))
+
+    def test_sign_writes_the_signed_file_and_with_a_base_the_patch(self):
+        bin_ = os.path.join(self.d, 'b.bin')
+        self.write(bin_, self.image)
+        self.main('--sign', bin_)
+        with open(bin_ + '.signed', 'rb') as f:
+            signed = f.read()
+        self.assertEqual(signed[:-72], self.image)
+        self.assertTrue(openssl_verifies(self.pub, self.image, signed[-72:-8]))
+        self.assertFalse(os.path.exists(bin_ + '.patch'))
+        base = esp_image(5)
+        bare, signed_base = os.path.join(self.d, 'base.bin'), os.path.join(self.d, 'base.signed')
+        self.write(bare, base)
+        self.write(signed_base, base + release_firmware.sign(base) + b'TILTSIG1')
+        self.assertIn('patch:', self.main('--sign', bin_, '--patch-from', bare))
+        with open(bin_ + '.patch', 'rb') as f:
+            from_bare = f.read()
+        self.main('--sign', bin_, '--patch-from', signed_base)
+        with open(bin_ + '.patch', 'rb') as f:
+            from_signed = f.read()
+        self.assertEqual(from_signed[:-136], from_bare[:-136])          # the same patch (signatures differ each time)
+        self.assertEqual(from_signed[4:36], base[-32:])
+        self.assertEqual(self.builds, [])
+
+    def test_hub_release_is_listed_as_hub(self):
+        import hashlib, json
+        os.makedirs(self.out)
+        self.write(os.path.join(self.out, 'firmware.json'), json.dumps({'stable': {'version': '2.3.0', 'file': 'tilt-2.3.0.bin'}}))
+        self.assertIn('hub 0.3.9', self.main('--hub', '--notes', 'faster'))
+        with open(os.path.join(self.out, 'tilt-hub-0.3.9.bin'), 'rb') as f:
+            data = f.read()
+        self.assertEqual(self.listing()['hub'], {'version': '0.3.9', 'file': 'tilt-hub-0.3.9.bin', 'size': len(data),
+                                                 'sha256': hashlib.sha256(data).hexdigest(), 'notes': 'faster'})
+        self.assertTrue(openssl_verifies(self.pub, self.image, data[-72:-8]))
+        self.assertEqual(self.listing()['stable']['version'], '2.3.0')
+        self.assertEqual(self.builds[0][1:], (self.hub, 'build-release'))
+        self.assertIn('-DTILT_RELEASE=1', self.builds[0][0])
+
+    def test_a_failed_build_names_its_log(self):
+        self.build_fails = True
+        with self.assertRaises(SystemExit) as e:
+            self.main('--hub')
+        self.assertIn('firmware/tilt_hub/build-release.log', str(e.exception.code))
+        with self.assertRaises(SystemExit) as e:
+            self.main('beta')
+        self.assertIn('firmware/blinds_matter/build-release.log', str(e.exception.code))
+
+    def test_a_controller_release_has_a_patch_from_each_older_image(self):
+        import hashlib, json
+        os.makedirs(self.out)
+        olds = {'tilt-2.2.0.bin': esp_image(6), 'tilt-2.3.0.bin': esp_image(7)}
+        for t, (name, img) in enumerate(olds.items()):
+            path = os.path.join(self.out, name)
+            self.write(path, img + release_firmware.sign(img) + b'TILTSIG1')
+            os.utime(path, (1000 + t, 1000 + t))
+        self.write(os.path.join(self.out, 'notes.txt'), 'not an image')
+        stable = {'version': '2.3.0', 'file': 'tilt-2.3.0.bin'}
+        self.write(os.path.join(self.out, 'firmware.json'), json.dumps({'stable': stable}))
+        self.assertIn('beta 2.4.0-beta1', self.main('beta', '--notes', 'try it'))
+        listing = self.listing()
+        self.assertEqual(listing['stable'], stable)
+        beta = listing['beta']
+        with open(os.path.join(self.out, 'tilt-2.4.0-beta1.bin'), 'rb') as f:
+            data = f.read()
+        self.assertEqual((beta['file'], beta['size'], beta['sha256'], beta['notes']),
+                         ('tilt-2.4.0-beta1.bin', len(data), hashlib.sha256(data).hexdigest(), 'try it'))
+        self.assertEqual([p['from'] for p in beta['patches']], [img[-32:].hex() for img in olds.values()])
+        self.assertEqual([p['file'] for p in beta['patches']],
+                         ['tilt-2.4.0-beta1-from-2.2.0.patch', 'tilt-2.4.0-beta1-from-2.3.0.patch'])
+        for p in beta['patches']:
+            with open(os.path.join(self.out, p['file']), 'rb') as f:
+                patch = f.read()
+            self.assertEqual((p['size'], p['sha256']), (len(patch), hashlib.sha256(patch).hexdigest()))
+        self.assertEqual(self.builds[0][2], 'build-release')
+
+    def test_no_signing_key_says_where_it_should_be(self):
+        from unittest import mock
+        missing = os.path.join(self.d, 'none.pem')
+        with mock.patch.object(release_firmware, 'KEY', missing):
+            with self.assertRaises(SystemExit) as e:
+                self.main('beta')
+        self.assertEqual(e.exception.code, 'no signing key at ' + missing)
+
+
 class ReleaseCI(unittest.TestCase):
     def test_parse_tag(self):
         self.assertEqual(release_ci.parse_tag('fw-v2.3.0'), ('controller', '2.3.0', 'stable'))
@@ -110,6 +308,91 @@ class ReleaseCI(unittest.TestCase):
                    'hub': {'file': 'tilt-hub-0.3.4.bin'}}
         self.assertEqual(release_ci.listed_files(listing), ['tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin'])
 
+    def test_get_sends_the_token_only_to_the_github_api(self):
+        from unittest import mock
+        seen = []
+
+        class Answer:
+            def read(self):
+                return b'body'
+
+        def urlopen(req, timeout):
+            seen.append((req.full_url, {k.lower(): v for k, v in req.header_items()}, timeout))
+            return Answer()
+        with mock.patch.object(release_ci.urllib.request, 'urlopen', urlopen), \
+                mock.patch.dict(os.environ, {'GITHUB_TOKEN': 'tok'}):
+            self.assertEqual(release_ci._get('https://api.github.com/repos/x/releases'), b'body')
+            release_ci._get('https://github.com/x/releases/download/a.bin')
+        with mock.patch.object(release_ci.urllib.request, 'urlopen', urlopen), mock.patch.dict(os.environ):
+            os.environ.pop('GITHUB_TOKEN', None)
+            release_ci._get('https://api.github.com/repos/x/releases')
+        self.assertEqual(seen[0][1]['authorization'], 'Bearer tok')
+        self.assertEqual(seen[0][1]['user-agent'], 'tilt-release')
+        self.assertEqual(seen[0][2], 60)
+        self.assertNotIn('authorization', seen[1][1])
+        self.assertNotIn('authorization', seen[2][1])
+
+    def run_main(self, *args):
+        import contextlib, io
+        from unittest import mock
+        with mock.patch.object(sys, 'argv', ['release_ci.py', *args]), contextlib.redirect_stdout(io.StringIO()) as said:
+            release_ci.main()
+        return said.getvalue()
+
+    def test_check_tag(self):
+        version = release_ci.code_version('controller')
+        kind = 'beta' if '-' in version else 'stable'
+        self.assertEqual(self.run_main('check-tag', 'fw-v' + version), 'kind=controller\nversion=%s\nchannel=%s\n' % (version, kind))
+        hub = release_ci.code_version('hub')
+        self.assertEqual(self.run_main('check-tag', 'hub-v' + hub), 'kind=hub\nversion=%s\nchannel=hub\n' % hub)
+        with self.assertRaises(SystemExit) as e:
+            self.run_main('check-tag', 'fw-v9.9.9')
+        self.assertIn('the tag says 9.9.9, the code says %s' % version, e.exception.code)
+
+    def test_fetch_and_verify_from_the_command_line(self):
+        from unittest import mock
+        calls = []
+        with mock.patch.object(release_ci, 'fetch', lambda: calls.append('fetch')), \
+                mock.patch.object(release_ci, 'verify', lambda pub: calls.append(('verify', pub))):
+            self.run_main('fetch')
+            self.run_main('verify', 'p.pem')
+        self.assertEqual(calls, ['fetch', ('verify', 'p.pem')])
+
+    def test_fetch_with_nothing_published(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(release_ci, '_get', lambda url: b'[]'):
+            import contextlib, io
+            with contextlib.redirect_stdout(io.StringIO()) as said:
+                release_ci.fetch(d)
+            self.assertIn('nothing published yet', said.getvalue())
+            self.assertEqual(release_ci.fetched_names(d), [])
+
+    def test_files_names_firmware_json_and_every_file_it_lists(self):
+        import json
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(release_ci, 'OUT', d):
+            listing = {'stable': {'file': 'tilt-2.3.0.bin', 'patches': [{'file': 'tilt-2.3.0-from-2.2.0.patch'}]},
+                       'hub': {'file': 'tilt-hub-0.3.4.bin'}}
+            with open(os.path.join(d, 'firmware.json'), 'w') as f:
+                json.dump(listing, f)
+            for name in ('tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin'):
+                open(os.path.join(d, name), 'w').close()
+            self.assertEqual(self.run_main('files').split(), [os.path.join(d, n) for n in
+                             ('firmware.json', 'tilt-2.3.0.bin', 'tilt-2.3.0-from-2.2.0.patch', 'tilt-hub-0.3.4.bin')])
+            os.unlink(os.path.join(d, 'tilt-2.3.0-from-2.2.0.patch'))
+            with self.assertRaises(SystemExit) as e:
+                self.run_main('files')
+            self.assertEqual(e.exception.code, 'missing ' + os.path.join(d, 'tilt-2.3.0-from-2.2.0.patch'))
+
+    def test_no_command_prints_the_usage(self):
+        with self.assertRaises(SystemExit) as e:
+            self.run_main()
+        self.assertIn('check-tag', e.exception.code)
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'release_ci.py'), 'nonsense'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('check-tag', r.stderr)
+
 
 class Orient(unittest.TestCase):
     def test_rotations_are_proper(self):
@@ -128,8 +411,411 @@ class Orient(unittest.TestCase):
         self.assertEqual(orient.copies('planet'), ['planet', 'planet_2', 'planet_3', 'planet_4'])
         self.assertEqual(orient.copies('worm'), ['worm'])
 
+    # A small part: one triangle across a 4 x 2 x 6 box at x 1..5, y 10..12, z -3..3 (all exact in float32).
+    TRIS = [(0.0, 0.0, 1.0, 1.0, 10.0, -3.0, 5.0, 10.0, 0.0, 1.0, 12.0, 3.0),
+            (1.0, 0.0, 0.0, 5.0, 12.0, 3.0, 1.0, 10.0, -3.0, 5.0, 11.0, 1.5)]
 
-@unittest.skipUnless(os.path.isdir(bambu.PRINT), 'no oriented STLs (run tools/orient.py)')
+    def test_write_then_read_gives_the_same_triangles(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'p.stl')
+            orient.write(path, self.TRIS)
+            self.assertEqual(os.path.getsize(path), 84 + 50 * len(self.TRIS))
+            self.assertEqual(orient.read(path), self.TRIS)
+
+    def test_orient_centers_the_part_and_stands_it_on_the_bed(self):
+        sizes = {orient.ID: [4, 2, 6], orient.FLIP: [4, 2, 6], orient.X_UP: [6, 2, 4], orient.X_DOWN: [6, 2, 4]}
+        for rot, size in sizes.items():
+            tris, got = orient.orient(self.TRIS, rot)
+            self.assertEqual(got, size)
+            pts = [t[3 + 3 * k:6 + 3 * k] for t in tris for k in range(3)]
+            for j in (0, 1):
+                self.assertAlmostEqual(min(p[j] for p in pts) + max(p[j] for p in pts), 0)
+            self.assertAlmostEqual(min(p[2] for p in pts), 0)
+            self.assertEqual(tris[0][:3], rot(*self.TRIS[0][:3]))      # normals turn, never move
+
+    def test_main_writes_one_file_per_printed_copy(self):
+        import contextlib, io
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            src, out = os.path.join(d, 'tilter'), os.path.join(d, 'tilter', 'print')
+            os.makedirs(src)
+            for name in orient.PARTS:
+                orient.write(os.path.join(src, name + '.stl'), self.TRIS)
+            with mock.patch.object(orient, 'SRC', src), mock.patch.object(orient, 'OUT', out), \
+                    contextlib.redirect_stdout(io.StringIO()) as said:
+                orient.main()
+            want = sorted(c + '.stl' for n in orient.PARTS for c in orient.copies(n))
+            self.assertEqual(sorted(os.listdir(out)), want)
+            self.assertIn('planet_4.stl', want)
+            self.assertEqual(orient.read(os.path.join(out, 'planet_4.stl')), orient.read(os.path.join(out, 'planet.stl')))
+            self.assertEqual(orient.read(os.path.join(out, 'worm.stl')), orient.orient(self.TRIS, orient.PARTS['worm'][0])[0])
+            self.assertIn('(print 4)', said.getvalue())
+            self.assertEqual(len(said.getvalue().splitlines()), len(orient.PARTS))
+
+
+class BambuStudio:
+    """A stand-in for Bambu Studio's command line, for the four project builders (bambu*.py).
+
+    subprocess.run is replaced: a call to bambu.CLI writes a small raw.3mf at --export-3mf with the three files the
+    builders read (3D/3dmodel.model, Metadata/model_settings.config, Metadata/project_settings.config), one object per
+    STL it was given, plus a plate thumbnail and a filament sequence. bambu.SYSTEM points at a temp folder of presets,
+    each inheriting from a base preset. Anything else goes to the real subprocess.run."""
+
+    def __init__(self, test, drop=0):
+        import json, shutil, subprocess
+        from unittest import mock
+        self.calls, self.loaded, self.drop = [], [], drop
+        self.system = tempfile.mkdtemp()
+        test.addCleanup(shutil.rmtree, self.system)
+        for kind in ('machine', 'process', 'filament'):
+            os.makedirs(os.path.join(self.system, kind))
+            with open(os.path.join(self.system, kind, 'fdm_base.json'), 'w') as f:
+                json.dump({'name': 'fdm_base', 'from_base': '1', 'layer_height': '0.3'}, f)
+        import bambu_hub, bambu_solar
+        for kind, name in set(bambu.PRESETS + bambu_solar.PRESETS + bambu_hub.PRESETS):
+            with open(os.path.join(self.system, kind, name + '.json'), 'w') as f:
+                json.dump({'name': name, 'inherits': 'fdm_base', 'layer_height': '0.12', 'own': kind}, f)
+        real = subprocess.run
+
+        def run(cmd, **kw):
+            if cmd[0] != bambu.CLI:
+                return real(cmd, **kw)
+            self.calls.append(cmd)
+            self.loaded.append(self.presets(cmd))
+            self.studio(cmd)
+            return subprocess.CompletedProcess(cmd, 0)
+        for p in (mock.patch.object(subprocess, 'run', run), mock.patch.object(bambu, 'SYSTEM', self.system)):
+            p.start()
+            test.addCleanup(p.stop)
+
+    def presets(self, cmd):
+        import json
+        files = cmd[cmd.index('--load-settings') + 1].split(';') + cmd[cmd.index('--load-filaments') + 1].split(';')
+        out = []
+        for path in files:
+            with open(path) as f:
+                out.append(json.load(f))
+        return out
+
+    def studio(self, cmd):
+        import json, zipfile
+        raw = cmd[cmd.index('--export-3mf') + 1]
+        stls = cmd[cmd.index('--export-3mf') + 2:]
+        stls = stls[:len(stls) - self.drop]
+        for s in stls:
+            orient.read(s)                       # a real STL, or this fails
+        model = ['<?xml version="1.0"?>', '<model unit="millimeter">', ' <metadata name="Title"></metadata>', ' <resources>']
+        cfg = ['<?xml version="1.0"?>', '<config>']
+        items, inst = [], []
+        for k, s in enumerate(stls):
+            oid, name = 2 * k + 2, os.path.basename(s)
+            model += ['  <object id="%d" type="model">' % oid, '   <components>',
+                      '    <component p:path="/3D/Objects/o%d.model" objectid="%d" transform="1 0 0 0 1 0 0 0 1 %d 0 0"/>'
+                      % (k, oid - 1, k), '   </components>', '  </object>']
+            items.append('  <item objectid="%d" transform="0 1 0 -1 0 0 0 0 1 %d %d 2.5" printable="1"/>' % (oid, 30 * k, 40))
+            cfg += ['  <object id="%d">' % oid, '    <metadata key="name" value="%s"/>' % name,
+                    '    <metadata key="extruder" value="1"/>',
+                    '    <part id="%d" subtype="normal_part">' % (oid - 1), '      <metadata key="name" value="%s"/>' % name,
+                    '      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>', '    </part>', '  </object>']
+            inst += ['    <model_instance>', '      <metadata key="object_id" value="%d"/>' % oid,
+                     '      <metadata key="instance_id" value="0"/>', '    </model_instance>']
+        model += [' </resources>', ' <build>'] + items + [' </build>', '</model>']
+        cfg += ['  <plate>', '    <metadata key="plater_id" value="1"/>', '    <metadata key="plater_name" value=""/>',
+                '    <metadata key="thumbnail_file" value="Metadata/plate_1.png"/>'] + inst + ['  </plate>', '</config>']
+        p = self.loaded[-1]
+        settings = {'filament_colour': ['#000000'] * (len(p) - 2), 'layer_height': p[1]['layer_height'],
+                    'printer_model': p[0]['name']}
+        with zipfile.ZipFile(raw, 'w') as z:
+            z.writestr('3D/3dmodel.model', '\n'.join(model) + '\n')
+            z.writestr('Metadata/model_settings.config', '\n'.join(cfg) + '\n')
+            z.writestr('Metadata/project_settings.config', json.dumps(settings))
+            z.writestr('Metadata/filament_sequence.json', '{}')
+            z.writestr('Metadata/plate_1.png', b'png')
+            for k in range(len(stls)):
+                z.writestr('3D/Objects/o%d.model' % k, '<mesh/>')
+
+
+def project(path):
+    """A written 3MF: (3dmodel.model, model_settings.config, project_settings as a dict, every file name)."""
+    import json, zipfile
+    with zipfile.ZipFile(path) as z:
+        return (z.read('3D/3dmodel.model').decode(), z.read('Metadata/model_settings.config').decode(),
+                json.loads(z.read('Metadata/project_settings.config')), z.namelist())
+
+
+def objects(cfg):
+    """[(object name, extruder)] from a model_settings.config."""
+    import re
+    return sorted(re.findall(r'<object id="\d+">\s*<metadata key="name" value="([^"]+)"/>\s*<metadata key="extruder" '
+                           r'value="(\d+)"/>', cfg))
+
+
+def run_quietly(f, *args):
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()) as said:
+        f(*args)
+    return said.getvalue()
+
+
+def run_builder_script(name, tmp):
+    """A builder as its own process, with no Bambu Studio presets (HOME) and nothing in the temp folder (TMPDIR).
+    It runs from the repo root, as the coverage run does: coverage.py finds `tools` from there. The packages
+    installed for this user (coverage.py on a Mac) live under HOME, so their folder goes on PYTHONPATH."""
+    import site, subprocess
+    path = os.pathsep.join(p for p in (os.environ.get('PYTHONPATH'), site.getusersitepackages()) if p)
+    env = dict(os.environ, HOME=tmp, TMPDIR=tmp, PYTHONPATH=path)
+    return subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True, env=env,
+                          cwd=os.path.dirname(HERE))
+
+
+class BambuBuilders(unittest.TestCase):
+    """The four Bambu project builders, run for real into a temp folder with the Bambu Studio stand-in."""
+
+    def setUp(self):
+        import shutil
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+
+    def test_flatten_takes_the_parents_values_and_its_own_win(self):
+        BambuStudio(self)
+        d = bambu.flatten('process', '0.12mm Fine @BBL H2D')
+        self.assertEqual((d['from_base'], d['layer_height'], d['own']), ('1', '0.12', 'process'))
+
+    def test_the_presets_go_to_studio_flattened(self):
+        studio = BambuStudio(self)
+        from unittest import mock
+        with mock.patch.dict(bambu.LAYOUT, bambu.pack(bambu.rows('PLA'))):
+            run_quietly(bambu.main, 'PLA', os.path.join(self.d, 'p.3mf'))
+        p = studio.loaded[0]
+        self.assertEqual([x['name'] for x in p], [n for _, n in bambu.PRESETS])
+        for x in p:
+            self.assertEqual((x['from'], x['instantiation'], x['from_base']), ('system', 'true', '1'))
+            self.assertNotIn('inherits', x)
+
+    def test_tilter_project_has_two_named_plates_and_petg_on_filament_2(self):
+        import re
+        from unittest import mock
+        studio = BambuStudio(self)
+        layout = dict(bambu.pack(bambu.rows('PLA')), **bambu.pack(bambu.rows('PETG')))
+        out = os.path.join(self.d, 'both.3mf')
+        with mock.patch.dict(bambu.LAYOUT, layout):
+            said = run_quietly(bambu.main, None, out)
+        self.assertIn('PETG: ', said)
+        self.assertEqual(len(studio.calls[0]) - studio.calls[0].index('--export-3mf') - 2, len(layout))
+        model, cfg, settings, names = project(out)
+        ext = dict(objects(cfg))
+        self.assertEqual(sorted(ext), sorted(n + '.stl' for n in layout))
+        for n in layout:
+            self.assertEqual(ext[n + '.stl'], '2' if n in bambu.PETG else '1', n)
+        self.assertEqual(re.findall(r'plater_name" value="([^"]*)"', cfg), ['PLA housing', 'PETG sensor gears'])
+        self.assertEqual(re.findall(r'plater_id" value="(\d+)"', cfg), ['1', '2'])
+        # every part square on its spot, a PETG part one plate over, its height kept
+        part_of = dict(re.findall(r'<object id="(\d+)">\s*<metadata key="name" value="([^"]+)\.stl"', cfg))
+        for oid, x, y, z in re.findall(r'<item objectid="(\d+)" transform="1 0 0 0 1 0 0 0 1 (\S+) (\S+) (\S+)"', model):
+            n = part_of[oid]
+            want = layout[n][0] + (bambu.PLATE_STEP if n in bambu.PETG else 0)
+            self.assertEqual((float(x), float(y), z), (want, layout[n][1], '2.5'), n)
+        self.assertEqual(model.count('transform="1 0 0 0 1 0 0 0 1 '), 2 * len(layout))   # items and components
+        self.assertFalse([n for n in names if n.endswith('.png')])
+        self.assertEqual((settings['wall_loops'], settings['printer_model']), ('4', 'Bambu Lab H2D 0.4 nozzle'))
+
+    def test_a_one_material_project_has_one_plate(self):
+        import json, re, zipfile
+        from unittest import mock
+        BambuStudio(self)
+        layout = dict(bambu.pack(bambu.rows('PLA')), **bambu.pack(bambu.rows('PETG')))
+        out = os.path.join(self.d, 'pla.3mf')
+        with mock.patch.dict(bambu.LAYOUT, layout):
+            run_quietly(bambu.main, 'PLA', out)
+        model, cfg, _, _ = project(out)
+        self.assertEqual(objects(cfg), sorted((n + '.stl', '1') for n in layout if n not in bambu.PETG))
+        self.assertEqual(re.findall(r'plater_id" value="(\d+)"', cfg), ['1'])
+        self.assertNotIn(' %g ' % (bambu.PLATE_STEP + 100), model)
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(list(json.loads(z.read('Metadata/filament_sequence.json'))), ['plate_1'])
+
+    def test_all_projects_writes_the_three_tilter_projects(self):
+        from unittest import mock
+        studio = BambuStudio(self)
+        out = os.path.join(self.d, 'tilter_H2D_PLA_PETG.3mf')
+        with mock.patch.dict(bambu.LAYOUT, {}), mock.patch.object(bambu, 'OUT', out):
+            run_quietly(bambu.all_projects)
+        self.assertEqual(sorted(os.listdir(self.d)), ['tilter_H2D_PETG_only.3mf', 'tilter_H2D_PLA_PETG.3mf',
+                                                      'tilter_H2D_PLA_only.3mf'])
+        self.assertEqual(len(studio.calls), 3)
+        self.assertEqual(objects(project(os.path.join(self.d, 'tilter_H2D_PETG_only.3mf'))[1]),
+                         sorted((n + '.stl', '2') for n in bambu.PETG))
+
+    def test_project_has_one_object_per_part_per_plate_on_its_spot(self):
+        import re
+        studio = BambuStudio(self)
+        plates = bambu_project.CONTROLLER
+        out = os.path.join(self.d, 'tilt_controller_box_H2D.3mf')
+        self.assertIn('3 plates, 4 objects', run_quietly(bambu_project.build, out, plates))
+        self.assertEqual(len(studio.calls), 1)
+        model, cfg, settings, names = project(out)
+        self.assertEqual(objects(cfg), [('controller_lid', '1')] * 2 + [('controller_tray', '1')] * 2)
+        self.assertEqual(re.findall(r'plater_name" value="([^"]*)"', cfg), [t for t, _ in plates])
+        self.assertIn('<metadata name="ProfileTitle">Controller box (3 plates)</metadata>', model)
+        cols, sx, sy = bambu_project.stride(len(plates))
+        want = []
+        for k, (_, rows) in enumerate(plates):
+            for n, (x, y) in sorted(bambu_project.pack(rows).items()):
+                want.append((k + 1, n, round(x + (k % cols) * sx, 2), round(y - (k // cols) * sy, 2)))
+        # Studio's component offset (the stand-in puts object k at x = k) comes off again
+        got = []
+        part_of = dict(re.findall(r'<object id="(\d+)">\s*<metadata key="name" value="([^"]+)"', cfg))
+        plate_of = {}
+        for k, plate in enumerate(re.findall(r'  <plate>.*?  </plate>\n', cfg, re.S)):
+            for oid in re.findall(r'object_id" value="(\d+)"', plate):
+                plate_of[oid] = k + 1
+        for oid, x, y in re.findall(r'<item objectid="(\d+)" transform="1 0 0 0 1 0 0 0 1 (\S+) (\S+) 2.5"', model):
+            got.append((plate_of[oid], part_of[oid], round(float(x) + (int(oid) - 2) // 2, 2), float(y)))
+        self.assertEqual(sorted(got), sorted(want))
+        self.assertEqual(settings['brim_type'], 'no_brim')
+        self.assertFalse([n for n in names if n.endswith('.png')])
+
+    def test_brims_and_supports_only_on_their_parts(self):
+        import re
+        BambuStudio(self)
+        plates = [('1 a', [['worm', 'carrier']]), ('2 b', [['case_left']])]
+        out = os.path.join(self.d, 'tilt_bulk_H2D.3mf')
+        run_quietly(bambu_project.build, out, plates)
+        _, cfg, _, _ = project(out)
+        blocks = {re.search(r'value="([^"]+)"', b).group(1): b for b in re.findall(r'  <object id.*?  </object>', cfg, re.S)}
+        self.assertEqual(objects(cfg), [('carrier', '2'), ('case_left', '1'), ('worm', '1')])
+        self.assertIn('key="enable_support" value="1"', blocks['worm'])
+        self.assertIn('key="brim_width" value="5"', blocks['worm'])
+        self.assertIn('key="brim_width" value="3"', blocks['carrier'])
+        self.assertNotIn('enable_support', blocks['carrier'])
+        self.assertNotIn('brim', blocks['case_left'])
+        self.assertNotIn('enable_support', blocks['case_left'])
+        self.assertNotIn('__', cfg)                       # the parts are named after the part, not the loaded file
+
+    def test_project_fails_when_studio_did_not_load_every_part(self):
+        BambuStudio(self, drop=1)
+        with self.assertRaises(AssertionError) as e:
+            run_quietly(bambu_project.build, os.path.join(self.d, 'x.3mf'), [('1 a', [['worm', 'carrier']])])
+        self.assertIn('did not load every part', str(e.exception))
+
+    def test_a_row_wider_than_the_bed_is_too_full(self):
+        with self.assertRaises(AssertionError) as e:
+            bambu_project.pack([['case_right', 'case_left', 'bearing_shell', 'motor_shell', 'tray', 'tray_lid'] * 2])
+        self.assertIn('plate too full', str(e.exception))
+
+    def test_hub_pause_is_one_layer_above_the_walls(self):
+        import re
+        import bambu_hub
+        top = float(re.search(r'top_z="([\d.]+)"', bambu_hub.pause_xml()).group(1))
+        self.assertAlmostEqual(top, round(bambu_hub.H['zp'] + bambu_hub.H['layer'], 2))
+        self.assertIn('type="1"', bambu_hub.pause_xml())
+        self.assertGreater(top, bambu_hub.H['zp'])
+
+    def hub(self, mark_age=0):
+        import shutil
+        from unittest import mock
+        import bambu_hub
+        box, mark, out = (os.path.join(self.d, n) for n in ('hub_box.stl', 'mark.stl', 'hub_box_multicolor.3mf'))
+        shutil.copy(bambu_hub.BOX, box)
+        orient.write(mark, Orient.TRIS)
+        os.utime(mark, (os.path.getmtime(box) - mark_age,) * 2)
+        for target, value in [('BOX', box), ('MARK', mark), ('OUT', out)]:
+            p = mock.patch.object(bambu_hub, target, value)
+            p.start()
+            self.addCleanup(p.stop)
+        return bambu_hub, out
+
+    def test_hub_mark_becomes_a_second_part_of_the_box(self):
+        import re, zipfile
+        BambuStudio(self)
+        bambu_hub, out = self.hub()
+        self.assertIn('pause before layer', run_quietly(bambu_hub.main))
+        model, cfg, settings, names = project(out)
+        self.assertEqual(objects(cfg), [('Tilt Hub box', '1')])
+        self.assertEqual(re.findall(r'<part .*?</part>', cfg, re.S)[1].count('key="extruder" value="2"'), 1)
+        self.assertIn('value="tilt mark"', cfg)
+        self.assertEqual(cfg.count('<model_instance>'), 1)
+        self.assertEqual(re.findall(r'<item objectid="(\d+)"', model), ['2'])
+        self.assertEqual(model.count('<component '), 2)                      # the box's and the mark's, one object
+        self.assertIn('transform="1 0 0 0 1 0 0 0 1 %g %g 0"' % (bambu_hub.BED[0] - bambu_hub.H['L'] / 2, bambu_hub.BED[1]),
+                      model)
+        self.assertEqual(settings['filament_colour'], ['#FFFFFF', '#1F6F8B'])
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(z.read('Metadata/custom_gcode_per_layer.xml').decode(), bambu_hub.pause_xml())
+        self.assertFalse([n for n in names if n.endswith('.png')])
+
+    def test_hub_without_a_fresh_inlay_says_to_run_fusion(self):
+        studio = BambuStudio(self)
+        bambu_hub, out = self.hub(mark_age=600)
+        with self.assertRaises(SystemExit) as e:
+            bambu_hub.main()
+        self.assertIn('run tools/fusion_hub.py first', e.exception.code)
+        os.unlink(bambu_hub.MARK)
+        with self.assertRaises(SystemExit):
+            bambu_hub.main()
+        self.assertEqual((studio.calls, os.path.exists(out)), ([], False))
+
+    def solar(self):
+        import shutil
+        from unittest import mock
+        import bambu_solar
+        stl = os.path.join(self.d, 'solar')
+        shutil.copytree(bambu_solar.STL, stl, ignore=shutil.ignore_patterns('*.3mf'))
+        p = mock.patch.object(bambu_solar, 'STL', stl)
+        p.start()
+        self.addCleanup(p.stop)
+        return bambu_solar, stl
+
+    def test_solar_asks_for_the_right_pieces(self):
+        studio = BambuStudio(self)
+        bambu_solar, stl = self.solar()
+        run_quietly(bambu_solar.run, ['3'])
+        run_quietly(bambu_solar.run, ['6', '--left'])
+        run_quietly(bambu_solar.run, [])
+        loaded = [[os.path.basename(s) for s in c[c.index('--export-3mf') + 2:]] for c in studio.calls]
+        self.assertEqual(loaded, [['solar_start_3.stl', 'solar_cap.stl'],
+                                  ['solar_start_3_wires_left.stl', 'solar_add_3_wires_left.stl', 'solar_cap_wires_left.stl'],
+                                  ['solar_start_3.stl', 'solar_cap.stl']])
+        self.assertEqual(sorted(f for f in os.listdir(stl) if f.endswith('.3mf')),
+                         ['solar_housing_3_H2D.3mf', 'solar_housing_6_wires_left_H2D.3mf'])
+        _, _, settings, _ = project(os.path.join(stl, 'solar_housing_3_H2D.3mf'))
+        self.assertEqual((settings['enable_support'], settings['layer_height']), ('0', '0.12'))
+
+    def test_solar_with_a_missing_stl_names_it(self):
+        studio = BambuStudio(self)
+        bambu_solar, stl = self.solar()
+        os.unlink(os.path.join(stl, 'solar_add_2.stl'))
+        with self.assertRaises(SystemExit) as e:
+            bambu_solar.main(5)
+        self.assertIn('solar_add_2.stl is missing', e.exception.code)
+        self.assertEqual(studio.calls, [])
+
+    def test_solar_pieces_agree_with_fusion_solar(self):
+        import ast, re
+        import bambu_solar
+        with open(os.path.join(HERE, 'fusion_solar.py')) as f:
+            fusion = ast.literal_eval(re.search(r'^PIECES = (\{.*\})', f.read(), re.M).group(1))
+        self.assertEqual(sorted(fusion), sorted(bambu_solar.PIECES))
+        for n, sections in fusion.items():
+            want = ['start_%d' % sections[0]] + ['add_%d' % s for s in sections[1:]]
+            self.assertEqual(bambu_solar.PIECES[n], want, n)
+            self.assertEqual(sum(sections), n)
+
+    def test_each_builder_stops_before_writing_without_studio(self):
+        import bambu_hub, bambu_solar
+        outs = [bambu.OUT, bambu_hub.OUT] + [os.path.join(bambu_project.STL, n) for n in bambu_project.PROJECTS] + \
+            [os.path.join(bambu_solar.STL, 'solar_housing_3_H2D.3mf')]
+        before = {p: os.path.getmtime(p) for p in outs if os.path.exists(p)}
+        for name in ('bambu.py', 'bambu_project.py', 'bambu_solar.py'):
+            r = run_builder_script(name, self.d)
+            self.assertNotEqual(r.returncode, 0, name)
+            self.assertIn('BambuStudio', r.stderr, name)               # the presets are not there
+        r = run_builder_script('bambu_hub.py', self.d)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('run tools/fusion_hub.py first', r.stderr)
+        self.assertEqual({p: os.path.getmtime(p) for p in before}, before)
+
+
 class BambuPacking(unittest.TestCase):
     BED_SIZE = (350.0, 320.0)                 # H2D: 350 x 320 mm
 
@@ -283,6 +969,12 @@ class BlindsClient(unittest.TestCase):
         self.assertEqual(blinds_client.seal(v['keySalted'], v['cid'], v['boot'], int(v['ctr']), v['cmd']), v['frameSalted'])
         self.assertEqual(blinds_client.open_reply(v['key'], v['cid'], v['frame'], v['reply']), v['replyOut'])
 
+    def test_link_vectors_prints_the_file(self):
+        import subprocess, link_vectors
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'link_vectors.py')], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, link_vectors.text())
+
     def test_store_is_private(self):
         old = blinds_client.STORE
         with tempfile.TemporaryDirectory() as d:
@@ -293,6 +985,336 @@ class BlindsClient(unittest.TestCase):
                 self.assertEqual(blinds_client.load(), {'x': 1})
             finally:
                 blinds_client.STORE = old
+
+
+class FakeController:
+    """A controller on the other end of blinds_client.http: its own P-256 key, /x/hello, /x/pair, /x/ask and /x,
+    sealing and opening the way link_vectors.py does (apart from blinds_client's code)."""
+
+    def __init__(self):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        self.priv = ec.generate_private_key(ec.SECP256R1())
+        self.boot, self.cid, self.key = bytes.fromhex('a1b2c3d4'), bytes.fromhex('0102030405060708'), None
+        self.last_ctr, self.refuse, self.wrong_check, self.conflicts = 0, None, False, 0
+        self.paths, self.frames, self.bodies, self.seen = [], [], [], []
+
+    def http(self, path, data=None):
+        import base64, hashlib, hmac, json, link_vectors
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        self.paths.append(path)
+        if self.refuse and path != '/x/hello':
+            return self.refuse
+        if path == '/x/hello':
+            return 200, json.dumps({'boot': self.boot.hex(), 'fw': '2.4.0'}).encode()
+        if path in ('/x/pair', '/x/ask'):
+            body = json.loads(data)
+            self.bodies.append(body)
+            cpub = base64.b64decode(body['pub'])
+            salt = None
+            if 'inv' in body:
+                salt = bytes.fromhex('00112233')
+                if body['inv'] != 'INV1' or body['mac'] != hmac.new(salt, cpub, hashlib.sha256).hexdigest():
+                    return 403, b'bad invite'
+            dpub = self.priv.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+            shared = self.priv.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), cpub))
+            self.key = link_vectors.derive_key(shared, salt, cpub, dpub)
+            check = hmac.new(self.key, b'confirm', hashlib.sha256).hexdigest()[:16]
+            r = {'pub': base64.b64encode(dpub).decode(), 'cid': self.cid.hex(), 'check': '0' * 16 if self.wrong_check else check,
+                 'owner': path == '/x/pair' and 'inv' not in body}
+            if path == '/x/ask':
+                r.update(wait=1, code='4821')
+            return 200, json.dumps(r).encode()
+        if path == '/x':
+            self.frames.append(data)
+            if data[:8] != self.cid:
+                return 403, b'who'
+            nonce = data[8:20]
+            if self.conflicts:                   # a stale boot id: the controller restarted
+                self.conflicts -= 1
+                self.boot = bytes.fromhex('0badf00d')
+                return 409, b'stale'
+            ctr = int.from_bytes(nonce[4:], 'big')
+            if nonce[:4] != self.boot or ctr <= self.last_ctr:
+                return 409, b'replay'
+            self.last_ctr = ctr
+            cmd = AESGCM(self.key).decrypt(nonce, data[20:], b'blinds-v1' + self.cid).decode()
+            self.seen.append(cmd)
+            return 200, link_vectors.seal_reply(self.key, self.cid, nonce, bytes([7]) * 12, '{"cmd":"%s"}' % cmd)
+        return 404, b'no'
+
+
+@unittest.skipUnless(blinds_client, "needs the 'cryptography' package")
+class BlindsClientTalks(unittest.TestCase):
+    """blinds_client.py against a fake controller: pairing, asking, joining, sealed commands and the command line."""
+
+    def setUp(self):
+        import shutil
+        from unittest import mock
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+        self.c = FakeController()
+        for target, value in [('STORE', os.path.join(self.d, 'c.json')), ('http', self.c.http), ('WHO', 'mac'),
+                              ('IP', '192.0.2.1')]:
+            p = mock.patch.object(blinds_client, target, value)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def quietly(self, f, *args, **kw):
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            f(*args, **kw)
+        return said.getvalue()
+
+    def test_pair_saves_the_key_the_controller_derived(self):
+        self.assertEqual(self.quietly(blinds_client.pair, 'Mac'), 'paired as Mac (owner)\n')
+        me = blinds_client.load()['mac']
+        self.assertEqual((me['cid'], bytes.fromhex(me['key']), me['ctr']), (self.c.cid.hex(), self.c.key, 0))
+        self.assertEqual(self.c.paths, ['/x/pair'])
+        self.assertEqual(self.c.bodies[0]['name'], 'Mac')
+
+    def test_a_wrong_check_is_not_trusted_and_nothing_is_saved(self):
+        self.c.wrong_check = True
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.pair('Mac')
+        self.assertIn('not trusted', str(e.exception))
+        self.assertEqual(blinds_client.load(), {})
+
+    def test_a_refused_pairing_shows_the_status(self):
+        self.c.refuse = (403, b'owned')
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.pair('Mac')
+        self.assertEqual(str(e.exception), 'pairing refused: 403 owned')
+
+    def test_ask_posts_to_ask_and_prints_the_wait_code(self):
+        said = self.quietly(blinds_client.main, ['ask', 'Den'])
+        self.assertEqual(said, 'asked to join as Den: an owner lets it in (code 4821)\n')
+        self.assertEqual(self.c.paths, ['/x/ask'])
+
+    def test_join_sends_the_invite_and_a_mac_the_controller_accepts(self):
+        self.assertEqual(self.quietly(blinds_client.main, ['join', 'INV1', '00112233', 'Guest']), 'paired as Guest\n')
+        self.assertEqual(self.c.bodies[0]['inv'], 'INV1')
+        self.assertEqual(blinds_client.load()['mac']['key'], self.c.key.hex())    # the salted key, on both ends
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.main(['join', 'INV1', 'ffffffff'])
+        self.assertIn('403 bad invite', str(e.exception))
+
+    def test_call_opens_the_answer(self):
+        self.quietly(blinds_client.pair, 'Mac')
+        self.assertEqual(blinds_client.call('/api/s'), '{"cmd":"/api/s"}')
+        self.assertEqual(self.c.seen, ['/api/s'])
+        pkt, out = blinds_client.call('/api/dev', raw_out=True)
+        self.assertEqual((pkt, out), (self.c.frames[-1], '{"cmd":"/api/dev"}'))
+        self.assertTrue(blinds_client.call('/api/s', replay=pkt).startswith('refused: 409'))   # the controller says replay
+        self.assertEqual(len(self.c.frames), 3)
+
+    def test_a_409_is_tried_once_more_with_a_fresh_boot_id(self):
+        self.quietly(blinds_client.pair, 'Mac')
+        self.c.conflicts = 1
+        self.assertEqual(blinds_client.call('/api/s'), '{"cmd":"/api/s"}')
+        self.assertEqual([f[8:12].hex() for f in self.c.frames], ['a1b2c3d4', '0badf00d'])
+        self.c.conflicts = 2
+        self.assertEqual(blinds_client.call('/api/s'), 'refused: 409 stale')
+
+    def test_another_refusal_comes_back_as_refused(self):
+        self.quietly(blinds_client.pair, 'Mac')
+        d = blinds_client.load()
+        d['mac']['cid'] = 'ffffffffffffffff'
+        blinds_client.save(d)
+        self.assertEqual(blinds_client.call('/api/s'), 'refused: 403 who')
+        self.assertEqual(len(self.c.frames), 1)
+
+    def test_the_saved_counter_never_goes_down(self):
+        import time
+        self.quietly(blinds_client.pair, 'Mac')
+        ahead = int(time.time() * 1000) + 10 ** 9
+        d = blinds_client.load()
+        d['mac']['ctr'] = ahead
+        blinds_client.save(d)
+        blinds_client.call('/api/s')
+        self.assertEqual(blinds_client.load()['mac']['ctr'], ahead + 1)
+        self.assertEqual(self.c.last_ctr, ahead + 1)
+
+    def test_no_saved_identity_says_pair_first(self):
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.call('/api/s')
+        self.assertIn('pair first', str(e.exception))
+
+    def test_the_command_line(self):
+        import json
+        self.assertEqual(json.loads(self.quietly(blinds_client.main, ['hello', '--ip', '192.0.2.9']))['boot'], 'a1b2c3d4')
+        self.assertEqual(blinds_client.IP, '192.0.2.9')
+        self.quietly(blinds_client.main, ['--as', 'den', 'pair'])
+        self.assertEqual(list(blinds_client.load()), ['den'])
+        self.assertEqual(self.c.bodies[0]['name'], 'Mac test')
+        self.assertEqual(self.quietly(blinds_client.main, ['get', '/api/s']), '{"cmd":"/api/s"}\n')
+        self.c.refuse = (500, b'busy')
+        with self.assertRaises(SystemExit) as e:
+            blinds_client.main(['get', '/api/s'])
+        self.assertEqual(str(e.exception), 'refused: 500 busy')
+        for args, said in [(['--ip'], '--ip needs a value'), (['get'], 'usage: blinds_client.py get'),
+                           (['join', 'x'], 'usage: blinds_client.py join'), (['fly'], 'unknown command "fly"')]:
+            with self.assertRaises(SystemExit) as e:
+                blinds_client.main(args)
+            self.assertIn(said, str(e.exception))
+
+    def test_http_talks_to_the_address(self):
+        import io, urllib.error
+        from unittest import mock
+        seen = []
+
+        class Answer(io.BytesIO):
+            status = 200
+
+        def urlopen(req, timeout):
+            seen.append((req.full_url, req.get_method(), req.data))
+            if req.data == b'bad':
+                raise urllib.error.HTTPError(req.full_url, 409, 'no', {}, io.BytesIO(b'stale'))
+            return Answer(b'hi')
+        mock.patch.stopall()                     # the real http, not the fake controller
+        with mock.patch.object(blinds_client, 'IP', '192.0.2.1/c/ab'), \
+                mock.patch.object(blinds_client.urllib.request, 'urlopen', urlopen):
+            self.assertEqual(blinds_client.http('/x/hello'), (200, b'hi'))
+            self.assertEqual(blinds_client.http('/x', b'bad'), (409, b'stale'))
+        self.assertEqual(seen, [('http://192.0.2.1/c/ab/x/hello', 'GET', None), ('http://192.0.2.1/c/ab/x', 'POST', b'bad')])
+
+    def test_the_script_runs_as_its_own_process(self):
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'blinds_client.py'), 'fly'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('unknown command "fly"', r.stderr)
+
+
+@unittest.skipUnless(blinds_client, "needs the 'cryptography' package")
+class CloudKitKey(unittest.TestCase):
+    """tools/cloudkit_key.py: the Tilt Hub's iCloud key, with every file in a temp folder and a fake CloudKit."""
+
+    def setUp(self):
+        import shutil
+        from unittest import mock
+        import cloudkit_key
+        self.ck = cloudkit_key
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d)
+        for target, name in [('KEY', 'keys/cloudkit-key.pem'), ('IDF', 'ids.json'), ('HEADER', 'cloud_key.h')]:
+            p = mock.patch.object(cloudkit_key, target, os.path.join(self.d, name))
+            p.start()
+            self.addCleanup(p.stop)
+        self.sent = []
+
+    def quietly(self, f, *args):
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            f(*args)
+        return said.getvalue()
+
+    def fake_cloudkit(self, status=200, text='{"records":[]}'):
+        import io, urllib.error
+        from unittest import mock
+
+        class Answer:
+            def __init__(self):
+                self.status = status
+
+            def read(self):
+                return text.encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def urlopen(req, timeout):
+            self.sent.append(req)
+            if status != 200:
+                raise urllib.error.HTTPError(req.full_url, status, 'no', {}, io.BytesIO(text.encode()))
+            return Answer()
+        return mock.patch.object(self.ck.urllib.request, 'urlopen', urlopen)
+
+    def test_new_makes_a_private_key_once(self):
+        said = self.quietly(self.ck.new)
+        self.assertEqual(os.stat(self.ck.KEY).st_mode & 0o777, 0o600)
+        self.assertIn('-----BEGIN PUBLIC KEY-----', said)
+        with open(self.ck.KEY, 'rb') as f:
+            first = f.read()
+        with self.assertRaises(SystemExit) as e:
+            self.ck.new()
+        self.assertIn('already there', e.exception.code)
+        with open(self.ck.KEY, 'rb') as f:
+            self.assertEqual(f.read(), first)
+
+    def test_header_holds_both_ids_and_the_key(self):
+        import json, re
+        self.quietly(self.ck.new)
+        self.assertIn('wrote', self.quietly(self.ck.header, 'DEVID', 'PRODID'))
+        with open(self.ck.HEADER) as f:
+            h = f.read()
+        self.assertIn('#define CLOUD_KEY_ID "DEVID"', h)
+        self.assertIn('#define CLOUD_KEY_ID_PROD "PRODID"', h)
+        d = re.search(r'#define CLOUD_KEY_HEX "([0-9a-f]+)"', h).group(1)
+        self.assertEqual(len(d), 64)
+        self.assertEqual(int(d, 16), self.ck.load().private_numbers().private_value)
+        with open(self.ck.IDF) as f:
+            self.assertEqual(json.load(f), {'development': 'DEVID', 'production': 'PRODID'})
+
+    def test_post_signs_date_body_hash_and_path(self):
+        import base64, hashlib
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        self.quietly(self.ck.new)
+        self.quietly(self.ck.header, 'DEVID', 'PRODID')
+        with self.fake_cloudkit():
+            self.assertEqual(self.ck.post('production', 'modify', {'a': 1}), (200, '{"records":[]}'))
+        req = self.sent[0]
+        sub = '/database/1/iCloud.app.tilt.blinds/production/public/records/modify'
+        self.assertEqual(req.full_url, 'https://api.apple-cloudkit.com' + sub)
+        self.assertEqual(req.get_method(), 'POST')
+        self.assertEqual(req.data, b'{"a":1}')
+        headers = dict(req.header_items())
+        self.assertEqual(headers['X-apple-cloudkit-request-keyid'], 'PRODID')
+        date = headers['X-apple-cloudkit-request-iso8601date']
+        msg = ('%s:%s:%s' % (date, base64.b64encode(hashlib.sha256(b'{"a":1}').digest()).decode(), sub)).encode()
+        self.ck.load().public_key().verify(base64.b64decode(headers['X-apple-cloudkit-request-signaturev1']), msg,
+                                           ec.ECDSA(hashes.SHA256()))         # raises when it does not verify
+
+    def test_post_gives_an_http_error_back_as_its_status_and_text(self):
+        self.quietly(self.ck.new)
+        self.quietly(self.ck.header, 'DEVID', 'PRODID')
+        with self.fake_cloudkit(401, 'bad key'):
+            self.assertEqual(self.ck.post('development', 'modify', {}), (401, 'bad key'))
+
+    def test_test_sends_one_alert(self):
+        import json
+        self.quietly(self.ck.new)
+        self.quietly(self.ck.header, 'DEVID', 'PRODID')
+        with self.fake_cloudkit():
+            self.assertEqual(self.quietly(self.ck.test, 'abc', 'leak'), '200 {"records":[]}\n')
+        self.assertIn('/development/', self.sent[0].full_url)
+        ops = json.loads(self.sent[0].data)['operations']
+        self.assertEqual(len(ops), 1)
+        self.assertEqual(ops[0]['operationType'], 'forceReplace')
+        rec = ops[0]['record']
+        self.assertEqual((rec['recordType'], rec['recordName']), ('Alert', 'alert-abc-leak-9'))
+        self.assertEqual((rec['fields']['topic']['value'], rec['fields']['kind']['value']), ('abc', 'leak'))
+
+    def test_the_command_line(self):
+        from unittest import mock
+        calls = []
+        with mock.patch.object(self.ck, 'new', lambda: calls.append(('new',))), \
+                mock.patch.object(self.ck, 'header', lambda *a: calls.append(('header',) + a)), \
+                mock.patch.object(self.ck, 'test', lambda *a: calls.append(('test',) + a)):
+            self.ck.main(['new'])
+            self.ck.main(['header', 'D', 'P'])
+            self.ck.main(['test', 'topic', 'kind', 'production', 'extra'])
+            self.assertIn('cloudkit_key.py new', self.quietly(self.ck.main, ['header', 'D']))
+            self.assertIn('cloudkit_key.py new', self.quietly(self.ck.main, []))
+        self.assertEqual(calls, [('new',), ('header', 'D', 'P'), ('test', 'topic', 'kind', 'production')])
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'cloudkit_key.py'), 'help'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('cloudkit_key.py header DEV_ID PROD_ID', r.stdout)
 
 
 class CheckDocs(unittest.TestCase):
@@ -1015,6 +2037,89 @@ class DeviceIdentity(unittest.TestCase):
             self.assertFalse(self.di.pin_valid(bad), bad)
 
 
+class DeviceIdentityEdges(unittest.TestCase):
+    """device_identity.py's left-over branches: bad input, the runner, the questions, the command line."""
+
+    def setUp(self):
+        import device_identity
+        self.di = device_identity
+
+    def test_a_home_code_with_the_wrong_sizes_is_refused(self):
+        with self.assertRaises(ValueError) as e:
+            self.di.home_code_blob({'salt': '00' * 31, 'verifier': '00' * 97, 'passcode': 1, 'iterations': 1000,
+                                    'discriminator': 1})
+        self.assertIn('32 bytes', str(e.exception))
+
+    def test_a_device_id_with_odd_characters_is_refused(self):
+        for bad in ('../x', 'ABC', ''):
+            with self.assertRaises(ValueError):
+                self.di._path(bad)
+
+    @unittest.skipUnless(_has('PIL'), 'needs pillow')
+    def test_an_old_pillow_gets_its_one_font(self):
+        from unittest import mock
+        from PIL import ImageFont
+        real = ImageFont.load_default
+
+        def old(*a, **kw):
+            if kw:
+                raise TypeError('load_default() got an unexpected keyword argument')
+            return 'the one font'
+        with mock.patch.object(ImageFont, 'load_default', old):
+            self.assertEqual(self.di._font(30), 'the one font')
+        self.assertIsNotNone(real)
+
+    def test_the_runner_names_a_failed_command_and_its_last_lines(self):
+        self.assertEqual(self.di._run([sys.executable, '-c', 'print("hi")']), 'hi\n')
+        with self.assertRaises(RuntimeError) as e:
+            self.di._run(['/bin/sh', '-c', 'for i in $(seq 1 30); do echo line$i; done; exit 3'])
+        text = str(e.exception)
+        self.assertTrue(text.startswith('sh failed:\n'), text)
+        self.assertIn('line30', text)
+        self.assertNotIn('line15\n', text)                      # only the last 15 lines
+        with self.assertRaises(RuntimeError) as e:
+            self.di._run([sys.executable, 'tool.py', 'nvs_gen', 'x'], cwd=tempfile.gettempdir())
+        self.assertTrue(str(e.exception).startswith('nvs_gen failed:'), str(e.exception))
+
+    def test_a_question_with_no_terminal_gets_no_answer(self):
+        import io
+        from unittest import mock
+        with mock.patch.object(sys, 'stdin', io.StringIO('yes\n')):
+            self.assertIsNone(self.di._ask('Wipe it? '))
+
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+        with mock.patch.object(sys, 'stdin', Terminal('yes\n')), mock.patch('builtins.input', lambda p: 'yes'):
+            self.assertEqual(self.di._ask('Wipe it? '), 'yes')
+
+    def test_mac_without_a_base_mac_line_takes_the_last_mac(self):
+        self.assertEqual(self.di.parse_mac('MAC: 11:22:33:44:55:66\nsomething\nMAC: aa:bb:cc:dd:ee:ff\n'), 'aabbccddeeff')
+        with self.assertRaises(RuntimeError):
+            self.di.parse_mac('Chip is ESP32-C6\nno address here\n')
+
+    def test_no_nvs_partition_is_an_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, 'partitions.csv'), 'w') as f:
+                f.write('# Name, Type, SubType, Offset, Size\nfactory, app, factory, 0x10000, 0x200000\n')
+            with self.assertRaises(RuntimeError) as e:
+                self.di.nvs_area(d)
+        self.assertIn('no nvs partition', str(e.exception))
+
+    def test_the_command_line_flash_reaches_flash(self):
+        from unittest import mock
+        calls = []
+        with mock.patch.object(self.di, 'flash', lambda *a: calls.append(a) or 0):
+            self.assertEqual(self.di.main(['flash', 'hub', '--port', '/dev/x', '--label-size', '30x20']), 0)
+        self.assertEqual(calls, [('hub', '/dev/x', False, (30.0, 20.0))])
+
+    def test_the_script_runs_as_its_own_process(self):
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'device_identity.py'), '--help'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('labels', r.stdout)
+
+
 def lcov(path, hits):
     """A made-up LCOV record: hits = {line: count}."""
     return 'SF:%s\n%s\nend_of_record\n' % (path, '\n'.join('DA:%d,%d' % (n, h) for n, h in sorted(hits.items())))
@@ -1515,6 +2620,243 @@ Soldering iron.
                 self.assertEqual(inventory.main(['order', '--set', '5']), 2)
                 for bad in (['--have', 'NOPE=1'], ['--have', 'B0F83XS7PW=lots'], ['--on-order', 'B0F83XS7PW=kit']):
                     self.assertEqual(inventory.main(['order', '--set', '1'] + bad), 2)
+
+
+class BenchJSON(unittest.TestCase):
+    """tools/bench_json.py: what flash.sh and battery_log.sh read out of a Tilt Hub's or a controller's answer."""
+    INFO = {'c': [{'id': 'a1', 'ota': 2, 'otaPct': 40, 'otaErr': '', 'hubCid': 'beef'},
+                  {'id': 'b2', 'ota': 4, 'otaPct': 7, 'otaErr': 'no space'}, {'id': 'c3'}]}
+    # The one-liners flash.sh ran before (tools/flash.sh, lines 29 and 65), with the controller id put in.
+    OLD_MEMBER = ("import sys,json; m=[c for c in json.load(sys.stdin)['c'] if c['id']=='%s']; "
+                  "print(*(m and [m[0].get('ota',0), m[0].get('otaPct',0), m[0].get('otaErr','')] or ['?']))")
+    OLD_HUBCID = "import sys,json; print(next((c.get('hubCid','') for c in json.load(sys.stdin)['c'] if c['id']=='%s'), ''))"
+
+    def run_py(self, args, info, code=None):
+        import json, subprocess
+        cmd = [sys.executable] + (['-c', code] if code else [os.path.join(HERE, 'bench_json.py')] + args)
+        r = subprocess.run(cmd, input=json.dumps(info), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout
+
+    def test_ota_progress(self):
+        import bench_json
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'a1'), '2 40 ')
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'b2'), '4 7 no space')
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'c3'), '0 0 ')
+        self.assertEqual(bench_json.ota_progress(self.INFO, 'zz'), '?')
+
+    def test_ota_progress_prints_what_the_shell_one_liner_did(self):
+        for cid in ('a1', 'b2', 'c3', 'zz'):
+            self.assertEqual(self.run_py(['ota-progress', cid], self.INFO), self.run_py([], self.INFO, self.OLD_MEMBER % cid))
+
+    def test_hub_cid(self):
+        import bench_json
+        self.assertEqual(bench_json.hub_cid(self.INFO, 'a1'), 'beef')
+        self.assertEqual(bench_json.hub_cid(self.INFO, 'b2'), '')
+        self.assertEqual(bench_json.hub_cid(self.INFO, 'zz'), '')
+        for cid in ('a1', 'b2', 'zz'):
+            self.assertEqual(self.run_py(['hub-cid', cid], self.INFO), self.run_py([], self.INFO, self.OLD_HUBCID % cid))
+
+    def test_battery_row(self):
+        import bench_json, time
+        dev = {'pwr': {'rest': 3.91234, 'vin': 4.987, 'pct': 80}, 'st': {'motorS': 125}}
+        now = time.mktime((2026, 11, 27, 9, 5, 0, 0, 0, -1))
+        self.assertEqual(bench_json.battery_row(dev, 'thread', now), '2026-11-27 09:05,thread,3.912,,4.99,125')
+        self.assertEqual(bench_json.battery_row(dev, '', now), '2026-11-27 09:05,?,3.912,,4.99,125')
+        out = self.run_py(['battery-row', 'wifi'], dev)
+        self.assertRegex(out, r'^\d{4}-\d\d-\d\d \d\d:\d\d,wifi,3\.912,,4\.99,125\n$')
+
+    def test_a_bad_command_is_a_usage_error(self):
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'bench_json.py'), 'nonsense'], input='{}',
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('usage:', r.stderr)
+
+    def test_the_shell_scripts_call_it(self):
+        for name in ('flash.sh', 'battery_log.sh'):
+            text = open(os.path.join(HERE, name)).read()
+            self.assertNotIn('-c "import', text, name)
+            self.assertNotIn('python3 -c', text, name)
+            self.assertIn('bench_json.py', text, name)
+
+
+def run_script(name, *args):
+    """A tool as its own process, from the repo root (as the coverage run starts it, so its guard line counts)."""
+    import subprocess
+    return subprocess.run([sys.executable, os.path.join(HERE, name), *args], capture_output=True, text=True,
+                          cwd=os.path.dirname(HERE))
+
+
+class LeftOverBranches(unittest.TestCase):
+    """The small tools' last branches, and each script's `if __name__ == '__main__'` line."""
+
+    def test_a_reference_link_is_checked_too(self):
+        d = CheckDocs.pages(None, {'a.md': '# A\n\n[gone]: gone.md\n[ok]: #a\n'})
+        self.assertEqual(check_docs.problems(d), ['a.md:3: broken link gone.md'])
+
+    def test_check_docs_as_a_script(self):
+        d = CheckDocs.pages(None, {'a.md': '[x](gone.md)\n'})
+        r = run_script('check_docs.py', d)
+        self.assertEqual((r.returncode, r.stdout), (1, 'a.md:1: broken link gone.md\n'))
+        r = run_script('check_docs.py', CheckDocs.pages(None, {'a.md': '# A\n'}))
+        self.assertEqual((r.returncode, r.stdout), (0, 'docs: ok\n'))
+
+    def test_pack_size_of_other_words(self):
+        self.assertEqual(inventory.pack_size('bulk'), 'bulk')
+        self.assertIsNone(inventory.pack_size(''))
+
+    def test_a_link_seen_again_with_a_count_takes_the_count(self):
+        bom = ('## One tilter\n### Hardware\n| Part | Per tilter | Sold as | Link |\n|---|---|---|---|\n'
+               '| Screw | 2 | kit | [K](https://www.amazon.com/dp/K1) |\n'
+               '| Screw | 1 | pack of 50 | [K](https://www.amazon.com/dp/K1) |\n')
+        parts = inventory.parse(bom)
+        self.assertEqual([p.pack for p in parts.values()], [50])
+
+    def test_inventory_as_a_script(self):
+        r = run_script('inventory.py', 'parts')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.startswith('| Key | Part | Pack |'), r.stdout[:80])
+
+    def test_tilter_wiring_png_asks_chrome_for_a_screenshot(self):
+        import contextlib, io
+        from unittest import mock
+        calls = []
+        with mock.patch.object(tilter_wiring.subprocess, 'run', lambda cmd, **kw: calls.append((cmd, kw))), \
+                contextlib.redirect_stdout(io.StringIO()) as said:
+            path = tilter_wiring.main(['tilter_wiring.py', '--png'])
+        self.assertEqual(len(calls), 1)
+        cmd, kw = calls[0]
+        self.assertEqual(cmd[0], tilter_wiring.CHROME)
+        self.assertIn('--screenshot=' + os.path.abspath(tilter_wiring.PNG), cmd)
+        self.assertEqual((cmd[-1], kw['check']), ('file://' + path, True))
+        self.assertIn('wrote ', said.getvalue())
+
+    def test_tilter_wiring_as_a_script(self):
+        r = run_script('tilter_wiring.py')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(r.stdout, r'^svg: .*tilter-wiring\.svg\n$')
+
+    def test_host_cjson_as_a_script(self):
+        r = run_script('host_cjson.py')
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('usage', r.stderr)
+
+    def test_release_firmware_as_a_script(self):
+        r = run_script('release_firmware.py', '--help')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('--hub', r.stdout)
+
+    def test_orient_as_a_script_starts_main(self):
+        """main() makes the print folder first: stop it there, so the STLs in Git are left alone."""
+        import runpy
+        from unittest import mock
+
+        class Stop(Exception):
+            pass
+
+        def makedirs(path, **kw):
+            raise Stop(path)
+        with mock.patch('os.makedirs', makedirs), self.assertRaises(Stop) as e:
+            runpy.run_path(os.path.join(HERE, 'orient.py'), run_name='__main__')
+        self.assertEqual(e.exception.args[0], orient.OUT)
+
+
+class CoverageGateEdges(unittest.TestCase):
+    """coverage_gate.py's left-over branches."""
+    G = coverage_gate
+
+    def test_the_middle_of_a_block_comment_is_not_code(self):
+        self.assertEqual(self.G.code_lines('a.cpp', '/* one\n   two\n   three */ int x;\nint y;\n'), {3, 4})
+
+    def test_an_untracked_file_counts_as_changed_all_through(self):
+        from unittest import mock
+        out = {'merge-base': 'abc\n', 'diff': '', 'ls-files': 'README.md\nno-such-file\n'}
+        with mock.patch.object(self.G, 'git', lambda *a: out[a[0]]):
+            changed = self.G.changed_since('origin/main')
+        n = len(self.G.read('README.md').splitlines())
+        self.assertEqual(changed, {'README.md': set(range(1, n + 1))})
+
+    def test_a_missing_exclusion_list_is_an_error(self):
+        from unittest import mock
+        with mock.patch.dict(self.G.AREAS, {'tools': ('tools', r'tools/.*\.py', 'tools/no-such-list.txt')}):
+            _, excluded, errors = self.G.area_inputs('tools', ['tools/bench_json.py'])
+        self.assertEqual((excluded, errors), (set(), ['tools/no-such-list.txt is missing']))
+
+    def check(self, *extra, floors=None, changed=None):
+        import contextlib, io
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'tools.lcov')
+            with open(path, 'w') as f:
+                f.write(lcov(os.path.join(self.G.ROOT, 'tools/bench_json.py'), {1: 1, 9: 0, 10: 0}))
+            patches = [mock.patch.object(self.G, 'changed_since', lambda base: changed or {})]
+            if floors is not None:
+                patches.append(mock.patch.object(self.G, 'read_floors', lambda text: floors))
+            with contextlib.ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                said = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                code = self.G.main(['check', '--area', 'tools', '--lcov', path, '--base', 'x', *extra])
+        return code, said.getvalue()
+
+    def test_no_floor_for_the_area_is_an_error(self):
+        code, said = self.check(floors={})
+        self.assertEqual(code, 1)
+        self.assertIn('no floor for tools in tools/coverage-floors.txt', said)
+
+    def test_uncovered_changed_lines_are_listed(self):
+        code, said = self.check(changed={'tools/bench_json.py': {9, 10}})
+        self.assertEqual(code, 1)
+        self.assertIn('  not covered: tools/bench_json.py:9\n  not covered: tools/bench_json.py:10\n', said)
+
+    def test_a_long_list_is_cut_in_the_comment(self):
+        r = self.G.measure('tools', {'tools/x.py': 'x = 1\n' * 250}, {}, {'tools/x.py': set(range(1, 251))})
+        body = self.G.render({'tools': r}, {}, 'abc', 'u')
+        self.assertIn('- and 50 more: see the report', body)
+        self.assertEqual(body.count('- `tools/x.py:'), self.G.MAX_LISTED)
+
+    def test_comment_with_post_says_what_it_did(self):
+        import contextlib, io, json
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            r = self.G.measure('tools', {}, {}, None)
+            with open(os.path.join(tmp, 'tools.json'), 'w') as f:
+                json.dump(r, f)
+            posted = []
+            with mock.patch.object(self.G, 'post', lambda body, repo, pr: posted.append((repo, pr)) or 'edited'), \
+                    contextlib.redirect_stdout(io.StringIO()) as said, contextlib.redirect_stderr(io.StringIO()):
+                self.G.main(['comment', '--results', tmp, '--head', 'abc', '--run-url', 'u', '--post', '7',
+                             '--repo', 'o/r'])
+        self.assertEqual(posted, [('o/r', '7')])
+        self.assertIn('coverage comment: edited', said.getvalue())
+
+    def test_readme_out_of_date_is_reported_or_rewritten(self):
+        import contextlib, io
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, 'tools'))
+            with open(os.path.join(root, self.G.FLOORS), 'w') as f:
+                f.write(self.G.read(self.G.FLOORS))
+            stale = 'top\n<!-- coverage:start -->\nold\n<!-- coverage:end -->\nend\n'
+            with open(os.path.join(root, 'README.md'), 'w') as f:
+                f.write(stale)
+            with mock.patch.object(self.G, 'ROOT', root), contextlib.redirect_stdout(io.StringIO()) as said:
+                self.assertEqual(self.G.main(['readme', '--check']), 1)
+                with open(os.path.join(root, 'README.md')) as f:
+                    self.assertEqual(f.read(), stale)                  # --check only reports
+                self.assertEqual(self.G.main(['readme']), 0)
+                self.assertEqual(self.G.main(['readme', '--check']), 0)
+            with open(os.path.join(root, 'README.md')) as f:
+                new = f.read()
+        self.assertIn('out of date (run tools/coverage_gate.py readme)', said.getvalue())
+        self.assertIn('README coverage table: rewritten', said.getvalue())
+        self.assertTrue(new.startswith('top\n<!-- coverage:start -->') and new.endswith('<!-- coverage:end -->\nend\n'))
+        self.assertNotIn('\nold\n', new)
+
+    def test_the_gate_as_a_script(self):
+        r = run_script('coverage_gate.py', 'readme', '--check')
+        self.assertEqual((r.returncode, r.stdout), (0, 'README coverage table: up to date\n'))
 
 
 if __name__ == '__main__':

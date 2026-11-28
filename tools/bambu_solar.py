@@ -62,6 +62,11 @@ def main(n=3, left=False):
     print('wrote', os.path.relpath(out, REPO))
 
 
+def run(argv):
+    """The command line: a panel count (default 3) and --left."""
+    nums = [int(a) for a in argv if a.isdigit()]
+    main(nums[0] if nums else 3, left='--left' in argv)
+
+
 if __name__ == '__main__':
-    nums = [int(a) for a in sys.argv[1:] if a.isdigit()]
-    main(nums[0] if nums else 3, left='--left' in sys.argv)
+    run(sys.argv[1:])
