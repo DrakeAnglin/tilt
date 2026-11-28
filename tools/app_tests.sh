@@ -41,7 +41,8 @@ if [ "$RC" != 0 ]; then
   echo "xcodebuild failed ($RC); the end of its log:"; tail -40 "$OUT/xcodebuild.log"
   # What each failed build command printed (a compiler crash says nothing with "error:" in it).
   awk 'NR==FNR { if (/^The following build commands failed:/) f=1; else if (f && /^\t/) { sub(/^\t/, ""); bad[$0]=1 }; next }
-       ($0 in bad) { n=40; print "---- " $0 } n > 0 { n--; print substr($0, 1, 300) }' "$OUT/xcodebuild.log" "$OUT/xcodebuild.log"
+       ($0 in bad) { n=400; print "---- " $0; next }
+       n > 0 && !/^SwiftCompile normal|^    cd |^ *$|builtin-Swift/ { n--; print substr($0, 1, 300) }' "$OUT/xcodebuild.log" "$OUT/xcodebuild.log" | head -80
   # A compile error can be in the result bundle only, not in the log.
   for R in "$OUT"/xcode/Logs/Test/*.xcresult; do
     [ -d "$R" ] && xcrun xcresulttool get build-results --path "$R" 2>/dev/null | grep -E '"(message|sourceURL)"' | head -40 || true
