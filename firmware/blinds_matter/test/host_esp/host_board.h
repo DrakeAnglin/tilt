@@ -16,9 +16,18 @@
 //                  An ADC read asks the pin's source first (adcSource: what is plugged into it), then the readings
 //                  queued on the pin (queueMilliVolts, one per read), then the millivolts set (setMilliVolts)
 //   reset reason   setResetReason: what esp_reset_reason() says after the next start
-//   mutexes        know if they are held; a give with no take or a second take is a fault
-//   restart()      clears the board (clock to 0, pins, LEDC, mutexes, wall clock), keeps flash, and runs every
-//                  onRestart hook: the test program's, which put the firmware's globals back to their start values
+//   mutexes        know if they are held; a give with no take or a second take is a fault. duringTake(m, fn, skip):
+//                  fn runs once inside a later take of m, before it is taken, after `skip` takes are let by (what
+//                  another task did while this one waited for the lock)
+//   random bytes   by default a counted stream (never the same bytes twice, also across restarts); queueRandom puts
+//                  the exact bytes the next esp_fill_random calls give (a test vector's), then the stream goes on
+//   the MAC        setMac: what esp_read_mac gives (a restart puts back the default 02:00:00:00:00:01)
+//   firmware slots slots(): the running slot's label, size, image length (-1: cannot be read), its state (kept, on
+//                  trial, -1: cannot be read), its SHA-256, and whether the other slot holds a firmware (esp_ota_ops.h)
+//   restarts       restarts(): how many times the firmware called esp_restart (the test restarts the board itself)
+//   restart()      clears the board (clock to 0, pins, LEDC, mutexes, wall clock, queued random bytes, the MAC), keeps
+//                  flash and the firmware slots, and runs every onRestart hook: the test program's, which put the
+//                  firmware's globals back to their start values
 //   faults         takeFaults(): how many faults since the last call (the test program counts them as failures)
 #pragma once
 #include <sys/time.h>
@@ -36,6 +45,16 @@
 namespace host {
 
 struct Mutex { bool held = false; };
+// The two firmware slots (esp_ota_ops.h): the running one, and whether the other holds a firmware to go back to.
+enum SlotState { SLOT_UNREADABLE = -1, SLOT_KEPT = 2, SLOT_ON_TRIAL = 1, SLOT_GONE_BACK = 3 };
+struct Slots {
+  char label[17] = "ota_0";
+  uint32_t address = 0x20000, size = 0x1e0000;
+  int64_t imageLen = 1500000;                          // -1: cannot be read
+  int state = SLOT_KEPT;
+  uint8_t sha[32] = {0};
+  bool otherHasFirmware = false;
+};
 struct Entry { bool blob = false; std::vector<uint8_t> bytes; };    // an NVS value: a blob, or one byte (u8)
 
 struct Board {
@@ -60,6 +79,14 @@ struct Board {
   std::vector<void (*)()> hooks;
   std::string lastLog;                                 // the last ESP_LOG line: "I blinds: text"
   int faults = 0;
+  void *takeMutex = nullptr;                           // duringTake: the mutex, the takes to let by, what runs
+  int takeSkip = 0;
+  std::function<void()> takeHook;
+  uint64_t randomCounted = 0;                          // bytes of the random stream given so far
+  std::deque<uint8_t> randomQueued;                    // given first, in order
+  uint8_t mac[6] = {0x02, 0, 0, 0, 0, 0x01};
+  Slots slots;
+  int restarts = 0;
 };
 inline Board &board() { static Board b; return b; }
 
@@ -162,11 +189,54 @@ inline void restart() {
   b.ledcTimer = false;
   b.mutexes.clear();
   b.lastLog.clear();
+  b.takeHook = nullptr;
+  b.takeMutex = nullptr;
+  b.takeSkip = 0;
+  b.randomQueued.clear();
+  const uint8_t mac[6] = {0x02, 0, 0, 0, 0, 0x01};
+  memcpy(b.mac, mac, 6);
   for (auto h : b.hooks) h();
 }
 
 // ---- mutexes
 inline bool held(void *m) { return m && ((Mutex *)m)->held; }
+inline void duringTake(void *m, std::function<void()> fn, int skip = 0) {
+  board().takeMutex = m;
+  board().takeSkip = skip;
+  board().takeHook = fn;
+}
+inline void beforeTake(void *m) {                      // from xSemaphoreTake (freertos/semphr.h)
+  Board &b = board();
+  if (!b.takeHook || b.takeMutex != m) return;
+  if (b.takeSkip > 0) { b.takeSkip--; return; }
+  std::function<void()> fn = b.takeHook;
+  b.takeHook = nullptr;                                // once: fn may take the same mutex
+  b.takeMutex = nullptr;
+  fn();
+}
+
+// ---- random bytes, the MAC
+inline void queueRandom(const std::vector<uint8_t> &bytes) { for (uint8_t v : bytes) board().randomQueued.push_back(v); }
+inline size_t randomQueued() { return board().randomQueued.size(); }
+inline void setMac(const uint8_t m[6]) { memcpy(board().mac, m, 6); }
+// One byte of the stream: a mix of its count (splitmix64), so the bytes look random but repeat from run to run.
+inline uint8_t streamByte() {
+  uint64_t z = ++board().randomCounted * 0x9e3779b97f4a7c15ULL;
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  return (uint8_t)((z ^ (z >> 31)) >> 56);
+}
+inline void fillRandom(void *p, size_t n) {
+  uint8_t *out = (uint8_t *)p;
+  for (size_t i = 0; i < n; i++) {
+    if (!board().randomQueued.empty()) { out[i] = board().randomQueued.front(); board().randomQueued.pop_front(); }
+    else out[i] = streamByte();
+  }
+}
+
+// ---- firmware slots, restarts
+inline Slots &slots() { return board().slots; }
+inline int restarts() { return board().restarts; }
 
 inline const std::string &lastLog() { return board().lastLog; }
 inline void espLog(char level, const char *tag, const char *fmt, ...) {
