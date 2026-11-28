@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -1634,7 +1635,20 @@ static Answer sendFrame(const SimPhone &p, const std::string &frame, bool *fromH
   CHECK(locksFree() && host::takeFaults() == 0, "secDo: the locks are free, no board fault");
   return {st, st == 200 ? p.open(frame, resp) : resp};
 }
-static Answer send(SimPhone &p, const std::string &cmd) { return sendFrame(p, p.seal(cmd, bootId)); }
+// The routes a test sent to their handler (a paired phone that may send it), for the check at the end that every
+// route in routes[] has a test.
+static std::set<std::string> reached;
+static Answer send(SimPhone &p, const std::string &cmd) {
+  size_t q = cmd.find('?');
+  std::string path = cmd.substr(0, q), query = q == std::string::npos ? "" : cmd.substr(q + 1);
+  int slot = -1;
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && !memcmp(keys[i].id, p.cid, 8)) slot = i;
+  const RouteRule *rule = routeRule(path);
+  bool may = slot >= 0 && rule && !permitQuery(rule->who, keys[slot].role, query, p.cidHex());
+  Answer a = sendFrame(p, p.seal(cmd, bootId));
+  if (may && a.st == 200 && a.out != "{\"ok\":0,\"err\":\"not paired\"}") reached.insert(path);
+  return a;
+}
 static int slotOf(const SimPhone &p) {
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, p.cid, 8)) return i;
   return -1;
@@ -2237,6 +2251,954 @@ static void testRebootDoesNotReturn() {
   CHECK(webTickOnce() && host::restarts() == before + 1, "the next webTick: one restart, and the code after it never runs");
 }
 
+// ---- the commands (web.h, routes.h): a controller with blinds 1 to 3 at open (290 degrees: up 200, open 290, down
+// 20), an Owner and a Guest
+struct Room { SimPhone o, g; };
+static void roomStart(Room &r) {
+  secStart();
+  for (int p = 0; p < PORTS; p++) blind(p, 290);
+  CHECK(pairFirst(r.o) && addGuest(r.o, r.g, "Bea"), "an Owner and a Guest");
+}
+static std::string pct(const std::string &s) {       // every byte but letters and digits as %XX
+  std::string o;
+  for (unsigned char c : s) {
+    if (isalnum(c)) o += (char)c;
+    else { char b[4]; snprintf(b, sizeof b, "%%%02X", c); o += b; }
+  }
+  return o;
+}
+// The top-level keys of a JSON object, in order ("a,b,"), and the raw text of one top-level value.
+static void walkTop(const std::string &j, const std::function<void(const std::string &, size_t)> &fn) {
+  int depth = 0;
+  for (size_t i = 0; i < j.size(); i++) {
+    char c = j[i];
+    if (c == '"') {
+      std::string k;
+      size_t e = i + 1;
+      for (; e < j.size() && j[e] != '"'; e++) { if (j[e] == '\\') e++; k += j[e]; }
+      if (depth == 1 && e + 1 < j.size() && j[e + 1] == ':') fn(k, e + 2);
+      i = e;
+    } else if (c == '{' || c == '[') depth++;
+    else if (c == '}' || c == ']') depth--;
+  }
+}
+static std::string topKeys(const std::string &j) { std::string o; walkTop(j, [&](const std::string &k, size_t) { o += k + ","; }); return o; }
+static std::string valueEnd(const std::string &j, size_t at) {   // the value that starts at `at`
+  int depth = 0;
+  size_t i = at;
+  for (; i < j.size(); i++) {
+    char c = j[i];
+    if (c == '"') { for (i++; i < j.size() && j[i] != '"'; i++) if (j[i] == '\\') i++; continue; }
+    if (c == '{' || c == '[') depth++;
+    else if (c == '}' || c == ']') { if (!depth) break; depth--; }
+    else if (c == ',' && !depth) break;
+  }
+  return j.substr(at, i - at);
+}
+static std::string rawOf(const std::string &j, const char *key) {
+  std::string v = "?";
+  bool found = false;
+  walkTop(j, [&](const std::string &k, size_t at) { if (!found && k == key) { v = valueEnd(j, at); found = true; } });
+  return v;
+}
+static std::vector<std::string> items(const std::string &arr) {   // the elements of a JSON array's raw text
+  std::vector<std::string> o;
+  for (size_t at = 1; at < arr.size() && arr[at] != ']'; at++) {
+    std::string v = valueEnd(arr, at);
+    o.push_back(v);
+    at += v.size();
+    if (at >= arr.size() || arr[at] != ',') break;
+  }
+  return o;
+}
+static time_t localAt(int y, int mo, int d, int h, int mi, int s) {   // in the time zone the controller runs on
+  struct tm tm = {};
+  tm.tm_year = y - 1900; tm.tm_mon = mo - 1; tm.tm_mday = d; tm.tm_hour = h; tm.tm_min = mi; tm.tm_sec = s; tm.tm_isdst = -1;
+  return mktime(&tm);
+}
+// Once a second for n seconds, as the blinds task: webTick with the lock held (motion: motionTick every millisecond
+// between). True when a restart came.
+static bool seconds(int n, bool motion = false) {
+  for (int i = 0; i < n; i++) {
+    if (motion) run(1000); else host::advanceMs(1000);
+    if (webTickOnce()) return true;
+  }
+  return false;
+}
+
+static void testGuestCommands() {
+  Room r;
+  roomStart(r);
+  const char *cmds[] = {"/api/s", "/api/cfg", "/api/go?b=0&t=30", "/api/stop", "/api/scenes", "/api/scene?gid=5&mask=1&t=0,0,0"};
+  bool all = true;
+  for (const char *c : cmds) {
+    Answer a = send(r.g, c);
+    if (a.st != 200 || a.out.find("\"err\"") != std::string::npos) { all = false; printf("  %s from a Guest: %s\n", c, a.out.c_str()); }
+  }
+  CHECK(all, "a Guest sends /api/s, /api/cfg, /api/go, /api/stop, /api/scenes and /api/scene: each works");
+  endsBy(60000);
+}
+
+// ---- status and the developer page (hState, hDev, resetReason)
+static void testStatus() {
+  Room r;
+  roomStart(r);
+  host::setWallClock(1795370000);
+  host::advanceMs(2000);
+  homes = 2;
+  SimPhone w;
+  CHECK(askJoin(w, "Kid"), "a phone asks to join");
+  Answer a = send(r.o, "/api/s");
+  std::string s = a.out;
+  CHECK(jsonStr(s, "v") == FW_VERSION && jsonStr(s, "name") == "Blinds", "/api/s: the firmware version and the name");
+  CHECK(num(s, "me") == 1 && num(s, "t") == (int)time(nullptr) && num(s, "tok") == 1 && num(s, "up") == (int)(millis() / 1000),
+        "/api/s as an Owner: me 1, the clock, clock set, seconds running");
+  std::string b = rawOf(s, "batt");
+  CHECK(rawOf(b, "v") == "3.90" && num(b, "pct") == battPercent(3.9f) && jsonStr(b, "st") == "battery" && num(b, "low") == 0 && num(b, "src") == SRC_BATTERY,
+        "the battery: resting volts, Battery level, charge state, not under the Motor cut-off, Power source Battery");
+  CHECK(num(s, "mv") == -1 && num(s, "gentle") == 0 && num(s, "asks") == 1 && num(s, "hkey") == 0 && num(s, "hk") == 2,
+        "no move, no gentle move, one Join request waiting, no hub key, in two Matter homes");
+  CHECK(jsonStr(s, "topic") == hexOf(cloudTopic, 16) && num(s, "closeUp") == 1 && num(s, "sync") == 0 && num(s, "par") == 1, "the topic, and the modes");
+  tiltTo(1, -50);
+  lockedDo([] { ramp[2] = {true, 0, 50, millis(), 60000, 0}; });
+  lockedDo([] { vbatRest = 3.30f; vin = 4.3f; powered = true; });
+  host::setWallClock(localAt(2026, 11, 23, 2, 0, 0));
+  lockedDo([] { sx.lat = 41.88f; sx.lon = -87.63f; });
+  s = send(r.g, "/api/s").out;
+  b = rawOf(s, "batt");
+  CHECK(num(s, "me") == 0 && jsonStr(s, "topic") == hexOf(cloudTopic, 16), "as a Guest: me 0, the topic too");
+  CHECK(num(b, "low") == 1 && rawOf(b, "vin") == "4.30" && jsonStr(b, "st") == "charging" && num(b, "src") == SRC_USB,
+        "under the Motor cut-off: low 1; input power at night: charging, Power source USB");
+  CHECK(num(s, "mv") == 1 && num(s, "gentle") == 1, "blind 2 moving, a gentle move running");
+  std::vector<std::string> blinds = items(rawOf(s, "b"));
+  std::vector<std::string> fixture = items(readFile(wireDir + "/state_blinds.json"));
+  CHECK(blinds.size() == 3 && fixture.size() == 4 && topKeys(blinds[0]) == topKeys(fixture[1]) && rawOf(blinds[0], "an") == "1",
+        "the b list: an analog blind has the keys of state_blinds.json's analog blind, in order, an 1");
+  CHECK(num(blinds[1], "mov") == 1 && rawOf(blinds[1], "tgt") == "-50" && jsonStr(blinds[0], "name") == "Blind 1", "blind 2 moving to -50");
+  lockedDo([] { vbatRest = vbat = 3.9f; powered = false; });
+  lockedDo(moveStop);
+  endsBy(60000);
+  cfgSave();
+  motionRestart();
+  blind(0, 100, true);
+  s = send(r.o, "/api/s").out;
+  blinds = items(rawOf(s, "b"));
+  CHECK(topKeys(blinds[0]) == topKeys(fixture[0]) && rawOf(blinds[0], "an") == "?", "a PWM blind: the keys of state_blinds.json's first blind, no an");
+}
+
+static void testDevPage() {
+  Room r;
+  roomStart(r);
+  const uint8_t mac[6] = {0x60, 0x55, 0xF9, 0x01, 0x02, 0x03};
+  host::setMac(mac);
+  host::board().chipRev = 2;
+  host::board().heapFree = 123456;
+  host::board().heapMin = 99999;
+  host::board().celsius = 31.3f;
+  threadJson = "{\"role\":\"child\"}";
+  lockedDo([] { stats.otaOk = 4; stats.brownouts = 2; cfg.b[2].down = NAN; });
+  Answer a = send(r.o, "/api/dev");
+  std::string sys = rawOf(a.out, "sys");
+  CHECK(num(sys, "rev") == 2 && jsonStr(sys, "mac") == "60:55:F9:01:02:03" && num(sys, "heap") == 123456 && num(sys, "heapMin") == 99999 &&
+            rawOf(sys, "temp") == "31.3",
+        "/api/dev: the chip revision, MAC, free memory and temperature the board has");
+  CHECK(jsonStr(sys, "part") == "ota_0" && num(sys, "appMax") == 0x1e0000 && num(sys, "pending") == 0 && jsonStr(sys, "rst") == "power on",
+        "the running slot's label and size, nothing on trial, the reset reason");
+  CHECK(rawOf(a.out, "thread") == threadJson, "the Thread facts from the hub link");
+  std::string st = rawOf(a.out, "st");
+  CHECK(num(st, "boots") == 1 && num(st, "brown") == 2 && num(st, "ota") == 4, "the counters");
+  CHECK(rawOf(a.out, "tune") == "{\"grace\":8000,\"stall\":2500,\"deg10\":10,\"max\":180,\"lead10\":80}", "the stall tune");
+  CHECK(num(rawOf(a.out, "pwr"), "next") == 0, "no Schedule: next 0");
+  std::vector<std::string> p = items(rawOf(a.out, "p"));
+  CHECK(p.size() == 3 && rawOf(p[0], "up") == "200.0" && rawOf(p[0], "open") == "290.0" && rawOf(p[0], "down") == "20.0" && rawOf(p[0], "prob") == "null" &&
+            jsonStr(p[0], "sig") == "analog",
+        "per blind: its Marks, no problem, analog");
+  CHECK(rawOf(p[2], "down") == "null" && jsonStr(p[2], "prob") != "", "a blind missing a Mark: null, and its problem");
+  host::board().noTempSensor = true;
+  motionRestart();
+  CHECK(!tsens, "webBegin with a temperature sensor that will not install: none");
+  a = send(r.o, "/api/dev");
+  CHECK(a.st == 200 && rawOf(rawOf(a.out, "sys"), "temp") == "0.0", "no temperature sensor: temp 0.0, no crash");
+  host::board().noTempSensor = false;
+  host::board().chipRev = 1;
+  host::board().heapFree = 180000;
+  host::board().heapMin = 150000;
+  host::board().celsius = 24.5f;
+  motionRestart();
+  CHECK(tsens != nullptr, "webBegin: the temperature sensor ready");
+}
+
+static void testResetReasonWords() {
+  struct { esp_reset_reason_t why; const char *words; } cases[] = {
+      {ESP_RST_POWERON, "power on"}, {ESP_RST_SW, "restart / update"}, {ESP_RST_PANIC, "crash"}, {ESP_RST_BROWNOUT, "brownout (supply dipped)"},
+      {ESP_RST_INT_WDT, "watchdog"}, {ESP_RST_TASK_WDT, "watchdog"}, {ESP_RST_WDT, "watchdog"}, {ESP_RST_USB, "USB"}, {ESP_RST_EXT, "other"}};
+  bool all = true;
+  for (auto &c : cases) {
+    host::setResetReason(c.why);
+    if (strcmp(resetReason(), c.words)) { all = false; printf("  reset reason %d: %s\n", (int)c.why, resetReason()); }
+  }
+  CHECK(all, "each reset reason in words");
+  host::setResetReason(ESP_RST_POWERON);
+}
+
+// ---- settings (hCfg, hSet, hReset)
+static void testCfgAsTheAppWrites() {
+  Room r;
+  roomStart(r);
+  std::string want = readFile(wireDir + "/cfg.json");
+  const char *sets[] = {"name&v=Den%20%22East%22", "closeUp&v=1", "sync&v=1", "par&v=0", "tz&v=CST6CDT%2CM3.2.0%2CM11.1.0&n=America%2FChicago",
+                        "hksep&v=0", "loc&v=41.88%2C-87.63", "b0.fav&v=0", "b1.name&v=Middle", "b1.speed&v=80", "b1.fav&v=-50",
+                        "b2.name&v=Right", "b2.hid&v=1", "b2.speed&v=50", "b2.fav&v=100"};
+  bool ok = send(r.o, "/api/set?k=b0.name&v=" + pct("Mom\xE2\x80\x99s caf\xC3\xA9")).out == OK;
+  for (const char *k : sets) ok = send(r.o, std::string("/api/set?k=") + k).out == OK && ok;
+  ok = send(r.o, "/api/sched?i=0&on=1&days=62&mask=7&min=420&tilt=0&kind=0&off=0&ramp=0&gid=1").out == OK && ok;
+  std::string slot = readFile(wireDir + "/slot_write.txt");
+  while (!slot.empty() && (slot.back() == '\n' || slot.back() == '\r')) slot.pop_back();
+  ok = send(r.o, slot).out == OK && ok;
+  CHECK(ok, "the app's writes: the name, the modes, the place, the blinds, two Schedules");
+  time_t at = 1795385700;
+  host::setWallClock(at + 60);
+  lockedDo([&] { lite.l[2].day = 20261123; lite.l[2].at = (uint32_t)at; lite.l[2].why = LIGHT_BY_LIGHT; lite.pw.lastDark = lite.pw.lastLit = (uint32_t)at; });
+  std::string got = send(r.o, "/api/cfg").out;
+  restartSoon = false;
+  CHECK(topKeys(got) == topKeys(want), "/api/cfg: the keys of cfg.json, in its order");
+  const char *same[] = {"name", "ports", "slots", "panel", "closeUp", "sync", "par", "tz", "tzn", "hksep", "b", "sched", "lat", "lon"};
+  bool all = true;
+  for (const char *k : same) if (rawOf(got, k) != rawOf(want, k)) { all = false; printf("  %s: %s, cfg.json %s\n", k, rawOf(got, k).c_str(), rawOf(want, k).c_str()); }
+  CHECK(all, "the written values are cfg.json's (the blinds, the Schedules, the Light trigger's last fire, the place)");
+  std::vector<std::string> sun = items(rawOf(got, "sun"));
+  CHECK(sun.size() == 2 && atol(sun[0].c_str()) == 1795351717 && atol(sun[1].c_str()) == 1795386302, "the sun times for that day and place");
+}
+
+static void testSetEachKey() {
+  Room r;
+  roomStart(r);
+  auto set = [&](const std::string &k, const std::string &v) { return send(r.o, "/api/set?k=" + k + "&v=" + pct(v)).out; };
+  bool ok = set("name", "Sal\xC3\xB3n") == OK && !strcmp(cfg.name, "Sal\xC3\xB3n");
+  ok = set("closeUp", "1") == OK && cfg.closeUp == 1 && ok;
+  lockedDo([] { hand.ref[0] = 12; });
+  ok = set("sync", "1") == OK && syncMode == 1 && isnan(hand.ref[0]) && ok;
+  ok = set("par", "0") == OK && parMode == 0 && ok;
+  ok = set("hksep", "1") == OK && hkSeparate == 1 && restartSoon && host::flashBlob("blinds", "hksep") == std::vector<uint8_t>{1} && ok;
+  restartSoon = false;
+  ok = set("tune.grace", "40000") == OK && tune.graceMs == 30000 && ok;
+  ok = set("tune.stall", "100") == OK && tune.stallMs == 200 && ok;
+  ok = set("tune.deg10", "500") == OK && tune.stallDeg10 == 100 && ok;
+  ok = set("tune.max", "1") == OK && tune.moveMaxS == 5 && ok;
+  ok = set("tune.lead10", "5") == OK && leadMax10 == 20 && ok;
+  ok = set("tz", "EST5EDT,M3.2.0,M11.1.0") == OK && !strcmp(cfg.tz, "EST5EDT,M3.2.0,M11.1.0") && ok;
+  ok = send(r.o, "/api/set?k=tz&v=" + pct("MST7") + "&n=" + pct("America/Denver")).out == OK && !strcmp(cfg.tz, "MST7") && !strcmp(cfg.tzName, "America/Denver") && ok;
+  ok = set("b0.name", "Caf\xC3\xA9") == OK && !strcmp(cfg.b[0].name, "Caf\xC3\xA9") && ok;
+  ok = set("b1.speed", "20") == OK && cfg.b[1].speed == 50 && ok;
+  ok = set("b1.fav", "-300") == OK && cfg.b[1].fav == -100 && ok;
+  ok = set("b2.hid", "1") == OK && cfg.b[2].hidden == 1 && ok;
+  ok = set("b2.sign", "-1") == OK && cfg.b[2].motSign == -1 && ok;
+  CHECK(ok, "each /api/set key: the new value in force, the tune held to its ends");
+  motionRestart();
+  CHECK(!strcmp(cfg.name, "Sal\xC3\xB3n") && cfg.closeUp == 1 && hkSeparate == 1 && tune.graceMs == 30000 && tune.stallMs == 200 &&
+            tune.stallDeg10 == 100 && tune.moveMaxS == 5 && leadMax10 == 20 && !strcmp(cfg.tz, "MST7") && !strcmp(cfg.tzName, "America/Denver") &&
+            !strcmp(cfg.b[0].name, "Caf\xC3\xA9") && cfg.b[1].speed == 50 && cfg.b[1].fav == -100 && cfg.b[2].hidden == 1 && cfg.b[2].motSign == -1,
+        "and each still there after a restart");
+  CHECK(parMode == 0, "par too (sync: the test start turns Follow off)");
+  CHECK(set("name", "") == OK && !strcmp(cfg.name, "Blinds") && set("b1.name", "") == OK && !strcmp(cfg.b[1].name, "Blind 2"),
+        "an empty name: Blinds; an empty blind name: Blind 2");
+  CHECK(set("speed", "1") == refused("unknown setting") && set("b1.speed", "140") == OK && cfg.b[1].speed == 100 && set("b1.fav", "300") == OK &&
+            cfg.b[1].fav == 100 && set("b2.sign", "1") == OK && cfg.b[2].motSign == 1 && set("tune.lead10", "900") == OK && leadMax10 == 250,
+        "the other ends");
+  set("tz", "CST6CDT,M3.2.0,M11.1.0");
+}
+
+static void testSetRefusals() {
+  Room r;
+  roomStart(r);
+  auto set = [&](const std::string &k, const std::string &v) { return send(r.o, "/api/set?k=" + k + "&v=" + pct(v)).out; };
+  Settings before = cfg;
+  SchedExtra sxBefore = sx;
+  static const std::string longZone(44, 'A');
+  struct { const char *k, *v, *why; } cases[] = {
+      {"loc", "41.8", "bad place"}, {"loc", "91,0", "bad place"}, {"loc", "0,181", "bad place"},
+      {"tz", "ab", "bad time zone"}, {"tz", longZone.c_str(), "bad time zone"},
+      {"battMode", "1", "not in this version"}, {"checkin", "1", "not in this version"}, {"tx", "20", "not in this version"},
+      {"b9.name", "X", "no such blind"}, {"b0.zzz", "1", "unknown setting"}, {"zzz", "1", "unknown setting"}};
+  bool all = true;
+  for (auto &c : cases) {
+    std::string out = set(c.k, c.v);
+    if (out != refused(c.why) || memcmp(&cfg, &before, sizeof cfg) || memcmp(&sx, &sxBefore, sizeof sx)) {
+      all = false;
+      printf("  /api/set %s=%s: %s\n", c.k, c.v, out.c_str());
+    }
+  }
+  CHECK(all, "each refusal with its reason, nothing changed");
+}
+
+static void testResetCommand() {
+  Room r;
+  roomStart(r);
+  lockedDo([] { stats.moves[0] = 5; stats.otaOk = 2; battHist[BATT_HIST - 1] = 120; cfg.closeUp = 0; strlcpy(cfg.name, "Den", sizeof cfg.name); });
+  uint32_t seq = logSeq;
+  CHECK(send(r.o, "/api/reset?what=stats").out == OK && stats.magic == STAT_MAGIC && stats.moves[0] == 0 && stats.otaOk == 0 && stats.boots == 0,
+        "/api/reset stats: the counters zero, the magic kept");
+  CHECK(send(r.o, "/api/reset?what=hist").out == OK && battHist[BATT_HIST - 1] == 0, "hist: the history zero");
+  CHECK(send(r.o, "/api/reset?what=all").out == OK && !strcmp(cfg.name, "Blinds") && cfg.closeUp == 1 && isnan(cfg.b[0].up), "all: the defaults back");
+  CHECK(count(logFrom(seq), "reset: ") == 3 && has(logFrom(seq), "reset: stats") && has(logFrom(seq), "reset: hist") && has(logFrom(seq), "reset: all"),
+        "a log line each");
+  seq = logSeq;
+  CHECK(send(r.o, "/api/reset?what=zzz").out == refused("unknown") && logSeq == seq, "what=zzz: unknown, no log line");
+  motionRestart();
+  CHECK(stats.moves[0] == 0 && battHist[BATT_HIST - 1] == 0 && !strcmp(cfg.name, "Blinds"), "all three kept in flash");
+}
+
+// ---- moves (hGo, hStop, hJog, hAngle, hMark, hWatch, hTrace, hAwake)
+static bool noMotorOn() { for (int p = 0; p < PORTS; p++) if (host::enHigh(p) || movingPort(p)) return false; return true; }
+static void testGo() {
+  Room r;
+  roomStart(r);
+  CHECK(send(r.o, "/api/go?b=1&t=40").out == OK && near(bs[1].target, 40, 0.01) && movingPort(1) && !movingPort(0), "/api/go?b=1&t=40: blind 2 to tilt 40");
+  lockedDo([] { cfg.b[1].fav = -30; });
+  struct { const char *to; int closeUp; float want; } words[] = {{"open", 1, 0}, {"up", 1, 100}, {"down", 1, -100}, {"fav", 1, -30}, {"close", 0, -100}, {"close", 1, 100}};
+  bool all = true;
+  for (auto &w : words) {
+    lockedDo([&] { cfg.closeUp = w.closeUp; });
+    std::string out = send(r.o, std::string("/api/go?b=1&to=") + w.to).out;
+    if (out != OK || !near(bs[1].target, w.want, 0.01)) { all = false; printf("  to=%s closeUp=%d: %s %.1f\n", w.to, w.closeUp, out.c_str(), bs[1].target); }
+  }
+  CHECK(all, "each word: open, up, down, fav, close (closeUp 0 and 1) gives its Target");
+  endsBy(60000);
+  lockedDo([] { cfg.b[0].fav = 10; cfg.b[1].fav = -20; cfg.b[2].fav = 30; });
+  CHECK(send(r.o, "/api/go?b=all&to=fav").out == OK && near(bs[0].target, 10, 0.01) && near(bs[1].target, -20, 0.01) && near(bs[2].target, 30, 0.01),
+        "b=all&to=fav: each blind to its own favorite");
+  endsBy(60000);
+  CHECK(send(r.o, "/api/go?t=-40").out == OK && near(bs[0].target, -40, 0.01) && !movingPort(1), "no b: blind 1 moves (today's rule)");
+  endsBy(60000);
+  uint32_t seq = logSeq;
+  CHECK(send(r.o, "/api/go?b=0&t=-60&ramp=5").out == OK && ramp[0].on && ramp[0].durMs == 300000 && !movingPort(0) && has(logFrom(seq), "gentle move started (5 min)"),
+        "ramp=5: a gentle move, and its log line");
+  CHECK(send(r.o, "/api/go?b=0&t=-60&ramp=600").out == OK && ramp[0].on && ramp[0].durMs == 3600000 && has(logFrom(seq), "gentle move started (60 min)"),
+        "ramp=600 is held to 60 minutes");
+  CHECK(send(r.o, "/api/stop").out == OK && !rampAny(), "/api/stop during a gentle move: ended");
+  CHECK(send(r.o, "/api/go?b=0&to=sideways").out == refused("unknown position") && noMotorOn(), "an unknown word: unknown position, no motor on");
+  lockedDo([] { vbatRest = 3.30f; });
+  CHECK(send(r.o, "/api/go?b=0&t=20").out == refused("battery too low") && noMotorOn(), "under the Motor cut-off: battery too low, no motor on");
+  lockedDo([] { vbatRest = 3.9f; });
+  send(r.o, "/api/go?b=2&t=-80");
+  run(500);
+  CHECK(movingPort(2) && send(r.o, "/api/stop").out == OK, "/api/stop during a move");
+  CHECK(endsBy(30000) && is(bs[2].last, "stopped"), "the move ends: stopped");
+}
+
+static void testJogAngleWatch() {
+  Room r;
+  roomStart(r);
+  CHECK(send(r.o, "/api/jog?b=0&d=1&p=60&ms=500").out == OK && mvs[0].kind == MV_JOG && mvs[0].jogDir == 1 && mvs[0].pct == 60, "/api/jog: the motor runs");
+  CHECK(send(r.o, "/api/jog?b=9&d=1&p=60&ms=500").out == refused("no such blind"), "/api/jog on blind 9: no such blind");
+  endsBy(10000);
+  CHECK(send(r.o, "/api/jog?b=1&d=-1&p=10&ms=500&seek=1").out == OK && mvs[1].jogDir == -1 && mvs[1].pct == 30 && mvs[1].seek, "a seek, the power held to 30");
+  endsBy(60000);
+  CHECK(send(r.o, "/api/angle?b=0&a=250").out == OK && mvs[0].kind == MV_ANGLE, "/api/angle: the motor runs");
+  CHECK(send(r.o, "/api/angle?b=9&a=250").out == refused("no such blind"), "/api/angle on blind 9: no such blind");
+  CHECK(send(r.o, "/api/mark?b=1&w=open").out == refused("wait until it stops"), "/api/mark during a move: wait until it stops");
+  endsBy(60000);
+  Answer a = send(r.o, "/api/mark?b=1&w=open");
+  CHECK(num(a.out, "ok") == 1 && near(atof(rawOf(a.out, "ang").c_str()), 290, 1) && rawOf(a.out, "prob") == "null" && near(cfg.b[1].open, 290, 1),
+        "/api/mark: the Mark set, its angle, no problem");
+  lockedDo([] { cfg.b[2].up = 100; });
+  a = send(r.o, "/api/mark?b=2&w=open");
+  CHECK(num(a.out, "ok") == 1 && jsonStr(a.out, "prob") == marksProblem(2), "Marks with a problem: the problem");
+  CHECK(send(r.o, "/api/mark?b=1&w=sideways").out == refused("unknown mark"), "an unknown mark: refused");
+  CHECK(send(r.o, "/api/watch?b=2").out == OK && hand.port == 2, "/api/watch: Setup open for that blind");
+  CHECK(send(r.o, "/api/watch?b=9").out == refused("no such blind") && send(r.o, "/api/watch?b=-1").out == refused("no such blind"), "blind 9 or -1: no such blind");
+}
+
+static void testTraceAndAwake() {
+  Room r;
+  roomStart(r);
+  host::tilter(0).degPerS = 4;
+  CHECK(send(r.o, "/api/go?b=0&to=down").out == OK, "a long move");
+  run(3000);
+  Answer a = send(r.o, "/api/trace");
+  CHECK(num(a.out, "moving") == 1 && num(a.out, "n") > 0, "/api/trace during the move: moving 1");
+  endsBy(120000);
+  int n = traceN;
+  a = send(r.o, "/api/trace");
+  CHECK(n > 300 && num(a.out, "n") == n && num(a.out, "from") == 0 && num(a.out, "moving") == 0 && items(rawOf(a.out, "p")).size() == 300,
+        "after a long move: the first page of 300 points");
+  a = send(r.o, "/api/trace?from=300");
+  CHECK(items(rawOf(a.out, "p")).size() == (size_t)std::min(300, n - 300) && rawOf(a.out, "p").rfind(std::string("[[") + std::to_string(trace[300].t) + ",", 0) == 0,
+        "from=300: the next page, from point 300");
+  a = send(r.o, "/api/trace?from=" + std::to_string(n + 50));
+  CHECK(num(a.out, "from") == n && rawOf(a.out, "p") == "[]", "from past the end: held to the count, no points");
+  CHECK(send(r.o, "/api/awake?min=5").out == OK && keepAwakeUntil == millis() + 300000, "/api/awake?min=5: 5 minutes");
+  CHECK(send(r.o, "/api/awake?min=9999").out == OK && keepAwakeUntil == millis() + 720u * 60000, "min=9999: 720 minutes");
+  CHECK(send(r.o, "/api/awake?min=0").out == OK && keepAwakeUntil == millis(), "min=0: now");
+}
+
+// ---- logs (hLog, hHist, hPowerLog, hLightLog)
+static void testLogs() {
+  Room r;
+  roomStart(r);
+  for (int i = 0; i < 70; i++) event("line %d", i);
+  uint32_t first = logSeq - LOG_N;
+  Answer a = send(r.o, "/api/log?since=" + std::to_string(logSeq - 3));
+  std::vector<std::string> lines = items(rawOf(a.out, "lines"));
+  CHECK(num(a.out, "seq") == (int)logSeq && lines.size() == 3 && has(lines[2], "line 69"), "/api/log since a line inside it: the lines from there");
+  a = send(r.o, "/api/log?since=" + std::to_string(first - 1));
+  lines = items(rawOf(a.out, "lines"));
+  CHECK(lines.size() == (size_t)LOG_N && jsonStr("{\"x\":" + lines[0] + "}", "x") == logLines[first % LOG_N], "older than the oldest kept: all 60");
+  a = send(r.o, "/api/log?since=" + std::to_string(logSeq + 5));
+  CHECK(items(rawOf(a.out, "lines")).size() == (size_t)LOG_N, "past the end: all 60");
+  lockedDo([] { memset(battHist, 0, sizeof battHist); battHist[0] = 7; battHist[BATT_HIST - 1] = 140; });
+  a = send(r.o, "/api/hist");
+  std::vector<std::string> h = items(rawOf(a.out, "h"));
+  CHECK(h.size() == (size_t)BATT_HIST && h[0] == "7" && h[1] == "0" && h[BATT_HIST - 1] == "140", "/api/hist: the week of hours as stored");
+  a = send(r.o, "/api/powerlog");
+  CHECK(a.out == "{\"cols\":[\"at\",\"rest\",\"vin\",\"on\",\"temp\",\"motor\",\"flags\",\"lit\",\"vinAvg\"],\"rows\":[]}", "/api/powerlog, an empty log: no rows");
+  lockedDo([] {
+    plog[PLOG_N - 2] = {1800000000, 140, 172, 30, 25, 12, 1, 20, 96, {0, 0}};
+    plog[PLOG_N - 1] = {1800003600, 120, 0, 0, -3, 0, 0, 0, 0, {0, 0}};
+  });
+  a = send(r.o, "/api/powerlog");
+  CHECK(rawOf(a.out, "rows") == "[[1800000000,3.90,4.30,30,25,12,1,20,2.40],[1800003600,3.70,0.00,0,-3,0,0,0,0.00]]",
+        "one row per stored hour, oldest first, in volts and minutes");
+  a = send(r.o, "/api/lightlog");
+  CHECK(a.out == "{\"scale\":40,\"w\":[]}", "/api/lightlog, nothing stored: no windows");
+  lockedDo([] {
+    llog[LLOG_N - 1].start = 1800000000; llog[LLOG_N - 1].rise = 1; llog[LLOG_N - 1].v[0] = 9;
+    llCur.start = 1800036000; llCur.rise = 0; llCur.v[LLOG_MIN - 1] = 44;
+  });
+  a = send(r.o, "/api/lightlog");
+  std::vector<std::string> w = items(rawOf(a.out, "w"));
+  CHECK(w.size() == 2 && num(w[0], "start") == 1800000000 && num(w[0], "rise") == 1 && items(rawOf(w[0], "v")).size() == (size_t)LLOG_MIN &&
+            items(rawOf(w[0], "v"))[0] == "9",
+        "/api/lightlog: each stored window");
+  CHECK(w.size() == 2 && num(w[1], "start") == 1800036000 && num(w[1], "rise") == 0 && items(rawOf(w[1], "v")).back() == "44", "and the one being filled, last");
+}
+
+// ---- the start, the hello, a restart, a firmware on trial (webBegin, helloJson, hReboot, hKeep, trialTick)
+static void testHello() {
+  secStart();
+  const uint8_t mac[6] = {0x60, 0x55, 0xF9, 0xAA, 0xBB, 0x0C};
+  host::setMac(mac);
+  for (int i = 0; i < 32; i++) host::slots().sha[i] = (uint8_t)i;
+  std::string h = helloJson();
+  char want[400];
+  snprintf(want, sizeof want, "{\"id\":\"6055f9aabb0c\",\"name\":\"Blinds\",\"fw\":\"%s\",\"img\":\"%s\",\"boot\":\"%s\",\"owned\":0,\"home\":0,\"net\":\"thread\",\"hub\":0,\"proto\":%d}",
+           FW_VERSION, hexOf(host::slots().sha, 32).c_str(), hexOf(bootId, 4).c_str(), LINK_PROTO);
+  CHECK(h == want, "helloJson: id from the MAC, the name, the firmware, the slot's SHA-256, the boot id, not owned");
+  CHECK(!host::held(mx), "helloJson: the controller lock is free after it");
+  SimPhone o;
+  CHECK(pairFirst(o), "a first phone pairs");
+  homes = 1;
+  hubUp = true;
+  host::slots().sha[0] = 0xEE;
+  h = helloJson();
+  CHECK(num(h, "owned") == 1 && num(h, "home") == 1 && num(h, "hub") == 1, "owned 1 after Pairing; home and hub as the hub link says");
+  CHECK(jsonStr(h, "img").rfind("0001", 0) == 0, "the slot's hash is read once a start: a changed slot does not show yet");
+  motionRestart();
+  host::setMac(mac);
+  CHECK(jsonStr(helloJson(), "img").rfind("ee01", 0) == 0, "after a restart: the changed slot's hash");
+  memset(host::slots().sha, 0, 32);
+}
+
+static void testRestartFromTheApp() {
+  Room r;
+  roomStart(r);
+  parMode = 0;
+  tiltTo(0, -60);
+  run(300);
+  tiltTo(1, -60);
+  lockedDo([] { ramp[2] = {true, 0, 50, millis(), 60000, 0}; });
+  CHECK(movingPort(0) && bs[1].queued && rampAny(), "blind 1 moving, blind 2 waiting, a gentle move on blind 3");
+  CHECK(send(r.o, "/api/reboot").out == OK && restartSoon, "/api/reboot: asked");
+  struct { bool seen, lockFree, stopped, nothingWaits, noGentle, asleep, held; uint32_t at; } w = {};
+  std::function<void()> look = [&] {
+    if (host::held(mx)) { host::duringDelay(look); return; }   // a sensor read on the way: not the wait yet
+    w.seen = true;
+    w.lockFree = true;
+    w.stopped = !moving() && is(bs[0].last, "stopped: restarting");
+    w.nothingWaits = !bs[0].queued && !bs[1].queued && !bs[2].queued;
+    w.noGentle = !rampAny();
+    w.asleep = !host::enHigh(0) && !host::enHigh(1) && !host::enHigh(2);
+    w.held = motorsHeld && is(startTilt(2, 0), "restarting");
+    w.at = millis();
+  };
+  host::duringDelay(look);
+  int before = host::restarts();
+  bool restarted = webTickOnce();
+  CHECK(w.seen && w.lockFree, "the wait before the restart: the controller lock free");
+  CHECK(w.stopped && w.nothingWaits && w.noGentle, "the moving blind stopped: restarting; nothing waiting; the gentle move ended");
+  CHECK(w.asleep && w.held, "every driver asleep, and no motor may start");
+  CHECK(restarted && host::restarts() == before + 1 && !restartSoon && esp_reset_reason() == ESP_RST_SW, "then one restart");
+}
+
+static void testKeepCommand() {
+  host::slots().state = host::SLOT_ON_TRIAL;
+  Room r;
+  roomStart(r);
+  CHECK(otaPending, "a firmware on trial");
+  uint32_t seq = logSeq, ok0 = stats.otaOk;
+  CHECK(send(r.o, "/api/keep").out == OK && !otaPending && stats.otaOk == ok0 + 1 && host::slots().state == host::SLOT_KEPT,
+        "/api/keep: it is kept, the update counter up by one");
+  CHECK(has(logFrom(seq), "new firmware " FW_VERSION " confirmed"), "the log line");
+  seq = logSeq;
+  CHECK(send(r.o, "/api/keep").out == OK && stats.otaOk == ok0 + 1 && logSeq == seq, "none on trial: nothing");
+  seq = logSeq;
+  CHECK(send(r.o, "/api/otaopen").out == OK && otaWindow == uptimeMs() + OTA_WINDOW_MS && has(logFrom(seq), "firmware updates allowed for 5 minutes"),
+        "/api/otaopen: updates allowed for 5 minutes, the log line");
+  CHECK(send(r.o, "/api/homeopen").out == homeCodeJson() && homeOpens == 1, "/api/homeopen: the home window opened, the code answered");
+}
+
+static void trialStart() {
+  host::slots().state = host::SLOT_ON_TRIAL;
+  motionStart();
+}
+static void testTrial() {
+  trialStart();
+  hubUp = true;
+  seconds(60);
+  CHECK(otaPending, "on trial, hub link up for a minute: still on trial");
+  uint32_t seq = logSeq;
+  seconds(2);
+  CHECK(!otaPending && host::slots().state == host::SLOT_KEPT && has(logFrom(seq), "confirmed"), "up for over a minute: kept");
+
+  trialStart();
+  hubLinkSeen = 500;
+  seconds(62);
+  CHECK(!otaPending, "Thread to the hub seen lately counts as the link up too: kept");
+
+  trialStart();
+  joined = true;
+  host::slots().otherHasFirmware = true;
+  blind(0, 290);
+  seconds(298);
+  CHECK(otaPending, "joined, no link, under 5 minutes: waits");
+  tiltTo(0, -60);
+  struct { bool seen, line, moving, lockFree; } w = {};
+  seq = logSeq;
+  std::function<void()> look = [&] {
+    if (host::held(mx)) { host::duringDelay(look); return; }
+    w = {true, has(logFrom(seq), "new firmware could not reach the Tilt Hub: going back"), movingPort(0), true};
+  };
+  host::duringDelay(look);
+  int before = host::restarts();
+  bool restarted = seconds(5);
+  CHECK(restarted && w.seen && w.line && w.lockFree, "no link after 5 minutes, another firmware there: the log line, the lock let go");
+  CHECK(w.moving, "the go-back leaves the moves alone");
+  CHECK(host::restarts() == before + 1 && host::slots().state == host::SLOT_GONE_BACK, "and goes back");
+  host::slots().otherHasFirmware = false;
+
+  trialStart();
+  joined = true;
+  seq = logSeq;
+  CHECK(!seconds(310), "the same with no firmware in the other slot: no restart");
+  CHECK(count(logFrom(seq), "going back") == 1 && count(logFrom(seq), "cannot go back (ESP_ERR_OTA_ROLLBACK_FAILED): staying on this firmware") == 1,
+        "cannot go back: logged once");
+  seconds(60);
+  CHECK(count(logFrom(seq), "going back") == 1 && otaPending, "no second try, still on trial");
+  SimPhone o;
+  CHECK(pairFirst(o) && send(o, "/api/keep").out == OK && !otaPending, "and /api/keep still works");
+
+  trialStart();
+  seq = logSeq;
+  seconds(400);
+  CHECK(otaPending && !has(logFrom(seq), "going back"), "on trial but not joined: it waits");
+  host::slots().state = host::SLOT_KEPT;
+  motionStart();
+  hubUp = true;
+  joined = true;
+  seq = logSeq;
+  seconds(400);
+  CHECK(!otaPending && !has(logFrom(seq), "firmware"), "not on trial: nothing");
+}
+
+// ---- once a second (histTick, devlogTick, powerTick)
+static void testHistTick() {
+  motionStart();
+  host::board().celsius = 27.0f;
+  host::setWallClock(1800000000);
+  lockedDo([] { vbatRest = 3.80f; });
+  seconds(1);
+  CHECK(battHist[BATT_HIST - 1] == 130 && plog[PLOG_N - 1].at == 0, "clock set: one battery history point at once, no power-log row yet");
+  lockedDo([] { vbatRest = 3.70f; });
+  seconds(3599);
+  CHECK(battHist[BATT_HIST - 1] == 130 && battHist[BATT_HIST - 2] != 130, "not again within the hour");
+  seconds(1);
+  CHECK(battHist[BATT_HIST - 1] == 120 && battHist[BATT_HIST - 2] == 130, "the next an hour later");
+  CHECK(plog[PLOG_N - 1].at == 1800003601 &&plog[PLOG_N - 1].tempC == 27 && plog[PLOG_N - 1].rest == 120, "and a power-log row from the second one on, with the board's temperature");
+  host::setWallClock(1799990000);
+  seconds(1);
+  CHECK(battHist[BATT_HIST - 2] == 120 && plog[PLOG_N - 1].at == 1799990001, "clock set back: a point at the next tick");
+  host::board().celsius = 24.5f;
+
+  motionStart();
+  seconds(3598);
+  CHECK(battHist[BATT_HIST - 1] == 0, "clock never set: no point in the first hour");
+  seconds(2);
+  CHECK(battHist[BATT_HIST - 1] == 140, "a point after an hour of running");
+}
+
+static void testDevlogAndPowerTicks() {
+  trialStart();
+  lockedDo([] { plogAcc.flags = 0; vin = 4.0f; powered = true; });
+  uint32_t seq = logSeq;
+  seconds(1);
+  CHECK(plogAcc.flags == 2 && plogAcc.ms == 0, "the first tick with a firmware on trial: the power-log flag 2, nothing added");
+  CHECK(!has(logFrom(seq), "input power") && !has(logFrom(seq), "on battery"), "the first tick: no power line");
+  seconds(3);
+  CHECK(plogAcc.ms == 3000 && plogAcc.poweredMs == 3000 && near(plogAcc.vinMax, 4.0, 0.001), "later ticks add the input and the powered time");
+  lockedDo([] { powered = false; vin = 0.2f; });
+  seconds(2);
+  lockedDo([] { powered = true; vin = 4.25f; });
+  seconds(2);
+  std::string l = logFrom(seq);
+  CHECK(count(l, "on battery (3.90 V)") == 1 && count(l, "input power connected (4.25 V)") == 1, "input power goes, then comes: \"on battery\" and \"input power connected\" once each");
+  host::slots().state = host::SLOT_KEPT;
+}
+
+// ---- Schedules (schedules.h). Monday 2026-11-23 in Chicago (the controller's time zone); the place of cfg.json.
+static const float LAT = 41.88f, LON = -87.63f;
+static void schedStart() {
+  motionStart();
+  for (int p = 0; p < PORTS; p++) blind(p, 290);
+}
+static void putSched(int i, int on, int days, int mask, int minute, int tilt, int kind = 0, int off = 0, int rampMin = 0, uint32_t gid = 0) {
+  lockedDo([&] {
+    Settings c = cfg;
+    c.sched[i] = Sched{};
+    Sched &s = c.sched[i];
+    s.on = on; s.days = days; s.mask = mask; s.minute = minute; s.tilt = tilt;
+    sx.x[i] = {(uint8_t)kind, (uint8_t)rampMin, (int16_t)off, gid};
+    sxSave();
+    cfgApply(c);
+  });
+}
+static bool targetIs(int p, float t) { return near(bs[p].target, t, 0.01); }
+static bool noTargets() { return isnan(bs[0].target) && isnan(bs[1].target) && isnan(bs[2].target); }
+
+static void testSchedBegin() {
+  motionStart();
+  CHECK(sx.magic == SX_MAGIC && isnan(sx.lat) && isnan(sx.lon) && sx.x[0].kind == 0 && lite.magic == LITE_MAGIC && lite.l[0].day == 0,
+        "schedBegin on empty flash: no extra facts, no place, no Light trigger memory");
+  SchedExtra other = {};
+  other.magic = SX_MAGIC + 1;
+  other.lat = 10;
+  LiteStore otherLite = {};
+  otherLite.magic = LITE_MAGIC + 1;
+  otherLite.l[0].day = 20261123;
+  host::putFlashBlob("blinds", "schx", &other, sizeof other);
+  host::putFlashBlob("blinds", "lite", &otherLite, sizeof otherLite);
+  motionRestart();
+  CHECK(sx.magic == SX_MAGIC && isnan(sx.lat) && lite.magic == LITE_MAGIC && lite.l[0].day == 0, "on another magic: the same");
+  lockedDo([] {
+    sx.lat = LAT; sx.lon = LON; sx.x[3] = {4, 10, -15, 77};
+    lite.l[3] = {20261123, 1795385700, 1, 9, 1, 0};
+    lite.pw = {1795300000, 1795310000, 5, 6, {0, 0}};
+    sxSave();
+    liteSave();
+  });
+  motionRestart();
+  CHECK(near(sx.lat, LAT, 1e-4) && near(sx.lon, LON, 1e-4) && sx.x[3].kind == 4 && sx.x[3].ramp == 10 && sx.x[3].off == -15 && sx.x[3].gid == 77,
+        "saved ones come back");
+  CHECK(lite.l[3].day == 20261123 && lite.l[3].at == 1795385700 && lite.l[3].why == 1 && lite.pw.lastDark == 1795300000 && lite.pw.lastLit == 1795310000,
+        "the Light trigger memory comes back");
+  CHECK(lite.l[3].run == 0 && lite.pw.darkRun == 0 && lite.pw.litRun == 0, "the steady runs at zero");
+}
+
+static void testClockSchedule() {
+  schedStart();
+  putSched(0, 1, 127, 0x05, 420, -50);
+  host::setWallClock(localAt(2026, 11, 23, 6, 59, 58));
+  uint32_t seq = logSeq;
+  seconds(1);
+  CHECK(noTargets(), "a clock Schedule at 07:00: no move at 06:59:59");
+  seconds(1);
+  CHECK(targetIs(0, -50) && targetIs(2, -50) && isnan(bs[1].target), "at 07:00: blinds 1 and 3 move");
+  CHECK(count(logFrom(seq), "schedule 1: tilt -50") == 1, "the log line");
+  seconds(1);
+  CHECK(count(logFrom(seq), "schedule 1: tilt -50") == 1, "none a second later");
+  endsBy(60000);
+
+  schedStart();
+  putSched(0, 1, 127 & ~(1 << 1), 0x07, 420, -50);           // every day but Monday
+  host::setWallClock(localAt(2026, 11, 23, 6, 59, 58));
+  seconds(4);
+  CHECK(noTargets(), "a day not in its days: no move");
+
+  schedStart();
+  putSched(0, 1, 127, 0x01, 420, -50);
+  host::setWallClock(localAt(2026, 11, 23, 7, 0, 59));
+  seconds(1);
+  CHECK(targetIs(0, -50), "the clock set 60 seconds after a Schedule's time: it runs");
+  endsBy(60000);
+  schedStart();
+  putSched(0, 1, 127, 0x01, 420, -50);
+  host::setWallClock(localAt(2026, 11, 23, 9, 0, 0));
+  seconds(2);
+  CHECK(noTargets(), "set 2 hours after: it does not");
+
+  schedStart();
+  putSched(0, 1, 127, 0x01, 420, -50);
+  host::setWallClock(localAt(2026, 11, 23, 6, 59, 59));
+  seq = logSeq;
+  seconds(3);
+  host::setWallClock(localAt(2026, 11, 23, 7, 0, 0));      // set back 2 seconds (the Tilt Hub's time, a little off)
+  seconds(3);
+  CHECK(count(logFrom(seq), "schedule 1:") == 1, "the clock set back a little after a Schedule ran: it does not run twice");
+  endsBy(60000);
+
+  schedStart();
+  host::setWallClock(localAt(2026, 11, 23, 7, 0, 30));
+  seconds(1);
+  SimPhone o;
+  CHECK(pairFirst(o) && send(o, "/api/sched?i=1&on=1&days=127&mask=1&min=420&tilt=-50&kind=0").out == OK, "/api/sched saves a Schedule for the minute just past");
+  lastSched = (uint32_t)localAt(2026, 11, 23, 6, 59, 0);      // as if the tick before had been a while ago
+  CHECK(send(o, "/api/sched?i=1&on=1&days=127&mask=1&min=420&tilt=-50&kind=0").out == OK && lastSched == (uint32_t)time(nullptr), "it starts from now");
+  seconds(2);
+  CHECK(noTargets(), "it does not run now");
+  CHECK(send(o, "/api/sched?i=8").out == refused("no such schedule") && send(o, "/api/sched?i=-1").out == refused("no such schedule"), "/api/sched?i=8: no such schedule");
+}
+
+static void testSunSchedules() {
+  schedStart();
+  lockedDo([] { sx.lat = LAT; sx.lon = LON; });
+  time_t noon = localAt(2026, 11, 23, 12, 0, 0);
+  uint32_t rise = sunEvent(noon, true), set = sunEvent(noon, false);
+  CHECK(rise && set && rise < (uint32_t)noon && set > (uint32_t)noon, "sunrise and sunset at the place");
+  putSched(0, 1, 127, 0x01, 0, -50, 1, 20);                 // sunrise + 20 minutes
+  putSched(1, 1, 127, 0x02, 0, 60, 2, -30);                 // sunset - 30 minutes
+  host::setWallClock(rise + 20 * 60 - 3);
+  CHECK(schedNext() == rise + 20 * 60, "schedNext: the nearest one that is on");
+  seconds(2);
+  CHECK(noTargets(), "before sunrise + 20: nothing");
+  seconds(1);
+  CHECK(targetIs(0, -50) && isnan(bs[1].target), "at sunrise + 20 minutes: its blind moves");
+  endsBy(60000);
+  host::setWallClock(set - 30 * 60 - 1);
+  CHECK(schedNext() == set - 30 * 60, "then the sunset one");
+  seconds(1);
+  CHECK(targetIs(1, 60), "at sunset - 30 minutes: its blind moves");
+  endsBy(60000);
+  putSched(0, 0, 127, 0x01, 0, -50, 1, 20);
+  putSched(1, 0, 127, 0x02, 0, 60, 2, -30);
+  CHECK(schedNext() == 0, "none on: schedNext 0");
+
+  schedStart();
+  putSched(0, 1, 127, 0x01, 0, -50, 1, 0);
+  putSched(1, 1, 127, 0x01, 0, -50, 3, 0);
+  host::setWallClock(rise - 2);
+  seconds(5);
+  CHECK(noTargets() && schedNext() == 0, "with no place: no sun Schedule, schedNext 0");
+  host::restart();
+  start();
+  CHECK(schedNext() == 0, "the clock not set: schedNext 0");
+}
+
+static void testCriticalBattery() {
+  schedStart();
+  putSched(0, 1, 127, 0x01, 420, -50);
+  putSched(1, 1, 127, 0x01, 430, 40);
+  lockedDo([] { vbatRest = 3.52f; });
+  host::setWallClock(localAt(2026, 11, 23, 6, 59, 59));
+  uint32_t seq = logSeq;
+  seconds(2);
+  CHECK(has(logFrom(seq), "schedule 1: tilt -50") && noTargets(), "Critical battery: the log line, no move");
+  lockedDo([] { vbatRest = 3.53f; });
+  host::setWallClock(localAt(2026, 11, 23, 7, 9, 59));
+  seconds(2);
+  CHECK(targetIs(0, 40), "the Battery level back at 10%: the next one moves");
+  endsBy(60000);
+}
+
+static void testGentleSchedule() {
+  schedStart();
+  putSched(0, 1, 127, 0x01, 420, -100, 0, 0, 10);
+  host::setWallClock(localAt(2026, 11, 23, 6, 59, 59));
+  float from = bs[0].tilt;
+  seconds(1, true);
+  CHECK(ramp[0].on && ramp[0].durMs == 600000 && near(ramp[0].to, -100, 0.01) && near(ramp[0].from, from, 0.01) && !movingPort(0),
+        "a gentle Schedule of 10 minutes: a gentle move toward its Target");
+  uint32_t moves = stats.moves[0];
+  seconds(19, true);
+  CHECK(stats.moves[0] == moves, "no step in the first 20 seconds");
+  seconds(1, true);
+  CHECK(movingPort(0) && near(bs[0].target, from + (-100 - from) * 20.0f / 600.0f, 1), "a step at 20 seconds, a little nearer the Target");
+  endsBy(30000);
+  host::tilter(1).degPerS = 1;
+  tiltTo(1, 100);                                          // a long move of another blind
+  uint32_t last = ramp[0].last, m0 = stats.moves[0];
+  seconds(30, true);
+  CHECK(movingPort(1) && ramp[0].last == last && stats.moves[0] == m0 && !movingPort(0), "none while a blind moves");
+  endsBy(200000);
+  seconds(600, true);
+  endsBy(60000);
+  CHECK(!ramp[0].on && near(bs[0].tilt, -100, 5), "the end at the Target");
+}
+
+static void testLightTrigger() {
+  schedStart();
+  lockedDo([] { sx.lat = LAT; sx.lon = LON; });
+  time_t noon = localAt(2026, 11, 23, 12, 0, 0);
+  uint32_t set = sunEvent(noon, false);
+  putSched(2, 1, 127, 0x01, 0, -100, LIGHT_KIND_DARK, 0, 0, 4000000000u);
+  host::setWallClock(set - 30 * 60);
+  lockedDo([] { lite.pw.lastDark = lite.pw.lastLit = (uint32_t)time(nullptr) - 3600; vin = 2.0f; });
+  uint32_t seq = logSeq;
+  seconds(5 * 60);
+  CHECK(noTargets(), "still light: no move");
+  lockedDo([] { vin = 0.1f; });
+  seconds(14 * 60);
+  CHECK(noTargets(), "dark for under 15 minutes: no move yet");
+  seconds(2 * 60);
+  CHECK(targetIs(0, -100) && count(logFrom(seq), "schedule 3: tilt -100 (by light)") == 1, "When it gets dark, the input falling inside the window: one move, by light");
+  LiteStore saved;
+  std::vector<uint8_t> f = host::flashBlob("blinds", "lite");
+  memcpy(&saved, f.data(), std::min(f.size(), sizeof saved));
+  CHECK(f.size() == sizeof saved && saved.l[2].day == 20261123 && saved.l[2].why == LIGHT_BY_LIGHT, "the fire in flash");
+  endsBy(60000);
+  seconds(60 * 60);
+  CHECK(count(logFrom(seq), "schedule 3:") == 1, "none again that day");
+  motionRestart();
+  host::setWallClock(set + 10 * 60);
+  lockedDo([] { vin = 2.0f; });
+  seconds(3 * 60);
+  lockedDo([] { vin = 0.1f; });
+  seconds(30 * 60);
+  CHECK(noTargets() && !has(logFrom(0), "schedule 3:"), "nor after a restart");
+}
+
+static void testLightFallBack() {
+  schedStart();
+  lockedDo([] { sx.lat = LAT; sx.lon = LON; });
+  uint32_t set = sunEvent(localAt(2026, 11, 23, 12, 0, 0), false);
+  putSched(2, 1, 127, 0x01, 0, -100, LIGHT_KIND_DARK);
+  host::setWallClock(set + LIGHT_WINDOW_S - 5 * 60);
+  lockedDo([] { lite.pw.lastDark = lite.pw.lastLit = (uint32_t)time(nullptr) - 3600; vin = 1.0f; });
+  uint32_t seq = logSeq;
+  seconds(7 * 60);
+  CHECK(targetIs(0, -100) && count(logFrom(seq), "(fell back)") == 1, "no steady reading by the window's end: fell back");
+  endsBy(60000);
+
+  schedStart();
+  lockedDo([] { sx.lat = LAT; sx.lon = LON; vin = 0; });
+  putSched(2, 1, 127, 0x01, 0, -100, LIGHT_KIND_DARK);
+  host::setWallClock(set - 3 * 60);
+  seq = logSeq;
+  seconds(5 * 60);
+  CHECK(targetIs(0, -100) && count(logFrom(seq), "(no panel: sun time)") == 1, "no panel seen: the move at sunset time");
+  endsBy(60000);
+
+  schedStart();
+  lockedDo([] { sx.lat = LAT; sx.lon = LON; vin = 0; vbatRest = 3.52f; });
+  putSched(2, 1, 127, 0x01, 0, -100, LIGHT_KIND_DARK);
+  host::setWallClock(set - 3 * 60);
+  seq = logSeq;
+  seconds(5 * 60);
+  CHECK(noTargets() && count(logFrom(seq), "schedule 3:") == 1 && lite.l[2].day == 20261123, "under Critical battery: no move, and it counts as run for the day");
+
+  schedStart();
+  putSched(2, 0, 127, 0x01, 0, -100, LIGHT_KIND_DARK);
+  host::setWallClock(set);
+  lockedDo([] { sx.lat = LAT; sx.lon = LON; lite.l[2].run = 7; });
+  seconds(2 * 60);
+  CHECK(lite.l[2].run == 0, "a Light Schedule turned off: its steady run cleared");
+}
+
+static void testSchedSlotLatch() {
+  schedStart();
+  SimPhone o;
+  CHECK(pairFirst(o), "an Owner");
+  std::string slot = readFile(wireDir + "/slot_write.txt");
+  while (!slot.empty() && (slot.back() == '\n' || slot.back() == '\r')) slot.pop_back();
+  CHECK(send(o, slot).out == OK, "a Light Schedule in slot 3");
+  lockedDo([] { lite.l[2] = {20261123, 1795385700, 1, 0, 0, 0}; });
+  CHECK(send(o, "/api/sched?i=2&on=1&days=127&mask=7&min=480&tilt=-80&kind=4&off=-10&ramp=0&gid=4000000000").out == OK && lite.l[2].day == 20261123,
+        "an edit of the same one: its last fire kept");
+  CHECK(send(o, "/api/sched?i=2&on=1&days=127&mask=7&min=480&tilt=-80&kind=4&off=-10&ramp=0&gid=12").out == OK && lite.l[2].day == 0 && lite.l[2].at == 0,
+        "another Schedule in the slot: its last fire cleared");
+}
+
+static void testPowerSourceAndPanel() {
+  schedStart();
+  lockedDo([] { sx.lat = LAT; sx.lon = LON; });
+  uint32_t noon = (uint32_t)localAt(2026, 11, 23, 12, 0, 0);
+  host::setWallClock(noon);
+  lockedDo([] { powered = true; });
+  CHECK(!panelSeen() && powerSource() == SRC_UNKNOWN, "by day with input power, no panel seen: not known (the v2.2 board cannot tell)");
+  lockedDo([] { lite.pw.lastDark = lite.pw.lastLit = (uint32_t)time(nullptr) - 3600; });
+  CHECK(panelSeen() && powerSource() == SRC_UNKNOWN, "a panel seen: panelSeen");
+  host::setWallClock(noon + 12 * 3600);
+  CHECK(powerSource() == SRC_USB, "input power deep in the night: USB");
+  lockedDo([] { powered = false; });
+  CHECK(powerSource() == SRC_BATTERY, "no input power: Battery");
+  host::setWallClock(noon + 5 * 86400);
+  CHECK(!panelSeen(), "a panel last seen over 3 days ago: not seen");
+}
+
+// ---- Scenes (scenes.h)
+static std::string sceneWrite() {
+  std::string s = readFile(wireDir + "/scene_write.txt");
+  while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+  return s;
+}
+static int scenesKept() { int n = 0; for (const SceneSlot &s : scn.s) if (s.gid) n++; return n; }
+static void testScenes() {
+  motionStart();
+  CHECK(scn.magic == SCN_MAGIC && scenesKept() == 0, "scenesBegin on empty flash: none");
+  SceneTable other = {};
+  other.magic = SCN_MAGIC - 1;
+  other.s[0].gid = 9;
+  host::putFlashBlob("blinds", "scn", &other, sizeof other);
+  motionRestart();
+  CHECK(scn.magic == SCN_MAGIC && scenesKept() == 0, "on another magic: none");
+  Room r;
+  roomStart(r);
+  CHECK(send(r.o, sceneWrite()).out == OK && send(r.o, "/api/scene?gid=7&ver=1795300000&name=Morning&sym=sunrise&mask=2&t=0,50,0").out == OK,
+        "the two Scenes of scenes.json written");
+  std::string want = readFile(wireDir + "/scenes.json");
+  while (!want.empty() && (want.back() == '\n' || want.back() == '\r')) want.pop_back();
+  CHECK(send(r.o, "/api/scenes").out == want, "/api/scenes: scenes.json byte for byte");
+  motionRestart();
+  CHECK(send(r.o, "/api/scenes").out == want, "they come back after a restart");
+  CHECK(send(r.g, "/api/scene?gid=7&ver=1795300001&name=Early&sym=sun.max&mask=6&t=10,20,30").out == OK && scenesKept() == 2 && scn.s[1].gid == 7 &&
+            !strcmp(scn.s[1].name, "Early") && scn.s[1].mask == 6 && scn.s[1].tilt[0] == 0 && scn.s[1].tilt[2] == 30,
+        "a Guest writes a Scene: the same gid, the same slot changed, still two");
+  CHECK(has(send(r.g, "/api/scenes").out, "\"name\":\"Early\""), "and reads it");
+  CHECK(send(r.o, "/api/scene?gid=7&mask=0").out == OK && scenesKept() == 1 && scn.s[1].gid == 0, "mask=0: the Scene gone");
+  SceneTable before = scn;
+  CHECK(send(r.o, "/api/scene?gid=99&mask=0").out == OK && !memcmp(&scn, &before, sizeof scn), "mask=0 for a gid not there: ok, nothing changed");
+  CHECK(send(r.o, "/api/scene?mask=1&name=X").out == refused("no scene id"), "no gid: no scene id");
+  CHECK(send(r.o, "/api/scene?gid=100&mask=1&name=").out == OK && !strcmp(scn.s[1].name, "Scene"), "an empty name: Scene");
+  std::string longName;
+  for (int i = 0; i < 23; i++) longName += "\xC3\xA9";                                  // 46 bytes ...
+  longName += "ab";                                                                     // ... then 2 more: 48
+  CHECK(send(r.o, "/api/scene?gid=101&mask=1&name=" + pct(longName)).out == OK && strlen(scn.s[2].name) == 47 && scn.s[2].name[46] == 'a',
+        "a name over 47 bytes: cut to 47");
+  longName = "a" + longName.substr(0, 46);                                              // a, then 23 two-byte letters: 47 bytes, then ab
+  longName += "\xC3\xA9";
+  CHECK(send(r.o, "/api/scene?gid=102&mask=1&name=" + pct(longName)).out == OK && strlen(scn.s[3].name) == 47 &&
+            (unsigned char)scn.s[3].name[46] == 0xA9,
+        "a name over 47 bytes ending in a two-byte letter: cut at a whole UTF-8 character");
+  for (uint32_t g = 200; scenesKept() < SCENES; g++) send(r.o, "/api/scene?gid=" + std::to_string(g) + "&mask=1");
+  CHECK(scenesKept() == 16 && send(r.o, "/api/scene?gid=999&mask=1").out == refused("this controller already has 16 scenes"), "16 Scenes, then a 17th: refused");
+  CHECK(send(r.o, "/api/scene?gid=200&mask=0").out == OK && send(r.o, "/api/scene?gid=999&mask=1").out == OK && scenesKept() == 16, "one deleted, then a new one: kept");
+}
+
+// ---- every route has a test: each path in routes[] was sent to its handler by a phone that may send it
+static void testHubRoutesReachStandIns() {
+  Room r;
+  roomStart(r);
+  const char *paths[] = {"/api/home?b=0&lift=5000", "/api/backup", "/api/hubjoin", "/api/swapfw", "/api/hubkey", "/api/hubnet", "/api/factory", "/api/restore"};
+  int before = standIns;
+  bool all = true;
+  for (const char *p : paths) all = send(r.o, p).out == OK && all;
+  CHECK(all && standIns == before + 8, "the eight hub-link routes reach their stand-in handlers (their bodies: #266)");
+}
+static void checkEveryRoute() {
+  std::string left;
+  for (int i = 0; i < routeCount; i++) if (!reached.count(routes[i].uri)) left += std::string(" ") + routes[i].uri;
+  if (!left.empty()) printf("  routes no test sent to their handler:%s\n", left.c_str());
+  CHECK(left.empty(), "every route in routes[] was sent to its handler by a test");
+}
+
 
 int main(int argc, char **argv) {
   // The wire folder: the first argument, else test/wire next to this file (the compile and the run share one folder).
@@ -2349,6 +3311,36 @@ int main(int argc, char **argv) {
   testReleaseSignature();
   testBoardClockBeforeSet();
   testRebootDoesNotReturn();
+  testGuestCommands();
+  testStatus();
+  testDevPage();
+  testResetReasonWords();
+  testCfgAsTheAppWrites();
+  testSetEachKey();
+  testSetRefusals();
+  testResetCommand();
+  testGo();
+  testJogAngleWatch();
+  testTraceAndAwake();
+  testLogs();
+  testHello();
+  testRestartFromTheApp();
+  testKeepCommand();
+  testTrial();
+  testHistTick();
+  testDevlogAndPowerTicks();
+  testSchedBegin();
+  testClockSchedule();
+  testSunSchedules();
+  testCriticalBattery();
+  testGentleSchedule();
+  testLightTrigger();
+  testLightFallBack();
+  testSchedSlotLatch();
+  testPowerSourceAndPanel();
+  testScenes();
+  testHubRoutesReachStandIns();
+  checkEveryRoute();
   failed += host::takeFaults();
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;
