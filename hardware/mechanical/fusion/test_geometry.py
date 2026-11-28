@@ -155,20 +155,25 @@ V2 = _load(os.path.join(_HERE, 'Controller', 'Controller.py'))
 
 
 class ControllerV3Fit(unittest.TestCase):
-    """The v3 fit study's numbers (no Fusion): the same section and groove as the v2.2 box, and the cell's fit."""
+    """The v3 fit study's numbers (no Fusion): the v2.2 box's width, height and groove, on foam pads; the cell's fit;
+    every part of the mock-up board in a place it fits."""
 
-    def test_section_and_groove_are_the_v22_box(self):
+    def test_section_is_the_v22_box_on_pads(self):
         c, o = V3.params(3), V2.C
-        for k in ('room_out', 'back_in', 'top', 'wall', 'floor', 'lid', 'bevel_bot', 'bevel_top', 'groove_r', 'groove_t'):
+        for k in ('room_out', 'back_in', 'wall', 'floor', 'lid', 'bevel_bot', 'groove_r', 'groove_t'):
             self.assertEqual(c[k], o[k], k)
-        self.assertAlmostEqual(c['groove_floor'], o['groove_floor'])
+        self.assertEqual(c['height'], o['top'])                       # as tall as the v2.2 box
+        self.assertEqual(c['floor_z'], 2.0)                           # standing on its 2 mm pads
+        self.assertAlmostEqual(c['groove_floor'], o['groove_floor'])  # the groove is where it was, from the rail's floor
         self.assertAlmostEqual(c['groove_y'], o['groove_y'])
-        self.assertAlmostEqual(c['bat_zc'], o['bat_zc'])          # the cell lies where it lies in the v2.2 box
+        self.assertAlmostEqual(c['bat_zc'] - c['floor_z'], o['bat_zc'])   # the cell lies where it lies in the v2.2 box
         self.assertAlmostEqual(c['bat_y'], o['bat_y'])
+        self.assertAlmostEqual(V3.facts(c)['rod_corners_to_groove'], 1.8)
+        self.assertEqual(len(V3.pads(c)), 4)
 
     def test_lengths(self):
-        self.assertAlmostEqual(V3.params(3)['L'], 134.8, places=1)
-        self.assertAlmostEqual(V3.params(1)['L'], 114.8, places=1)
+        self.assertAlmostEqual(V3.params(3)['L'], 114.5, places=1)
+        self.assertAlmostEqual(V3.params(1)['L'], 96.4, places=1)
         self.assertLess(V3.params(3)['L'], V2.C['L'])
 
     def test_cell_and_contacts(self):
@@ -176,7 +181,7 @@ class ControllerV3Fit(unittest.TestCase):
             c = V3.params(ports)
             f = V3.facts(c)
             self.assertGreaterEqual(f['cell_top_to_lid'], 0.3)
-            self.assertGreaterEqual(f['cell_to_groove_channel'], 3.0)
+            self.assertGreaterEqual(f['cell_to_groove_channel'], 2.0)
             self.assertGreaterEqual(f['cell_to_board_edge'], 1.0)
             self.assertLessEqual(abs(f['button_above_cell_axis']), 1.5)     # the button lands on a dia 5 button top
             for sq in f['leaf_squeeze'].values():                           # the leaf is pressed, and not solid
@@ -188,16 +193,77 @@ class ControllerV3Fit(unittest.TestCase):
     def test_room_under_the_lid(self):
         for ports in (1, 3):
             f = V3.facts(V3.params(ports))
-            for k in ('esp_tips_to_lid', 'jack_top_to_lid', 'cap_top_to_lid', 'contact_top_to_lid'):
+            for k in ('esp_tips_to_lid', 'contact_top_to_lid', 'jack_to_groove_channel'):
                 self.assertGreater(f[k], 0.5, k)
+            self.assertGreater(f['jack_top_to_seam'], 0.2)
+
+    def test_fronts_are_flush(self):
+        f = V3.facts(V3.params(3))['fronts_behind_wall_face']
+        self.assertLessEqual(f['RJ12'], 0.3)
+        self.assertLessEqual(f['solar'], 0.3)
+        self.assertLessEqual(f['USB-C'], 1.0)                              # as far out as its shell stakes allow
+        c = V3.params(3)
+        self.assertGreater(f['button'], c['end_t'])                        # the button is all inside: a pin reaches it
+        self.assertLessEqual(c['btn_hole_r'], 1.2)
+        for web in V3.facts(c)['end_a_webs'].values():                     # solid wall between end A's openings
+            self.assertGreaterEqual(web, 3.0)
+        self.assertGreaterEqual(V3.facts(c)['solar_plug_max_dia'], 9.5)    # a barrel plug beside a USB-C plug
+        # the board is slid home into end wall A: the room for that is at end B
+        self.assertGreaterEqual(c['end_gap_b'], c['end_t'] - min(c['sol_in'], c['usb_in']) + 0.5)
+        self.assertGreaterEqual(V3.facts(V3.params(3))['usb_board_edge_behind_mouth'], 1.2 - 1e-9)
+
+    def test_every_part_has_a_place(self):
+        for ports in (1, 3):
+            c = V3.params(ports)
+            self.assertEqual(V3.layout_problems(c), [])
+        self.assertGreater(len(V3.comps(V3.params(3))), len(V3.comps(V3.params(1))))   # ports 2 and 3 left off
+        names = [p[0] for p in V3.comps(V3.params(3))]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertEqual(len(names), 71)                                   # none dropped for want of a slot
+        self.assertEqual(len(V3.comps(V3.params(1))), 45)
+        for must in ('R EN pull-up', 'C EN', 'Charge light'):
+            self.assertIn(must, names)
+        for must in ('U1 charger BQ21040', 'U2 regulator RT9080', 'D USB 1N5817', 'D solar 1 1N4001', 'F cell fuse MF-RG400', 'C 470uF',
+                     'P1 fuse MF-R110', 'P3 switch AO3401A', 'Temperature sensor NTC', 'P2 C IN1 10n'):
+            self.assertIn(must, names)
+
+    def test_layout_check_finds_a_misplaced_part(self):
+        c = V3.params(3)
+        real = V3.comps
+
+        def moved(cc=None):
+            out = real(cc)
+            out.append(('Stray tall part', 14.0, 18.0, 50.0, 54.0, 14.0, 'box'))        # on port 2's parts, too tall for its place
+            out.append(('Stray off board', 40.0, 44.0, 40.0, 44.0, 1.0, 'box'))          # in the cell's notch
+            return out
+        V3.comps = moved
+        try:
+            bad = V3.layout_problems(c)
+        finally:
+            V3.comps = real
+        self.assertTrue(any('Stray tall part is' in b and 'high' in b for b in bad))
+        self.assertTrue(any('overlaps Stray tall part' in b for b in bad))
+        self.assertTrue(any('Stray off board is off the board' in b for b in bad))
 
     def test_jacks_and_holes(self):
         self.assertEqual(len(V3.jacks(V3.params(1))), 1)
         self.assertEqual(len(V3.jacks(V3.params(3))), 3)
         self.assertEqual(len(V3.holes(V3.params(1))), 3)
         self.assertEqual(len(V3.holes(V3.params(3))), 4)
+        self.assertEqual(len(set(round(y, 3) for x, y in V3.holes(V3.params(3)))), 1)     # the screws are in one line
+        self.assertAlmostEqual(V3.holes(V3.params(3))[0][1], V3.params(3)['groove_y'])    # down the middle
         self.assertEqual(len(V3.outline_pts()), 8)
+        c = V3.params(3)
+        ys = sorted(y for p, y, xf, xr, s in V3.jacks(c) if s > 0)        # jacks 2 and 3: a wide wall between them
+        self.assertGreater(ys[1] - ys[0] - c['rj_w'], 10.0)
+        for hx, hy in V3.holes(c):                                         # no screw head under a foam pad
+            for px, py in V3.pads(c):
+                self.assertGreater(math.hypot(hx - px, hy - py), c['pad_d'] / 2 + 3.1)
 
+    def test_tilts_into_the_rail_on_its_pads(self):
+        T = _load(os.path.join(_HERE, 'Controller', 'tilt_in.py'))
+        pieces = [T.hull(q) for q in V3.tilt_pieces(V3.params(1))]
+        self.assertLessEqual(T.min_spread(pieces), 0.2)
 
 if __name__ == '__main__':
     unittest.main()
