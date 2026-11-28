@@ -8,6 +8,7 @@
 #include "../main/tilter.h"
 #include "../main/wire.h"
 #include "../../tilt_hub/main/alert_rules.h"
+#include "sim_rod.h"
 #include <cstdio>
 #include <ctime>
 #include <fstream>
@@ -99,13 +100,8 @@ static void requestTests() {
 
 // A simulated Tilter: a rod turned through gear play, an Angle that reads 3 degrees high while the motor runs, hard
 // stops, a PWM sensor's blind spot near its zero, and a hand that can turn the wand.
-struct SimTilter : Tilter {
+struct SimTilter : Tilter, Rod {   // the rod, gear play, speed, hard stops and motor direction: test/sim_rod.h
   uint32_t t = 0;
-  float rod = 290, gear = 290;  // the rod's true angle; where the motor side of the gear play is
-  float play = 5;               // gear play, degrees of rod turn
-  float degPerS = 2.5f;         // at full duty
-  int phys = 1;                 // +1: motor "forward" makes the angle rise
-  float lo = -1e9f, hi = 1e9f;  // hard stops (unwrapped degrees)
   float blindLo = -1, blindHi = -1;  // the sensor sees nothing while the rod is past blindLo or before blindHi (reads 0); -1 = never
   uint32_t wandAt = 0; float wandBy = 0;   // a hand turns the wand this much at this time
   uint32_t handAt = 0, handMs = 0; float handRate = 0;   // a hand turning the wand steadily (deg/s) for a while
@@ -116,7 +112,6 @@ struct SimTilter : Tilter {
   uint32_t motorAfterHand = 0;  // ms the motor ran once the hand started
   uint32_t dropAt = 0, dropMs = 0;   // the sensor gives nothing for a while (a dropout: Dining, 2026-11-25)
   ReadingJudge judge;           // the controller's own rule (logic.h) for what a reading at a rail is
-  float rodMin = 1e9f, rodMax = -1e9f;   // how far the rod went, either way
   int dir = 0, duty = 0;
   int8_t sign = 1;
   TiltMemory mem;
@@ -129,15 +124,8 @@ struct SimTilter : Tilter {
     if (wandAt && t >= wandAt) { rod += wandBy; gear += wandBy; wandAt = 0; }
     if (handMs && t >= handAt && t < handAt + handMs) { rod += handRate * dt / 1000.0f; gear += handRate * dt / 1000.0f; }
     if (handMs && t >= handAt && dir) motorAfterHand += dt;
-    gear += phys * dir * degPerS * duty / 100.0f * dt / 1000.0f;
-    if (gear > rod + play / 2) rod = gear - play / 2;
-    if (gear < rod - play / 2) rod = gear + play / 2;
-    if (rod > hi) rod = hi;
-    if (rod < lo) rod = lo;
-    gear = std::min(std::max(gear, rod - play / 2), rod + play / 2);
-    rodMin = std::min(rodMin, rod); rodMax = std::max(rodMax, rod);
+    turn(dir, duty, dt);
   }
-  float wrapped() { return fmodf(fmodf(rod, 360.0f) + 360.0f, 360.0f); }
   bool inBlind() { float a = wrapped(); return blindLo >= 0 && (a >= blindLo || a <= blindHi); }
   uint32_t ms() override { return t; }
   bool wake() override { return true; }
