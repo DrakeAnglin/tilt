@@ -58,6 +58,7 @@ bool hubKeySet = false;
 int hubSlot() { if (!hubKeySet) return -1; for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 1 && !memcmp(keys[i].id, hubKeyId, 8)) return i; return -1; }
 // When each request to join was made (this start): a new request may only take the place of one older than 10 minutes.
 uint32_t askAt[MAX_KEYS];
+uint32_t lastAsk = 0;                          // the last request to join (millis; 0: none this start): each is written to flash, so no more than one every 10 seconds
 // A controller nobody owns takes its first owner only in its first 15 minutes after power-on (unplug it to pair again).
 const uint32_t FIRST_PAIR_MS = 15 * 60 * 1000;
 bool firstPairOpen() { return esp_timer_get_time() / 1000 < FIRST_PAIR_MS; }
@@ -128,7 +129,6 @@ const char *pairDo(const std::string &b, std::string &out, bool ask = false, boo
   KeysLock kl;
   first = !owned();
   if (ask) {
-    static uint32_t lastAsk = 0;               // each ask is written to flash: no more than one every 10 seconds
     if (first) { out = "{\"err\":\"this controller has no owner yet\"}"; return "403 Forbidden"; }
     if (lastAsk && millis() - lastAsk < 10000) { out = "{\"err\":\"try again in a few seconds\"}"; return "429 Too Many Requests"; }
     lastAsk = millis();
