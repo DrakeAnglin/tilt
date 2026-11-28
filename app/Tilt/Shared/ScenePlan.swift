@@ -61,6 +61,15 @@ enum ScenePlan {
     static func limitName(_ s: String) -> String { NameRule.limit(s, bytes: nameBytes) }
     /// A Scene name as the controller keeps it (NameRule.fit, firmware wire.h keptName).
     static func fitName(_ s: String) -> String { NameRule.fit(s, bytes: nameBytes) }
+    /// Why a Scene could not be saved, in words; `name` gives a controller's name. (A switch, not `catch .full(let c)`
+    /// at the caller: Xcode 26's compiler crashes on those catch patterns there.)
+    static func problem(_ p: PlanProblem, name: (String) -> String) -> any Error {
+        switch p {
+        case .full(let c): return TiltError("\(name(c)) already has \(perController) scenes.")
+        case .notRead(let c): return TiltError("\(name(c)) did not answer. Try again when it is reachable.")
+        default: return p
+        }
+    }
     /// The Scenes, put together from the controllers that answered (`read`), with the phone's copy (`kept`) for the
     /// controllers that did not. A kept Scene that was on a controller but that no answering controller has any more
     /// was deleted on another phone: only its part on controllers that did not answer is left, or nothing. A kept Scene
