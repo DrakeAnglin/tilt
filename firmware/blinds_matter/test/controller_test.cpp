@@ -36,6 +36,7 @@ static void motionStartValues() {
   traceTgt = NAN;
   tracePort = -1;
   for (auto &r : ramp) r = Ramp{};
+  tickTimes = TickTimes();
   capTimer = nullptr;
   capRunning = false;
   capRes = 80000000;
@@ -529,9 +530,34 @@ static void testUnlocked() {
 // ---- motion (motion.h, with pwmin.h, tilter.h, handwatch.h, request.h), on the stand-in tilters (host_tilter.h)
 // "Blind 1" is port 0 with a tilter plugged in and Marks set: up 200, open 290, down 20 (so tilt 50 is 245 degrees).
 static void lockedDo(const std::function<void()> &fn) { xSemaphoreTake(mx, portMAX_DELAY); fn(); xSemaphoreGive(mx); }
+// What the motors did while the tests ran (run): per port, the first direction and duty, when the motor first ran and
+// first stopped after that, the most motors on at once.
+struct Seen {
+  int firstDir[PORTS], firstDuty[PORTS], maxDuty[PORTS];
+  uint32_t onAt[PORTS], offAt[PORTS];
+  bool on[PORTS];
+  int maxOn;
+};
+static Seen seen;
+static void seenReset() {
+  seen = Seen();
+  for (int p = 0; p < PORTS; p++) seen.onAt[p] = seen.offAt[p] = 0;
+}
+static void look() {
+  int n = 0;
+  for (int p = 0; p < PORTS; p++) {
+    int duty, d = host::motorDir(p, &duty);
+    if (d && host::enHigh(p)) {
+      n++;
+      if (!seen.on[p]) { seen.on[p] = true; seen.firstDir[p] = d; seen.firstDuty[p] = duty; seen.onAt[p] = millis(); }
+      seen.maxDuty[p] = std::max(seen.maxDuty[p], duty);
+    } else if (seen.on[p] && !seen.offAt[p]) seen.offAt[p] = millis();
+  }
+  seen.maxOn = std::max(seen.maxOn, n);
+}
 // The blinds task's pass, for ms milliseconds: the lock held, motionTick once a millisecond, the clock moved 1 ms.
 static void run(uint32_t ms) {
-  for (uint32_t i = 0; i < ms; i++) { lockedDo(motionTick); host::advanceMs(1); }
+  for (uint32_t i = 0; i < ms; i++) { lockedDo(motionTick); look(); host::advanceMs(1); }
 }
 static bool runUntil(const std::function<bool()> &done, uint32_t maxMs) {
   for (uint32_t i = 0; i < maxMs; i++) { if (done()) return true; run(1); }
@@ -587,6 +613,567 @@ static void testStopAtStart() {
   CHECK(!strcmp(bs[0].last, "stopped") && !moving(), "a stop as the move starts: it ends \"stopped\"");
 }
 
+// A restart with the motion code; the tilters stay plugged in, flash stays.
+static void motionRestart() {
+  start();
+  adcBegin();
+  lockBegin();
+  vbatRest = vbat = 3.9f;
+  syncMode = 0;
+  motionBegin();
+}
+
+// ---- start and sensors (motion.h)
+static void testMotionBegin() {
+  host::wipeFlash();
+  host::putFlashU8("blinds", "pwm", 0x05);
+  unplugAll();
+  start();
+  motionBegin();
+  bool enLow = true, braked = true;
+  for (int p = 0; p < PORTS; p++) {
+    enLow = enLow && host::pinLevel(P_EN[p]) == 0 && host::pinModeOf(P_EN[p]) == 1;
+    braked = braked && host::dutyOf(P_IN1[p]) == 255 && host::dutyOf(P_IN2[p]) == 255;
+  }
+  CHECK(enLow, "motionBegin: every EN pin an output, low (drivers and sensors asleep)");
+  CHECK(braked, "motionBegin: both motor pins of every port at 255 (braked)");
+  CHECK(pwmSaved == 0x05, "motionBegin: the PWM ports are read back from flash");
+}
+
+static void testEmptyPort() {
+  motionStart();
+  setMarks(0);
+  pulseRead(0);
+  CHECK(!bs[0].present && bs[0].seen && isnan(bs[0].tilt), "an empty port is read: not present, seen, tilt unknown");
+  const char *e = startTilt(0, 50);
+  CHECK(e && !strcmp(e, "no tilter plugged in"), "an empty port: a move to a tilt is refused, no tilter plugged in");
+}
+
+static void testAnalogRead() {
+  motionStart();
+  host::plugAnalog(0, 120);
+  setMarks(0, 30, 120, 210);
+  pulseRead(0);
+  CHECK(bs[0].present && !bs[0].pwm && near(bs[0].ang, 120, 1), "an analog tilter at 120 degrees: present, Angle 120");
+  CHECK(near(bs[0].tilt, tiltOfMarks(marksOf(0), 120), 1), "an analog tilter: the tilt worked out from the Marks");
+  CHECK(host::pinLevel(P_EN[0]) == 0, "after a read: EN low");
+}
+
+static void testPwmRead() {
+  motionStart();
+  uint32_t seq = logSeq;
+  blind(0, 100, true);
+  CHECK(bs[0].present && bs[0].pwm && (pwmSaved & 1), "a PWM tilter: found as PWM");
+  CHECK(host::flashBlob("blinds", "pwm") == std::vector<uint8_t>{1}, "a PWM tilter: the bit saved in flash");
+  CHECK(count(logFrom(seq), "sensor signal is PWM") == 1, "a PWM tilter: one \"sensor signal is PWM\" line");
+  CHECK(near(bs[0].ang, 100, 1), "a PWM tilter: the Angle within 1 degree");
+  CHECK(!host::capTimerRunning(), "after a read: the capture timer stopped");
+  motionRestart();
+  pulseRead(0);
+  CHECK(bs[0].pwm && near(bs[0].ang, 100, 1), "after a restart: still PWM");
+  CHECK(!has(logFrom(0), "sensor signal"), "after a restart: no second line");
+}
+
+static void testPwmResting() {
+  motionStart();
+  blind(0, 5, true);
+  cfgSave();
+  host::rest(0);
+  pulseRead(0);
+  CHECK(bs[0].present && bs[0].pwm, "a PWM tilter resting at its zero: still PWM");
+  CHECK(near(bs[0].ang, 5, 1) && bs[0].blind && !bs[0].lost, "resting at its zero: the last good Angle kept, no reading, not a dropout");
+  motionRestart();
+  pulseRead(0);
+  CHECK(bs[0].pwm && bs[0].seen && isnan(bs[0].tilt) && isnan(bs[0].ang), "resting at its zero just after a restart: the tilt unknown, not 0 (#135)");
+  host::rest(0, true);
+  pulseRead(0);
+  CHECK(bs[0].present && bs[0].pwm, "resting at the rail: still the PWM sensor");
+}
+
+static void testPwmBackToAnalog() {
+  motionStart();
+  blind(0, 100, true);
+  uint32_t seq = logSeq;
+  host::plugAnalog(0, 150);
+  pulseRead(0);
+  CHECK(!bs[0].pwm && !(pwmSaved & 1) && host::flashBlob("blinds", "pwm") == std::vector<uint8_t>{0},
+        "a port that was PWM gets an analog tilter in mid-range: back to analog, saved");
+  CHECK(count(logFrom(seq), "sensor signal is analog") == 1 && near(bs[0].ang, 150, 1), "one \"sensor signal is analog\" line");
+}
+
+static void testOddResults() {
+  motionStart();
+  blind(0, 260);
+  host::unplug(0);
+  pulseRead(0);
+  pulseRead(0);
+  CHECK(bs[0].present, "two odd plugged-in results in a row: still present");
+  pulseRead(0);
+  CHECK(!bs[0].present && isnan(bs[0].ang) && isnan(bs[0].judge.good), "a third: gone, its Angle unknown, its last good reading forgotten");
+}
+
+static void testAnalogDropout() {
+  motionStart();
+  blind(0, 260);
+  uint32_t seq = logSeq;
+  host::dropout(0, 1000);
+  pulseRead(0);
+  CHECK(bs[0].present && near(bs[0].ang, 260, 1) && bs[0].lost, "an analog dropout away from zero: the last Angle kept, lost");
+  CHECK(count(logFrom(seq), "gave no reading (1 time)") == 1, "a dropout: one log line");
+  host::advanceMs(1000);
+  pulseRead(0);
+  CHECK(!bs[0].lost, "the sensor gives readings again");
+  host::dropout(0, 1000);
+  pulseRead(0);
+  CHECK(count(logFrom(seq), "gave no reading") == 1, "a second dropout inside 10 minutes: no line");
+  host::advanceMs(601000);
+  pulseRead(0);
+  host::dropout(0, 1000);
+  pulseRead(0);
+  CHECK(count(logFrom(seq), "gave no reading (2 times)") == 1, "one after 10 minutes: logged with the count");
+}
+
+static void testPwmFramesLost() {
+  motionStart();
+  blind(0, 100, true);
+  digitalWrite(P_EN[0], HIGH);
+  delay(20);
+  senseWake(0);
+  CHECK(near(readAngle(0), 100, 1), "a PWM sensor that is on: read");
+  host::dropout(0, 1000);
+  delay(150);
+  float a = readAngle(0);
+  CHECK(near(a, 100, 1) && !bs[0].blind, "frames lost for under 200 ms: the last good share is used");
+  delay(100);
+  readAngle(0);
+  CHECK(bs[0].blind && bs[0].lost, "frames lost for longer: judged as at a rail (here a dropout)");
+  sensorOff(0);
+}
+
+static void testRailDips() {
+  motionStart();
+  blind(0, 260);
+  digitalWrite(P_EN[0], HIGH);
+  delay(20);
+  int reads = host::tilter(0).angleReads;
+  host::queueMilliVolts(PIN_VIN, {3300, 3300, 3300, 3300, 3200, 3200, 3200, 3200});
+  float a = readAngle(0);
+  CHECK(host::tilter(0).angleReads - reads == 16 && near(a, 260, 1), "the rail differs between the two probes: read again");
+  CHECK(near(vdd, 3.3, 0.001), "the rail from the probes that agree");
+  reads = host::tilter(0).angleReads;
+  for (int k = 0; k < 6; k++) host::queueMilliVolts(PIN_VIN, {3300, 3300, 3300, 3300, 3200, 3200, 3200, 3200});
+  readAngle(0);
+  CHECK(host::tilter(0).angleReads - reads == 32, "four tries at most");
+  CHECK(near(vdd, 3.25, 0.001), "both probes in range: vdd is their middle");
+  host::board().mvQueue.clear();
+  host::queueMilliVolts(PIN_VIN, std::vector<int>(32, 3700));
+  readAngle(0);
+  CHECK(near(vdd, 3.25, 0.001), "probes over 3.6 V: vdd is not changed");
+  host::board().mvQueue.clear();
+  host::queueMilliVolts(PIN_VIN, {3300, 3300, 3300, 3300, 2400, 2400, 2400, 2400});
+  host::queueMilliVolts(PIN_VIN, std::vector<int>(24, 2400));
+  readAngle(0);
+  CHECK(near(vdd, 3.25, 0.001), "a probe under 2.5 V: vdd is not changed");
+  host::board().mvQueue.clear();
+  sensorOff(0);
+}
+
+// ---- PWM frames (pwmin.h)
+static void testCaptureTimer() {
+  motionStart();
+  capStop(1);
+  CHECK(host::capTimers() == 0, "a stop of a port never started: nothing");
+  CHECK(!capStart(-1, P_ANG[0]) && !capStart(3, P_ANG[0]) && host::capTimers() == 0, "a start of port -1 or 3: false, nothing made");
+  bool ok = capStart(0, P_ANG[0]) && capStart(1, P_ANG[1]) && capStart(2, P_ANG[2]);
+  CHECK(ok && host::capTimers() == 1 && host::capTimerStarts() == 1, "three ports started: one timer, started once");
+  CHECK(host::pinModeOf(P_ANG[1]) == 0, "a started port's pin is an input");
+  capStop(-1);
+  capStop(3);
+  capStop(0);
+  capStop(1);
+  CHECK(host::capTimerStops() == 0 && host::capTimerRunning(), "stopped one by one: the timer runs while one is left");
+  capStop(2);
+  CHECK(host::capTimerStops() == 1 && !host::capTimerRunning(), "the last port stopped: the timer too");
+  capStop(2);
+  CHECK(host::capTimerStops() == 1, "a second stop: nothing");
+}
+
+static void testCaptureFails() {
+  motionStart();
+  host::failNext("mcpwm_new_capture_timer");
+  CHECK(!capStart(0, P_ANG[0]) && !capTimer, "the timer cannot be made: capStart false");
+  host::failNext("mcpwm_new_capture_channel");
+  CHECK(!capStart(0, P_ANG[0]) && !capChan[0] && !host::capTimerRunning(), "a channel cannot be made: capStart false");
+  CHECK(capShare(0) < 0, "after: the port reads no pulses");
+}
+
+static void edge(bool rising, uint32_t ticks) { host::capEdge(P_ANG[0], rising, ticks); }
+static void frame(uint32_t at, uint32_t high) { edge(true, at); edge(false, at + high); }   // its rise and fall
+static void testCaptureFrames() {
+  motionStart();
+  const uint32_t P = 80000000 / 115;
+  host::advanceMs(1);                               // a frame's stamp of 0 means none
+  capStart(0, P_ANG[0]);
+  edge(false, 10);
+  edge(true, 100);
+  edge(true, 100 + P);
+  CHECK(capFrames[0] == 0, "a falling edge before any rising edge is ignored");
+  uint32_t t = 1000000;
+  frame(t, P / 4); frame(t + P, P / 4); edge(true, t + 2 * P);
+  CHECK(capFrames[0] == 2 && capShare(0) == as5600Share(P / 4, P), "frames at 115 Hz, a quarter high: the share of that frame");
+  host::advanceMs(41);
+  CHECK(capShare(0) < 0, "41 ms after the last frame: no reading");
+  capStart(0, P_ANG[0]);
+  CHECK(capFrames[0] == 0 && capPeriod[0] == 0 && capShare(0) < 0, "capStart on a running port: its frames cleared");
+  t = 5000000;
+  uint32_t L = P + P / 10;
+  frame(t, P / 4); edge(true, t + L);
+  CHECK(capFrames[0] == 1 && capNom[0] == L, "before a frame length is learned: a frame a tenth longer is taken");
+  edge(false, t + L + P / 4); uint32_t at = t + 2 * L + L / 20; edge(true, at);
+  CHECK(capFrames[0] == 1 && capBad[0] == 1, "after: a frame 5% off is dropped");
+  for (int k = 0; k < 3; k++) { edge(false, at + P / 4); at += L + L / 20; edge(true, at); }
+  CHECK(capNom[0] == 0 && capBad[0] == 0 && capFrames[0] == 1, "four misfits in a row: the length is learned again");
+  edge(false, at + P / 4); at += P; edge(true, at);
+  CHECK(capFrames[0] == 2 && capNom[0] == P, "the next frame is taken and learned");
+  edge(false, at + P + 10); at += P; edge(true, at);
+  CHECK(capFrames[0] == 2 && capBad[0] == 1, "a frame with its high time not under its period is dropped");
+  capStop(0);
+}
+
+// ---- moves
+static const char *tiltTo(int p, float t) { const char *e = nullptr; lockedDo([&] { e = startTilt(p, t); }); return e; }
+static bool is(const char *a, const char *b) { return a && b && !strcmp(a, b); }
+static bool braked(int p) { return host::dutyOf(P_IN1[p]) == 255 && host::dutyOf(P_IN2[p]) == 255; }
+static bool endsBy(uint32_t ms) { return runUntil(settled, ms); }
+
+static void testWholeMove() {
+  motionStart();
+  blind(0, 290);
+  powered = false;
+  uint32_t moves = stats.moves[0], seq = logSeq;
+  seenReset();
+  CHECK(!tiltTo(0, 50) && host::pinLevel(P_EN[0]) == 1, "a move to tilt 50: accepted, EN high");
+  CHECK(blindNow(0).busy && near(bs[0].target, 50, 0.01), "while it moves: busy, the Target set");
+  CHECK(endsBy(60000), "the move ends");
+  CHECK(seen.firstDir[0] == -1 && seen.firstDuty[0] < 60 && seen.maxDuty[0] >= 99, "a soft start, the right way (the angle falls toward up)");
+  CHECK(is(bs[0].last, "reached") && near(bs[0].tilt, 50, 5), "it ends \"reached\" within 5 of tilt 50");
+  CHECK(braked(0) && host::pinLevel(P_EN[0]) == 0, "after: motor braked, EN low");
+  CHECK(stats.moves[0] == moves + 1 && stats.motorMs > 0 && stats.battMotorMs == stats.motorMs, "the moves counter up one, motor time added (on battery too)");
+  CHECK(isnan(bs[0].target) && !blindNow(0).busy, "the Target cleared");
+  CHECK(count(logFrom(seq), "reached at tilt") == 1, "one log line with the tilt");
+  powered = true;
+  uint32_t batt = stats.battMotorMs, all = stats.motorMs;
+  tiltTo(0, -20);
+  endsBy(60000);
+  CHECK(stats.motorMs > all && stats.battMotorMs == batt, "with input power: motor time added, not to the battery's");
+}
+
+static void testAlreadyThere() {
+  motionStart();
+  blind(0, 245);
+  seenReset();
+  tiltTo(0, 50);
+  endsBy(5000);
+  CHECK(is(bs[0].last, "already there") && !seen.on[0], "a move to where it already is: \"already there\", the motor never driven");
+}
+
+// The stall rule as the code has it today (F-5 asks for 250 ms: a product question, filed apart): no check while the
+// gear play is taken up (tune.graceMs), then the rod has to move within the stall time (tune.stallMs).
+static void testStall() {
+  motionStart();
+  blind(0, 290);
+  uint32_t stalls = stats.stalls[0], seq = logSeq;
+  host::hold(0);                                   // held from the start, part-way between its Marks
+  seenReset();
+  tiltTo(0, 50);
+  endsBy(60000);
+  uint32_t ranFor = seen.offAt[0] - seen.onAt[0];
+  CHECK(ranFor >= tune.graceMs && ranFor < tune.graceMs + 100,
+        "rod held: the motor braked as the gear play time ends (it has stood still for longer than the stall time)");
+  CHECK(count(logFrom(seq), "trying the other direction") == 1, "no progress at all: one try the other way");
+  CHECK(is(bs[0].last, "blocked (stalled)") && stats.stalls[0] == stalls + 1 && movesStalled[0] == 1, "it ends \"blocked (stalled)\", the stalls counters up one");
+  CHECK(near(blindNow(0).tilt, 0, 2) && cfg.b[0].motSign == 1, "the Current tilt is reported, not the Target; the direction put back");
+  host::letGo(0);
+  motionStart();
+  blind(0, 290);
+  seq = logSeq;
+  seenReset();
+  tiltTo(0, -100);
+  run(2000);
+  host::hold(0);                                   // held part-way through the move
+  endsBy(60000);
+  ranFor = seen.offAt[0] - seen.onAt[0];
+  CHECK(ranFor >= tune.graceMs + tune.stallMs && ranFor < tune.graceMs + tune.stallMs + 100,
+        "rod held part-way: the motor braked once it stood still for the stall time after the gear play");
+  CHECK(is(bs[0].last, "blocked (stalled)") && !has(logFrom(seq), "other direction"), "it ends \"blocked (stalled)\", no turn-round after progress");
+  host::letGo(0);
+}
+
+static void testEndStop() {
+  motionStart();
+  host::HostTilter &t = blind(0, 230);
+  t.lo = 205;
+  tiltTo(0, 100);
+  endsBy(60000);
+  CHECK(is(bs[0].last, "reached (end stop)"), "against its end stop near the up Mark, Target 100: \"reached (end stop)\"");
+}
+
+static void testWiredRound() {
+  motionStart();
+  host::HostTilter &t = blind(0, 290);
+  t.phys = -1;
+  t.hi = 320;
+  uint32_t seq = logSeq;
+  tiltTo(0, 50);
+  endsBy(60000);
+  Settings saved;
+  std::vector<uint8_t> b = host::flashBlob("blinds", "cfg");
+  memcpy(&saved, b.data(), std::min(b.size(), sizeof saved));
+  CHECK(count(logFrom(seq), "going the wrong way") == 1, "a motor wired the other way round: it turns round once");
+  CHECK(is(bs[0].last, "reached") && cfg.b[0].motSign == -2 && saved.b[0].motSign == -2, "it reaches, the direction saved in flash as seen");
+}
+
+static void testNoReadingMidMove() {
+  motionStart();
+  blind(0, 290);
+  tiltTo(0, -50);
+  run(1500);
+  host::dropout(0, 5000);
+  endsBy(30000);
+  CHECK(is(bs[0].last, "stopped: no reading from the sensor"), "the sensor gives nothing for over a second: it stops and says why");
+}
+
+static void testUnpluggedBeforeMove() {
+  motionStart();
+  blind(0, 290);
+  host::unplug(0);
+  pulseRead(0);
+  pulseRead(0);                                  // two odd results: still present (testOddResults)
+  seenReset();
+  CHECK(!tiltTo(0, 50), "the move is accepted (the blind was there at its last reads)");
+  endsBy(5000);
+  CHECK(is(bs[0].last, "no tilter plugged in") && !seen.on[0], "unplugged before a move starts: \"no tilter plugged in\", the motor never driven");
+}
+
+static void testTimeLimit() {
+  motionStart();
+  host::HostTilter &t = blind(0, 290);
+  t.degPerS = 2.5f;
+  tune.moveMaxS = 2;
+  tiltTo(0, 50);
+  endsBy(30000);
+  CHECK(is(bs[0].last, "stopped: time limit"), "a move past the time limit: \"stopped: time limit\"");
+}
+
+static void testOneAtATime() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  parMode = 0;
+  seenReset();
+  tiltTo(0, 50);
+  tiltTo(1, 50);
+  CHECK(bs[1].queued && blindNow(1).busy && near(bs[1].target, 50, 0.01) && !movingPort(1), "one at a time: blind 2 waits, busy, its Target set");
+  endsBy(60000);
+  CHECK(seen.maxOn == 1 && seen.onAt[1] > seen.offAt[0], "one at a time: only one motor on at any moment, blind 2 after blind 1");
+  CHECK(is(bs[0].last, "reached") && is(bs[1].last, "reached"), "one at a time: both reach");
+}
+
+static void testTogether() {
+  motionStart();
+  for (int p = 0; p < PORTS; p++) blind(p, 290);
+  parMode = 1;
+  seenReset();
+  for (int p = 0; p < PORTS; p++) tiltTo(p, 50);
+  endsBy(60000);
+  CHECK(seen.maxOn == 3, "together: all three motors on at the same time");
+  CHECK(is(bs[0].last, "reached") && is(bs[1].last, "reached") && is(bs[2].last, "reached"), "together: all three reach (F-2)");
+}
+
+static void testWaitingUnplugged() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  parMode = 0;
+  tiltTo(0, 50);
+  tiltTo(1, 50);
+  run(500);
+  host::unplug(1);
+  for (int k = 0; k < 3; k++) pulseRead(1);       // its third odd result: gone
+  endsBy(60000);
+  CHECK(is(bs[1].last, "no tilter plugged in") && isnan(bs[1].target) && !bs[1].queued, "a waiting blind unplugged before its turn: the reason kept, its Target cleared");
+}
+
+static int traced(char c, int pin) { std::string s = host::pinTrace(pin); return (int)std::count(s.begin(), s.end(), c); }
+static void testNewTarget() {
+  motionStart();
+  blind(0, 290);
+  tiltTo(0, 50);
+  run(1500);
+  int wakes = traced('O', P_ANG[0]);
+  CHECK(mvs[0].st == MS_RUN && !tiltTo(0, -50), "a new Target during a move: accepted");
+  endsBy(60000);
+  CHECK(is(bs[0].last, "reached") && near(bs[0].tilt, -50, 5), "it carries on to the new Target");
+  CHECK(traced('O', P_ANG[0]) == wakes, "with no second wake");
+}
+
+static void testStartAngle() {
+  motionStart();
+  host::plugAnalog(0, 290).degPerS = 15;
+  pulseRead(0);
+  const char *e = nullptr;
+  lockedDo([&] { e = startAngle(0, 250); });
+  endsBy(60000);
+  CHECK(!e && near(host::tilter(0).wrapped(), 250, 2), "startAngle with no Marks: the rod within 2 degrees of the Angle asked for");
+}
+
+static void testRefusals() {
+  motionStart();
+  blind(0, 290);
+  const char *r[6];
+  lockedDo([&] {
+    r[0] = startTilt(-1, 0); r[1] = startTilt(3, 0); r[2] = startAngle(-1, 0); r[3] = startAngle(3, 0);
+    r[4] = jog(-1, 1, 100, 100, false); r[5] = jog(3, 1, 100, 100, false);
+  });
+  bool ok = true;
+  for (auto *x : r) ok = ok && is(x, "no such blind");
+  CHECK(ok, "port -1 and 3: \"no such blind\" (startTilt, startAngle, jog)");
+  motorsHeld = true;
+  lockedDo([&] { r[0] = startTilt(0, 0); r[1] = startAngle(0, 0); r[2] = jog(0, 1, 100, 100, false); });
+  CHECK(is(r[0], "restarting") && is(r[1], "restarting") && is(r[2], "restarting"), "motorsHeld: \"restarting\"");
+  motorsHeld = false;
+  vbatRest = 3.34f;
+  lockedDo([&] { r[0] = startTilt(0, 0); r[1] = startAngle(0, 0); r[2] = jog(0, 1, 100, 100, false); });
+  CHECK(is(r[0], "battery too low") && is(r[1], "battery too low") && is(r[2], "battery too low"), "resting cell under 3.35 V: \"battery too low\" (Motor cut-off)");
+  vbatRest = 3.9f;
+  cfg.b[0].open = NAN;
+  CHECK(is(tiltTo(0, 0), "not set up yet"), "no Marks: startTilt \"not set up yet\"");
+  CHECK(!moving(), "nothing started");
+}
+
+static const char *jogNow(int p, int d, uint32_t ms, bool seek = false) {
+  const char *e = nullptr;
+  lockedDo([&] { e = jog(p, d, 100, ms, seek); });
+  return e;
+}
+static void testJog() {
+  motionStart();
+  blind(0, 290);
+  seenReset();
+  jogNow(0, 1, 500);
+  run(300);
+  CHECK(host::motorRunning(0), "a jog of 500 ms: the motor on");
+  jogNow(0, 1, 500);
+  run(400);
+  CHECK(host::motorRunning(0), "a second call the same way before the end: the end pushed out");
+  run(1000);
+  CHECK(!moving() && is(bs[0].last, "jog"), "then it ends \"jog\"");
+  jogNow(0, 1, 500);
+  run(100);
+  jogNow(0, -1, 500);
+  CHECK(mvs[0].kind == MV_JOG && mvs[0].jogDir == -1 && mvs[0].st == MS_WAKE, "a call the other way starts a new jog");
+  endsBy(5000);
+  uint32_t at = millis();
+  jogNow(0, 1, 5000);
+  CHECK(mvs[0].deadline - at == 2030, "5000 ms asked: cut to 2000");
+  endsBy(10000);
+}
+
+static void testJogLearns() {
+  motionStart();
+  blind(0, 290);
+  uint32_t seq = logSeq;
+  jogNow(0, 1, 1500);
+  endsBy(10000);
+  Settings saved;
+  memcpy(&saved, host::flashBlob("blinds", "cfg").data(), sizeof saved);
+  CHECK(cfg.b[0].motSign == 2 && saved.b[0].motSign == 2, "a jog of more than 4 degrees, no direction known: learned and saved");
+  CHECK(count(logFrom(seq), "motor direction learned (+1)") == 1, "a log line");
+}
+
+static void testSeek() {
+  motionStart();
+  host::HostTilter &t = blind(0, 290);
+  t.lo = 250;
+  uint32_t at = millis();
+  jogNow(0, -1, 30000, true);
+  endsBy(40000);
+  CHECK(is(bs[0].last, "jog: stalled") && millis() - at < 20000 && near(t.rod, 250, 0.01), "a seek toward an end stop stops by itself there, well inside 30 s");
+}
+
+static void testStopWithWaiting() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  parMode = 0;
+  tiltTo(0, 50);
+  tiltTo(1, 50);
+  run(1500);
+  lockedDo(moveStop);
+  CHECK(braked(0) && !bs[1].queued && isnan(bs[1].target) && !blindNow(1).busy, "stop with another waiting: braked, the waiting one no longer busy");
+  endsBy(5000);
+  CHECK(is(bs[0].last, "stopped") && !movingPort(1), "it ends \"stopped\", the waiting one never starts");
+}
+
+static void testStopEndsGentle() {
+  motionStart();
+  blind(0, 290);
+  ramp[0] = {true, 0, 50, millis(), 60000, 0};
+  lockedDo(moveStop);
+  CHECK(!rampAny(), "moveStop while a gentle move is set: it is ended too");
+}
+
+static void testRecording() {
+  motionStart();
+  host::HostTilter &a = blind(0, 290);
+  blind(1, 290);
+  a.degPerS = 1;
+  tiltTo(0, -100);
+  run(100);
+  tiltTo(1, 50);
+  bool apart = true, motor = false;
+  endsBy(200000);
+  for (int i = 1; i < traceN; i++) apart = apart && trace[i].t - trace[i - 1].t >= 4;
+  for (int i = 0; i < traceN; i++) motor = motor || (trace[i].st & 16);
+  CHECK(tracePort == 0, "the move recording: the first move that started");
+  CHECK(apart && motor, "points 40 ms or more apart, the motor-on bit set while it ran");
+  CHECK(traceN == TRACE_N, "never more than 1500 points");
+}
+
+static void testBlindNow() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  parMode = 0;
+  tiltTo(0, 50);
+  tiltTo(1, -50);
+  run(3000);
+  BlindReport r = blindNow(0);
+  CHECK(r.busy && r.movable && near(r.target, 50, 0.01) && near(r.tilt, tiltOf(0, mvs[0].live), 0.01) && r.tilt > 5,
+        "blindNow during a move: the live tilt, busy, the Target, movable");
+  CHECK(blindNow(1).busy, "blindNow for a waiting blind: busy");
+  endsBy(60000);
+}
+
+// ---- move requests through the controller's adapter (EspMoves)
+static void testRequests() {
+  motionStart();
+  blind(0, 290);
+  vbatRest = 3.45f;                                 // Critical battery, above the Motor cut-off
+  MoveResult r = moveBlinds(moveAsk(FROM_SCHEDULE, -1, 30, 0, 0x01));
+  CHECK(r.started == 0 && is(r.why, "battery critical: Schedules paused") && !moving(), "a Schedule at Critical battery: nothing started");
+  r = moveBlinds(moveAsk(FROM_APP, 0, 30));
+  CHECK(r.started == 1 && movingPort(0), "the same from the app: it starts");
+  endsBy(60000);
+  vbatRest = 3.9f;
+  r = moveBlinds(moveAsk(FROM_APP, 0, -40, 600000));
+  CHECK(r.started == 1 && ramp[0].on && near(ramp[0].from, bs[0].tilt, 0.01) && near(ramp[0].to, -40, 0.01) && ramp[0].durMs == 600000 && !moving(),
+        "a gentle request from the app: a gentle move from the Current tilt, no motor yet");
+  r = moveBlinds(moveAsk(FROM_APP, 0, 10));
+  CHECK(!ramp[0].on && movingPort(0), "a plain app command after it ends it");
+  endsBy(60000);
+}
+
 int main() {
   host::onRestart(firmwareStartValues);
   setenv("TZ", "CST6CDT,M3.2.0,M11.1.0", 1);
@@ -614,6 +1201,41 @@ int main() {
   testPreferences();
   testUnlocked();
   testStopAtStart();
+  testMotionBegin();
+  testEmptyPort();
+  testAnalogRead();
+  testPwmRead();
+  testPwmResting();
+  testPwmBackToAnalog();
+  testOddResults();
+  testAnalogDropout();
+  testPwmFramesLost();
+  testRailDips();
+  testCaptureTimer();
+  testCaptureFails();
+  testCaptureFrames();
+  testWholeMove();
+  testAlreadyThere();
+  testStall();
+  testEndStop();
+  testWiredRound();
+  testNoReadingMidMove();
+  testUnpluggedBeforeMove();
+  testTimeLimit();
+  testOneAtATime();
+  testTogether();
+  testWaitingUnplugged();
+  testNewTarget();
+  testStartAngle();
+  testRefusals();
+  testJog();
+  testJogLearns();
+  testSeek();
+  testStopWithWaiting();
+  testStopEndsGentle();
+  testRecording();
+  testBlindNow();
+  testRequests();
   failed += host::takeFaults();
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;
