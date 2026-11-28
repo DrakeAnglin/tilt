@@ -1,5 +1,6 @@
 // Stand-in for FreeRTOS's semphr.h on the host board (host_board.h): a mutex that knows if it is held (host::held).
-// One task only: a second take (which would wait for ever) and a give with no take are faults. Tests only.
+// One task only: a second take (which would wait for ever) and a give with no take are faults. What another task did
+// while this one waited for the lock (host::duringTake) runs inside the take, before the mutex is taken. Tests only.
 #pragma once
 #include "FreeRTOS.h"
 typedef void *SemaphoreHandle_t;
@@ -9,6 +10,7 @@ inline SemaphoreHandle_t xSemaphoreCreateMutex() {
 }
 inline BaseType_t xSemaphoreTake(SemaphoreHandle_t m, TickType_t) {
   if (!m) { host::fault("xSemaphoreTake on no mutex"); return pdFALSE; }
+  host::beforeTake(m);
   host::Mutex *x = (host::Mutex *)m;
   if (x->held) { host::fault("xSemaphoreTake on a mutex already held: the task would wait for ever"); return pdFALSE; }
   x->held = true;

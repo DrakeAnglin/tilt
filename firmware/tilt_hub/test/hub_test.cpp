@@ -229,7 +229,8 @@ static void peopleOpTests() {
     CHECK(same(p.apply(PO_APPROVE, o, id).err, "no such phone") && p.keys[u].role == 0, "approve: only one that waits");
     idOf(3, id);
     PeopleResult r = p.apply(PO_APPROVE, o, id, true);
-    CHECK(!r.err && !strcmp(r.name, "asker") && p.role(a) == HUB_OWNER && p.last[a] == 0, "approve as an owner");
+    CHECK(!r.err && !strcmp(r.name, "asker") && p.role(a) == HUB_OWNER && p.last[a] == 99,
+          "approve as an owner, its counter kept (a frame it sent while waiting stays stale)");
     fakeNow += 20000;
     int b = addAsked(p, 4); idOf(4, id);
     CHECK(!p.apply(PO_APPROVE, o, id, false).err && p.role(b) == HUB_GUEST, "approve as a Guest");

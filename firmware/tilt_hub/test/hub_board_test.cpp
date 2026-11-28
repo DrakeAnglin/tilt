@@ -16,6 +16,7 @@ static const char *buildPin = "24681357";       // the setup code the build woul
 #include "../main/hub_store.h"
 #include "../main/hub_pair.h"
 #include <nvs_flash.h>
+#include "../../blinds_matter/test/sim_phone.h"
 
 static int passed = 0, failed = 0;
 #define CHECK(cond, what) do { if (cond) passed++; else { failed++; printf("FAIL line %d: %s\n", __LINE__, what); } } while (0)
@@ -79,63 +80,7 @@ static int numField(const std::string &json, const char *key) {
   return n;
 }
 
-// ---- a phone: its own P-256 key pair, the Pairing request, its half of the key exchange, sealed commands
-static int phoneRng(void *, unsigned char *b, size_t n) {
-  static uint32_t x = 12345;
-  for (size_t i = 0; i < n; i++) { x = x * 1103515245u + 12345u; b[i] = (uint8_t)(x >> 16); }
-  return 0;
-}
-struct Phone {
-  uint8_t d[32], pub[65], key[32], cid[8];
-  uint64_t ctr = 1000;
-  std::string check;                             // the check the phone works out (the hub's must be the same)
-  Phone() {
-    mbedtls_ecp_group grp; mbedtls_mpi dm; mbedtls_ecp_point Q;
-    mbedtls_ecp_group_init(&grp); mbedtls_mpi_init(&dm); mbedtls_ecp_point_init(&Q);
-    size_t n = 0;
-    mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1);
-    mbedtls_ecdh_gen_public(&grp, &dm, &Q, phoneRng, nullptr);
-    mbedtls_mpi_write_binary(&dm, d, 32);
-    mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &n, pub, sizeof pub);
-    mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&dm); mbedtls_ecp_point_free(&Q);
-    memset(key, 0, sizeof key); memset(cid, 0, sizeof cid);
-  }
-  // The request body: {"pub": base64, "name": ...} (no name: none sent).
-  std::string body(const char *name = "Ann's iPhone") const {
-    uint8_t b64[100]; size_t n = 0;
-    mbedtls_base64_encode(b64, sizeof b64, &n, pub, 65);
-    cJSON *o = cJSON_CreateObject();
-    cJSON_AddStringToObject(o, "pub", std::string((char *)b64, n).c_str());
-    if (name) cJSON_AddStringToObject(o, "name", name);
-    char *t = cJSON_PrintUnformatted(o);
-    std::string s = t;
-    cJSON_free(t);
-    cJSON_Delete(o);
-    return s;
-  }
-  // The phone's half, from the hub's answer: the shared secret, then the key with `salt` (the setup code it typed).
-  bool finish(const std::string &answer, const std::string &salt) {
-    uint8_t dpub[65], shared[32];
-    if (!pairPub(field(answer, "pub"), dpub) || !unhex(field(answer, "cid"), cid, 8)) return false;
-    mbedtls_ecp_group grp; mbedtls_mpi dm, z; mbedtls_ecp_point P;
-    mbedtls_ecp_group_init(&grp); mbedtls_mpi_init(&dm); mbedtls_mpi_init(&z); mbedtls_ecp_point_init(&P);
-    bool ok = mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) == 0 && mbedtls_mpi_read_binary(&dm, d, 32) == 0 &&
-              mbedtls_ecp_point_read_binary(&grp, &P, dpub, 65) == 0 &&
-              mbedtls_ecdh_compute_shared(&grp, &z, &P, &dm, phoneRng, nullptr) == 0 && mbedtls_mpi_write_binary(&z, shared, 32) == 0;
-    mbedtls_ecp_group_free(&grp); mbedtls_mpi_free(&dm); mbedtls_mpi_free(&z); mbedtls_ecp_point_free(&P);
-    PairKeys pk;
-    if (!ok || !pairDerive(shared, salt, pub, dpub, pk)) return false;
-    memcpy(key, pk.key, 32);
-    check = hexOf(pk.check, 8);
-    return true;
-  }
-  std::string seal(const std::string &cmd, const uint8_t *boot = hboot) { return frameSeal(key, cid, boot, ++ctr, cmd); }
-  // The hub's answer opened with this phone's key ("" if it does not open).
-  std::string open(const std::string &frame, const std::string &reply) const {
-    std::string out;
-    return replyOpen(key, cid, (const uint8_t *)frame.data() + 8, reply, out) ? out : "";
-  }
-};
+// ---- a phone: the test phone both firmwares' tests share (blinds_matter/test/sim_phone.h)
 
 // pairDo and secDo, each followed by the check that keyMx is free again (a held keyMx would hang the hub's next call).
 static int pair(const std::string &b, std::string &out, bool ask, const char *what) {
@@ -149,12 +94,12 @@ static int sec(const std::string &b, std::string &resp, const char *what) {
   return st;
 }
 // A first phone that pairs with the setup code it typed and sends its first command: the status of that command.
-static int claim(Phone &p, const std::string &typed, std::string &resp) {
+static int claim(SimPhone &p, const std::string &typed, std::string &resp) {
   std::string out;
   if (pair(p.body(), out, false, "pairDo (first phone): the lock is free") != 200 || !p.finish(out, typed)) return -1;
-  return sec(p.seal("/api/info"), resp, "secDo (first command): the lock is free");
+  return sec(p.seal("/api/info", hboot), resp, "secDo (first command): the lock is free");
 }
-static int slotOf(const Phone &p) { return people.find(p.cid); }
+static int slotOf(const SimPhone &p) { return people.find(p.cid); }
 
 // ---- storage (hub_store.h)
 static void testEmptyFlash() {
@@ -278,7 +223,7 @@ static void testPeopleFromFlash() {
   host::wipeFlash();
   // start() restarts the board, which clears queued bytes: do its steps here with the bytes queued after the restart.
   host::restart();
-  hubhost::queueRandom(rnd);
+  host::queueRandom(rnd);
   nvs_open("hub", NVS_READWRITE, &nv);
   hubId();
   stateMx = xSemaphoreCreateMutex();
@@ -324,7 +269,7 @@ static void testHubId() {
   host::wipeFlash();
   host::restart();
   const uint8_t mac[6] = {0x40, 0x4c, 0xca, 0x01, 0x02, 0xab};
-  hubhost::setMac(mac);
+  host::setMac(mac);
   nvs_open("hub", NVS_READWRITE, &nv);
   CHECK(hubId() == "hub404cca0102ab", "the hub's id: hub and the MAC in hex the first time");
   CHECK(host::flashStr("hub", "hubid") == "hub404cca0102ab", "the hub's id: saved");
@@ -336,7 +281,7 @@ static void testHubId() {
 static void testHubOwned() {
   firstStart();
   CHECK(!hubOwned(), "hubOwned: false on a new hub");
-  Phone p;
+  SimPhone p;
   std::string resp;
   CHECK(claim(p, "24681357", resp) == 200, "a first phone with the right setup code: in");
   CHECK(hubOwned(), "hubOwned: true once an Owner is in");
@@ -386,7 +331,7 @@ static void testBadKey() {
 
 static void testFirstPhone() {
   firstStart();
-  Phone p;
+  SimPhone p;
   std::string out;
   CHECK(pair(p.body(), out, false, "pairDo (first phone): the lock is free") == 200, "a first phone with a good key: 200");
   uint8_t dpub[65];
@@ -399,7 +344,7 @@ static void testFirstPhone() {
   CHECK(slot >= 0 && people.keys[slot].used == HK_CLAIM && people.keys[slot].role == 1, "the place is held as a claim");
   CHECK(!strcmp(people.keys[slot].name, "Ann's iPhone"), "the phone's name as typed");
   CHECK(!hubOwned(), "no Owner until its first command opens");
-  std::string frame = p.seal("/api/info"), resp;
+  std::string frame = p.seal("/api/info", hboot), resp;
   cmdAnswer = "{\"ok\":1,\"name\":\"Tilt Hub\"}";
   CHECK(sec(frame, resp, "secDo (first command): the lock is free") == 200, "its first sealed command opens: 200");
   CHECK(cmdCalls == 1 && cmdGot == "/api/info" && cmdSlot == slot, "hubCommand gets the command and the phone's place");
@@ -413,7 +358,7 @@ static void testWrongSetupCode() {
   firstStart();
   std::string resp;
   for (int i = 1; i <= 5; i++) {
-    Phone p;
+    SimPhone p;
     int st = claim(p, "00000000", resp);
     char what[80];
     snprintf(what, sizeof what, "wrong setup code %d: its first command is refused with 401", i);
@@ -421,7 +366,7 @@ static void testWrongSetupCode() {
     CHECK(slotOf(p) < 0 && cmdCalls == 0, "a wrong setup code: the place is gone, no command");
   }
   CHECK(host::lastLog() == "W hub: five wrong setup codes: connecting closed for 5 minutes", "the fifth: the log says connecting is closed");
-  Phone p;
+  SimPhone p;
   std::string out;
   CHECK(pair(p.body(), out, false, "pairDo (closed): the lock is free") == 429, "the sixth /hub/x/pair: 429");
   host::advanceMs(299000);
@@ -432,7 +377,7 @@ static void testWrongSetupCode() {
 
 static void testClaimBusy() {
   firstStart();
-  Phone a, b;
+  SimPhone a, b;
   std::string out;
   CHECK(pair(a.body(), out, false, "pairDo (claim): the lock is free") == 200, "a first phone holds a claim");
   host::advanceMs(59000);
@@ -441,7 +386,7 @@ static void testClaimBusy() {
   CHECK(pair(b.body(), out, false, "pairDo (after a minute): the lock is free") == 200, "after a minute: taken");
   CHECK(b.finish(out, "24681357"), "the second phone works out its key");
   std::string resp;
-  CHECK(sec(b.seal("/api/info"), resp, "secDo (second phone): the lock is free") == 200 && hubOwned(), "the second phone is the Owner");
+  CHECK(sec(b.seal("/api/info", hboot), resp, "secDo (second phone): the lock is free") == 200 && hubOwned(), "the second phone is the Owner");
   bool aGone = true;
   for (auto &k : people.keys) aGone = aGone && !(k.used == HK_CLAIM);
   CHECK(aGone, "the old claim is gone");
@@ -449,7 +394,7 @@ static void testClaimBusy() {
 
 static void testPairOrAskRefused() {
   firstStart();
-  Phone o, x;
+  SimPhone o, x;
   std::string out, resp;
   CHECK(pair(x.body(), out, true, "pairDo (ask, no Owner): the lock is free") == 403, "/hub/x/ask on a hub with no Owner: 403");
   CHECK(claim(o, "24681357", resp) == 200, "an Owner is in");
@@ -458,7 +403,7 @@ static void testPairOrAskRefused() {
 
 static void testJoinRequest() {
   firstStart();
-  Phone o, a, b, c;
+  SimPhone o, a, b, c;
   std::string out, resp;
   host::advanceMs(5000);                         // the hub has been up a while
   CHECK(claim(o, "24681357", resp) == 200, "an Owner is in");
@@ -490,7 +435,7 @@ static void testNoRoom() {
   host::wipeFlash();
   host::putFlashBlob("hub", "hkeys", keys, sizeof keys);
   start();
-  Phone p;
+  SimPhone p;
   std::string out;
   CHECK(pair(p.body(), out, true, "pairDo (no room): the lock is free") == 403 && field(out, "err") == "no room for another phone",
         "the hub has no room for another phone: 403");
@@ -499,33 +444,33 @@ static void testNoRoom() {
 // ---- sealed commands (secDo)
 static void testSealedRefused() {
   firstStart();
-  Phone o;
+  SimPhone o;
   std::string resp;
   CHECK(claim(o, "24681357", resp) == 200, "an Owner is in");
   CHECK(sec("abc", resp, "secDo (short): the lock is free") == 400 && field(resp, "err") == "short", "a body shorter than a frame: 400 short");
-  Phone stranger;
+  SimPhone stranger;
   memset(stranger.cid, 0x77, 8);
   memset(stranger.key, 0x01, 32);
-  CHECK(sec(stranger.seal("/api/info"), resp, "secDo (unknown): the lock is free") == 401 && field(resp, "err") == "not paired",
+  CHECK(sec(stranger.seal("/api/info", hboot), resp, "secDo (unknown): the lock is free") == 401 && field(resp, "err") == "not paired",
         "an id the hub does not know: 401 not paired");
   uint8_t other[4];
   memcpy(other, hboot, 4);
   other[3] ^= 1;
   CHECK(sec(o.seal("/api/info", other), resp, "secDo (stale): the lock is free") == 409 && field(resp, "err") == "stale" &&
         field(resp, "boot") == hexOf(hboot, 4), "a frame for another boot id: 409 stale, with the hub's boot id");
-  std::string frame = o.seal("/api/info");
+  std::string frame = o.seal("/api/info", hboot);
   CHECK(sec(frame, resp, "secDo (once): the lock is free") == 200, "a fresh frame: 200");
   CHECK(sec(frame, resp, "secDo (replay): the lock is free") == 409, "the same frame again (a replay): 409");
   o.ctr -= 5;
-  CHECK(sec(o.seal("/api/info"), resp, "secDo (older counter): the lock is free") == 409, "a counter under the last one taken: 409");
+  CHECK(sec(o.seal("/api/info", hboot), resp, "secDo (older counter): the lock is free") == 409, "a counter under the last one taken: 409");
   o.ctr += 10;
-  std::string bent = o.seal("/api/info");
+  std::string bent = o.seal("/api/info", hboot);
   bent[22] ^= 0x40;
   int calls = cmdCalls;
   CHECK(sec(bent, resp, "secDo (bad key): the lock is free") == 401 && field(resp, "err") == "bad key", "one byte changed: 401 bad key");
   CHECK(slotOf(o) >= 0 && people.keys[slotOf(o)].used == HK_IN && hubOwned(), "one byte changed: the phone is still in");
   CHECK(cmdCalls == calls, "a refused frame never reaches hubCommand");
-  CHECK(sec(o.seal("/api/info"), resp, "secDo (after a bad one): the lock is free") == 200, "its next good frame: 200");
+  CHECK(sec(o.seal("/api/info", hboot), resp, "secDo (after a bad one): the lock is free") == 200, "its next good frame: 200");
 }
 
 static void testLinkVector(const char *path) {
@@ -546,33 +491,33 @@ static void testLinkVector(const char *path) {
   host::putFlashBlob("hub", "htopic", std::vector<uint8_t>(16, 9).data(), 16);
   // the boot id is the next 4 random bytes at the start: the vector's
   host::restart();
-  hubhost::queueRandom(bytesOf(s("boot")));
+  host::queueRandom(bytesOf(s("boot")));
   nvs_open("hub", NVS_READWRITE, &nv);
   stateMx = xSemaphoreCreateMutex();
   keysBegin();
   CHECK(hexOf(hboot, 4) == s("boot"), "the hub's boot id is the vector's");
   cmdAnswer = s("replyOut");
-  hubhost::queueRandom(bytesOf(s("replyRnd")));
+  host::queueRandom(bytesOf(s("replyRnd")));
   std::string resp;
   CHECK(sec(strOf(s("frame")), resp, "secDo (vector): the lock is free") == 200, "the vector's frame: 200");
   CHECK(cmdGot == s("cmd") && cmdSlot == 0, "hubCommand gets the vector's command");
   CHECK(hexOf((const uint8_t *)resp.data(), (int)resp.size()) == s("reply"), "the answer is the vector's reply, byte for byte");
-  CHECK(hubhost::randomQueued() == 0, "the reply took the vector's random bytes");
+  CHECK(host::randomQueued() == 0, "the reply took the vector's random bytes");
   cJSON_Delete(v);
 }
 
 static void testWaitingPhone() {
   firstStart();
-  Phone o, w, w2;
+  SimPhone o, w, w2;
   std::string out, resp;
   host::advanceMs(5000);                         // the hub has been up a while
   CHECK(claim(o, "24681357", resp) == 200, "an Owner is in");
   CHECK(pair(w.body("Kid"), out, true, "pairDo (ask): the lock is free") == 200 && w.finish(out, ""), "a phone asks to join");
   int calls = cmdCalls;
-  CHECK(sec(w.seal("/api/info"), resp, "secDo (waiting): the lock is free") == 403 && field(resp, "err") == "waiting",
+  CHECK(sec(w.seal("/api/info", hboot), resp, "secDo (waiting): the lock is free") == 403 && field(resp, "err") == "waiting",
         "a phone that waits sends /api/info: 403 waiting");
   CHECK(cmdCalls == calls, "a phone that waits: hubCommand is not called");
-  CHECK(sec(w.seal("/api/leave"), resp, "secDo (leave): the lock is free") == 401 && field(resp, "err") == "not paired",
+  CHECK(sec(w.seal("/api/leave", hboot), resp, "secDo (leave): the lock is free") == 401 && field(resp, "err") == "not paired",
         "a phone that waits sends /api/leave: 401 not paired");
   CHECK(slotOf(w) < 0 && cmdCalls == calls, "its Join request is gone");
 
@@ -582,7 +527,7 @@ static void testWaitingPhone() {
   PeopleResult r = people.apply(PO_APPROVE, slotOf(o), w2.cid);
   xSemaphoreGive(keyMx);
   CHECK(r.err == nullptr, "an Owner approves the waiting phone");
-  std::string frame = w2.seal("/api/info");
+  std::string frame = w2.seal("/api/info", hboot);
   CHECK(sec(frame, resp, "secDo (approved): the lock is free") == 200 && cmdGot == "/api/info" && cmdSlot == slotOf(w2),
         "the approved phone's command goes through: 200");
   CHECK(w2.open(frame, resp) == "{\"ok\":1}", "the answer opens with its key");
@@ -590,13 +535,13 @@ static void testWaitingPhone() {
   // a restart: the people back from flash, the old boot id's frames stale
   uint8_t oldBoot[4];
   memcpy(oldBoot, hboot, 4);
-  std::string old = w2.seal("/api/info");
+  std::string old = w2.seal("/api/info", hboot);
   start();
   CHECK(slotOf(o) >= 0 && people.keys[slotOf(o)].role == 1 && slotOf(w2) >= 0 && people.keys[slotOf(w2)].used == HK_IN,
         "a restart: the people are back from flash");
   CHECK(memcmp(hboot, oldBoot, 4) != 0, "a restart: a new boot id");
   CHECK(sec(old, resp, "secDo (old boot): the lock is free") == 409 && field(resp, "err") == "stale", "a restart: the old boot id's frames are stale");
-  CHECK(sec(o.seal("/api/info"), resp, "secDo (new boot): the lock is free") == 200, "a frame for the new boot id: 200");
+  CHECK(sec(o.seal("/api/info", hboot), resp, "secDo (new boot): the lock is free") == 200, "a frame for the new boot id: 200");
 }
 
 int main(int argc, char **argv) {

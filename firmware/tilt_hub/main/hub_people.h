@@ -175,7 +175,7 @@ struct HubPeople {
       memcpy(r.name, k.name, sizeof r.name);
       if (op == PO_APPROVE || op == PO_DENY) {
         if (k.used != HK_ASKED) break;
-        if (op == PO_APPROVE) { k.used = HK_IN; k.role = asOwner; last[i] = 0; }
+        if (op == PO_APPROVE) { k.used = HK_IN; k.role = asOwner; }   // its counter stays: a frame sent while waiting is not taken again
         else memset(&k, 0, sizeof k);
       } else if (op == PO_MAKEOWNER || op == PO_UNOWNER) k.role = op == PO_MAKEOWNER;
       else { if (i == slot) { r.err = "you cannot remove yourself"; break; } memset(&k, 0, sizeof k); }

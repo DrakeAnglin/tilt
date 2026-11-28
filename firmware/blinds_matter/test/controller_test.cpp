@@ -1,16 +1,24 @@
 // Tests for the controller's own code on the host board (test/host_esp/host_board.h): main/store.h, main/power.h,
-// main/lock.h, main/motion.h (with main/pwmin.h, main/request.h, main/handwatch.h and main/tilter.h), and with them
-// main/ardu.h and main/config.h, run on the Mac: tools/firmware_tests.sh. The real files run unchanged; the include
-// path picks the stand-in SDK headers in test/host_esp, and a stand-in tilter sits on each port behind the pins
-// (test/host_esp/host_tilter.h). Built with TILT_DEVLOG, so the dev build's power log and light log are tested too.
+// main/lock.h, main/motion.h (with main/pwmin.h, main/request.h, main/handwatch.h and main/tilter.h), main/web.h's
+// secured channel and people rules (main/sec.h, main/api.h, main/people.h, main/update.h, main/fwkey.h), and with them
+// main/ardu.h and main/config.h, run on the Mac with real mbedtls: tools/firmware_tests.sh. The real files run
+// unchanged; the include path picks the stand-in SDK headers in test/host_esp, and a stand-in tilter sits on each port
+// behind the pins (test/host_esp/host_tilter.h). A test phone (test/sim_phone.h) pairs, seals commands and opens the
+// answers. Built with TILT_DEVLOG, so the dev build's power log and light log are tested too.
+//   controller_test [wire folder]   (default: test/wire next to this file: link.json, keys.json, fw_sig.json)
 #include "../main/store.h"
 #include "../main/power.h"
 #include "../main/lock.h"
 #include "../main/motion.h"
+#include "../main/web.h"
 #include "host_tilter.h"
+#include "sim_phone.h"
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <sstream>
 #include <string>
+#include <vector>
 
 static int passed = 0, failed = 0;
 #define CHECK(cond, what) do { if (cond) passed++; else { failed++; printf("FAIL line %d: %s\n", __LINE__, what); } } while (0)
@@ -19,6 +27,27 @@ static bool near(double a, double b, double tol) { return fabs(a - b) <= tol; }
 // app_main.cpp's: someone has the app open. Its real body comes under test with app_main.cpp (#267).
 static bool uiOn = false;
 bool uiActive() { return uiOn; }
+// app_main.cpp's and home_code.h's, until those parts come under test (#267): the blinds task woken (counted), the
+// Matter homes, the home window and its code.
+static int pokes = 0, homeOpens = 0;
+void pokeBlinds() { pokes++; }
+int homesPaired() { return 0; }
+void openHomeWindow() { homeOpens++; }
+std::string homeCodeJson() { return "{\"ok\":1}"; }
+// hub_link.h's, until it comes under test (#266): the hub link's state, and its eight handlers, which note the query
+// they got and answer {"ok":1}.
+bool hubOk() { return false; }
+bool hubJoined() { return false; }
+void hubTick() {}
+std::string hubThreadJson() { return "{}"; }
+volatile uint32_t hubLinkSeen = 0;
+static int standIns = 0;
+static std::string standInGot;                   // "hHome b=0&lift=5000": the last stand-in handler run and its query
+#define TILT_STAND_IN(fn) \
+  esp_err_t fn(httpd_req_t *r) { standIns++; standInGot = std::string(#fn) + " " + (secQuery ? secQuery : ""); return ok(r); }
+TILT_STAND_IN(hHome) TILT_STAND_IN(hHubJoin) TILT_STAND_IN(hSwapFw) TILT_STAND_IN(hHubKey)
+TILT_STAND_IN(hHubNet) TILT_STAND_IN(hFactory) TILT_STAND_IN(hBackup) TILT_STAND_IN(hRestore)
+#undef TILT_STAND_IN
 
 // motion.h and pwmin.h: every global back to its start value.
 static void motionStartValues() {
@@ -50,9 +79,36 @@ static void motionStartValues() {
   uiOn = false;
 }
 
+// sec.h, api.h, people.h and update.h: every global back to its start value.
+static void secStartValues() {
+  memset(keys, 0, sizeof keys);
+  memset(lastCtr, 0, sizeof lastCtr);
+  memset(askAt, 0, sizeof askAt);
+  lastAsk = 0;
+  memset(bootId, 0, sizeof bootId);
+  memset(cloudTopic, 0, sizeof cloudTopic);
+  memset(hubKeyId, 0, sizeof hubKeyId);
+  hubKeySet = false;
+  memset(hubLink, 0, sizeof hubLink);
+  hubLinkOk = false;
+  secClient = -1;
+  secQuery = nullptr;
+  secOut = nullptr;
+  secMx = nullptr;
+  recover = Recover();
+  lastWeb = 0;
+  restartSoon = false;
+  otaWindow = 0;
+  otaPending = false;
+  appSize = 0;
+  pokes = homeOpens = standIns = 0;
+  standInGot.clear();
+}
+
 // A restart puts every global of the firmware back to its start value, as the chip does; flash stays.
 static void firmwareStartValues() {
   motionStartValues();
+  secStartValues();
   memset(&cfg, 0, sizeof cfg);
   memset(&stats, 0, sizeof stats);
   memset(movesStalled, 0, sizeof movesStalled);
@@ -82,12 +138,16 @@ static void firmwareStartValues() {
   ledcCount() = 0;
   memset(ledcPins(), 0, 8 * sizeof(int));
 }
-// A start of the controller as app_main.cpp does it, as far as these files go.
-static void start(esp_reset_reason_t why = ESP_RST_POWERON) {
+// A start of the controller as app_main.cpp does it, as far as these files go. rnd: the random bytes the start takes
+// (queued after the board's restart, which clears them).
+static void start(esp_reset_reason_t why = ESP_RST_POWERON, const std::vector<uint8_t> &rnd = {}) {
   host::setResetReason(why);
   host::restart();
+  host::queueRandom(rnd);
   logBegin();
   storeBegin();
+  updateBegin();
+  secBegin();
 }
 static void firstStart() { host::wipeFlash(); start(); }
 
@@ -616,8 +676,8 @@ static void testStopAtStart() {
 }
 
 // A restart with the motion code; the tilters stay plugged in, flash stays.
-static void motionRestart() {
-  start();
+static void motionRestart(const std::vector<uint8_t> &rnd = {}) {
+  start(ESP_RST_POWERON, rnd);
   adcBegin();
   lockBegin();
   vbatRest = vbat = 3.9f;
@@ -1491,7 +1551,650 @@ static void testMarkLock() {
   CHECK(heldAfter && host::takeFaults() == 0, "and held when setMark returns, with no board fault");
 }
 
-int main() {
+// ---- the secured channel (sec.h): keys, Pairing, Join requests, sealed commands, the proofs with the Tilt Hub
+static std::string wireDir;                         // test/wire (link.json, keys.json, fw_sig.json)
+static std::string readFile(const std::string &path) {
+  std::ifstream f(path);
+  std::stringstream ss;
+  ss << f.rdbuf();
+  return ss.str();
+}
+static std::vector<uint8_t> bytesOf(const std::string &hex) {
+  std::vector<uint8_t> b(hex.size() / 2);
+  unhex(hex, b.data(), b.size());
+  return b;
+}
+static std::string strOf(const std::string &hex) { std::vector<uint8_t> b = bytesOf(hex); return std::string(b.begin(), b.end()); }
+static std::string b64Of(const std::vector<uint8_t> &b) {
+  uint8_t out[200];
+  size_t n = 0;
+  mbedtls_base64_encode(out, sizeof out, &n, b.data(), b.size());
+  return std::string((char *)out, n);
+}
+static int num(const std::string &j, const char *key) {     // a number field of a flat JSON answer (-999: none)
+  std::string k = std::string("\"") + key + "\":";
+  size_t i = j.find(k);
+  return i == std::string::npos ? -999 : atoi(j.c_str() + i + k.size());
+}
+static std::string errOf(const std::string &j) { return jsonStr(j, "err"); }
+static std::string refused(const char *why) { return std::string("{\"ok\":0,\"err\":\"") + why + "\"}"; }
+static const std::string OK = "{\"ok\":1}";
+
+static httpd_req_t req;
+static bool locksFree() { return !host::held(mx) && !host::held(secMx); }
+// pairDo, recoverDo and secDo, each followed by the check that the controller lock and secMx are free again and the
+// board saw no fault.
+static int pair(const std::string &b, std::string &out, bool ask = false) {
+  int st = atoi(pairDo(b, out, ask));
+  CHECK(locksFree() && host::takeFaults() == 0, "pairDo: the locks are free, no board fault");
+  return st;
+}
+static int recoverStart(const std::string &b, std::string &out) {
+  int st = atoi(recoverDo(b, out));
+  CHECK(locksFree() && host::takeFaults() == 0, "recoverDo: the locks are free, no board fault");
+  return st;
+}
+struct Answer { int st; std::string out; };          // the status, and the answer: opened when 200, else as it came
+static Answer sendFrame(const SimPhone &p, const std::string &frame, bool *fromHub = nullptr) {
+  std::string resp;
+  int st = atoi(secDo(frame, resp, &req, fromHub));
+  CHECK(locksFree() && host::takeFaults() == 0, "secDo: the locks are free, no board fault");
+  return {st, st == 200 ? p.open(frame, resp) : resp};
+}
+static Answer send(SimPhone &p, const std::string &cmd) { return sendFrame(p, p.seal(cmd, bootId)); }
+static int slotOf(const SimPhone &p) {
+  for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used && !memcmp(keys[i].id, p.cid, 8)) return i;
+  return -1;
+}
+static bool keysInFlash() {
+  std::vector<uint8_t> f = host::flashBlob("blinds", "keys");
+  return f.size() == sizeof keys && !memcmp(f.data(), keys, sizeof keys);
+}
+// A controller with the motion code, every port empty, up for a second.
+static void secStart() { motionStart(); host::advanceMs(1000); }
+static bool pairFirst(SimPhone &p, const char *name = "Ann's iPhone") {
+  std::string out;
+  return pair(p.body(name), out) == 200 && p.finish(out);
+}
+static bool askJoin(SimPhone &p, const char *name) {          // 10 s after the last ask
+  host::advanceMs(10001);
+  std::string out;
+  return pair(p.body(name), out, true) == 200 && p.finish(out);
+}
+static bool approve(SimPhone &owner, SimPhone &p, bool asOwner = false) {
+  return send(owner, "/api/approve?cid=" + p.cidHex() + "&ok=1" + (asOwner ? "&owner=1" : "")).out == OK;
+}
+static bool addGuest(SimPhone &owner, SimPhone &p, const char *name) { return askJoin(p, name) && approve(owner, p); }
+static void lockedPut(int slot, uint8_t used, uint8_t role, uint8_t idByte, const char *name) {
+  lockedDo([&] {
+    ClientKey &k = keys[slot];
+    memset(&k, 0, sizeof k);
+    k.used = used; k.role = role;
+    memset(k.id, idByte, 8);
+    memset(k.key, idByte + 1, 32);
+    strlcpy(k.name, name, sizeof k.name);
+  });
+}
+
+static void testKeysEmptyFlash() {
+  std::vector<uint8_t> rnd;
+  for (int i = 0; i < 20; i++) rnd.push_back((uint8_t)(0x40 + i));
+  host::wipeFlash();
+  start(ESP_RST_POWERON, rnd);
+  bool none = true;
+  for (auto &k : keys) none = none && !k.used;
+  CHECK(none && !owned() && asksWaiting() == 0, "empty flash: no keys, no owner");
+  CHECK(!memcmp(bootId, rnd.data(), 4), "empty flash: the boot id comes from the random source");
+  CHECK(!memcmp(cloudTopic, rnd.data() + 4, 16), "empty flash: a new 16-byte topic");
+  CHECK(host::flashBlob("blinds", "topic") == std::vector<uint8_t>(rnd.begin() + 4, rnd.end()), "the topic is saved");
+  CHECK(hubSlot() < 0 && !hubKeySet, "empty flash: no hub key");
+}
+
+static void testKeysKept() {
+  secStart();
+  SimPhone p;
+  CHECK(pairFirst(p) && send(p, "/api/keys").st == 200, "a first phone is paired and has sent a command");
+  uint8_t topic[16], boot[4];
+  memcpy(topic, cloudTopic, 16);
+  memcpy(boot, bootId, 4);
+  motionRestart();
+  int s = slotOf(p);
+  CHECK(s >= 0 && keys[s].used == 1 && keys[s].role == 1 && !memcmp(keys[s].key, p.key, 32), "a restart: the keys are kept");
+  CHECK(!memcmp(cloudTopic, topic, 16), "a restart: the same topic");
+  CHECK(memcmp(bootId, boot, 4) != 0, "a restart: a new boot id");
+  bool zero = true;
+  for (uint64_t c : lastCtr) zero = zero && c == 0;
+  CHECK(zero, "a restart: every counter at 0");
+  CHECK(send(p, "/api/keys").st == 200, "the phone's next command, for the new boot id: 200");
+
+  ClientKey other[MAX_KEYS] = {};
+  other[0].used = 1; other[0].role = 1;
+  host::wipeFlash();
+  host::putFlashBlob("blinds", "keys", other, sizeof other - 1);
+  motionRestart();
+  CHECK(!owned() && !keys[0].used, "a keys blob of another size in flash: no keys");
+}
+
+static void testJsonStr() {
+  CHECK(jsonStr("{\"a\":\"x\",\"name\":\"Bo\"}", "name") == "Bo", "jsonStr: the value for a key");
+  CHECK(jsonStr("{\"name\" : \"say \\\"hi\\\" a\\\\b\"}", "name") == "say \"hi\" a\\b", "jsonStr: \\\" and \\\\ undone");
+  CHECK(jsonStr("{\"a\":\"x\"}", "name") == "", "jsonStr: a missing key");
+  CHECK(jsonStr("{\"name\"", "name") == "", "jsonStr: a missing colon");
+  CHECK(jsonStr("{\"name\":12}", "name") == "", "jsonStr: a missing quote");
+  CHECK(jsonStr("{\"name\":\"open", "name") == "", "jsonStr: an unclosed string");
+}
+
+static void testFirstPairing() {
+  secStart();
+  SimPhone p;
+  std::string out;
+  uint32_t seq = logSeq;
+  CHECK(pair(p.body(), out) == 200 && num(out, "owner") == 1 && num(out, "wait") == 0, "a first phone in the first 15 minutes: 200, an owner");
+  CHECK(p.finish(out) && jsonStr(out, "check") == p.check, "the phone works out the same key and check");
+  int s = slotOf(p);
+  CHECK(s >= 0 && keys[s].used == 1 && keys[s].role == 1 && !memcmp(keys[s].key, p.key, 32), "its key is kept, as an owner");
+  CHECK(!strcmp(keys[s].name, "Ann's iPhone"), "the name as typed");
+  CHECK(jsonStr(out, "topic") == hexOf(cloudTopic, 16), "the answer carries the topic");
+  CHECK(keysInFlash(), "the key is in flash");
+  CHECK(has(logFrom(seq), "Ann's iPhone paired (owner)"), "the log line");
+  CHECK(owned(), "owned() once the first phone is in");
+  CHECK(send(p, "/api/keys").st == 200, "its first command: 200");
+
+  secStart();
+  SimPhone q;
+  CHECK(pair(q.body(nullptr), out) == 200 && q.finish(out) && !strcmp(keys[slotOf(q)].name, "iPhone"), "no name: iPhone");
+
+  secStart();
+  CHECK(pair("{\"pub\":\"AAAA\"}", out) == 400 && errOf(out) == "bad key", "a pub that is not 65 bytes: 400 bad key");
+  std::string v = readFile(wireDir + "/link.json");
+  std::string cpub = "{\"pub\":\"" + b64Of(bytesOf(linkJsonStr(v, "cpub"))) + "\"}";
+  CHECK(pair(cpub, out) == 400 && errOf(out) == "key exchange failed", "link.json's cpub (not on the curve): 400 key exchange failed");
+  CHECK(!owned(), "and nothing kept");
+
+  secStart();
+  host::advanceMs(FIRST_PAIR_MS);
+  CHECK(pair(p.body(), out) == 403 && errOf(out).rfind("setup is closed", 0) == 0, "a first phone after 15 minutes: 403 setup is closed");
+  secStart();
+  CHECK(pairFirst(p), "a first phone");
+  CHECK(pair(q.body(), out) == 403 && errOf(out) == "this controller has an owner. Ask to join from the app.",
+        "a second first-pairing on an owned controller: 403, ask to join");
+}
+
+static void testJoinRequests() {
+  secStart();
+  SimPhone o, a, b, c, d;
+  std::string out;
+  CHECK(pair(a.body("Kid"), out, true) == 403 && errOf(out) == "this controller has no owner yet", "a Join request with no owner: 403");
+  CHECK(pairFirst(o), "an owner pairs");
+  host::advanceMs(10001);
+  uint32_t seq = logSeq;
+  CHECK(pair(a.body("Kid"), out, true) == 200 && num(out, "wait") == 1 && num(out, "owner") == 0 && a.finish(out), "a Join request: 200, waiting");
+  int s = slotOf(a);
+  CHECK(s >= 0 && keys[s].used == 2 && keys[s].role == 0 && asksWaiting() == 1, "its key is kept as waiting");
+  CHECK(has(logFrom(seq), "Kid asked to join"), "the log line");
+  host::advanceMs(5000);
+  CHECK(pair(b.body("Bea"), out, true) == 429 && errOf(out) == "try again in a few seconds", "a second request inside 10 s: 429");
+  host::advanceMs(5001);
+  CHECK(pair(b.body("Bea"), out, true) == 200 && b.finish(out), "after 10 s: 200");
+  host::advanceMs(10001);
+  CHECK(pair(c.body("Cy"), out, true) == 429 && errOf(out) == "two requests are waiting already. Try again later.",
+        "a third while two wait: 429");
+  host::advanceMs(600000);
+  seq = logSeq;
+  CHECK(pair(c.body("Cy"), out, true) == 200 && c.finish(out), "once one has waited over 10 minutes: 200");
+  CHECK(slotOf(a) < 0 && slotOf(b) >= 0 && slotOf(c) >= 0 && asksWaiting() == 2, "the oldest request is replaced");
+  CHECK(has(logFrom(seq), "Kid's request to join was replaced by a newer one"), "the log line");
+
+  secStart();
+  CHECK(pairFirst(o), "an owner pairs");
+  for (int i = 1; i < MAX_KEYS; i++) lockedPut(i, 1, 0, (uint8_t)(0x10 * i), "Guest");
+  host::advanceMs(10001);
+  CHECK(pair(d.body(), out, true) == 403 && errOf(out) == "no room for another phone", "all eight places taken: 403");
+}
+
+static void testPairedMeanwhile() {
+  secStart();
+  SimPhone a, b;
+  std::string out, other;
+  int otherSt = 0;
+  host::duringTake(mx, [&] { otherSt = atoi(pairDo(b.body("Bea"), other)); }, 1);   // between the lock's two takes
+  CHECK(pair(a.body(), out) == 409 && errOf(out) == "another phone paired at the same moment. Try again.",
+        "another phone pairs during the key exchange: 409");
+  CHECK(otherSt == 200 && b.finish(other) && slotOf(b) >= 0 && slotOf(a) < 0, "the other phone is the owner");
+}
+
+static void testLinkVector() {
+  std::string v = readFile(wireDir + "/link.json");
+  CHECK(!v.empty(), "link.json reads");
+  auto s = [&](const char *k) { return linkJsonStr(v, k); };
+  ClientKey k[MAX_KEYS] = {};
+  k[0].used = 1; k[0].role = 1;
+  unhex(s("cid"), k[0].id, 8);
+  unhex(s("key"), k[0].key, 32);
+  strlcpy(k[0].name, "Vector", sizeof k[0].name);
+  host::wipeFlash();
+  host::putFlashBlob("blinds", "keys", k, sizeof k);
+  host::putFlashBlob("blinds", "topic", std::vector<uint8_t>(16, 9).data(), 16);
+  unplugAll();
+  motionRestart(bytesOf(s("boot")));                // the boot id is the start's first random bytes: the vector's
+  CHECK(hexOf(bootId, 4) == s("boot"), "the boot id is the vector's");
+  host::queueRandom(bytesOf(s("replyRnd")));
+  std::string resp;
+  CHECK(atoi(secDo(strOf(s("frame")), resp, &req)) == 200, "the vector's frame: 200");
+  CHECK(standInGot == "hHome " + s("cmd").substr(s("cmd").find('?') + 1), "it opens to the vector's command (hHome gets b=0&lift=5000)");
+  CHECK(hexOf((const uint8_t *)resp.data(), (int)resp.size()) == s("reply"), "the answer is the vector's reply, byte for byte");
+  CHECK(host::randomQueued() == 0 && locksFree(), "the reply took the vector's random bytes; the locks are free");
+}
+
+static void testSealedRefused() {
+  secStart();
+  SimPhone o, w, stranger;
+  CHECK(pairFirst(o), "an owner pairs");
+  std::string resp;
+  CHECK(atoi(secDo(std::string(36, 'x'), resp, &req)) == 400 && errOf(resp) == "short", "under 37 bytes: 400 short");
+  memset(stranger.cid, 0x77, 8);
+  memset(stranger.key, 0x55, 32);
+  Answer a = send(stranger, "/api/s");
+  CHECK(a.st == 401 && errOf(a.out) == "not paired", "an unknown phone: 401 not paired");
+  uint8_t other[4];
+  memcpy(other, bootId, 4);
+  other[0] ^= 1;
+  a = sendFrame(o, o.seal("/api/s", other));
+  CHECK(a.st == 409 && errOf(a.out) == "stale" && jsonStr(a.out, "boot") == hexOf(bootId, 4), "another boot id: 409 stale with this start's boot");
+  std::string frame = o.seal("/api/s", bootId);
+  CHECK(sendFrame(o, frame).st == 200 && sendFrame(o, frame).st == 409, "the same frame twice: 200, then 409");
+  o.ctr -= 5;
+  CHECK(send(o, "/api/s").st == 409, "a lower counter: 409");
+  o.ctr += 10;
+  frame = o.seal("/api/s", bootId);
+  std::string bent = frame;
+  bent[25] ^= 1;
+  a = sendFrame(o, bent);
+  CHECK(a.st == 401 && errOf(a.out) == "bad key", "one byte changed: 401 bad key");
+  CHECK(sendFrame(o, frame).st == 200, "the counter did not move: the true frame still opens");
+
+  CHECK(askJoin(w, "Kid"), "a phone asks to join");
+  int before = pokes;
+  a = send(w, "/api/s");
+  CHECK(a.st == 403 && errOf(a.out) == "waiting" && pokes == before, "a waiting phone sends a command: 403 waiting, no handler run");
+  uint32_t seq = logSeq;
+  a = send(w, "/api/leave");
+  CHECK(a.st == 401 && errOf(a.out) == "not paired" && slotOf(w) < 0, "it sends /api/leave: 401, its place free");
+  CHECK(has(logFrom(seq), "Kid took the request back") && keysInFlash(), "the log line, and flash");
+}
+
+// Nothing a handler does: no lock taken (Lock pokes the blinds task), no stand-in run, no home window opened.
+struct Quiet { int pokes, standIns, homeOpens; uint32_t lastWeb; bool restart; };
+static Quiet quiet() { return {pokes, standIns, homeOpens, lastWeb, restartSoon}; }
+static bool same(const Quiet &a) { Quiet b = quiet(); return a.pokes == b.pokes && a.standIns == b.standIns && a.homeOpens == b.homeOpens && a.lastWeb == b.lastWeb && a.restart == b.restart; }
+static void testWhoMayDoWhat() {
+  secStart();
+  SimPhone o, g, o2;
+  CHECK(pairFirst(o) && addGuest(o, g, "Bea"), "an owner and a Guest");
+  bool allRefused = true;
+  int owners = 0;
+  for (int i = 0; i < routeCount; i++) {
+    if (routes[i].who != OWNER) continue;
+    owners++;
+    Quiet q = quiet();
+    Answer a = send(g, std::string(routes[i].uri) + "?cid=" + o.cidHex());
+    if (a.st != 200 || a.out != refused("only the owner can do that") || !same(q)) {
+      allRefused = false;
+      printf("  %s from a Guest: %d %s\n", routes[i].uri, a.st, a.out.c_str());
+    }
+  }
+  CHECK(owners >= 25 && allRefused, "a Guest sends each OWNER route: a sealed \"only the owner can do that\", the handler never run");
+  Answer a = send(o, "/api/reboot");
+  CHECK(a.out == OK && restartSoon, "an Owner sends one: the handler runs");
+  restartSoon = false;
+  a = send(g, "/api/keyname?cid=" + g.cidHex() + "&name=Bee");
+  CHECK(a.out == OK && !strcmp(keys[slotOf(g)].name, "Bee"), "a Guest renames itself: allowed");
+  CHECK(send(g, "/api/keyname?cid=" + o.cidHex() + "&name=X").out == refused("only the owner can do that"), "with another phone's cid: refused");
+  CHECK(send(g, "/api/keyname?name=X").out == refused("only the owner can do that"), "with no cid: refused");
+  CHECK(send(g, "/api/keyname?cid=" + o.cidHex() + "&cid=" + g.cidHex() + "&name=X").out == refused("only the owner can do that"),
+        "with two cids: refused");
+  CHECK(!strcmp(keys[slotOf(o)].name, "Ann's iPhone"), "and the owner's name is unchanged");
+  CHECK(send(o, "/api/nope").out == refused("unknown command"), "an unknown path: a sealed \"unknown command\"");
+
+  // The phone is removed while its command waits for secMx (a command that ran just before it).
+  int after = 0;
+  std::string removed;
+  host::duringTake(secMx, [&] { removed = send(o, "/api/revoke?cid=" + g.cidHex()).out; after = pokes; });
+  a = send(g, "/api/s");
+  CHECK(jsonStr(removed, "proof").size() == 32, "the owner removes the Guest meanwhile");
+  CHECK(a.st == 200 && a.out == refused("not paired") && pokes == after, "removed while waiting for secMx: a sealed \"not paired\", no handler run");
+
+  // An Owner made a Guest while its OWNER command waits for secMx.
+  CHECK(askJoin(o2, "Cy") && approve(o, o2, true), "a second owner");
+  std::string demoted;
+  host::duringTake(secMx, [&] { demoted = send(o, "/api/makeowner?cid=" + o2.cidHex() + "&on=0").out; });
+  a = send(o2, "/api/reboot");
+  CHECK(demoted == OK && keys[slotOf(o2)].role == 0, "the first owner makes it a Guest meanwhile");
+  CHECK(a.out == refused("only the owner can do that") && !restartSoon, "made a Guest while waiting for secMx: refused, no handler run");
+  restartSoon = false;
+}
+
+static void testStaleAfterLetIn() {
+  secStart();
+  SimPhone o, w;
+  CHECK(pairFirst(o) && askJoin(w, "Kid"), "an owner, and a phone that asks to join");
+  std::string frame = w.seal("/api/s", bootId);
+  CHECK(sendFrame(w, frame).st == 403, "a frame it sends while waiting: 403 waiting");
+  CHECK(approve(o, w), "the owner lets it in");
+  Answer a = sendFrame(w, frame);
+  CHECK(a.st == 409 && errOf(a.out) == "stale", "the frame it sent while waiting, sent again after approval: 409 stale");
+  CHECK(send(w, "/api/s").st == 200, "its next frame: 200");
+}
+
+static void testHubProofs() {
+  secStart();
+  SimPhone o;
+  CHECK(pairFirst(o), "an owner pairs");
+  CHECK(hubMac("x") == "" && !hubMacOk("x", "") && !hubMacOk("x", std::string(32, '0')), "no hub key: no proof, none checks");
+  std::string v = readFile(wireDir + "/link.json");
+  auto s = [&](const char *k) { return linkJsonStr(v, k); };
+  std::vector<uint8_t> vboot = bytesOf(s("boot"));
+  ClientKey k[MAX_KEYS] = {};
+  k[0] = keys[slotOf(o)];
+  k[1].used = 1; k[1].role = 0;
+  memset(k[1].id, 0xa5, 8);
+  unhex(s("hubKey"), k[1].key, 32);
+  strlcpy(k[1].name, "Tilt Hub", sizeof k[1].name);
+  host::putFlashBlob("blinds", "keys", k, sizeof k);
+  host::putFlashBlob("blinds", "hubkey", k[1].id, 8);
+  motionRestart();
+  CHECK(hubSlot() == 1, "link.json's hubKey paired and marked as the hub's");
+  CHECK(hubMac(proofText(Proof::CtlPush, vboot.data(), s("pushJson") + s("pushN"))) == s("proofPush"), "the push's proof is the vector's");
+  std::string tm = proofText(Proof::HubTime, vboot.data(), s("timeMsg")), good = s("proofTime");
+  CHECK(hubMacOk(tm, good), "the time's proof checks");
+  std::string bent = good;
+  bent[5] = bent[5] == 'a' ? 'b' : 'a';
+  CHECK(!hubMacOk(tm, bent) && !hubMacOk(tm, good.substr(0, 31)) && !hubMacOk(tm, ""), "one character changed, one short, empty: no");
+  SimPhone hub;
+  memcpy(hub.cid, k[1].id, 8);
+  memcpy(hub.key, k[1].key, 32);
+  bool fromHub = false;
+  CHECK(sendFrame(hub, hub.seal("/api/s", bootId), &fromHub).st == 200 && fromHub, "a command sealed with the hub's key: from the hub");
+  CHECK(sendFrame(o, o.seal("/api/s", bootId), &fromHub).st == 200 && !fromHub, "with another phone's: not");
+  CHECK(send(o, "/api/revoke?cid=" + hub.cidHex()).out.find("\"ok\":1") != std::string::npos, "the owner removes the hub's phone");
+  CHECK(hubMac(tm) == "" && !hubMacOk(tm, good), "then the proofs stop");
+  motionRestart();
+  CHECK(hubKeySet && hubSlot() == -1, "the key marked in flash but its phone gone, after a restart: hubSlot() -1");
+}
+
+// ---- the handlers' helpers (api.h)
+static void testApiHelpers() {
+  secStart();
+  secQuery = "a=1%202&n=42&b=";
+  CHECK(arg(&req, "a") == "1 2" && arg(&req, "b") == "" && argi(&req, "n") == 42 && argi(&req, "x") == 0, "arg, argi inside a command");
+  secQuery = nullptr;
+  CHECK(arg(&req, "a") == "" && argi(&req, "n") == 0, "outside one: \"\"");
+  CHECK(sendJson(&req, "{}") == ESP_FAIL && ok(&req) == ESP_FAIL, "outside one: nobody to answer, ESP_FAIL");
+  std::string out;
+  secOut = &out;
+  CHECK(ok(&req) == ESP_OK && out == OK, "ok: {\"ok\":1}");
+  fail(&req, "say \"no\"");
+  CHECK(out == "{\"ok\":0,\"err\":\"say \\\"no\\\"\"}", "fail: the reason, quotes escaped");
+  done(&req, nullptr);
+  CHECK(out == OK, "done with no reason: ok");
+  done(&req, "no");
+  CHECK(out == refused("no"), "done with a reason: fail");
+  secOut = nullptr;
+
+  host::restart();
+  lockBegin();
+  int before = pokes;
+  bool inside = false;
+  { Lock l; inside = host::held(mx); }
+  CHECK(inside && lastWeb == 1, "Lock: the controller lock held inside, lastWeb 1 when the clock reads 0");
+  CHECK(!host::held(mx) && pokes == before + 1, "and the blinds task poked once on the way out");
+  host::advanceMs(5000);
+  { Lock l; }
+  CHECK(lastWeb == 5000, "Lock: lastWeb is the time");
+  before = pokes;
+  { QuietLock l; inside = host::held(mx); }
+  CHECK(inside && lastWeb == 5000 && pokes == before && !host::held(mx), "QuietLock: held inside, neither lastWeb nor a poke");
+}
+
+// ---- people (people.h)
+// The keys the answer's objects carry, in order (a value's text left out): {"keys":[{"cid","name",...}]} for its first row.
+static std::string shapeOf(const std::string &j) {
+  std::string out;
+  size_t a = j.find('{', 1), b = j.find('}', a);
+  for (size_t i = a; i != std::string::npos && i < b;) {
+    size_t q = j.find('"', i);
+    if (q == std::string::npos || q > b) break;
+    std::string k;
+    size_t e = q + 1;
+    for (; e < j.size() && j[e] != '"'; e++) { if (j[e] == '\\') e++; k += j[e]; }
+    if (e + 1 < j.size() && j[e + 1] == ':') out += k + ",";
+    i = e + 1;
+  }
+  return out;
+}
+static void testPeopleList() {
+  secStart();
+  SimPhone o, g, w;
+  CHECK(pairFirst(o) && addGuest(o, g, "Bea") && askJoin(w, "Kid"), "an owner, a Guest, a waiting phone");
+  Answer a = send(o, "/api/keys");
+  CHECK(has(a.out, ("{\"cid\":\"" + o.cidHex() + "\",\"name\":\"Ann's iPhone\",\"owner\":1,\"me\":1,\"wait\":0,\"code\":\"\"}").c_str()),
+        "/api/keys as an Owner: the owner's row, me on the caller");
+  CHECK(has(a.out, ("{\"cid\":\"" + g.cidHex() + "\",\"name\":\"Bea\",\"owner\":0,\"me\":0,\"wait\":0,\"code\":\"\"}").c_str()), "the Guest's row");
+  CHECK(has(a.out, ("{\"cid\":\"" + w.cidHex() + "\",\"name\":\"Kid\",\"owner\":0,\"me\":0,\"wait\":1,\"code\":\"" + w.code() + "\"}").c_str()),
+        "the waiting phone's row, with the code that phone works out");
+  CHECK(a.out.rfind("{\"keys\":[", 0) == 0 && shapeOf(a.out) == shapeOf(readFile(wireDir + "/keys.json")) && !shapeOf(a.out).empty(),
+        "the answer has the shape of wire/keys.json");
+  a = send(g, "/api/keys");
+  CHECK(has(a.out, "\"name\":\"Kid\",\"owner\":0,\"me\":0,\"wait\":1,\"code\":\"\"}") && has(a.out, "\"name\":\"Bea\",\"owner\":0,\"me\":1"),
+        "as a Guest: the code \"\", me on the Guest");
+}
+
+static void testRevoke() {
+  secStart();
+  SimPhone o, g, g2;
+  CHECK(pairFirst(o) && addGuest(o, g, "Bea") && addGuest(o, g2, "Cy"), "an owner and two Guests");
+  uint32_t seq = logSeq;
+  Answer a = send(o, "/api/revoke?cid=" + g.cidHex());
+  uint8_t h[32];
+  hmac256(g.key, 32, (const uint8_t *)"removed", 7, h);
+  CHECK(num(a.out, "ok") == 1 && jsonStr(a.out, "proof") == hexOf(h, 16), "a Guest removed: ok, with a proof made with its own key");
+  CHECK(slotOf(g) < 0 && send(g, "/api/s").st == 401, "its next command: 401");
+  CHECK(has(logFrom(seq), "Bea removed") && keysInFlash(), "the log line, and flash");
+  CHECK(send(o, "/api/revoke?cid=" + o.cidHex()).out == refused("you cannot remove yourself"), "the caller's own id: refused");
+  CHECK(send(o, "/api/revoke?cid=0011223344556677").out == refused("no such phone"), "an unknown id: no such phone");
+  CHECK(send(o, "/api/revoke?cid=xyz").out == refused("bad id"), "not hex: bad id");
+
+  // The only Owner, with no caller (the rule as a second guard: an Owner cannot name itself through a command).
+  std::string out, q = "cid=" + o.cidHex();
+  secClient = -1; secQuery = q.c_str(); secOut = &out;
+  hRevoke(&req);
+  secQuery = nullptr; secOut = nullptr;
+  CHECK(out == refused("that is the only owner") && slotOf(o) >= 0, "the only owner, no caller: refused, the key kept");
+
+  a = send(o, "/api/revoke?cid=all");
+  CHECK(num(a.out, "ok") == 1 && !owned() && slotOf(g2) < 0 && keysInFlash(), "cid=all: no keys left, owned() false");
+}
+
+static void testKeyName() {
+  secStart();
+  SimPhone o, g;
+  CHECK(pairFirst(o) && addGuest(o, g, "Bea"), "an owner and a Guest");
+  CHECK(send(o, "/api/keyname?cid=" + g.cidHex() + "&name=Den%20iPad").out == OK && !strcmp(keys[slotOf(g)].name, "Den iPad") && keysInFlash(),
+        "/api/keyname: the new name saved");
+  CHECK(send(o, "/api/keyname?cid=" + g.cidHex() + "&name=").out == refused("a name is needed"), "an empty name: refused");
+  CHECK(send(o, "/api/keyname?cid=0011223344556677&name=X").out == refused("no such phone"), "an unknown id: no such phone");
+  CHECK(send(o, "/api/keyname?cid=12&name=X").out == refused("bad id"), "a bad id");
+}
+
+static void testApprove() {
+  secStart();
+  SimPhone o, a, b, c;
+  CHECK(pairFirst(o) && askJoin(a, "Bea") && askJoin(b, "Cy"), "an owner and two waiting phones");
+  uint32_t seq = logSeq;
+  CHECK(approve(o, a), "ok=1");
+  CHECK(keys[slotOf(a)].used == 1 && keys[slotOf(a)].role == 0 && keysInFlash(), "a Guest");
+  CHECK(has(logFrom(seq), "Bea approved (guest)"), "the log line says guest");
+  CHECK(approve(o, b, true) && keys[slotOf(b)].role == 1 && has(logFrom(seq), "Cy approved (owner)"), "ok=1&owner=1: an Owner");
+  CHECK(askJoin(c, "Kid"), "another asks");
+  CHECK(send(o, "/api/approve?cid=" + c.cidHex() + "&ok=0").out == OK && slotOf(c) < 0 && keysInFlash(), "ok=0: gone");
+  CHECK(has(logFrom(seq), "Kid turned down") && send(c, "/api/s").st == 401, "the log line, and its next command is 401");
+  CHECK(send(o, "/api/approve?cid=" + a.cidHex() + "&ok=1").out == refused("no such request"), "a phone already in: no such request");
+  CHECK(send(o, "/api/approve?cid=0011223344556677&ok=1").out == refused("no such request"), "an unknown id: no such request");
+  CHECK(send(o, "/api/approve?cid=zz&ok=1").out == refused("bad id"), "a bad id");
+}
+
+static void testMakeOwner() {
+  secStart();
+  SimPhone o, g, w;
+  CHECK(pairFirst(o) && addGuest(o, g, "Bea") && askJoin(w, "Kid"), "an owner, a Guest, a waiting phone");
+  uint32_t seq = logSeq;
+  CHECK(send(o, "/api/makeowner?cid=" + g.cidHex()).out == OK && keys[slotOf(g)].role == 1 && keysInFlash(), "a Guest becomes an Owner");
+  CHECK(send(g, "/api/reboot").out == OK && restartSoon, "and may then send an OWNER route");
+  restartSoon = false;
+  CHECK(has(logFrom(seq), "Bea is now an owner"), "the log line");
+  CHECK(send(o, "/api/makeowner?cid=" + g.cidHex() + "&on=0").out == OK && keys[slotOf(g)].role == 0 && keysInFlash(), "on=0: a Guest again");
+  CHECK(has(logFrom(seq), "Bea is now a guest"), "the log line");
+  CHECK(send(o, "/api/makeowner?cid=" + o.cidHex() + "&on=0").out == refused("you cannot change yourself"), "on=0 on the caller: refused");
+  CHECK(send(o, "/api/makeowner?cid=" + w.cidHex()).out == refused("no such phone"), "a waiting phone: no such phone");
+  CHECK(send(o, "/api/makeowner?cid=0011223344556677").out == refused("no such phone"), "an unknown id: no such phone");
+  CHECK(send(o, "/api/makeowner?cid=q").out == refused("bad id"), "a bad id");
+}
+
+// ---- Recovery (people.h): blind 2 (port 1) is the only one set up, at open (290 degrees: up 200, open 290, down 20)
+static void recoverTicks(int s = 3) { for (int i = 0; i < s; i++) { run(1000); lockedDo(recoverTick); } }
+static void recoverSetUp(SimPhone &o) {
+  secStart();
+  blind(1, 290);
+  CHECK(pairFirst(o), "an owner pairs (and later loses the phone)");
+  host::advanceMs(10001);
+}
+static void testRecoverRefused() {
+  secStart();
+  SimPhone o, r;
+  std::string out;
+  CHECK(recoverStart(r.body("Lost"), out) == 409 && errOf(out) == "no blind is set up, so there is nothing to turn", "no blind with Marks: 409");
+  blind(1, 290);
+  CHECK(recoverStart(r.body("Lost"), out) == 403 && errOf(out) == "this controller has no owner yet", "no keys at all: 403");
+}
+static void testRecoverWhole() {
+  SimPhone o, r, x;
+  recoverSetUp(o);
+  lockedDo([] { ramp[2].on = true; });              // a gentle move running
+  std::string out;
+  uint32_t seq = logSeq;
+  CHECK(recoverStart(r.body("Lost"), out) == 200 && num(out, "recover") == 1 && num(out, "blind") == 1 && jsonStr(out, "blindName") == "Blind 2",
+        "a start: 200, the first movable blind and its name");
+  CHECK(num(out, "wait") == 1 && r.finish(out) && keys[slotOf(r)].used == 2, "a waiting key");
+  CHECK(!rampAny() && has(logFrom(seq), "recovery started: turn blind 2"), "the gentle move ended; the log line");
+  CHECK(recoverStateJson() == "{\"on\":1,\"step\":0,\"left\":120}", "the state: on, step 0, 120 s left");
+  std::string frame = r.seal("/api/s", bootId);
+  CHECK(sendFrame(r, frame).st == 403, "a frame it sends meanwhile: 403 waiting");
+  host::advanceMs(10001);
+  CHECK(recoverStart(x.body("X"), out) == 429, "a second start meanwhile: 429");
+
+  lockedDo([] { bs[1].tilt = NAN; recoverTick(); });
+  CHECK(recover.slot == slotOf(r) && recover.step == 0, "a blind with no reading: the attempt waits");
+  host::turnByHand(1, 90);                         // closed down first: the wrong order
+  recoverTicks();
+  CHECK(recover.step == 0, "closed down first: no step");
+  host::turnByHand(1, -180);                       // closed up
+  recoverTicks();
+  CHECK(recover.step == 1 && num(recoverStateJson(), "step") == 1, "closed up: step 1");
+  host::turnByHand(1, 180);                        // closed down
+  recoverTicks();
+  CHECK(recover.step == 2, "closed down: step 2");
+  seq = logSeq;
+  host::turnByHand(1, -90);                        // open
+  recoverTicks();
+  int s = slotOf(r);
+  CHECK(s >= 0 && keys[s].used == 1 && keys[s].role == 1 && keysInFlash(), "open: the phone is an Owner");
+  CHECK(has(logFrom(seq), "Lost recovered access by turning blind 2"), "the log line");
+  CHECK(num(recoverStateJson(), "on") == 0, "the state: on 0");
+  Answer a = sendFrame(r, frame);
+  CHECK(a.st == 409 && errOf(a.out) == "stale", "the frame it sent while waiting, sent again after the Recovery: 409 stale");
+  CHECK(send(r, "/api/reboot").out == OK && restartSoon, "its next command is taken as an Owner's");
+  restartSoon = false;
+}
+static void testRecoverEnds() {
+  SimPhone o, r, r2, r3;
+  std::string out;
+  recoverSetUp(o);
+  CHECK(recoverStart(r.body("Lost"), out) == 200 && r.finish(out), "a Recovery starts");
+  host::advanceMs(120001);
+  uint32_t seq = logSeq;
+  lockedDo(recoverTick);
+  CHECK(slotOf(r) < 0 && has(logFrom(seq), "recovery timed out") && recover.slot < 0 && keysInFlash(), "two minutes pass: the key gone, timed out");
+
+  host::advanceMs(10001);
+  CHECK(recoverStart(r2.body("Lost"), out) == 200 && r2.finish(out), "a Recovery starts again");
+  CHECK(send(o, "/api/go?b=1&t=50").out == OK, "a move from another phone");
+  seq = logSeq;
+  lockedDo(recoverTick);
+  CHECK(slotOf(r2) < 0 && recover.slot < 0 && has(logFrom(seq), "recovery stopped: a motor ran") && keysInFlash(), "a motor runs: the key gone");
+  endsBy(60000);
+
+  host::advanceMs(10001);
+  CHECK(recoverStart(r3.body("Lost"), out) == 200 && r3.finish(out), "a Recovery starts again");
+  CHECK(send(o, "/api/approve?cid=" + r3.cidHex() + "&ok=0").out == OK, "an Owner turns the request down meanwhile");
+  seq = logSeq;
+  lockedDo(recoverTick);
+  CHECK(recover.slot < 0 && slotOf(o) >= 0 && keys[slotOf(o)].role == 1 && logSeq == seq, "the attempt is over, nothing else removed");
+}
+static void testRecoverFull() {
+  SimPhone o, r;
+  recoverSetUp(o);
+  host::advanceMs(60000);
+  for (int i = 1; i < 6; i++) lockedPut(i, 1, 0, (uint8_t)(0x10 * i), "Guest");
+  lockedPut(6, 2, 0, 0x60, "Newer");
+  lockedPut(7, 2, 0, 0x70, "Older");
+  askAt[6] = millis() - 5000;
+  askAt[7] = millis() - 50000;
+  std::string out;
+  uint32_t seq = logSeq;
+  CHECK(recoverStart(r.body("Lost"), out) == 200 && r.finish(out), "all places taken, two waiting: a Recovery starts");
+  CHECK(slotOf(r) == 7 && recover.slot == 7 && keys[6].used == 2 && !strcmp(keys[6].name, "Newer"), "it takes the oldest waiting place");
+  CHECK(has(logFrom(seq), "Older's request to join was replaced by a newer one"), "the log line");
+}
+
+// ---- firmware on trial and the release signature (update.h, fwkey.h)
+static void testOnTrial() {
+  host::Slots kept = host::slots();
+  host::slots().state = host::SLOT_ON_TRIAL;
+  host::slots().imageLen = 1234567;
+  start();
+  CHECK(otaPending && appSize == 1234567, "the running slot on trial: otaPending; appSize is the image length");
+  host::slots().state = host::SLOT_KEPT;
+  host::slots().imageLen = -1;
+  start();
+  CHECK(!otaPending && appSize == 0, "kept: not pending; the image length cannot be read: 0");
+  host::slots().state = host::SLOT_UNREADABLE;
+  start();
+  CHECK(!otaPending, "the state cannot be read: not pending");
+  host::slots() = kept;
+}
+static void testReleaseSignature() {
+  std::string v = readFile(wireDir + "/fw_sig.json");
+  std::vector<uint8_t> hash = bytesOf(linkJsonStr(v, "hash")), sig = bytesOf(linkJsonStr(v, "sig"));
+  CHECK(hash.size() == 32 && sig.size() == 64 && linkJsonStr(v, "tag") == "fw-v2.3.0-dev31", "fw_sig.json reads");
+  if (hash.size() != 32 || sig.size() != 64) return;
+  CHECK(fwSignatureOk(hash.data(), sig.data()), "the release's hash and signature: ok");
+  std::vector<uint8_t> h = hash, s = sig;
+  h[7] ^= 0x10;
+  CHECK(!fwSignatureOk(h.data(), sig.data()), "one bit changed in the hash: no");
+  s[3] ^= 1;
+  CHECK(!fwSignatureOk(hash.data(), s.data()), "one bit changed in r: no");
+  s = sig;
+  s[40] ^= 1;
+  CHECK(!fwSignatureOk(hash.data(), s.data()), "one bit changed in s: no");
+  std::vector<uint8_t> zero(64, 0);
+  CHECK(!fwSignatureOk(hash.data(), zero.data()), "64 zero bytes: no");
+}
+
+
+int main(int argc, char **argv) {
+  // The wire folder: the first argument, else test/wire next to this file (the compile and the run share one folder).
+  std::string here = __FILE__;
+  wireDir = argc > 1 ? argv[1] : here.substr(0, here.find_last_of('/') + 1) + "wire";
   host::onRestart(firmwareStartValues);
   setenv("TZ", "CST6CDT,M3.2.0,M11.1.0", 1);
   tzset();
@@ -1574,6 +2277,29 @@ int main() {
   testMarkUnsteady();
   testMarkInterrupted();
   testMarkLock();
+  testKeysEmptyFlash();
+  testKeysKept();
+  testJsonStr();
+  testFirstPairing();
+  testJoinRequests();
+  testPairedMeanwhile();
+  testLinkVector();
+  testSealedRefused();
+  testWhoMayDoWhat();
+  testStaleAfterLetIn();
+  testHubProofs();
+  testApiHelpers();
+  testPeopleList();
+  testRevoke();
+  testKeyName();
+  testApprove();
+  testMakeOwner();
+  testRecoverRefused();
+  testRecoverWhole();
+  testRecoverEnds();
+  testRecoverFull();
+  testOnTrial();
+  testReleaseSignature();
   failed += host::takeFaults();
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;

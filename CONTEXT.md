@@ -78,6 +78,10 @@ _Avoid_: user, member
 **Matter user**:
 Someone using the blinds through Apple Home or Alexa. Never holds an app key, so is neither Owner nor Guest.
 
+**Recovery**:
+A phone becoming an Owner of a controller when no Owner's phone is at hand, proven by a Manual move of one blind (closed up, closed down, open) within two minutes. The app calls it "Recover Access".
+_Avoid_: reset, factory reset
+
 ### Joining the system
 
 **Commissioning**:
