@@ -190,7 +190,6 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool 
   std::string cmd(n, 0);
   int slot = -1;
   uint8_t key[32];                               // a copy: the reply is sealed with it even if the phone is removed meanwhile
-  bool owner = false;
   {
     // Find the phone, check the counter, decrypt and record the counter in one step under the lock, so two requests
     // carrying the same counter (a replay racing the original) cannot both get through.
@@ -206,7 +205,6 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool 
       if (cmd == "/api/leave") { event("%s took the request back", keys[slot].name); memset(&keys[slot], 0, sizeof keys[slot]); keysSave(); resp = "{\"err\":\"not paired\"}"; return "401 Unauthorized"; }
       resp = "{\"err\":\"waiting\"}"; return "403 Forbidden";
     }
-    owner = keys[slot].role;
   }
 
   size_t q = cmd.find('?');
@@ -214,16 +212,18 @@ const char *secDo(const std::string &b, std::string &resp, httpd_req_t *r, bool 
   const Route *rt = nullptr;
   for (int i = 0; i < routeCount; i++) if (path == routes[i].uri) rt = &routes[i];
   if (!rt) out = "{\"ok\":0,\"err\":\"unknown command\"}";
-  else if (const char *why = permit(*rt, query, Caller{owner, p})) out = std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
   else {
     xSemaphoreTake(secMx, portMAX_DELAY);
-    bool still;                                  // removed by a command that ran just before this one?
-    { KeysLock kl; still = keys[slot].used == 1 && !memcmp(keys[slot].id, p, 8); }
-    if (still) {
+    // Removed, or made a Guest, by a command that ran just before this one? Who the phone is now decides.
+    bool still, owner;
+    { KeysLock kl; still = keys[slot].used == 1 && !memcmp(keys[slot].id, p, 8); owner = keys[slot].role; }
+    if (!still) out = "{\"ok\":0,\"err\":\"not paired\"}";
+    else if (const char *why = permit(*rt, query, Caller{owner, p})) out = std::string("{\"ok\":0,\"err\":\"") + why + "\"}";
+    else {
       secClient = slot; secQuery = query.c_str(); secOut = &out;
       rt->fn(r);
       secClient = -1; secQuery = nullptr; secOut = nullptr;
-    } else out = "{\"ok\":0,\"err\":\"not paired\"}";
+    }
     xSemaphoreGive(secMx);
   }
   resp.assign(12 + out.size() + 16, 0);

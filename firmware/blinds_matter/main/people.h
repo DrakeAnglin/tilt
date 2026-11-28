@@ -58,7 +58,7 @@ esp_err_t hApprove(httpd_req_t *r) {             // owner: answer a phone that a
   uint8_t id[8];
   if (!unhex(arg(r, "cid"), id, 8)) return fail(r, "bad id");
   for (int i = 0; i < MAX_KEYS; i++) if (keys[i].used == 2 && !memcmp(keys[i].id, id, 8)) {
-    if (arg(r, "ok") == "1") { keys[i].used = 1; keys[i].role = arg(r, "owner") == "1" ? 1 : 0; lastCtr[i] = 0; event("%s approved (%s)", keys[i].name, roleWord(keys[i].role)); }
+    if (arg(r, "ok") == "1") { keys[i].used = 1; keys[i].role = arg(r, "owner") == "1" ? 1 : 0; event("%s approved (%s)", keys[i].name, roleWord(keys[i].role)); }
     else { event("%s turned down", keys[i].name); memset(&keys[i], 0, sizeof keys[i]); }
     keysSave();
     return ok(r);
@@ -93,7 +93,7 @@ void recoverTick() {                             // from webTick, once a second
   if (isnan(t)) return;
   bool hit = recover.step == 0 ? t >= 85 : recover.step == 1 ? t <= -85 : fabsf(t) <= 20;
   if (!hit || ++recover.step < 3) return;
-  k.used = 1; k.role = 1; lastCtr[recover.slot] = 0;
+  k.used = 1; k.role = 1;                         // its counter stays: a frame sent while waiting is not taken again
   keysSave();
   event("%s recovered access by turning blind %d", k.name, p + 1);
   recover.slot = -1;
