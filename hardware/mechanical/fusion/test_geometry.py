@@ -150,5 +150,54 @@ class ControllerBox(unittest.TestCase):
         self.assertGreaterEqual(h, 3.5 + 1.0)
 
 
+V3 = _load(os.path.join(_HERE, 'ControllerV3', 'ControllerV3.py'))
+V2 = _load(os.path.join(_HERE, 'Controller', 'Controller.py'))
+
+
+class ControllerV3Fit(unittest.TestCase):
+    """The v3 fit study's numbers (no Fusion): the same section and groove as the v2.2 box, and the cell's fit."""
+
+    def test_section_and_groove_are_the_v22_box(self):
+        c, o = V3.params(3), V2.C
+        for k in ('room_out', 'back_in', 'top', 'wall', 'floor', 'lid', 'bevel_bot', 'bevel_top', 'groove_r', 'groove_t'):
+            self.assertEqual(c[k], o[k], k)
+        self.assertAlmostEqual(c['groove_floor'], o['groove_floor'])
+        self.assertAlmostEqual(c['groove_y'], o['groove_y'])
+        self.assertAlmostEqual(c['bat_zc'], o['bat_zc'])          # the cell lies where it lies in the v2.2 box
+        self.assertAlmostEqual(c['bat_y'], o['bat_y'])
+
+    def test_lengths(self):
+        self.assertAlmostEqual(V3.params(3)['L'], 134.8, places=1)
+        self.assertAlmostEqual(V3.params(1)['L'], 114.8, places=1)
+        self.assertLess(V3.params(3)['L'], V2.C['L'])
+
+    def test_cell_and_contacts(self):
+        for ports in (1, 3):
+            c = V3.params(ports)
+            f = V3.facts(c)
+            self.assertGreaterEqual(f['cell_top_to_lid'], 0.3)
+            self.assertGreaterEqual(f['cell_to_groove_channel'], 3.0)
+            self.assertGreaterEqual(f['cell_to_board_edge'], 1.0)
+            self.assertLessEqual(abs(f['button_above_cell_axis']), 1.5)     # the button lands on a dia 5 button top
+            for sq in f['leaf_squeeze'].values():                           # the leaf is pressed, and not solid
+                self.assertGreaterEqual(sq, 0.8)
+                self.assertLessEqual(sq, 3.4)
+            self.assertTrue(all(v > 0 for v in f['cell_ends_inside_notch']))
+            self.assertAlmostEqual(c['ct_x'][1] - c['ct_x'][0], c['bat_l'] + 2.3)   # Keystone's L for a 596 / 590 pair
+
+    def test_room_under_the_lid(self):
+        for ports in (1, 3):
+            f = V3.facts(V3.params(ports))
+            for k in ('esp_tips_to_lid', 'jack_top_to_lid', 'cap_top_to_lid', 'contact_top_to_lid'):
+                self.assertGreater(f[k], 0.5, k)
+
+    def test_jacks_and_holes(self):
+        self.assertEqual(len(V3.jacks(V3.params(1))), 1)
+        self.assertEqual(len(V3.jacks(V3.params(3))), 3)
+        self.assertEqual(len(V3.holes(V3.params(1))), 3)
+        self.assertEqual(len(V3.holes(V3.params(3))), 4)
+        self.assertEqual(len(V3.outline_pts()), 8)
+
+
 if __name__ == '__main__':
     unittest.main()

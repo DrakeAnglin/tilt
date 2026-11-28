@@ -4,6 +4,7 @@
 |---|---|---|
 | [`Tilter/Tilter.py`](Tilter/Tilter.py) | The tilter: every printed part, with collision, gear-mesh and assembly checks | `tools/fusion_tilter.py`, `tools/fusion_thin.py` |
 | [`Controller/Controller.py`](Controller/Controller.py) | Controller box for the PCB | `tools/fusion_controller.py` |
+| [`ControllerV3/ControllerV3.py`](ControllerV3/ControllerV3.py) | Fit study for the PCB v3 box (mock-up board; no print files yet) | `tools/fusion_controller_v3.py` |
 | [`Hub/Hub.py`](Hub/Hub.py) | Tilt Hub box | `tools/fusion_hub.py` |
 | [`Hub/Hub.py`](Hub/Hub.py) | Tilt Hub box, printed round the ESP | `tools/fusion_hub.py` |
 
