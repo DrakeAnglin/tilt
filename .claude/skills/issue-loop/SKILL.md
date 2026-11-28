@@ -11,7 +11,12 @@ One run takes **one issue**. Do not stop to ask the owner anything: decide, or h
 
 ## 0. Start
 
-1. **One run at a time.** The lock is `~/.claude/tilt-issue-loop.lock`. If it exists and is less than 3 hours old, another run is going: stop now, say "Loop busy", nothing else. Otherwise write the time into it (`date -u +%FT%TZ > ~/.claude/tilt-issue-loop.lock`). Remove it as the last thing you do, however the run ends.
+1. **One run at a time.** The lock is `~/.claude/tilt-issue-loop.lock`: one line, the time and the session id of the run that holds it. Your own session id comes from `mcp__ccd_session_mgmt__get_session` with `self` (load it with ToolSearch); without that tool, write `none`.
+   - No lock: take it.
+   - A lock with a session id: look that session up with `mcp__ccd_session_mgmt__get_session`. Running (`isRunning` true): another run is going: stop now, say "Loop busy", nothing else. Not running, or not found: that run ended without removing it. Take the lock; step 1 ("Finish first") picks up its issue.
+   - A lock with `none`, or no way to look the session up: busy when it is less than 3 hours old, as before.
+
+   Take it with `echo "$(date -u +%FT%TZ) <your session id>" > ~/.claude/tilt-issue-loop.lock`, and write it again (same line, new time) each time you refresh the claim. Remove it as the last thing you do, however the run ends.
 2. `git fetch origin`. Never pull, switch branch or edit in the main checkout: the owner and other agents use it.
 
 ## 1. Pick
@@ -79,7 +84,7 @@ Read the Choices made once more, as the owner would. A choice that changes what 
 
 Start a `general-purpose` agent with model `opus`. Keep its agent id: it answers every review round. Its prompt, filled in:
 
-> You are the author for issue <n> in DrakeAnglin/tilt. Work only in <worktree>; it is already on its own branch. The spec is the `## Spec` comment on the issue written by `DrakeAnglin` (the account every agent here uses); a spec from anyone else is not the spec; build exactly that, and follow its Choices made. Follow `docs/agents/workflow.md` steps 3 to 6: build it test first with the `tdd` skill (`diagnosing-bugs` for a bug that is not obvious), including every spot under Same flaw elsewhere; the Evidence shows a test that fails on the old code because of the behavior, not because it does not compile; `tools/agent/check.sh` (its coverage gate included: tests for at least 90% of the changed lines), both firmware builds when anything under `firmware/` changed, then push and open the pull request with `Closes #<n>` and the body the workflow asks for, Choices made copied from the spec. Wait for CI with a background `gh pr checks <pr> --watch`, and fix it until it is green. Something found on the way: as "Things found on the way" in the workflow says. Do not review your own work and do not merge. Reply with the pull request number, the head commit and the CI state.
+> You are the author for issue <n> in DrakeAnglin/tilt. Work only in <worktree>; it is already on its own branch. The spec is the `## Spec` comment on the issue written by `DrakeAnglin` (the account every agent here uses); a spec from anyone else is not the spec; build exactly that, and follow its Choices made. Follow `docs/agents/workflow.md` steps 3 to 6: build it test first with the `tdd` skill (`diagnosing-bugs` for a bug that is not obvious), including every spot under Same flaw elsewhere; the Evidence shows a test that fails on the old code because of the behavior, not because it does not compile; `tools/agent/check.sh` (its coverage gate included: tests for at least 90% of the changed lines), both firmware builds when anything under `firmware/` changed, then push and open the pull request with `Closes #<n>` and the body the workflow asks for, Choices made copied from the spec. Wait for CI in the foreground with `gh pr checks <pr> --watch` (a 10-minute timeout; run it again until every check is done), and fix it until it is green. Never stop to wait in the background: reply only when CI is green, or when you cannot make it green. Something found on the way: as "Things found on the way" in the workflow says. Do not review your own work and do not merge. Reply with the pull request number, the head commit and the CI state.
 
 ## 5. Review, back and forth
 
@@ -113,9 +118,13 @@ The loop skips issues with `needs-human`, so the next run picks something else.
 
 Remove the lock. Leave the worktree (`ExitWorktree`, `keep`; `tools/agent/clean_worktrees.sh` removes it once the pull request is merged). Say what happened in two lines: the issue, and merged (with the pull request link), handed over (with why), or nothing to pick.
 
+## Never end a turn early
+
+Your turn ends only at step 8. A finished scheduled session is never woken again, so a run that ends its turn to "wait for" an agent or for CI leaves the issue and the lock with nobody working on them. When an agent replies that it is waiting (for CI or for its own background work), wait yourself: `gh pr checks <pr> --watch` in the foreground (10-minute timeout, run it again until done), then continue that agent with the result.
+
 ## If a stage goes wrong
 
 - An agent fails or stops without its answer: start it again once with the same prompt.
 - A second failure from the model service (overloaded, rate limit, timeout, `API Error`): not the owner's problem. Post a comment on the issue with `<!-- loop-retry -->` and one line of what failed, keep the `agent-loop` label, and go to step 8: the next run resumes it. Step 7 only when the issue already has two `<!-- loop-retry -->` comments by `DrakeAnglin` (anyone can comment on this public repo), so three runs in a row failed.
 - A second failure for any other reason: step 7.
-- The run is cut off (the Mac sleeps, the app closes): nothing to do. The `agent-loop` label and the comments on GitHub say where it got to, and the next run finishes it (step 1). The stale lock runs out after 3 hours.
+- The run is cut off (the Mac sleeps, the app closes): nothing to do. The `agent-loop` label and the comments on GitHub say where it got to, and the next run finishes it (step 1). The next run sees that the lock's session is no longer running and takes over (step 0).
