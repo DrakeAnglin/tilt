@@ -2190,6 +2190,23 @@ static void testReleaseSignature() {
   CHECK(!fwSignatureOk(hash.data(), zero.data()), "64 zero bytes: no");
 }
 
+// ---- the board as the chip has it: a clock that runs before it is set, a restart that does not return
+static void testBoardClockBeforeSet() {
+  host::restart();
+  host::advanceMs(5000);
+  CHECK(time(nullptr) == 5, "a wall clock never set: the seconds since the start, as on the chip");
+}
+static void testRebootDoesNotReturn() {
+  secStart();
+  SimPhone o;
+  CHECK(pairFirst(o) && send(o, "/api/reboot").out == OK, "an Owner asks for a restart");
+  int before = host::restarts();
+  bool threw = false;
+  xSemaphoreTake(mx, portMAX_DELAY);
+  try { webTick(); xSemaphoreGive(mx); } catch (...) { threw = true; }
+  CHECK(threw && host::restarts() == before + 1, "the next webTick: one restart, and the code after it never runs");
+}
+
 
 int main(int argc, char **argv) {
   // The wire folder: the first argument, else test/wire next to this file (the compile and the run share one folder).
@@ -2300,6 +2317,8 @@ int main(int argc, char **argv) {
   testRecoverFull();
   testOnTrial();
   testReleaseSignature();
+  testBoardClockBeforeSet();
+  testRebootDoesNotReturn();
   failed += host::takeFaults();
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;
