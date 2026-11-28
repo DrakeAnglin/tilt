@@ -555,9 +555,11 @@ static void look() {
   }
   seen.maxOn = std::max(seen.maxOn, n);
 }
-// The blinds task's pass, for ms milliseconds: the lock held, motionTick once a millisecond, the clock moved 1 ms.
+// The blinds task's pass, for ms milliseconds of the board's clock: the lock held, motionTick once a millisecond, the
+// clock moved 1 ms each time (and more while a pass waits: a sensor read takes tens of milliseconds).
 static void run(uint32_t ms) {
-  for (uint32_t i = 0; i < ms; i++) { lockedDo(motionTick); look(); host::advanceMs(1); }
+  uint32_t end = millis() + ms;
+  while ((int32_t)(millis() - end) < 0) { lockedDo(motionTick); look(); host::advanceMs(1); }
 }
 static bool runUntil(const std::function<bool()> &done, uint32_t maxMs) {
   for (uint32_t i = 0; i < maxMs; i++) { if (done()) return true; run(1); }
@@ -1174,6 +1176,318 @@ static void testRequests() {
   endsBy(60000);
 }
 
+// ---- settings changes (cfgApply)
+static Settings savedCfg() {
+  Settings s;
+  std::vector<uint8_t> b = host::flashBlob("blinds", "cfg");
+  memcpy(&s, b.data(), std::min(b.size(), sizeof s));
+  return s;
+}
+static void apply(const Settings &n) { lockedDo([&] { cfgApply(n); }); }
+static void testNewMarksWhileMoving() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  tiltTo(0, 50);
+  tiltTo(1, 50);
+  run(1500);
+  Settings n = cfg;
+  n.b[0].open = 280;
+  apply(n);
+  CHECK(is(bs[0].last, "stopped: settings changed") && !movingPort(0), "new Marks for a moving blind: stopped, \"settings changed\"");
+  CHECK(near(bs[0].tilt, tiltOfMarks(Marks{200, 280, 20}, bs[0].ang), 0.01), "its tilt worked out from the new Marks");
+  CHECK(savedCfg().b[0].open == 280, "the settings saved in flash");
+  CHECK(movingPort(1), "the other blind still moving");
+  endsBy(60000);
+}
+
+static void testNewMarksWaitingAndGentle() {
+  motionStart();
+  for (int p = 0; p < PORTS; p++) blind(p, 290);
+  parMode = 0;
+  tiltTo(0, 50);
+  tiltTo(1, 50);
+  moveBlinds(moveAsk(FROM_SCHEDULE, -1, 30, 600000, 0x04));
+  CHECK(bs[1].queued && ramp[2].on, "blind 2 waits, blind 3 on a gentle move");
+  Settings n = cfg;
+  n.b[1].open = n.b[2].open = 280;
+  apply(n);
+  CHECK(!bs[1].queued && isnan(bs[1].target) && !blindNow(1).busy, "new Marks for a waiting blind: no longer busy, its Target cleared");
+  CHECK(!ramp[2].on, "new Marks for a blind on a gentle move: the gentle move off");
+  CHECK(movingPort(0), "the blind whose Marks stayed carries on");
+  endsBy(60000);
+}
+
+static void testNameOnly() {
+  motionStart();
+  blind(0, 290);
+  tiltTo(0, 50);
+  run(1500);
+  Settings n = cfg;
+  strlcpy(n.b[0].name, "Den", sizeof n.b[0].name);
+  apply(n);
+  CHECK(movingPort(0) && !strcmp(cfg.b[0].name, "Den"), "only a name changes during a move: the move carries on");
+  endsBy(60000);
+  CHECK(is(bs[0].last, "reached"), "and reaches");
+}
+
+static void testDirectionChange() {
+  motionStart();
+  blind(0, 290);
+  tiltTo(0, 50);
+  run(1500);
+  Settings n = cfg;
+  n.b[0].motSign = -1;
+  apply(n);
+  CHECK(!movingPort(0) && is(bs[0].last, "stopped: settings changed") && cfg.b[0].motSign == -1, "the motor direction flipped: stopped, the asked direction kept");
+  motionStart();
+  blind(0, 290);
+  tiltTo(0, 80);
+  run(3000);
+  n = cfg;                                         // asked before the move learned anything: +1
+  n.b[0].open = 285;
+  apply(n);
+  CHECK(cfg.b[0].motSign == 2, "a change that does not touch the direction keeps what the stopped move learned");
+}
+
+static void testNewZone() {
+  motionStart();
+  Settings n = cfg;
+  strlcpy(n.tz, "EST5EDT,M3.2.0,M11.1.0", sizeof n.tz);
+  apply(n);
+  CHECK(!strcmp(getenv("TZ"), "EST5EDT,M3.2.0,M11.1.0"), "a new time zone: the running zone changed at once");
+  n = cfg;
+  strlcpy(n.tz, "CST6CDT,M3.2.0,M11.1.0", sizeof n.tz);
+  apply(n);
+}
+
+static void testMarksNeverRead() {
+  motionStart();
+  Settings n = cfg;
+  n.b[2].up = 200; n.b[2].open = 290; n.b[2].down = 20;
+  apply(n);
+  CHECK(!bs[2].seen && isnan(bs[2].tilt), "new Marks for a blind never read: its tilt still unknown");
+}
+
+// ---- the watch and Follow (ADR 0004)
+static int highs(int p) { return traced('1', P_EN[p]); }   // times EN went high since the last clearTrace
+static void testIdleQuiet() {
+  motionStart();
+  for (int p = 0; p < PORTS; p++) blind(p, 290);
+  host::clearTrace();
+  run(10000);
+  CHECK(highs(0) + highs(1) + highs(2) == 0, "idle, nobody looking, Follow off, every port seen: no sensor switched on in 10 s");
+}
+
+static void testIdleLooking() {
+  motionStart();
+  for (int p = 0; p < PORTS; p++) blind(p, 290);
+  uiOn = true;
+  run(1000);
+  bool turn = true;
+  for (int k = 0; k < 6; k++) {
+    host::clearTrace();
+    run(1000);
+    int p = (int)(tickTimes.idlePort + PORTS - 1) % PORTS;   // the port read last
+    turn = turn && highs(p) == 1 && highs(0) + highs(1) + highs(2) == 1;
+  }
+  CHECK(turn, "idle with someone looking: one port read each second, in turn");
+}
+
+static void testFollowPace() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  syncMode = 1;
+  run(1000);
+  host::clearTrace();
+  run(3500);
+  int slow = highs(0) + highs(1) + highs(2);
+  uiOn = true;
+  host::clearTrace();
+  run(3500);
+  int quick = highs(0) + highs(1) + highs(2);
+  CHECK(slow == 3 || slow == 4, "Follow on, two movable blinds, nobody looking: a read each second");
+  CHECK(quick == 10 || quick == 9, "someone looking: every 350 ms");
+}
+
+static void followSetUp(bool follow) {
+  motionStart();
+  for (int p = 0; p < PORTS; p++) blind(p, 290);
+  syncMode = follow;
+  uiOn = true;
+  run(3500);                                       // each blind read once: where the controller left it
+}
+static void testFollowHand() {
+  followSetUp(true);
+  uint32_t seq = logSeq;
+  seenReset();
+  host::turnByHand(0, -27);                        // 30 tilt
+  CHECK(runUntil([] { return sensorPort == 0; }, 5000), "Follow on, blind 1 turned by hand: its sensor kept on");
+  host::clearTrace();
+  run(1000);
+  CHECK(host::pinLevel(P_EN[0]) == 1 && highs(0) == 0 && near(bs[0].tilt, 30, 2), "read every 100 ms with its sensor on");
+  CHECK(runUntil([] { return movingPort(1); }, 3000), "1.5 s after it holds still: the others move");
+  endsBy(60000);
+  CHECK(near(bs[1].tilt, 30, 5) && near(bs[2].tilt, 30, 5) && !seen.on[0], "blinds 2 and 3 at its tilt, blind 1 not driven");
+  CHECK(count(logFrom(seq), "turned by hand") == 1, "one \"turned by hand\" line");
+}
+
+static void testHandNoFollow() {
+  followSetUp(false);
+  seenReset();
+  host::turnByHand(0, -27);
+  run(8000);
+  CHECK(seen.maxOn == 0, "Follow off, blind 1 turned by hand: no blind moves");
+  CHECK(near(blindNow(0).tilt, 30, 2), "the app shows blind 1's new tilt at its next read (F-12)");
+}
+
+static void testAppMoveNoFollow() {
+  followSetUp(true);
+  seenReset();
+  moveBlinds(moveAsk(FROM_APP, 0, 50));
+  endsBy(60000);
+  run(8000);
+  CHECK(seen.on[0] && !seen.on[1] && !seen.on[2], "Follow on, blind 1 moved from the app: blinds 2 and 3 do not move");
+}
+
+static void testSetupQuiet() {
+  followSetUp(true);
+  seenReset();
+  bool kept = true;
+  for (int k = 0; k < 3; k++) {
+    hand.setupOpen(1, millis());                   // the app asks every second
+    run(1000);
+    kept = kept && sensorPort == 1 && host::pinLevel(P_EN[1]) == 1;
+  }
+  host::turnByHand(0, -27);
+  run(8000);
+  CHECK(kept, "Setup open for blind 2: its sensor kept on");
+  CHECK(seen.maxOn == 0, "blind 1 turned by hand within 15 s: nothing followed");
+}
+
+static void testWatchMoves() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  watchSync(0);
+  CHECK(sensorPort == 0 && host::pinLevel(P_EN[0]) == 1, "the watch on blind 1: its sensor on");
+  watchSync(1);
+  CHECK(sensorPort == 1 && host::pinLevel(P_EN[0]) == 0 && host::pinLevel(P_EN[1]) == 1, "the watch moves to blind 2: the first sensor off");
+  tiltTo(0, 50);
+  CHECK(sensorPort == -1 && host::pinLevel(P_EN[1]) == 0, "a move that starts ends the watch");
+  watchSync(1);
+  watchSync(0);
+  CHECK(sensorPort == 0 && host::pinLevel(P_EN[0]) == 1, "the watch leaves a blind that is moving: its sensor stays on");
+  endsBy(60000);
+}
+
+// ---- Setup (the Marks)
+static const char *mark(int p, const char *w) { const char *e = nullptr; lockedDo([&] { e = setMark(p, w); }); return e; }
+static void testWholeSetup() {
+  motionStart();
+  host::HostTilter &t = host::plugAnalog(0, 250);
+  t.degPerS = 15;
+  t.lo = 195;
+  t.hi = 385;
+  pulseRead(0);
+  uint32_t seq = logSeq;
+  jogNow(0, -1, 30000, true);
+  endsBy(30000);
+  const char *up = mark(0, "up");
+  while (t.wrapped() < 284 && t.wrapped() > 100) { jogNow(0, 1, 500); run(200); }
+  endsBy(5000);
+  const char *open = mark(0, "open");
+  jogNow(0, 1, 30000, true);
+  endsBy(30000);
+  const char *down = mark(0, "down");
+  CHECK(!up && !open && !down, "a whole Setup: each mark taken");
+  Settings s = savedCfg();
+  CHECK(near(s.b[0].up, 195, 2) && near(s.b[0].open, 290, 5) && near(s.b[0].down, 25, 2), "the three Marks saved in flash");
+  CHECK(count(logFrom(seq), ": marked ") == 3, "a \"marked\" line each");
+  CHECK(near(tiltOf(0, s.b[0].up), 100, 0.01) && near(tiltOf(0, s.b[0].open), 0, 0.01) && near(bs[0].tilt, -100, 1),
+        "tilt 100, 0 and -100 at the three places");
+  tiltTo(0, 50);
+  endsBy(60000);
+  CHECK(is(bs[0].last, "reached"), "then a move to tilt 50 ends \"reached\"");
+}
+
+static void testMarkUpResetsDirection() {
+  motionStart();
+  blind(0, 290);
+  cfg.b[0].motSign = -2;
+  CHECK(!mark(0, "up") && cfg.b[0].motSign == -1, "mark up on a blind whose direction was seen: back to assumed, same way");
+}
+
+static void testMarksClear() {
+  motionStart();
+  blind(0, 290);
+  uint32_t seq = logSeq;
+  CHECK(!mark(0, "clear"), "clear: accepted");
+  Settings s = savedCfg();
+  CHECK(isnan(cfg.b[0].up) && isnan(cfg.b[0].open) && isnan(cfg.b[0].down) && isnan(s.b[0].open), "the three Marks gone, saved");
+  CHECK(isnan(bs[0].tilt) && count(logFrom(seq), "marks cleared") == 1, "the tilt unknown, a \"marks cleared\" line");
+}
+
+static void testMarkRefusals() {
+  motionStart();
+  blind(0, 290);
+  CHECK(is(mark(3, "up"), "no such blind") && is(mark(-1, "up"), "no such blind"), "port 3: \"no such blind\"");
+  tiltTo(0, 50);
+  CHECK(is(mark(0, "up"), "wait until it stops"), "during a move: \"wait until it stops\"");
+  endsBy(60000);
+  CHECK(is(mark(1, "up"), "no tilter plugged in"), "an empty port: \"no tilter plugged in\"");
+  Marks before = marksOf(0);
+  CHECK(is(mark(0, "sideways"), "unknown mark"), "a word that is not a mark: \"unknown mark\"");
+  Marks after = marksOf(0);
+  CHECK(after.up == before.up && after.open == before.open && after.down == before.down, "the Marks unchanged");
+}
+
+static void testMarkUnsteady() {
+  motionStart();
+  blind(0, 290);
+  host::turnByHand(0, -20, 3000);
+  CHECK(is(mark(0, "up"), "the slats are still moving: let them settle, then tap again"), "turned by hand during the steady reading");
+  run(3000);
+  host::dropout(0, 3000);
+  CHECK(is(mark(0, "up"), "the sensor gave no reading: check the tilter's cable, then tap again"), "the sensor gives nothing during it");
+}
+
+// fn runs in the first wait of the steady reading (the lock let go), as another task would.
+static void inFirstWait(std::function<void()> fn) {
+  host::duringDelay([fn] {
+    if (host::held(mx)) { inFirstWait(fn); return; }
+    lockedDo(fn);
+  });
+}
+static void testMarkInterrupted() {
+  motionStart();
+  blind(0, 290);
+  blind(1, 290);
+  inFirstWait([] { startTilt(1, 50); });
+  CHECK(is(mark(0, "up"), "wait until it stops"), "a move starts during a wait: \"wait until it stops\"");
+  endsBy(60000);
+  inFirstWait([] { watchSync(1); });
+  CHECK(is(mark(0, "up"), "interrupted: tap again"), "the watch goes to another blind during a wait: \"interrupted: tap again\"");
+  host::board().delayHook = nullptr;
+}
+
+static int freeWaits = 0;
+static void countWaits() {
+  host::duringDelay([] { if (!host::held(mx)) freeWaits++; countWaits(); });
+}
+static void testMarkLock() {
+  motionStart();
+  blind(0, 290);
+  freeWaits = 0;
+  bool heldAfter = false;
+  countWaits();
+  lockedDo([&] { setMark(0, "up"); heldAfter = host::held(mx); });
+  host::board().delayHook = nullptr;
+  CHECK(freeWaits == 12, "the steady reading: the lock free inside each 50 ms wait");
+  CHECK(heldAfter && host::takeFaults() == 0, "and held when setMark returns, with no board fault");
+}
+
 int main() {
   host::onRestart(firmwareStartValues);
   setenv("TZ", "CST6CDT,M3.2.0,M11.1.0", 1);
@@ -1236,6 +1550,27 @@ int main() {
   testRecording();
   testBlindNow();
   testRequests();
+  testNewMarksWhileMoving();
+  testNewMarksWaitingAndGentle();
+  testNameOnly();
+  testDirectionChange();
+  testNewZone();
+  testMarksNeverRead();
+  testIdleQuiet();
+  testIdleLooking();
+  testFollowPace();
+  testFollowHand();
+  testHandNoFollow();
+  testAppMoveNoFollow();
+  testSetupQuiet();
+  testWatchMoves();
+  testWholeSetup();
+  testMarkUpResetsDirection();
+  testMarksClear();
+  testMarkRefusals();
+  testMarkUnsteady();
+  testMarkInterrupted();
+  testMarkLock();
   failed += host::takeFaults();
   printf("%d passed, %d failed\n", passed, failed);
   return failed ? 1 : 0;
