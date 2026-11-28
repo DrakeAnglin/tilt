@@ -1154,7 +1154,10 @@ static void testBlindNow() {
   CHECK(r.busy && r.movable && near(r.target, 50, 0.01) && near(r.tilt, tiltOf(0, mvs[0].live), 0.01) && r.tilt > 5,
         "blindNow during a move: the live tilt, busy, the Target, movable");
   CHECK(blindNow(1).busy, "blindNow for a waiting blind: busy");
+  CHECK(firstMoving() == 0 && msign(0) == 1 && near(arcX(0, 245), 45, 0.01) && near(xOfTilt(0, -50), -45, 0.01),
+        "the developer page's helpers: the first blind moving, its motor direction, degrees from open");
   endsBy(60000);
+  CHECK(firstMoving() == -1, "nothing moving: -1");
 }
 
 // ---- move requests through the controller's adapter (EspMoves)
