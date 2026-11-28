@@ -29,17 +29,19 @@ static bool uiOn = false;
 bool uiActive() { return uiOn; }
 // app_main.cpp's and home_code.h's, until those parts come under test (#267): the blinds task woken (counted), the
 // Matter homes, the home window and its code.
-static int pokes = 0, homeOpens = 0;
+static int pokes = 0, homeOpens = 0, homes = 0;     // homes: the Matter homes a test says this controller is in
 void pokeBlinds() { pokes++; }
-int homesPaired() { return 0; }
+int homesPaired() { return homes; }
 void openHomeWindow() { homeOpens++; }
-std::string homeCodeJson() { return "{\"ok\":1}"; }
-// hub_link.h's, until it comes under test (#266): the hub link's state, and its eight handlers, which note the query
-// they got and answer {"ok":1}.
-bool hubOk() { return false; }
-bool hubJoined() { return false; }
+std::string homeCodeJson() { return "{\"ok\":1,\"code\":\"34970112332\"}"; }
+// hub_link.h's, until it comes under test (#266): the hub link's state as a test sets it, and its eight handlers,
+// which note the query they got and answer {"ok":1}.
+static bool hubUp = false, joined = false;
+static std::string threadJson = "{}";
+bool hubOk() { return hubUp; }
+bool hubJoined() { return joined; }
 void hubTick() {}
-std::string hubThreadJson() { return "{}"; }
+std::string hubThreadJson() { return threadJson; }
 volatile uint32_t hubLinkSeen = 0;
 static int standIns = 0;
 static std::string standInGot;                   // "hHome b=0&lift=5000": the last stand-in handler run and its query
@@ -101,8 +103,11 @@ static void secStartValues() {
   otaWindow = 0;
   otaPending = false;
   appSize = 0;
-  pokes = homeOpens = standIns = 0;
+  pokes = homeOpens = standIns = homes = 0;
   standInGot.clear();
+  hubUp = joined = false;
+  threadJson = "{}";
+  hubLinkSeen = 0;
 }
 
 // A restart puts every global of the firmware back to its start value, as the chip does; flash stays.
@@ -137,17 +142,36 @@ static void firmwareStartValues() {
   adcCali() = nullptr;
   ledcCount() = 0;
   memset(ledcPins(), 0, 8 * sizeof(int));
+  // schedules.h, scenes.h, web.h
+  memset(&sx, 0, sizeof sx);
+  memset(&lite, 0, sizeof lite);
+  lastSched = 0;
+  lightMean = MinuteMean();
+  lastLight = 0;
+  memset(&scn, 0, sizeof scn);
+  tsens = nullptr;
+  webTicks = WebTicks();
 }
-// A start of the controller as app_main.cpp does it, as far as these files go. rnd: the random bytes the start takes
-// (queued after the board's restart, which clears them).
-static void start(esp_reset_reason_t why = ESP_RST_POWERON, const std::vector<uint8_t> &rnd = {}) {
+// A start of the controller in the order of app_main.cpp, as far as these files go. rnd: the random bytes the start
+// takes (queued after the board's restart, which clears them). motion: with the motion code (the ADC, the controller
+// lock, motionBegin), the battery at 3.9 V; without it, only what storage, the secured channel and the web part need.
+static void start(esp_reset_reason_t why = ESP_RST_POWERON, const std::vector<uint8_t> &rnd = {}, bool motion = false) {
   host::setResetReason(why);
   host::restart();
   host::queueRandom(rnd);
   logBegin();
+  if (motion) adcBegin();
   storeBegin();
+  if (motion) {
+    lockBegin();
+    vbatRest = vbat = 3.9f;
+    motionBegin();
+  }
+  schedBegin();
+  scenesBegin();
   updateBegin();
   secBegin();
+  webBegin();
 }
 static void firstStart() { host::wipeFlash(); start(); }
 
@@ -630,13 +654,10 @@ static void unplugAll() { for (int p = 0; p < PORTS; p++) host::unplug(p); }
 // A start of the controller with the motion code, and every port empty.
 static void motionStart() {
   unplugAll();
-  firstStart();
-  adcBegin();
-  lockBegin();
+  host::wipeFlash();
   host::setMilliVolts(PIN_VIN, 3300);            // the rail, as probeVdd measures it
-  vbatRest = vbat = 3.9f;
+  start(ESP_RST_POWERON, {}, true);
   syncMode = 0;
-  motionBegin();
 }
 static void setMarks(int p, float up = 200, float open = 290, float down = 20) {
   cfg.b[p].up = up; cfg.b[p].open = open; cfg.b[p].down = down;
@@ -677,12 +698,24 @@ static void testStopAtStart() {
 
 // A restart with the motion code; the tilters stay plugged in, flash stays.
 static void motionRestart(const std::vector<uint8_t> &rnd = {}) {
-  start(ESP_RST_POWERON, rnd);
-  adcBegin();
-  lockBegin();
-  vbatRest = vbat = 3.9f;
+  start(ESP_RST_POWERON, rnd, true);
   syncMode = 0;
-  motionBegin();
+}
+// The blinds task's once-a-second work: webTick with the controller lock held. A restart from inside it (host::Restarted:
+// restartNow lets the lock go first) ends it as on the chip: the board restarts and the controller starts again, with
+// the motion code. True when it restarted.
+static bool webTickOnce() {
+  xSemaphoreTake(mx, portMAX_DELAY);
+  try {
+    webTick();
+  } catch (host::Restarted &) {
+    CHECK(!host::held(mx), "a restart from webTick: the controller lock was let go first");
+    start(ESP_RST_SW, {}, true);
+    syncMode = 0;
+    return true;
+  }
+  xSemaphoreGive(mx);
+  return false;
 }
 
 // ---- start and sensors (motion.h)
@@ -2201,10 +2234,7 @@ static void testRebootDoesNotReturn() {
   SimPhone o;
   CHECK(pairFirst(o) && send(o, "/api/reboot").out == OK, "an Owner asks for a restart");
   int before = host::restarts();
-  bool threw = false;
-  xSemaphoreTake(mx, portMAX_DELAY);
-  try { webTick(); xSemaphoreGive(mx); } catch (...) { threw = true; }
-  CHECK(threw && host::restarts() == before + 1, "the next webTick: one restart, and the code after it never runs");
+  CHECK(webTickOnce() && host::restarts() == before + 1, "the next webTick: one restart, and the code after it never runs");
 }
 
 

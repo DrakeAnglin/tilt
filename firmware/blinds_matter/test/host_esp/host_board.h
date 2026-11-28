@@ -8,7 +8,8 @@
 //                  that runs whenever it moves (what is plugged into the board moves with it: host_tilter.h); the
 //                  hook gets the time it moves to and may stop at times on the way (setUs), never back
 //   another task   duringDelay(fn): fn runs inside the next vTaskDelay (what another task does while the code waits)
-//   the wall clock setWallClock(epoch) or settimeofday(); 0 = not set (the Mac's clock is never read or set)
+//   the wall clock setWallClock(epoch) or settimeofday(); 0 = not set: it then reads the seconds since the start, as
+//                  the chip's does (the Mac's clock is never read or set)
 //   flash          kept in memory by namespace and key; survives restart(), wipeFlash() clears it
 //                  (putFlashStr / flashStr: a string as nvs_set_str keeps it)
 //   pins           the mode and level last written (pinTrace: the history; onLevel(hook): a hook that runs at each
@@ -24,7 +25,10 @@
 //   the MAC        setMac: what esp_read_mac gives (a restart puts back the default 02:00:00:00:00:01)
 //   firmware slots slots(): the running slot's label, size, image length (-1: cannot be read), its state (kept, on
 //                  trial, -1: cannot be read), its SHA-256, and whether the other slot holds a firmware (esp_ota_ops.h)
-//   restarts       restarts(): how many times the firmware called esp_restart (the test restarts the board itself)
+//   restarts       restarts(): how many times the firmware restarted the chip (esp_restart, or a go-back that worked).
+//                  Neither returns: they throw host::Restarted, the test catches it and restarts the board itself
+//   the chip       chipRev, heapFree, heapMin: what esp_chip_info and the free memory calls give; celsius: the chip's
+//                  temperature; noTempSensor: its install fails. A restart keeps them (the chip's own)
 //   restart()      clears the board (clock to 0, pins, LEDC, mutexes, wall clock, queued random bytes, the MAC), keeps
 //                  flash and the firmware slots, and runs every onRestart hook: the test program's, which put the
 //                  firmware's globals back to their start values
@@ -87,7 +91,12 @@ struct Board {
   uint8_t mac[6] = {0x02, 0, 0, 0, 0, 0x01};
   Slots slots;
   int restarts = 0;
+  uint16_t chipRev = 1;                                // the chip (esp_chip_info.h, esp_system.h, temperature_sensor.h)
+  uint32_t heapFree = 180000, heapMin = 150000;
+  float celsius = 24.5f;
+  bool noTempSensor = false;
 };
+struct Restarted {};                                   // thrown by a restart: on the chip nothing after it runs
 inline Board &board() { static Board b; return b; }
 
 inline void fault(const char *fmt, ...) {
@@ -115,7 +124,7 @@ inline void onClock(std::function<void(int64_t)> hook) { board().clockHook = hoo
 inline void onLevel(std::function<void(int)> hook) { board().levelHook = hook; }
 inline void duringDelay(std::function<void()> fn) { board().delayHook = fn; }
 inline void setWallClock(time_t t) { board().wallAt = t; board().wallSetUs = board().us; }
-inline time_t wallClock() { Board &b = board(); return b.wallAt ? b.wallAt + (time_t)((b.us - b.wallSetUs) / 1000000) : 0; }
+inline time_t wallClock() { Board &b = board(); return b.wallAt + (time_t)((b.us - b.wallSetUs) / 1000000); }
 
 // ---- flash
 inline void wipeFlash() { board().flash.clear(); }
@@ -237,6 +246,7 @@ inline void fillRandom(void *p, size_t n) {
 // ---- firmware slots, restarts
 inline Slots &slots() { return board().slots; }
 inline int restarts() { return board().restarts; }
+[[noreturn]] inline void restarted() { board().restarts++; throw Restarted(); }
 
 inline const std::string &lastLog() { return board().lastLog; }
 inline void espLog(char level, const char *tag, const char *fmt, ...) {

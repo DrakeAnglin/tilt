@@ -262,7 +262,6 @@ esp_err_t hReset(httpd_req_t *r) {
   return ok(r);
 }
 esp_err_t hReboot(httpd_req_t *r) { Lock l; restartSoon = true; return ok(r); }
-esp_err_t hNotYet(httpd_req_t *r) { return fail(r, "not in this version"); }
 esp_err_t hWatch(httpd_req_t *r) {              // setup is open for this blind: keep its reading live for 3 more seconds
   Lock l;
   int p = argi(r, "b");
@@ -300,6 +299,12 @@ esp_err_t hKeep(httpd_req_t *r) {
   return ok(r);
 }
 
+// What the once-a-second work below (and helloJson) keeps between calls. trial: the firmware on trial (ota.h Trial);
+// lastHist: the battery history's last point (epoch); lastPl: the dev power log's last tick (millis, 0 = none yet);
+// powerKnown, wasPowered: input power at the tick before (the first tick only takes it); img: the running firmware's
+// SHA-256 in hex, read once a start.
+struct WebTicks { Trial trial; uint32_t lastHist = 0, lastPl = 0; bool powerKnown = false, wasPowered = false; std::string img; } webTicks;
+
 // ---- who may use this controller (the rules: sec.h)
 std::string ctrlId() { uint8_t m[6] = {0}; esp_read_mac(m, ESP_MAC_WIFI_STA); return hexOf(m, 6); }
 bool hubOk();                                    // hub_link.h
@@ -307,7 +312,7 @@ void hubTick();
 std::string helloJson() {                       // from the hub task and Bluetooth, which do not hold mx: it is taken here
   std::string j;
   // img: the running firmware's SHA-256 (as esptool shows it), so an update can be a patch made from exactly it.
-  static std::string img;
+  std::string &img = webTicks.img;
   if (img.empty()) { uint8_t h[32]; if (esp_partition_get_sha256(esp_ota_get_running_partition(), h) == ESP_OK) img = hexOf(h, 32); }
   std::string name;
   bool own;
@@ -368,7 +373,7 @@ esp_err_t restartNow(bool rollback, uint32_t waitMs) {
 // A new firmware is on trial until Thread to the Tilt Hub has worked for a minute (ota.h Trial). Going back refused:
 // it is asked and logged once, then the controller stays on this firmware, still on trial (it can still be kept).
 static void trialTick(uint32_t now) {
-  static Trial trial;
+  Trial &trial = webTicks.trial;
   TrialVerdict v = trial.tick(now, trialLinkUp(hubOk(), hubLinkSeen, now), hubJoined());
   if (!otaPending) return;
   if (v == TRIAL_KEEP) trialKeep();
@@ -381,7 +386,7 @@ static void trialTick(uint32_t now) {
 }
 // Once an hour: the battery history (and, on a developer build, the power log's temperature).
 static void histTick() {
-  static uint32_t lastHist = 0;
+  uint32_t &lastHist = webTicks.lastHist;
   uint32_t ep = time(nullptr);
   if (lastHist > ep || ep - lastHist >= 3600) {
     bool first = lastHist == 0;
@@ -396,7 +401,7 @@ static void histTick() {
 }
 #ifdef TILT_DEVLOG
 static void devlogTick() {
-  static uint32_t lastPl = 0;
+  uint32_t &lastPl = webTicks.lastPl;
   uint32_t nowMs = millis();
   if (!lastPl && otaPending) plogAcc.flags |= 2;   // this start is new firmware on trial
   if (lastPl) plogTick(vin, powered, nowMs - lastPl);
@@ -404,7 +409,8 @@ static void devlogTick() {
 }
 #endif
 static void powerTick() {                        // input power connected or gone: a line in the log
-  static bool wasPowered = powered;
+  bool &wasPowered = webTicks.wasPowered;
+  if (!webTicks.powerKnown) { webTicks.powerKnown = true; wasPowered = powered; }   // the first tick only takes it
   if (wasPowered != powered) { wasPowered = powered; event(powered ? "input power connected (%.2f V)" : "on battery (%.2f V)", powered ? vin : vbatRest); }
 }
 static void restartTick() {                      // asked for (an update, a setting): motors off and held first

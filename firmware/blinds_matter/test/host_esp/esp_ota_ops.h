@@ -1,6 +1,7 @@
 // Stand-in for ESP-IDF's esp_ota_ops.h (and the partition call with it) on the host board: the firmware slots a test
 // sets (host_board.h slots). Keep and go-back change the running slot's state; go-back is refused when the other slot
-// holds no firmware. A restart of the board keeps the slots. Tests only.
+// holds no firmware (it returns why), and one that works does not return (host::Restarted, as esp_restart). A restart
+// of the board keeps the slots. Tests only.
 #pragma once
 #include "esp_err.h"
 #include "host_board.h"
@@ -23,11 +24,10 @@ inline esp_err_t esp_ota_get_state_partition(const esp_partition_t *, esp_ota_im
   return ESP_OK;
 }
 inline esp_err_t esp_ota_mark_app_valid_cancel_rollback() { host::slots().state = host::SLOT_KEPT; return ESP_OK; }
-inline esp_err_t esp_ota_mark_app_invalid_rollback_and_reboot() {   // the restart itself is the test's
+inline esp_err_t esp_ota_mark_app_invalid_rollback_and_reboot() {   // returns only when refused
   if (!host::slots().otherHasFirmware) return ESP_ERR_OTA_ROLLBACK_FAILED;
   host::slots().state = host::SLOT_GONE_BACK;
-  host::board().restarts++;
-  return ESP_OK;
+  host::restarted();
 }
 inline esp_err_t esp_partition_get_sha256(const esp_partition_t *, uint8_t *sha) {
   memcpy(sha, host::slots().sha, 32);
