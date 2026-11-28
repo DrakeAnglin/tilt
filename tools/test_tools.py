@@ -558,10 +558,14 @@ def run_quietly(f, *args):
 
 
 def run_builder_script(name, tmp):
-    """A builder as its own process, with no Bambu Studio presets (HOME) and nothing in the temp folder (TMPDIR)."""
-    import subprocess
-    env = dict(os.environ, HOME=tmp, TMPDIR=tmp)
-    return subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True, env=env, cwd=tmp)
+    """A builder as its own process, with no Bambu Studio presets (HOME) and nothing in the temp folder (TMPDIR).
+    It runs from the repo root, as the coverage run does: coverage.py finds `tools` from there. The packages
+    installed for this user (coverage.py on a Mac) live under HOME, so their folder goes on PYTHONPATH."""
+    import site, subprocess
+    path = os.pathsep.join(p for p in (os.environ.get('PYTHONPATH'), site.getusersitepackages()) if p)
+    env = dict(os.environ, HOME=tmp, TMPDIR=tmp, PYTHONPATH=path)
+    return subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True, env=env,
+                          cwd=os.path.dirname(HERE))
 
 
 class BambuBuilders(unittest.TestCase):
@@ -2033,6 +2037,89 @@ class DeviceIdentity(unittest.TestCase):
             self.assertFalse(self.di.pin_valid(bad), bad)
 
 
+class DeviceIdentityEdges(unittest.TestCase):
+    """device_identity.py's left-over branches: bad input, the runner, the questions, the command line."""
+
+    def setUp(self):
+        import device_identity
+        self.di = device_identity
+
+    def test_a_home_code_with_the_wrong_sizes_is_refused(self):
+        with self.assertRaises(ValueError) as e:
+            self.di.home_code_blob({'salt': '00' * 31, 'verifier': '00' * 97, 'passcode': 1, 'iterations': 1000,
+                                    'discriminator': 1})
+        self.assertIn('32 bytes', str(e.exception))
+
+    def test_a_device_id_with_odd_characters_is_refused(self):
+        for bad in ('../x', 'ABC', ''):
+            with self.assertRaises(ValueError):
+                self.di._path(bad)
+
+    @unittest.skipUnless(_has('PIL'), 'needs pillow')
+    def test_an_old_pillow_gets_its_one_font(self):
+        from unittest import mock
+        from PIL import ImageFont
+        real = ImageFont.load_default
+
+        def old(*a, **kw):
+            if kw:
+                raise TypeError('load_default() got an unexpected keyword argument')
+            return 'the one font'
+        with mock.patch.object(ImageFont, 'load_default', old):
+            self.assertEqual(self.di._font(30), 'the one font')
+        self.assertIsNotNone(real)
+
+    def test_the_runner_names_a_failed_command_and_its_last_lines(self):
+        self.assertEqual(self.di._run([sys.executable, '-c', 'print("hi")']), 'hi\n')
+        with self.assertRaises(RuntimeError) as e:
+            self.di._run(['/bin/sh', '-c', 'for i in $(seq 1 30); do echo line$i; done; exit 3'])
+        text = str(e.exception)
+        self.assertTrue(text.startswith('sh failed:\n'), text)
+        self.assertIn('line30', text)
+        self.assertNotIn('line15\n', text)                      # only the last 15 lines
+        with self.assertRaises(RuntimeError) as e:
+            self.di._run([sys.executable, 'tool.py', 'nvs_gen', 'x'], cwd=tempfile.gettempdir())
+        self.assertTrue(str(e.exception).startswith('nvs_gen failed:'), str(e.exception))
+
+    def test_a_question_with_no_terminal_gets_no_answer(self):
+        import io
+        from unittest import mock
+        with mock.patch.object(sys, 'stdin', io.StringIO('yes\n')):
+            self.assertIsNone(self.di._ask('Wipe it? '))
+
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+        with mock.patch.object(sys, 'stdin', Terminal('yes\n')), mock.patch('builtins.input', lambda p: 'yes'):
+            self.assertEqual(self.di._ask('Wipe it? '), 'yes')
+
+    def test_mac_without_a_base_mac_line_takes_the_last_mac(self):
+        self.assertEqual(self.di.parse_mac('MAC: 11:22:33:44:55:66\nsomething\nMAC: aa:bb:cc:dd:ee:ff\n'), 'aabbccddeeff')
+        with self.assertRaises(RuntimeError):
+            self.di.parse_mac('Chip is ESP32-C6\nno address here\n')
+
+    def test_no_nvs_partition_is_an_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, 'partitions.csv'), 'w') as f:
+                f.write('# Name, Type, SubType, Offset, Size\nfactory, app, factory, 0x10000, 0x200000\n')
+            with self.assertRaises(RuntimeError) as e:
+                self.di.nvs_area(d)
+        self.assertIn('no nvs partition', str(e.exception))
+
+    def test_the_command_line_flash_reaches_flash(self):
+        from unittest import mock
+        calls = []
+        with mock.patch.object(self.di, 'flash', lambda *a: calls.append(a) or 0):
+            self.assertEqual(self.di.main(['flash', 'hub', '--port', '/dev/x', '--label-size', '30x20']), 0)
+        self.assertEqual(calls, [('hub', '/dev/x', False, (30.0, 20.0))])
+
+    def test_the_script_runs_as_its_own_process(self):
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'device_identity.py'), '--help'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('labels', r.stdout)
+
+
 def lcov(path, hits):
     """A made-up LCOV record: hits = {line: count}."""
     return 'SF:%s\n%s\nend_of_record\n' % (path, '\n'.join('DA:%d,%d' % (n, h) for n, h in sorted(hits.items())))
@@ -2592,6 +2679,184 @@ class BenchJSON(unittest.TestCase):
             self.assertNotIn('-c "import', text, name)
             self.assertNotIn('python3 -c', text, name)
             self.assertIn('bench_json.py', text, name)
+
+
+def run_script(name, *args):
+    """A tool as its own process, from the repo root (as the coverage run starts it, so its guard line counts)."""
+    import subprocess
+    return subprocess.run([sys.executable, os.path.join(HERE, name), *args], capture_output=True, text=True,
+                          cwd=os.path.dirname(HERE))
+
+
+class LeftOverBranches(unittest.TestCase):
+    """The small tools' last branches, and each script's `if __name__ == '__main__'` line."""
+
+    def test_a_reference_link_is_checked_too(self):
+        d = CheckDocs.pages(None, {'a.md': '# A\n\n[gone]: gone.md\n[ok]: #a\n'})
+        self.assertEqual(check_docs.problems(d), ['a.md:3: broken link gone.md'])
+
+    def test_check_docs_as_a_script(self):
+        d = CheckDocs.pages(None, {'a.md': '[x](gone.md)\n'})
+        r = run_script('check_docs.py', d)
+        self.assertEqual((r.returncode, r.stdout), (1, 'a.md:1: broken link gone.md\n'))
+        r = run_script('check_docs.py', CheckDocs.pages(None, {'a.md': '# A\n'}))
+        self.assertEqual((r.returncode, r.stdout), (0, 'docs: ok\n'))
+
+    def test_pack_size_of_other_words(self):
+        self.assertEqual(inventory.pack_size('bulk'), 'bulk')
+        self.assertIsNone(inventory.pack_size(''))
+
+    def test_a_link_seen_again_with_a_count_takes_the_count(self):
+        bom = ('## One tilter\n### Hardware\n| Part | Per tilter | Sold as | Link |\n|---|---|---|---|\n'
+               '| Screw | 2 | kit | [K](https://www.amazon.com/dp/K1) |\n'
+               '| Screw | 1 | pack of 50 | [K](https://www.amazon.com/dp/K1) |\n')
+        parts = inventory.parse(bom)
+        self.assertEqual([p.pack for p in parts.values()], [50])
+
+    def test_inventory_as_a_script(self):
+        r = run_script('inventory.py', 'parts')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.startswith('| Key | Part | Pack |'), r.stdout[:80])
+
+    def test_tilter_wiring_png_asks_chrome_for_a_screenshot(self):
+        import contextlib, io
+        from unittest import mock
+        calls = []
+        with mock.patch.object(tilter_wiring.subprocess, 'run', lambda cmd, **kw: calls.append((cmd, kw))), \
+                contextlib.redirect_stdout(io.StringIO()) as said:
+            path = tilter_wiring.main(['tilter_wiring.py', '--png'])
+        self.assertEqual(len(calls), 1)
+        cmd, kw = calls[0]
+        self.assertEqual(cmd[0], tilter_wiring.CHROME)
+        self.assertIn('--screenshot=' + os.path.abspath(tilter_wiring.PNG), cmd)
+        self.assertEqual((cmd[-1], kw['check']), ('file://' + path, True))
+        self.assertIn('wrote ', said.getvalue())
+
+    def test_tilter_wiring_as_a_script(self):
+        r = run_script('tilter_wiring.py')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(r.stdout, r'^svg: .*tilter-wiring\.svg\n$')
+
+    def test_host_cjson_as_a_script(self):
+        r = run_script('host_cjson.py')
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('usage', r.stderr)
+
+    def test_release_firmware_as_a_script(self):
+        r = run_script('release_firmware.py', '--help')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('--hub', r.stdout)
+
+    def test_orient_as_a_script_starts_main(self):
+        """main() makes the print folder first: stop it there, so the STLs in Git are left alone."""
+        import runpy
+        from unittest import mock
+
+        class Stop(Exception):
+            pass
+
+        def makedirs(path, **kw):
+            raise Stop(path)
+        with mock.patch('os.makedirs', makedirs), self.assertRaises(Stop) as e:
+            runpy.run_path(os.path.join(HERE, 'orient.py'), run_name='__main__')
+        self.assertEqual(e.exception.args[0], orient.OUT)
+
+
+class CoverageGateEdges(unittest.TestCase):
+    """coverage_gate.py's left-over branches."""
+    G = coverage_gate
+
+    def test_the_middle_of_a_block_comment_is_not_code(self):
+        self.assertEqual(self.G.code_lines('a.cpp', '/* one\n   two\n   three */ int x;\nint y;\n'), {3, 4})
+
+    def test_an_untracked_file_counts_as_changed_all_through(self):
+        from unittest import mock
+        out = {'merge-base': 'abc\n', 'diff': '', 'ls-files': 'README.md\nno-such-file\n'}
+        with mock.patch.object(self.G, 'git', lambda *a: out[a[0]]):
+            changed = self.G.changed_since('origin/main')
+        n = len(self.G.read('README.md').splitlines())
+        self.assertEqual(changed, {'README.md': set(range(1, n + 1))})
+
+    def test_a_missing_exclusion_list_is_an_error(self):
+        from unittest import mock
+        with mock.patch.dict(self.G.AREAS, {'tools': ('tools', r'tools/.*\.py', 'tools/no-such-list.txt')}):
+            _, excluded, errors = self.G.area_inputs('tools', ['tools/bench_json.py'])
+        self.assertEqual((excluded, errors), (set(), ['tools/no-such-list.txt is missing']))
+
+    def check(self, *extra, floors=None, changed=None):
+        import contextlib, io
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'tools.lcov')
+            with open(path, 'w') as f:
+                f.write(lcov(os.path.join(self.G.ROOT, 'tools/bench_json.py'), {1: 1, 9: 0, 10: 0}))
+            patches = [mock.patch.object(self.G, 'changed_since', lambda base: changed or {})]
+            if floors is not None:
+                patches.append(mock.patch.object(self.G, 'read_floors', lambda text: floors))
+            with contextlib.ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                said = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                code = self.G.main(['check', '--area', 'tools', '--lcov', path, '--base', 'x', *extra])
+        return code, said.getvalue()
+
+    def test_no_floor_for_the_area_is_an_error(self):
+        code, said = self.check(floors={})
+        self.assertEqual(code, 1)
+        self.assertIn('no floor for tools in tools/coverage-floors.txt', said)
+
+    def test_uncovered_changed_lines_are_listed(self):
+        code, said = self.check(changed={'tools/bench_json.py': {9, 10}})
+        self.assertEqual(code, 1)
+        self.assertIn('  not covered: tools/bench_json.py:9\n  not covered: tools/bench_json.py:10\n', said)
+
+    def test_a_long_list_is_cut_in_the_comment(self):
+        r = self.G.measure('tools', {'tools/x.py': 'x = 1\n' * 250}, {}, {'tools/x.py': set(range(1, 251))})
+        body = self.G.render({'tools': r}, {}, 'abc', 'u')
+        self.assertIn('- and 50 more: see the report', body)
+        self.assertEqual(body.count('- `tools/x.py:'), self.G.MAX_LISTED)
+
+    def test_comment_with_post_says_what_it_did(self):
+        import contextlib, io, json
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            r = self.G.measure('tools', {}, {}, None)
+            with open(os.path.join(tmp, 'tools.json'), 'w') as f:
+                json.dump(r, f)
+            posted = []
+            with mock.patch.object(self.G, 'post', lambda body, repo, pr: posted.append((repo, pr)) or 'edited'), \
+                    contextlib.redirect_stdout(io.StringIO()) as said, contextlib.redirect_stderr(io.StringIO()):
+                self.G.main(['comment', '--results', tmp, '--head', 'abc', '--run-url', 'u', '--post', '7',
+                             '--repo', 'o/r'])
+        self.assertEqual(posted, [('o/r', '7')])
+        self.assertIn('coverage comment: edited', said.getvalue())
+
+    def test_readme_out_of_date_is_reported_or_rewritten(self):
+        import contextlib, io
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, 'tools'))
+            with open(os.path.join(root, self.G.FLOORS), 'w') as f:
+                f.write(self.G.read(self.G.FLOORS))
+            stale = 'top\n<!-- coverage:start -->\nold\n<!-- coverage:end -->\nend\n'
+            with open(os.path.join(root, 'README.md'), 'w') as f:
+                f.write(stale)
+            with mock.patch.object(self.G, 'ROOT', root), contextlib.redirect_stdout(io.StringIO()) as said:
+                self.assertEqual(self.G.main(['readme', '--check']), 1)
+                with open(os.path.join(root, 'README.md')) as f:
+                    self.assertEqual(f.read(), stale)                  # --check only reports
+                self.assertEqual(self.G.main(['readme']), 0)
+                self.assertEqual(self.G.main(['readme', '--check']), 0)
+            with open(os.path.join(root, 'README.md')) as f:
+                new = f.read()
+        self.assertIn('out of date (run tools/coverage_gate.py readme)', said.getvalue())
+        self.assertIn('README coverage table: rewritten', said.getvalue())
+        self.assertTrue(new.startswith('top\n<!-- coverage:start -->') and new.endswith('<!-- coverage:end -->\nend\n'))
+        self.assertNotIn('\nold\n', new)
+
+    def test_the_gate_as_a_script(self):
+        r = run_script('coverage_gate.py', 'readme', '--check')
+        self.assertEqual((r.returncode, r.stdout), (0, 'README coverage table: up to date\n'))
 
 
 if __name__ == '__main__':

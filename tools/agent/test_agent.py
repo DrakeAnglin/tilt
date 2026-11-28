@@ -127,6 +127,13 @@ class Guard(unittest.TestCase):
             for line in ['git push', 'git push 2>&1 | tail -3', 'git push -u origin HEAD']:
                 self.assertIsNone(guard.check(line, cwd=repo), line)
 
+    def test_a_folder_git_cannot_run_in_is_not_main(self):
+        self.assertFalse(guard.on_main('/no/such/folder'))
+
+    def test_a_line_of_only_settings_is_fine_and_a_setting_before_a_command_is_looked_past(self):
+        self.assertIsNone(guard.check('FOO=1 BAR=2', cwd='/'))
+        self.assertIsNotNone(guard.check('FOO=1 env gh pr merge 5', cwd='/'))
+
     def test_bad_input_blocks(self):
         import subprocess
         script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'guard.py')
@@ -820,6 +827,27 @@ class ClaimTest(unittest.TestCase):
     def test_bad_arguments(self):
         code, _, _ = self.run_claim(args=('five', 'loop-a'))
         self.assertEqual(code, 2)
+
+    def test_the_wrong_number_of_arguments_prints_the_usage(self):
+        for args in (('5',), ('5', 'loop-a', '--resume', 'x'), ('5', 'loop-a', '--other')):
+            code, out, comments = self.run_claim(args=args)
+            self.assertEqual(code, 2, args)
+            self.assertEqual(out, 'Claim an issue so no other agent starts on it at the same time.\n', args)
+            self.assertEqual(comments, [], args)
+
+    def test_a_failed_gh_stops_with_its_error(self):
+        import subprocess, tempfile
+        here = os.path.dirname(os.path.abspath(__file__))
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = os.path.join(tmp, 'gh')
+            with open(fake, 'w') as f:
+                f.write('#!/bin/sh\necho "HTTP 401: Bad credentials" >&2\nexit 1\n')
+            os.chmod(fake, 0o755)
+            env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'])
+            r = subprocess.run([sys.executable, os.path.join(here, 'claim.py'), '5', 'loop-a'], env=env,
+                               capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertEqual(r.stderr.strip(), 'gh api user failed: HTTP 401: Bad credentials')
 
 
 if __name__ == '__main__':
